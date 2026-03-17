@@ -277,5 +277,10 @@ vp run verify
 vp run bootstrap:tokens
 ```
 
+## Release Flow
+
+Pushes to `main` verify the repo and then run `semantic-release`.
+Add `NPM_TOKEN` in GitHub secrets and use conventional commits to drive version bumps.
+
 Implementation and confidence notes live in `docs/READINESS.md`.
 Target-by-target live verification guidance lives in `docs/TESTING.md`.

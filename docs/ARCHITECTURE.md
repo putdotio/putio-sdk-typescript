@@ -92,3 +92,8 @@ Use three layers:
 1. static checks: lint, format, typecheck, package build
 2. live tests in `test/live`
 3. source verification against backend, current frontend consumers, and archived `putio-js`
+
+## Release Model
+
+- `main` is the release branch
+- pushes to `main` verify first, then `semantic-release` publishes and tags the release

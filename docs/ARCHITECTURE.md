@@ -21,14 +21,14 @@ graph LR
 
 ## Components
 
-| Component           | Responsibility                                      |
-| ------------------- | --------------------------------------------------- |
-| Promise client      | ergonomic app-facing entrypoint                     |
-| Effect client       | Effect-native entrypoint for workflows              |
-| Domain namespaces   | grouped API operations by domain                    |
-| Shared HTTP runtime | fetch-native transport, auth resolution, base URLs  |
-| Error model         | transport, validation, and operation-aware failures |
-| Live verification   | runtime verification against real put.io accounts   |
+| Component           | Responsibility                                                 |
+| ------------------- | -------------------------------------------------------------- |
+| Promise client      | ergonomic app-facing entrypoint with managed runtime ownership |
+| Effect client       | Effect-native entrypoint for workflows                         |
+| Domain namespaces   | grouped API operations by domain                               |
+| Shared HTTP runtime | fetch-native transport, auth resolution, base URLs             |
+| Error model         | transport, validation, and operation-aware failures            |
+| Live verification   | runtime verification against real put.io accounts              |
 
 ## Namespace Layout
 
@@ -77,6 +77,8 @@ That split is deliberate:
 | Validation   | `Schema`                                             |
 | Auth         | config token, explicit token, basic auth, or no-auth |
 | Portability  | standard Web APIs first                              |
+
+The Promise client owns a managed Effect runtime per client instance and exposes `dispose()` so host applications can tear it down explicitly.
 
 ## What This Package Is Not
 

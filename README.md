@@ -23,7 +23,7 @@
 ## Installation
 
 ```bash
-pnpm install @putdotio/sdk
+vp add @putdotio/sdk
 ```
 
 ## Promise Example
@@ -39,6 +39,8 @@ const info = await sdk.account.getInfo({
   download_token: 1,
   pas: 1,
 });
+
+await sdk.dispose();
 ```
 
 ## Effect Example
@@ -88,6 +90,7 @@ Effect is the canonical typed surface. The Promise client is an adapter for envi
 
 - Effect client: keeps errors in the Effect error channel with operation-specific typing
 - Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`
+- Promise client: owns a managed Effect runtime and exposes `dispose()` for explicit teardown
 
 ## Namespace Surface
 

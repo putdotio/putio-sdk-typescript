@@ -23,6 +23,7 @@ describe("sdk client factories", () => {
   it("creates the Promise-based SDK client surface", () => {
     const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
 
+    expect(client.dispose).toBeTypeOf("function");
     expect(client.account.getInfo).toBeTypeOf("function");
     expect(client.auth.getCode).toBeTypeOf("function");
     expect(client.files.createUploadFormData).toBeTypeOf("function");
@@ -135,5 +136,17 @@ describe("sdk client factories", () => {
     ).toBe("https://api.put.io/v2/oauth/apps/5/icon?oauth_token=token-123");
 
     expect(fetchMock).toHaveBeenCalledTimes(8);
+  });
+
+  it("fails fast after the Promise client runtime is disposed", async () => {
+    const client = createPutioSdkPromiseClient({
+      accessToken: "token-123",
+    });
+
+    await client.dispose();
+
+    await expect(client.account.getSettings()).rejects.toMatchObject({
+      _tag: "PutioConfigurationError",
+    });
   });
 });

@@ -82,6 +82,8 @@ interface PutioRequestOptions {
   readonly body?: PutioRequestBody;
 }
 
+type PutioSdkHttpContext = PutioSdkConfig | HttpClient.HttpClient;
+
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
 const decodeSuccessJson = <A, I, R>(
@@ -196,70 +198,53 @@ const makeRequest = (url: string, options: PutioRequestOptions, authorization?: 
     return yield* withBody(request, body);
   });
 
+const executeRequest = (options: PutioRequestOptions) =>
+  Effect.gen(function* () {
+    const config = yield* PutioSdkConfig;
+    const authorization = yield* resolveAuthorization(config, options.auth);
+    const url = buildPutioUrl(
+      options.baseUrl ?? config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
+      options.path,
+      options.query,
+    );
+    const request = yield* makeRequest(url, options, authorization);
+
+    return yield* HttpClient.execute(request).pipe(Effect.mapError(mapTransportError));
+  });
+
 export const requestJson = <A, I, R>(
   schema: Schema.Schema<A, I, R>,
   options: PutioRequestOptions,
-): Effect.Effect<A, PutioSdkError, PutioSdkConfig | HttpClient.HttpClient | R> =>
-  Effect.gen(function* () {
-    const config = yield* PutioSdkConfig;
-    const authorization = yield* resolveAuthorization(config, options.auth);
-    const url = buildPutioUrl(
-      options.baseUrl ?? config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
-      options.path,
-      options.query,
-    );
-    const request = yield* makeRequest(url, options, authorization);
-    const response = yield* HttpClient.execute(request).pipe(Effect.mapError(mapTransportError));
-
-    if (isSuccessStatus(response.status)) {
-      return yield* decodeSuccessJson(schema, response);
-    }
-
-    const error = yield* decodeFailure(response, response.headers);
-    return yield* Effect.fail(error);
-  });
+): Effect.Effect<A, PutioSdkError, PutioSdkHttpContext | R> =>
+  executeRequest(options).pipe(
+    Effect.flatMap((response) =>
+      isSuccessStatus(response.status)
+        ? decodeSuccessJson(schema, response)
+        : decodeFailure(response, response.headers).pipe(Effect.flatMap(Effect.fail)),
+    ),
+  );
 
 export const requestArrayBuffer = (
   options: PutioRequestOptions,
-): Effect.Effect<Uint8Array, PutioSdkError, PutioSdkConfig | HttpClient.HttpClient> =>
-  Effect.gen(function* () {
-    const config = yield* PutioSdkConfig;
-    const authorization = yield* resolveAuthorization(config, options.auth);
-    const url = buildPutioUrl(
-      options.baseUrl ?? config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
-      options.path,
-      options.query,
-    );
-    const request = yield* makeRequest(url, options, authorization);
-    const response = yield* HttpClient.execute(request).pipe(Effect.mapError(mapTransportError));
-
-    if (isSuccessStatus(response.status)) {
-      const buffer = yield* response.arrayBuffer.pipe(Effect.mapError(mapTransportError));
-      return new Uint8Array(buffer);
-    }
-
-    const error = yield* decodeFailure(response, response.headers);
-    return yield* Effect.fail(error);
-  });
+): Effect.Effect<Uint8Array, PutioSdkError, PutioSdkHttpContext> =>
+  executeRequest(options).pipe(
+    Effect.flatMap((response) =>
+      isSuccessStatus(response.status)
+        ? response.arrayBuffer.pipe(
+            Effect.mapError(mapTransportError),
+            Effect.map((buffer) => new Uint8Array(buffer)),
+          )
+        : decodeFailure(response, response.headers).pipe(Effect.flatMap(Effect.fail)),
+    ),
+  );
 
 export const requestVoid = (
   options: PutioRequestOptions,
-): Effect.Effect<void, PutioSdkError, PutioSdkConfig | HttpClient.HttpClient> =>
-  Effect.gen(function* () {
-    const config = yield* PutioSdkConfig;
-    const authorization = yield* resolveAuthorization(config, options.auth);
-    const url = buildPutioUrl(
-      options.baseUrl ?? config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
-      options.path,
-      options.query,
-    );
-    const request = yield* makeRequest(url, options, authorization);
-    const response = yield* HttpClient.execute(request).pipe(Effect.mapError(mapTransportError));
-
-    if (isSuccessStatus(response.status)) {
-      return;
-    }
-
-    const error = yield* decodeFailure(response, response.headers);
-    return yield* Effect.fail(error);
-  });
+): Effect.Effect<void, PutioSdkError, PutioSdkHttpContext> =>
+  executeRequest(options).pipe(
+    Effect.flatMap((response) =>
+      isSuccessStatus(response.status)
+        ? Effect.void
+        : decodeFailure(response, response.headers).pipe(Effect.flatMap(Effect.fail)),
+    ),
+  );

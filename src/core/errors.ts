@@ -64,10 +64,20 @@ type PutioOperationErrorReason<TContract extends PutioKnownErrorContract> = TCon
       }
     : never;
 
-const isKnownContractMatch = (
-  contract: PutioKnownErrorContract,
+type PutioMatchableKnownErrorContract =
+  | {
+      readonly errorType: string;
+      readonly statusCode?: number;
+    }
+  | {
+      readonly errorType?: undefined;
+      readonly statusCode: number;
+    };
+
+const isKnownContractMatch = <TContract extends PutioKnownErrorContract>(
+  contract: TContract,
   error: PutioApiError | PutioAuthError,
-) => {
+): contract is Extract<TContract, PutioMatchableKnownErrorContract> => {
   if (contract.errorType !== undefined) {
     return error.body.error_type === contract.errorType;
   }
@@ -82,21 +92,33 @@ const isKnownContractMatch = (
 const isMatchableApiError = (error: PutioSdkError): error is PutioApiError | PutioAuthError =>
   error._tag === "PutioApiError" || error._tag === "PutioAuthError";
 
-const toOperationReason = <TContract extends PutioKnownErrorContract>(
-  contract: TContract,
-): PutioOperationErrorReason<TContract> => {
+function toOperationReason<TType extends string>(contract: {
+  readonly errorType: TType;
+  readonly statusCode?: number;
+}): {
+  readonly kind: "error_type";
+  readonly errorType: TType;
+};
+function toOperationReason<TStatus extends number>(contract: {
+  readonly errorType?: undefined;
+  readonly statusCode: TStatus;
+}): {
+  readonly kind: "status_code";
+  readonly statusCode: TStatus;
+};
+function toOperationReason(contract: PutioMatchableKnownErrorContract) {
   if (contract.errorType !== undefined) {
     return {
       kind: "error_type",
       errorType: contract.errorType,
-    } as PutioOperationErrorReason<TContract>;
+    };
   }
 
   return {
     kind: "status_code",
-    statusCode: contract.statusCode as ContractStatusCode<TContract>,
-  } as unknown as PutioOperationErrorReason<TContract>;
-};
+    statusCode: contract.statusCode,
+  };
+}
 
 export class PutioTransportError extends Data.TaggedError("PutioTransportError")<{
   readonly cause: unknown;

@@ -1,5 +1,5 @@
 import { FetchHttpClient } from "@effect/platform";
-import { Cause, Effect, Exit, Option, Schema } from "effect";
+import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 
 import {
   clearAccount,
@@ -284,35 +284,54 @@ import {
   type ZipInfo,
   type ZipSummary,
 } from "../domains/zips.js";
+import { mapConfigurationError } from "./errors.js";
 
-const unwrapPromiseFailure = (cause: Cause.Cause<unknown>) =>
-  Option.getOrElse(Cause.failureOption(cause), () => Cause.squash(cause));
+type PutioSdkPromiseRuntimeContext =
+  | import("./http.js").PutioSdkConfig
+  | import("@effect/platform").HttpClient.HttpClient;
 
-const runWithConfig = async <A, E>(
-  config: PutioSdkConfigShape,
-  effect: Effect.Effect<A, E, never>,
-) => {
-  const exit = await Effect.runPromiseExit(effect);
+type PutioSdkPromiseRuntime = ManagedRuntime.ManagedRuntime<PutioSdkPromiseRuntimeContext, never>;
 
-  if (Exit.isSuccess(exit)) {
-    return exit.value;
+const promiseClientRuntimeCache = new WeakMap<PutioSdkConfigShape, PutioSdkPromiseRuntime>();
+const disposedPromiseClientConfigs = new WeakSet<PutioSdkConfigShape>();
+
+const getPromiseClientRuntime = (config: PutioSdkConfigShape): PutioSdkPromiseRuntime => {
+  if (disposedPromiseClientConfigs.has(config)) {
+    throw mapConfigurationError(
+      "This Promise client has been disposed and can no longer execute SDK effects",
+    );
   }
 
-  throw unwrapPromiseFailure(exit.cause);
+  const cachedRuntime = promiseClientRuntimeCache.get(config);
+
+  if (cachedRuntime) {
+    return cachedRuntime;
+  }
+
+  const runtime = ManagedRuntime.make(
+    Layer.mergeAll(makePutioSdkLayer(config), FetchHttpClient.layer),
+  );
+  promiseClientRuntimeCache.set(config, runtime);
+  return runtime;
 };
 
-const provideSdk = <A, E>(
+const disposePromiseClientRuntime = async (config: PutioSdkConfigShape): Promise<void> => {
+  disposedPromiseClientConfigs.add(config);
+
+  const runtime = promiseClientRuntimeCache.get(config);
+  promiseClientRuntimeCache.delete(config);
+
+  if (!runtime) {
+    return;
+  }
+
+  await runtime.dispose();
+};
+
+const provideSdk = async <A, E>(
   config: PutioSdkConfigShape,
-  effect: Effect.Effect<
-    A,
-    E,
-    import("./http.js").PutioSdkConfig | import("@effect/platform").HttpClient.HttpClient
-  >,
-) =>
-  runWithConfig(
-    config,
-    effect.pipe(Effect.provide(makePutioSdkLayer(config)), Effect.provide(FetchHttpClient.layer)),
-  );
+  effect: Effect.Effect<A, E, PutioSdkPromiseRuntimeContext>,
+) => getPromiseClientRuntime(config).runPromise(effect);
 
 export const createPutioSdkEffectClient = () => ({
   account: {
@@ -535,7 +554,9 @@ export const createPutioSdkEffectClient = () => ({
   },
 });
 
-export const createPutioSdkPromiseClient = (config: PutioSdkConfigShape = {}) => {
+export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape = {}) => {
+  const config = { ...initialConfig };
+
   function getInfo(query: {
     readonly download_token: 1;
     readonly pas: 1;
@@ -601,6 +622,7 @@ export const createPutioSdkPromiseClient = (config: PutioSdkConfigShape = {}) =>
   }
 
   return {
+    dispose: () => disposePromiseClientRuntime(config),
     account: {
       clear: (options: AccountClearOptions) => provideSdk(config, clearAccount(options)),
       destroy: (currentPassword: string) => provideSdk(config, destroyAccount(currentPassword)),

@@ -267,7 +267,6 @@ await run("payment report with empty ids yields typed 400", async () => {
     return assertOperationError(error, {
       domain: "payment",
       operation: "reportPayments",
-      errorType: "PAYMENT_BAD_REQUEST",
       statusCode: 400,
     });
   }

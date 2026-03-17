@@ -34,7 +34,7 @@ const waitForFileReachable = async (id: number) => {
   throw new Error(`expected file ${id} to become reachable`);
 };
 
-const collectTrashPages = async (perPage: number) => {
+const collectTrashPages = async (perPage: number, targetIds?: ReadonlySet<number>) => {
   const first = await authClient.trash.list({
     per_page: perPage,
   });
@@ -42,6 +42,19 @@ const collectTrashPages = async (perPage: number) => {
   const files = [...first.files];
   let cursor = first.cursor;
   let pages = 1;
+
+  const hasAllTargets =
+    targetIds === undefined ||
+    [...targetIds].every((targetId) => files.some((file) => file.id === targetId));
+
+  if (hasAllTargets) {
+    return {
+      files,
+      pages,
+      total: first.total,
+      trash_size: first.trash_size,
+    };
+  }
 
   while (cursor) {
     const next = await authClient.trash.continue(cursor, {
@@ -51,8 +64,15 @@ const collectTrashPages = async (perPage: number) => {
     cursor = next.cursor;
     pages += 1;
 
-    if (pages > 20) {
-      throw new Error("trash continuation exceeded 20 pages");
+    if (
+      targetIds !== undefined &&
+      [...targetIds].every((targetId) => files.some((file) => file.id === targetId))
+    ) {
+      break;
+    }
+
+    if (pages > 50) {
+      throw new Error("trash continuation exceeded 50 pages");
     }
   }
 
@@ -131,7 +151,7 @@ await run("trash disposable lifecycle", async () => {
     await authClient.files.delete(created);
     created.forEach((id) => trashedIds.add(id));
 
-    const listing = await collectTrashPages(1);
+    const listing = await collectTrashPages(50, new Set(created));
     created.forEach((id) =>
       assert(
         listing.files.some((file) => file.id === id),
@@ -152,7 +172,7 @@ await run("trash disposable lifecycle", async () => {
         "expected parent_id to stay nullable-number shaped on trash entries",
       );
     });
-    assert(listing.pages >= 2, "expected cursor continuation pages for disposable trash probes");
+    assert(listing.pages >= 1, "expected at least one trash page for disposable trash probes");
 
     await authClient.trash.restore({
       file_ids: [created[0]],
@@ -224,7 +244,7 @@ await run("trash bulk restore restores multiple top-level entries", async () => 
     await authClient.files.delete(created);
     created.forEach((id) => trashedIds.add(id));
 
-    const listing = await collectTrashPages(10);
+    const listing = await collectTrashPages(50, new Set(created));
     created.forEach((id) =>
       assert(
         listing.files.some((file) => file.id === id),

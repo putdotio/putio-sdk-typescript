@@ -1,5 +1,5 @@
 import { FetchHttpClient } from "@effect/platform";
-import { Effect, Layer, ManagedRuntime, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, ManagedRuntime, Option, Schema } from "effect";
 
 import {
   clearAccount,
@@ -324,10 +324,24 @@ const disposePromiseClientRuntime = async (config: PutioSdkConfigShape): Promise
   await runtime.dispose();
 };
 
+const rejectWithSdkFailure = <A, E>(exit: Exit.Exit<A, E>): Promise<A> =>
+  Exit.match(exit, {
+    onSuccess: (value) => Promise.resolve(value),
+    onFailure: (cause) => {
+      const failure = Cause.failureOption(cause);
+
+      if (Option.isSome(failure)) {
+        return Promise.reject(failure.value);
+      }
+
+      return Promise.reject(Cause.squash(cause));
+    },
+  });
+
 const provideSdk = async <A, E>(
   config: PutioSdkConfigShape,
   effect: Effect.Effect<A, E, PutioSdkContext>,
-) => getPromiseClientRuntime(config).runPromise(effect);
+) => rejectWithSdkFailure(await getPromiseClientRuntime(config).runPromiseExit(effect));
 
 export const createPutioSdkEffectClient = () => ({
   account: {

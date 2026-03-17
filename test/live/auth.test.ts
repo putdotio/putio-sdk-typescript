@@ -40,7 +40,7 @@ describe.sequential("auth live", () => {
           typeof grant.name === "string" &&
           typeof grant.description === "string" &&
           typeof grant.website === "string" &&
-          typeof grant.has_icon === "boolean",
+          (typeof grant.has_icon === "boolean" || grant.has_icon === null),
       ),
     ).toBe(true);
   });

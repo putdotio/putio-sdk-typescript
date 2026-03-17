@@ -74,6 +74,18 @@ describe("sdk client factories", () => {
           });
         case "/v2/events/1/torrent":
           return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+        case "/v2/oauth/grants/":
+          return new Response(
+            JSON.stringify({
+              error_message: "invalid scope",
+              error_type: "invalid_scope",
+              status_code: 401,
+            }),
+            {
+              status: 401,
+              headers: { "content-type": "application/json" },
+            },
+          );
         default:
           return new Response(JSON.stringify({ status: "OK" }), {
             status: 200,
@@ -134,8 +146,22 @@ describe("sdk client factories", () => {
         oauthToken: "token-123",
       }),
     ).toBe("https://api.put.io/v2/oauth/apps/5/icon?oauth_token=token-123");
+    await expect(client.auth.grants()).rejects.toMatchObject({
+      _tag: "PutioOperationError",
+      body: {
+        error_type: "invalid_scope",
+        status_code: 401,
+      },
+      domain: "auth",
+      operation: "grants",
+      reason: {
+        errorType: "invalid_scope",
+        kind: "error_type",
+      },
+      status: 401,
+    });
 
-    expect(fetchMock).toHaveBeenCalledTimes(8);
+    expect(fetchMock).toHaveBeenCalledTimes(9);
   });
 
   it("fails fast after the Promise client runtime is disposed", async () => {

@@ -24,7 +24,7 @@ export default defineConfig({
   pack: {
     clean: true,
     dts: true,
-    entry: ["src/index.ts"],
+    entry: ["src/index.ts", "src/utilities.ts"],
     format: ["esm"],
     outDir: "dist",
     platform: "neutral",

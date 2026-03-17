@@ -15,7 +15,7 @@
   <p>
     <a href="https://github.com/putdotio/putio-sdk-typescript/actions/workflows/ci.yml?query=branch%3Amain" style="text-decoration:none;"><img src="https://img.shields.io/github/actions/workflow/status/putdotio/putio-sdk-typescript/ci.yml?branch=main&style=flat&label=ci&colorA=000000&colorB=000000" alt="CI"></a>
     <a href="https://www.npmjs.com/package/@putdotio/sdk" style="text-decoration:none;"><img src="https://img.shields.io/npm/v/%40putdotio%2Fsdk?style=flat&colorA=000000&colorB=000000" alt="npm version"></a>
-    <a href="https://www.npmjs.com/package/@putdotio/sdk" style="text-decoration:none;"><img src="https://img.shields.io/npm/dm/%40putdotio%2Fsdk?style=flat&colorA=000000&colorB=000000" alt="npm downloads"></a>
+    <a href="https://bundlephobia.com/package/@putdotio/sdk" style="text-decoration:none;"><img src="https://img.shields.io/bundlephobia/minzip/%40putdotio%2Fsdk?style=flat&label=bundle%20size&colorA=000000&colorB=000000" alt="bundle size"></a>
     <a href="https://github.com/putdotio/putio-sdk-typescript/blob/main/LICENSE" style="text-decoration:none;"><img src="https://img.shields.io/github/license/putdotio/putio-sdk-typescript?style=flat&colorA=000000&colorB=000000" alt="license"></a>
   </p>
 </div>
@@ -26,6 +26,18 @@ Install with your package manager of choice:
 
 ```bash
 npm install @putdotio/sdk
+```
+
+## Utilities
+
+Shared formatting and URL helpers are available from the utilities subpath:
+
+```ts
+import {
+  FileURLProvider,
+  secondsToReadableDuration,
+  toHumanFileSize,
+} from "@putdotio/sdk/utilities";
 ```
 
 ## Promise Example

@@ -1,70 +1,57 @@
 {
-  "author": "put.io <ui@put.io>",
-  "bugs": {
-    "url": "https://github.com/putdotio/putio-js/issues"
-  },
-  "dependencies": {
-    "axios": "^0.21.1",
-    "event-emitter": "^0.3.5",
-    "js-base64": "2.6.3",
-    "qs": "^6.10.3",
-    "urijs": "^1.19.7"
-  },
-  "description": "JavaScript SDK for interacting with the put.io API.",
-  "devDependencies": {
-    "@putdotio/prettier-config": "^1.0.0",
-    "@types/event-emitter": "^0.3.3",
-    "@types/js-base64": "2.3.1",
-    "@types/qs": "^6.9.7",
-    "@types/urijs": "^1.19.18",
-    "@types/uuid": "^8.3.4",
-    "husky": "^4.2.5",
-    "tsdx": "^0.14.1",
-    "tslib": "^2.3.1",
-    "typescript": "4.5.5"
-  },
-  "engines": {
-    "node": ">=10"
-  },
-  "files": [
-    "dist",
-    "src"
-  ],
-  "homepage": "https://github.com/putdotio/putio-js",
-  "husky": {
-    "hooks": {
-      "pre-commit": "tsdx lint"
-    }
-  },
+  "name": "@putdotio/sdk",
+  "version": "9.0.0",
+  "description": "Effect-first TypeScript SDK for the put.io API.",
   "keywords": [
-    "putio",
+    "effect",
     "put.io",
-    "sdk"
+    "putio",
+    "sdk",
+    "typescript"
   ],
   "license": "MIT",
-  "main": "dist/index.js",
-  "module": "dist/api-client.esm.js",
-  "name": "@putdotio/api-client",
-  "prettier": "@putdotio/prettier-config",
+  "author": "put.io <ui@put.io>",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "publishConfig": {
     "access": "public"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/putdotio/putio-js.git"
-  },
-  "resolutions": {
-    "**/@typescript-eslint/eslint-plugin": "5.10.2",
-    "**/@typescript-eslint/parser": "5.10.2"
-  },
   "scripts": {
-    "build": "tsdx build",
-    "lint": "tsdx lint",
-    "prepare": "tsdx build",
-    "start": "tsdx watch",
-    "test": "tsdx test",
-    "tsc": "tsc --noEmit"
+    "bootstrap:tokens": "node ./scripts/bootstrap-tokens.mts",
+    "build": "vp pack",
+    "check": "vp check .",
+    "clean": "rm -rf .live-build .turbo coverage dist",
+    "coverage": "vp test run --coverage --passWithNoTests",
+    "dev": "vp pack --watch",
+    "prepack": "vp pack",
+    "test": "vp test run --passWithNoTests",
+    "test:live": "vp pack && vp test run --config vitest.live.config.ts",
+    "verify": "vp check . && vp pack && vp test run --passWithNoTests && vp test run --coverage --passWithNoTests"
   },
-  "typings": "dist/index.d.ts",
-  "version": "8.49.0"
+  "dependencies": {
+    "@effect/platform": "0.94.5",
+    "effect": "3.19.19"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.0",
+    "typescript": "^5.9.3",
+    "vite-plus": "^0.1.11",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+  },
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "packageManager": "pnpm@10.32.1"
 }

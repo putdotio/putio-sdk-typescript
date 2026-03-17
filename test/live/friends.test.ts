@@ -1,0 +1,1 @@
+import "./domains/friends.js";

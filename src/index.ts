@@ -1,19 +1,22 @@
-export * from './test-utils/mocks'
-export * from './client/types'
-export * from './constants'
-
-export * from './resources/Account/types'
-export * from './resources/Auth/types'
-export * from './resources/DownloadLinks/types'
-export * from './resources/Events/types'
-export * from './resources/Files/types'
-export * from './resources/FriendInvites/types'
-export * from './resources/Friends/types'
-export * from './resources/Payment/types'
-export * from './resources/RSS/types'
-export * from './resources/Sharing/types'
-export * from './resources/Transfers/types'
-export * from './resources/User/types'
-
-export { isPutioAPIError, isPutioAPIErrorResponse } from './utils'
-export { PutioAPIClient as default } from './client'
+export * from "./core/client.js";
+export * from "./core/defaults.js";
+export * from "./core/errors.js";
+export * from "./core/http.js";
+export * from "./domains/account.js";
+export * from "./domains/auth.js";
+export * from "./domains/config.js";
+export * from "./domains/download-links.js";
+export * from "./domains/events.js";
+export * from "./domains/family.js";
+export * from "./domains/files.js";
+export * from "./domains/friend-invites.js";
+export * from "./domains/friends.js";
+export * from "./domains/ifttt.js";
+export * from "./domains/oauth.js";
+export * from "./domains/payment.js";
+export * from "./domains/rss.js";
+export * from "./domains/sharing.js";
+export * from "./domains/trash.js";
+export * from "./domains/transfers.js";
+export * from "./domains/tunnel.js";
+export * from "./domains/zips.js";

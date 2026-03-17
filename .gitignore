@@ -1,7 +1,10 @@
-node_modules
-build
-dist
-*.log
-coverage
 .DS_Store
-demo
+.env
+.live-build
+.turbo
+coverage
+dist
+node_modules
+src/**/*.d.ts
+*.log
+*.tsbuildinfo

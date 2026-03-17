@@ -28,23 +28,6 @@ Install with npm:
 npm install @putdotio/sdk
 ```
 
-## Utilities
-
-Shared formatting, URL, and error-localization helpers are available from the utilities subpath:
-
-```ts
-import {
-  FileURLProvider,
-  secondsToReadableDuration,
-  toHumanFileSize,
-} from "@putdotio/sdk/utilities";
-```
-
-```ts
-const size = toHumanFileSize(1_572_864);
-const duration = secondsToReadableDuration(444);
-```
-
 ## Quick Start
 
 ```ts
@@ -65,6 +48,23 @@ The SDK can also be created without a default token:
 const sdk = createPutioSdkPromiseClient();
 
 const validation = await sdk.auth.validateToken(process.env.PUTIO_TOKEN!);
+```
+
+## Utilities
+
+Shared formatting, URL, and error-localization helpers are available from the utilities subpath:
+
+```ts
+import {
+  FileURLProvider,
+  secondsToReadableDuration,
+  toHumanFileSize,
+} from "@putdotio/sdk/utilities";
+```
+
+```ts
+const size = toHumanFileSize(1_572_864);
+const duration = secondsToReadableDuration(444);
 ```
 
 ## Effect Example
@@ -284,32 +284,18 @@ export const useFiles = (parentId: number) =>
   });
 ```
 
-## Repo Verification
+## Docs
 
-If you are working on the SDK itself, repo-local verification uses `vp`:
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for package shape and boundaries
+- [docs/TESTING.md](./docs/TESTING.md) for local and live verification
+- [docs/READINESS.md](./docs/READINESS.md) for domain readiness
+- [docs/RELEASE.md](./docs/RELEASE.md) for release automation
+- [SECURITY.md](./SECURITY.md) for private-first vulnerability disclosure
 
-Local checks:
+## Contributing
 
-```bash
-vp install
-vp check .
-vp pack
-vp test run --passWithNoTests
-vp test run --coverage --passWithNoTests
-```
+Contributor setup, validation, and live-test workflow live in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-Live verification:
+## License
 
-```bash
-vp run test:live
-```
-
-Repo scripts:
-
-```bash
-vp run verify
-vp run bootstrap:tokens
-```
-
-Implementation notes live in `docs/READINESS.md`.
-Target-by-target live verification guidance lives in `docs/TESTING.md`.
+This project is available under the [MIT License](./LICENSE).

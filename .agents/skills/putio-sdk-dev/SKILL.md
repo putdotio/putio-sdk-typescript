@@ -3,7 +3,7 @@ name: putio-sdk-dev
 description: Use when developing the put.io TypeScript SDK in this repo, including adding or changing namespaces, tightening schemas or typed errors, validating conditional API behavior, running SDK live probes, or checking how the SDK should be documented and verified.
 ---
 
-# putio-sdk-dev
+# put.io SDK dev
 
 Use this skill when editing `@putdotio/sdk` or answering questions about the SDK architecture and workflow in this repository.
 

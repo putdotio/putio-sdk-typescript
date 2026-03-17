@@ -36,5 +36,6 @@ export default defineConfig({
       exclude: [...coverageConfig.exclude, "src/domains/**", "src/index.ts"],
     },
     exclude: ["test/live/**"],
+    include: ["src/**/*.spec.ts", "src/**/*.test.ts"],
   },
 });

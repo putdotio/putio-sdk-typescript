@@ -26,6 +26,7 @@ graph LR
 | Promise client      | ergonomic app-facing entrypoint with managed runtime ownership |
 | Effect client       | Effect-native entrypoint for workflows                         |
 | Domain namespaces   | grouped API operations by domain                               |
+| Utilities subpath   | file URLs, localized errors, and shared formatting helpers     |
 | Shared HTTP runtime | fetch-native transport, auth resolution, base URLs             |
 | Error model         | transport, validation, and operation-aware failures            |
 | Live verification   | runtime verification against real put.io accounts              |
@@ -36,6 +37,7 @@ The source currently lives in:
 
 - `src/core/*.ts` for shared runtime, transport, defaults, and client composition
 - `src/domains/*.ts` for domain namespaces
+- `src/utilities/*.ts` for opt-in helper utilities exported from `@putdotio/sdk/utilities`
 
 The current package layout is:
 
@@ -43,9 +45,12 @@ The current package layout is:
 graph TD
   SDK["src"] --> Core["core"]
   SDK --> Domains["domains"]
+  SDK --> Utilities["utilities"]
   Core --> Http["http"]
   Core --> Client["client"]
   Core --> Errors["errors"]
+  Utilities --> Urls["file-url-provider"]
+  Utilities --> Localized["localized-error"]
   Domains --> Account["account"]
   Domains --> Files["files"]
   Domains --> Transfers["transfers"]

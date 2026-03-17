@@ -50,9 +50,9 @@ Default local env file:
 
 - `.env`
 
-Example 1Password-backed env file:
+Example env file:
 
-- `.env.1password.example`
+- `.env.example`
 
 Expected variables:
 
@@ -99,14 +99,14 @@ Bootstrap runtime tokens with 1Password:
 
 ```bash
 export OP_SERVICE_ACCOUNT_TOKEN="$OP_SERVICE_ACCOUNT_PUTIO_FRONTEND_CI"
-op run --env-file=.env.1password.example -- vp run bootstrap:tokens
+op run --env-file=.env.example -- vp run bootstrap:tokens
 ```
 
 Run a credentialed live target with 1Password:
 
 ```bash
 export OP_SERVICE_ACCOUNT_TOKEN="$OP_SERVICE_ACCOUNT_PUTIO_FRONTEND_CI"
-op run --env-file=.env.1password.example -- \
+op run --env-file=.env.example -- \
   vp pack && vp test run --config vitest.live.config.ts test/live/auth-credentials.test.ts
 ```
 
@@ -126,6 +126,7 @@ What it checks:
 - an external temp project can install that tarball
 - TypeScript can typecheck against the published exports
 - Node can import the built package at runtime
+- the public `@putdotio/sdk/utilities` subpath resolves for external consumers
 - internal package paths stay fenced off
 
 ## Safety Rules

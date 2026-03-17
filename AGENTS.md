@@ -12,6 +12,7 @@
 - architecture: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
 - testing and live verification: [docs/TESTING.md](./docs/TESTING.md)
 - readiness snapshot: [docs/READINESS.md](./docs/READINESS.md)
+- release automation: [docs/RELEASE.md](./docs/RELEASE.md)
 
 ## Commands
 

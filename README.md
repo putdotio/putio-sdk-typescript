@@ -22,7 +22,7 @@
 
 ## Installation
 
-Install with your package manager of choice:
+Install with npm:
 
 ```bash
 npm install @putdotio/sdk
@@ -30,7 +30,7 @@ npm install @putdotio/sdk
 
 ## Utilities
 
-Shared formatting and URL helpers are available from the utilities subpath:
+Shared formatting, URL, and error-localization helpers are available from the utilities subpath:
 
 ```ts
 import {
@@ -40,19 +40,31 @@ import {
 } from "@putdotio/sdk/utilities";
 ```
 
-## Promise Example
+```ts
+const size = toHumanFileSize(1_572_864);
+const duration = secondsToReadableDuration(444);
+```
+
+## Quick Start
 
 ```ts
 import { createPutioSdkPromiseClient } from "@putdotio/sdk";
 
 const sdk = createPutioSdkPromiseClient({
-  accessToken: process.env.PUTIO_TOKEN_FIRST_PARTY,
+  accessToken: process.env.PUTIO_TOKEN,
 });
 
-const info = await sdk.account.getInfo({
+const account = await sdk.account.getInfo({
   download_token: 1,
-  pas: 1,
 });
+```
+
+The SDK can also be created without a default token:
+
+```ts
+const sdk = createPutioSdkPromiseClient();
+
+const validation = await sdk.auth.validateToken(process.env.PUTIO_TOKEN!);
 ```
 
 ## Effect Example
@@ -71,7 +83,7 @@ const program = sdk.files
   .pipe(
     Effect.provide(
       makePutioSdkLayer({
-        accessToken: process.env.PUTIO_TOKEN_FIRST_PARTY!,
+        accessToken: process.env.PUTIO_TOKEN!,
       }),
     ),
   );
@@ -100,6 +112,8 @@ Choose the Effect client when you want the canonical typed error channel and Eff
 
 Effect is the canonical typed surface. The Promise client is an adapter for environments that want standard async functions.
 
+- SDK creation does not require an access token
+- Authenticated endpoints need a token through client config or the Effect layer config
 - Effect client: keeps errors in the Effect error channel with operation-specific typing
 - Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`
 - Promise client: owns a managed Effect runtime and exposes `dispose()` for explicit teardown
@@ -127,6 +141,7 @@ If you create a long-lived Promise client in a script, test harness, or server i
 | `transfers`     | transfer list, add/retry/cancel/clean flows                                |
 | `trash`         | trash listing, restore, delete, empty                                      |
 | `tunnel`        | route listing                                                              |
+| `utilities`     | file URLs, localized errors, and shared formatting helpers                 |
 | `zips`          | zip creation and lookup                                                    |
 
 ## Design Rules
@@ -163,7 +178,7 @@ import {
 } from "@putdotio/sdk";
 
 const sdk = createPutioSdkPromiseClient({
-  accessToken: process.env.PUTIO_TOKEN_FIRST_PARTY,
+  accessToken: process.env.PUTIO_TOKEN,
 });
 
 try {
@@ -207,7 +222,7 @@ const handled = sdk.files
     }),
     Effect.provide(
       makePutioSdkLayer({
-        accessToken: process.env.PUTIO_TOKEN_FIRST_PARTY!,
+        accessToken: process.env.PUTIO_TOKEN!,
       }),
     ),
   );
@@ -269,9 +284,9 @@ export const useFiles = (parentId: number) =>
   });
 ```
 
-## Verification
+## Repo Verification
 
-Repo-local verification uses `vp`:
+If you are working on the SDK itself, repo-local verification uses `vp`:
 
 Local checks:
 
@@ -289,12 +304,12 @@ Live verification:
 vp run test:live
 ```
 
-Custom package scripts:
+Repo scripts:
 
 ```bash
 vp run verify
 vp run bootstrap:tokens
 ```
 
-Implementation and confidence notes live in `docs/READINESS.md`.
+Implementation notes live in `docs/READINESS.md`.
 Target-by-target live verification guidance lives in `docs/TESTING.md`.

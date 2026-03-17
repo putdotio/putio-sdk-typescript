@@ -12,6 +12,7 @@ Readiness here is based on four things:
 ## Overall Status
 
 - namespace coverage is effectively complete for the current planned public domains
+- unit verification now covers all production code under `src/**` with a global 90% coverage guardrail
 - live coverage exists for every implemented domain
 - packed-package consumer verification covers install, type exports, runtime imports, and internal export fencing
 - the main remaining work is depth of verification, not breadth of implementation

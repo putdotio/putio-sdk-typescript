@@ -17,6 +17,13 @@ describe("utility file", () => {
     expect(
       getFileRenderType({
         ...baseFile,
+        content_type: null,
+      }),
+    ).toBe("other");
+
+    expect(
+      getFileRenderType({
+        ...baseFile,
         content_type: "application/x-directory",
         file_type: "FOLDER",
       }),
@@ -37,6 +44,42 @@ describe("utility file", () => {
         file_type: "VIDEO",
       }),
     ).toBe("video");
+
+    expect(
+      getFileRenderType({
+        ...baseFile,
+        content_type: "image/png",
+      }),
+    ).toBe("image");
+
+    expect(
+      getFileRenderType({
+        ...baseFile,
+        content_type: "application/pdf",
+      }),
+    ).toBe("pdf");
+
+    expect(
+      getFileRenderType({
+        ...baseFile,
+        content_type: "application/epub+zip",
+      }),
+    ).toBe("epub");
+
+    expect(
+      getFileRenderType({
+        ...baseFile,
+        content_type: "application/zip",
+      }),
+    ).toBe("archive");
+
+    expect(
+      getFileRenderType({
+        ...baseFile,
+        content_type: "text/plain",
+        file_type: "TEXT",
+      }),
+    ).toBe("text");
 
     expect(
       getFileRenderType({
@@ -63,7 +106,12 @@ describe("utility file", () => {
 
   it("builds file access urls", () => {
     const provider = new FileURLProvider("https://api.example.com", "test-token");
+    const providerWithVersionedUrl = new FileURLProvider(
+      "https://api.example.com/v2",
+      "test-token",
+    );
     expect(provider.apiURL).toBe("https://api.example.com/v2");
+    expect(providerWithVersionedUrl.baseURL).toBe("https://api.example.com");
     expect(provider.getDownloadURL(123)).toBe(
       "https://api.example.com/v2/files/123/download?oauth_token=test-token",
     );
@@ -88,6 +136,13 @@ describe("utility file", () => {
       "https://api.example.com/v2/files/1/hls/media.m3u8?max_subtitle_count=2&oauth_token=test-token&original=1&subtitle_languages=en%2Ces",
     );
     expect(
+      provider.getHLSStreamURL({
+        ...baseFile,
+        content_type: "audio/mpeg",
+        file_type: "AUDIO",
+      }),
+    ).toBeNull();
+    expect(
       provider.getMP4DownloadURL({
         ...baseFile,
         content_type: "video/mp4",
@@ -95,6 +150,14 @@ describe("utility file", () => {
         is_mp4_available: true,
       }),
     ).toBe("https://api.example.com/v2/files/1/mp4/download?oauth_token=test-token");
+    expect(
+      provider.getMP4DownloadURL({
+        ...baseFile,
+        content_type: "video/mp4",
+        file_type: "VIDEO",
+        is_mp4_available: false,
+      }),
+    ).toBeNull();
     expect(
       provider.getMP4StreamURL({
         ...baseFile,
@@ -104,6 +167,13 @@ describe("utility file", () => {
       }),
     ).toBe("https://api.example.com/v2/files/1/mp4/stream?oauth_token=test-token");
     expect(
+      provider.getMP4StreamURL({
+        ...baseFile,
+        content_type: "audio/mpeg",
+        file_type: "AUDIO",
+      }),
+    ).toBeNull();
+    expect(
       provider.getStreamURL({
         ...baseFile,
         content_type: "audio/mpeg",
@@ -111,11 +181,20 @@ describe("utility file", () => {
       }),
     ).toBe("https://api.example.com/v2/files/1/stream.mp3?oauth_token=test-token");
     expect(
+      provider.getStreamURL({
+        ...baseFile,
+        content_type: "video/mp4",
+        file_type: "VIDEO",
+      }),
+    ).toBe("https://api.example.com/v2/files/1/stream?oauth_token=test-token");
+    expect(provider.getStreamURL(baseFile)).toBeNull();
+    expect(
       provider.getXSPFURL({
         ...baseFile,
         content_type: "video/mp4",
         file_type: "VIDEO",
       }),
     ).toBe("https://api.example.com/v2/files/1/xspf?oauth_token=test-token");
+    expect(provider.getXSPFURL(baseFile)).toBeNull();
   });
 });

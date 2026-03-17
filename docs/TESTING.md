@@ -37,12 +37,19 @@ vp test run --coverage --passWithNoTests
 ```
 
 The local suite focuses on the shared runtime in `src/core`.
-Schema-heavy `src/domains/*` files are validated primarily through:
+Unit coverage now includes all production code under `src/**`, including:
 
-- `vp check .`
-- package build output
-- local unit tests for shared runtime behavior
-- live SDK verification in `test/live/**`
+- `src/core/*`
+- `src/domains/*`
+- `src/utilities/*`
+- barrel entrypoints such as `src/index.ts` and `src/utilities.ts`
+
+`vp run verify` enforces the repo coverage floor through the unit suite only.
+Live tests stay separate on purpose:
+
+- they do not contribute to the coverage report
+- they do not gate CI coverage
+- they exist to sanity-check real API behavior before releases and deeper changes
 
 ## Live Environment
 

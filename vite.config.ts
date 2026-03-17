@@ -13,10 +13,10 @@ const coverageConfig = {
   provider: "v8",
   reporter: ["text", "lcov"],
   thresholds: {
-    branches: 80,
-    functions: 80,
-    lines: 85,
-    statements: 85,
+    branches: 90,
+    functions: 90,
+    lines: 90,
+    statements: 90,
   },
 } as const;
 
@@ -31,10 +31,7 @@ export default defineConfig({
     sourcemap: true,
   },
   test: {
-    coverage: {
-      ...coverageConfig,
-      exclude: [...coverageConfig.exclude, "src/domains/**", "src/index.ts"],
-    },
+    coverage: coverageConfig,
     exclude: ["test/live/**"],
     include: ["src/**/*.spec.ts", "src/**/*.test.ts"],
   },

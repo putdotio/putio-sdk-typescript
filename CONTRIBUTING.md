@@ -20,6 +20,9 @@ vp run verify
 
 That command runs formatting, linting, package build, unit tests, and coverage using the same repo-local entrypoint CI relies on.
 
+The coverage guardrail is unit-only and counts all production files under `src/**`.
+Live tests are intentionally separate confidence checks and do not count toward the coverage threshold.
+
 ## Live Verification
 
 Live verification is opt-in and uses the real put.io API.
@@ -35,6 +38,8 @@ Run the full live suite:
 ```bash
 vp run test:live
 ```
+
+This is optional for normal contributions and requires real credentials. Use it when you need backend sanity checks, release confidence, or verification for stateful flows that unit tests cannot prove.
 
 Bootstrap runtime tokens with 1Password:
 

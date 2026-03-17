@@ -25,9 +25,19 @@ describe("utility date", () => {
 
   it("formats relative and absolute dates", () => {
     expect(toTimeAgo()).toBe("N/A");
+    expect(toTimeAgo("2023-06-04T09:38:33Z")).toBe("30 seconds ago");
+    expect(toTimeAgo("2023-06-04T09:09:03Z")).toBe("30 minutes ago");
     expect(toTimeAgo("2023-06-03T18:30:03Z")).toBe("15 hours ago");
+    expect(toTimeAgo("2023-05-01T09:39:03Z")).toBe("1 month ago");
+    expect(toTimeAgo("2022-06-04T09:39:03Z")).toBe("1 year ago");
     expect(formatDate()).toBe("N/A");
     expect(formatDate("2023-06-03T18:30:03Z")).toBe("June 3, 2023");
+    expect(
+      formatDate("2023-06-03T18:30:03Z", {
+        month: "short",
+        year: "numeric",
+      }),
+    ).toBe("Jun 2023");
   });
 
   it("calculates day differences", () => {

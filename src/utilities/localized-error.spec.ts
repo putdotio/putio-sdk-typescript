@@ -73,6 +73,33 @@ describe("utility localized error", () => {
     expect(localizeError(apiError).message).toBe("type message");
   });
 
+  it("falls back to status-code localizers when no type localizer matches", () => {
+    const apiError = new PutioApiError({
+      body: {
+        error_message: "bad request",
+        status_code: 400,
+      },
+      status: 400,
+    });
+
+    const localizeError = createLocalizeError([
+      genericErrorLocalizer,
+      {
+        kind: "api_status_code",
+        localize: () => ({
+          message: "status message",
+          recoverySuggestion: {
+            description: "status description",
+            type: "instruction",
+          },
+        }),
+        status_code: 400,
+      },
+    ]);
+
+    expect(localizeError(apiError).message).toBe("status message");
+  });
+
   it("localizes operation errors and preserves meta", () => {
     const spec = definePutioOperationErrorSpec({
       domain: "files",
@@ -159,6 +186,11 @@ describe("utility localized error", () => {
     expect(localizeError({ foo: "bar" }).message).toBe("match");
   });
 
+  it("falls back to generic localizers for unknown errors", () => {
+    const localizeError = createLocalizeError([genericErrorLocalizer]);
+    expect(localizeError(new Error("boom")).message).toBe("message");
+  });
+
   it("detects error localizer functions", () => {
     expect(
       isErrorLocalizer(
@@ -173,5 +205,6 @@ describe("utility localized error", () => {
           }),
       ),
     ).toBe(true);
+    expect(isErrorLocalizer(() => new Error("nope"))).toBe(false);
   });
 });

@@ -162,6 +162,42 @@ describe("sdk core errors", () => {
     }
   });
 
+  it("supports pipe-friendly operation error wrapping", async () => {
+    const spec = definePutioOperationErrorSpec({
+      domain: "files",
+      operation: "delete",
+      knownErrors: [{ statusCode: 404 }] as const,
+    });
+
+    const exit = await Effect.runPromiseExit(
+      Effect.fail(
+        new PutioApiError({
+          status: 404,
+          body: {
+            error_message: "Not found",
+            status_code: 404,
+          },
+        }),
+      ).pipe(withOperationErrors(spec)),
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+
+    if (Exit.isFailure(exit)) {
+      const error = expectFailure(exit);
+      expect(error).toBeInstanceOf(PutioOperationError);
+      expect(error).toMatchObject({
+        _tag: "PutioOperationError",
+        domain: "files",
+        operation: "delete",
+        reason: {
+          kind: "status_code",
+          statusCode: 404,
+        },
+      });
+    }
+  });
+
   it("wraps matched API errors in a typed operation error by status code", async () => {
     const spec = definePutioOperationErrorSpec({
       domain: "download-links",

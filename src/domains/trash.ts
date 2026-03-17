@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 
+import { joinCsv } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
@@ -129,7 +130,7 @@ const toBulkTrashBody = (input: TrashBulkInput) => {
 
   return {
     cursor: undefined,
-    file_ids: input.file_ids.join(","),
+    file_ids: joinCsv(input.file_ids),
   };
 };
 
@@ -140,7 +141,7 @@ export const listTrash = (
     method: "GET",
     path: "/v2/trash/list",
     query,
-  }).pipe((effect) => withOperationErrors(effect, ListTrashErrorSpec));
+  }).pipe(withOperationErrors(ListTrashErrorSpec));
 
 export const continueTrash = (
   cursor: string,
@@ -156,7 +157,7 @@ export const continueTrash = (
     method: "POST",
     path: "/v2/trash/list/continue",
     query,
-  }).pipe((effect) => withOperationErrors(effect, ContinueTrashErrorSpec));
+  }).pipe(withOperationErrors(ContinueTrashErrorSpec));
 
 export const restoreTrash = (
   input: TrashBulkInput,
@@ -168,7 +169,7 @@ export const restoreTrash = (
     },
     method: "POST",
     path: "/v2/trash/restore",
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, RestoreTrashErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(RestoreTrashErrorSpec));
 
 export const deleteTrash = (
   input: TrashBulkInput,
@@ -180,10 +181,10 @@ export const deleteTrash = (
     },
     method: "POST",
     path: "/v2/trash/delete",
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, DeleteTrashErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(DeleteTrashErrorSpec));
 
 export const emptyTrash = (): Effect.Effect<void, EmptyTrashError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "POST",
     path: "/v2/trash/empty",
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, EmptyTrashErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(EmptyTrashErrorSpec));

@@ -1,12 +1,19 @@
 import { Effect, Schema } from "effect";
 
+import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
 import { FileBroadSchema } from "./files.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonField,
+  selectJsonFields,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 export const SharingCloneStatusSchema = Schema.Literal("NEW", "PROCESSING", "DONE", "ERROR");
 
@@ -317,11 +324,8 @@ export type GetPublicShareFileUrlError = PutioOperationFailure<
   typeof GetPublicShareFileUrlErrorSpec
 >;
 
-const toCsv = (values: ReadonlyArray<string | number> | undefined) =>
-  values && values.length > 0 ? values.join(",") : undefined;
-
 const toShareTarget = (target: SharingShareInput["target"]) =>
-  target.type === "everyone" ? "everyone" : target.friendNames.join(",");
+  target.type === "everyone" ? "everyone" : (joinCsv(target.friendNames) ?? "everyone");
 
 export const cloneSharedFiles = (
   input: SharingCloneInput = {},
@@ -330,18 +334,13 @@ export const cloneSharedFiles = (
     body: {
       type: "form",
       value: {
-        cursor: input.cursor,
-        exclude_ids: toCsv(input.excludeIds),
-        file_ids: toCsv(input.ids),
+        ...toCursorSelectionForm(input),
         parent_id: input.parentId ?? 0,
       },
     },
     method: "POST",
     path: "/v2/sharing/clone",
-  }).pipe(
-    Effect.map(({ id }) => ({ id })),
-    (effect) => withOperationErrors(effect, CreateSharingCloneErrorSpec),
-  );
+  }).pipe(selectJsonFields("id"), withOperationErrors(CreateSharingCloneErrorSpec));
 
 export const getSharingCloneInfo = (
   id: number,
@@ -349,7 +348,7 @@ export const getSharingCloneInfo = (
   requestJson(SharingCloneInfoSchema, {
     method: "GET",
     path: `/v2/sharing/clone/${id}`,
-  }).pipe((effect) => withOperationErrors(effect, GetSharingCloneInfoErrorSpec));
+  }).pipe(withOperationErrors(GetSharingCloneInfoErrorSpec));
 
 export const shareFiles = (
   input: SharingShareInput,
@@ -358,15 +357,13 @@ export const shareFiles = (
     body: {
       type: "form",
       value: {
-        cursor: input.cursor,
-        exclude_ids: toCsv(input.excludeIds),
-        file_ids: toCsv(input.ids),
+        ...toCursorSelectionForm(input),
         friends: toShareTarget(input.target),
       },
     },
     method: "POST",
     path: "/v2/files/share",
-  }).pipe((effect) => withOperationErrors(effect, ShareFilesErrorSpec));
+  }).pipe(withOperationErrors(ShareFilesErrorSpec));
 
 export const listSharedFiles = (): Effect.Effect<
   ReadonlyArray<SharedFile>,
@@ -376,10 +373,7 @@ export const listSharedFiles = (): Effect.Effect<
   requestJson(SharedFilesEnvelopeSchema, {
     method: "GET",
     path: "/v2/files/shared",
-  }).pipe(
-    Effect.map(({ shared }) => shared),
-    (effect) => withOperationErrors(effect, ListSharedFilesErrorSpec),
-  );
+  }).pipe(selectJsonField("shared"), withOperationErrors(ListSharedFilesErrorSpec));
 
 export const getSharedWith = (
   fileId: number,
@@ -387,7 +381,7 @@ export const getSharedWith = (
   requestJson(SharedFileSharedWithSchema, {
     method: "GET",
     path: `/v2/files/${fileId}/shared-with-v2`,
-  }).pipe((effect) => withOperationErrors(effect, GetSharedWithErrorSpec));
+  }).pipe(withOperationErrors(GetSharedWithErrorSpec));
 
 export const unshareFile = (
   input: SharingUnshareInput,
@@ -396,12 +390,12 @@ export const unshareFile = (
     body: {
       type: "form",
       value: {
-        shares: input.shares && input.shares.length > 0 ? toCsv(input.shares) : "everyone",
+        shares: joinCsv(input.shares) ?? "everyone",
       },
     },
     method: "POST",
     path: `/v2/files/${input.fileId}/unshare`,
-  }).pipe((effect) => withOperationErrors(effect, UnshareFileErrorSpec));
+  }).pipe(withOperationErrors(UnshareFileErrorSpec));
 
 export const createPublicShare = (
   fileId: number,
@@ -409,10 +403,7 @@ export const createPublicShare = (
   requestJson(PublicShareEnvelopeSchema, {
     method: "POST",
     path: `/v2/public_share/${fileId}`,
-  }).pipe(
-    Effect.map(({ public_share }) => public_share),
-    (effect) => withOperationErrors(effect, CreatePublicShareErrorSpec),
-  );
+  }).pipe(selectJsonField("public_share"), withOperationErrors(CreatePublicShareErrorSpec));
 
 export const listPublicShares = (): Effect.Effect<
   ReadonlyArray<PublicShare>,
@@ -422,10 +413,7 @@ export const listPublicShares = (): Effect.Effect<
   requestJson(PublicSharesEnvelopeSchema, {
     method: "GET",
     path: "/v2/public_share/list",
-  }).pipe(
-    Effect.map(({ public_shares }) => public_shares),
-    (effect) => withOperationErrors(effect, ListPublicSharesErrorSpec),
-  );
+  }).pipe(selectJsonField("public_shares"), withOperationErrors(ListPublicSharesErrorSpec));
 
 export const deletePublicShare = (
   id: number,
@@ -437,7 +425,7 @@ export const deletePublicShare = (
   requestJson(OkResponseSchema, {
     method: "DELETE",
     path: `/v2/public_share/${id}`,
-  }).pipe((effect) => withOperationErrors(effect, DeletePublicShareErrorSpec));
+  }).pipe(withOperationErrors(DeletePublicShareErrorSpec));
 
 export const getPublicShare = (): Effect.Effect<
   PublicShare,
@@ -447,10 +435,7 @@ export const getPublicShare = (): Effect.Effect<
   requestJson(PublicShareEnvelopeSchema, {
     method: "GET",
     path: "/v2/public_share",
-  }).pipe(
-    Effect.map(({ public_share }) => public_share),
-    (effect) => withOperationErrors(effect, GetPublicShareErrorSpec),
-  );
+  }).pipe(selectJsonField("public_share"), withOperationErrors(GetPublicShareErrorSpec));
 
 export const listPublicShareFiles = (
   query: PublicShareListQuery = {},
@@ -463,7 +448,7 @@ export const listPublicShareFiles = (
     method: "GET",
     path: "/v2/public_share/files/list",
     query,
-  }).pipe((effect) => withOperationErrors(effect, ListPublicShareFilesErrorSpec));
+  }).pipe(withOperationErrors(ListPublicShareFilesErrorSpec));
 
 export const continuePublicShareFiles = (
   cursor: string,
@@ -481,7 +466,7 @@ export const continuePublicShareFiles = (
     method: "POST",
     path: "/v2/public_share/files/list/continue",
     query,
-  }).pipe((effect) => withOperationErrors(effect, ContinuePublicShareFilesErrorSpec));
+  }).pipe(withOperationErrors(ContinuePublicShareFilesErrorSpec));
 
 export const getPublicShareFileUrl = (
   fileId: number,
@@ -489,7 +474,4 @@ export const getPublicShareFileUrl = (
   requestJson(PublicShareFileUrlEnvelopeSchema, {
     method: "GET",
     path: `/v2/public_share/files/${fileId}/url`,
-  }).pipe(
-    Effect.map(({ url }) => url),
-    (effect) => withOperationErrors(effect, GetPublicShareFileUrlErrorSpec),
-  );
+  }).pipe(selectJsonField("url"), withOperationErrors(GetPublicShareFileUrlErrorSpec));

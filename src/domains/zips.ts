@@ -1,11 +1,17 @@
 import { Effect, Schema } from "effect";
 
+import { toCursorSelectionForm } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonField,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 export const ZipStatusSchema = Schema.Literal("NEW", "PROCESSING", "DONE", "ERROR");
 
@@ -115,10 +121,7 @@ export const listZips = (): Effect.Effect<
   requestJson(ZipsListEnvelopeSchema, {
     method: "GET",
     path: "/v2/zips/list",
-  }).pipe(
-    Effect.map(({ zips }) => zips),
-    (effect) => withOperationErrors(effect, ListZipsErrorSpec),
-  );
+  }).pipe(selectJsonField("zips"), withOperationErrors(ListZipsErrorSpec));
 
 export const createZip = (
   input: CreateZipInput,
@@ -127,26 +130,25 @@ export const createZip = (
     body: {
       type: "form",
       value: {
-        cursor: input.cursor,
-        exclude_ids: input.exclude_ids?.join(","),
-        file_ids: input.file_ids?.join(","),
+        ...toCursorSelectionForm({
+          cursor: input.cursor,
+          excludeIds: input.exclude_ids,
+          ids: input.file_ids,
+        }),
       },
     },
     method: "POST",
     path: "/v2/zips/create",
-  }).pipe(
-    Effect.map(({ zip_id }) => zip_id),
-    (effect) => withOperationErrors(effect, CreateZipErrorSpec),
-  );
+  }).pipe(selectJsonField("zip_id"), withOperationErrors(CreateZipErrorSpec));
 
 export const getZip = (id: number): Effect.Effect<ZipInfo, GetZipError, PutioSdkContext> =>
   requestJson(ZipInfoSchema, {
     method: "GET",
     path: `/v2/zips/${id}`,
-  }).pipe((effect) => withOperationErrors(effect, GetZipErrorSpec));
+  }).pipe(withOperationErrors(GetZipErrorSpec));
 
 export const cancelZip = (id: number): Effect.Effect<void, CancelZipError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "GET",
     path: `/v2/zips/${id}/cancel`,
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, CancelZipErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(CancelZipErrorSpec));

@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { requestJson, type PutioSdkContext } from "../core/http.js";
+import { requestJson, selectJsonField, type PutioSdkContext } from "../core/http.js";
 
 export const TunnelRouteSchema = Schema.Struct({
   description: Schema.String,
@@ -36,7 +36,4 @@ export const listTunnelRoutes = (): Effect.Effect<
   requestJson(TunnelRoutesEnvelopeSchema, {
     method: "GET",
     path: "/v2/tunnel/routes",
-  }).pipe(
-    Effect.map(({ routes }) => routes),
-    (effect) => withOperationErrors(effect, ListTunnelRoutesErrorSpec),
-  );
+  }).pipe(selectJsonField("routes"), withOperationErrors(ListTunnelRoutesErrorSpec));

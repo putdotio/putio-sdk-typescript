@@ -10,6 +10,8 @@ import {
   OkResponseSchema,
   buildPutioUrl,
   requestJson,
+  selectJsonField,
+  selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
 import { OAuthAppSchema, OAuthAppSessionSchema } from "./oauth.js";
@@ -382,13 +384,7 @@ export const login = (input: {
       client_name: input.clientName,
       client_secret: input.clientSecret,
     },
-  }).pipe(
-    Effect.map(({ access_token, user_id }) => ({
-      access_token,
-      user_id,
-    })),
-    (effect) => withOperationErrors(effect, LoginErrorSpec),
-  );
+  }).pipe(selectJsonFields("access_token", "user_id"), withOperationErrors(LoginErrorSpec));
 
 export const logout = (): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
@@ -413,10 +409,7 @@ export const register = (
     },
     method: "POST",
     path: "/v2/registration/register",
-  }).pipe(
-    Effect.map(({ access_token }) => ({ access_token })),
-    (effect) => withOperationErrors(effect, RegisterErrorSpec),
-  );
+  }).pipe(selectJsonFields("access_token"), withOperationErrors(RegisterErrorSpec));
 
 export const exists = (
   key: "mail" | "username",
@@ -431,7 +424,7 @@ export const exists = (
     query: {
       value,
     },
-  }).pipe(Effect.map(({ exists }) => exists));
+  }).pipe(selectJsonField("exists"));
 
 export const getVoucher = (
   code: string,
@@ -446,10 +439,7 @@ export const getVoucher = (
     },
     method: "GET",
     path: `/v2/registration/voucher/${code}`,
-  }).pipe(
-    Effect.map(({ voucher }) => voucher),
-    (effect) => withOperationErrors(effect, VoucherLookupErrorSpec),
-  );
+  }).pipe(selectJsonField("voucher"), withOperationErrors(VoucherLookupErrorSpec));
 
 export const getGiftCard = (
   code: string,
@@ -464,10 +454,7 @@ export const getGiftCard = (
     },
     method: "GET",
     path: `/v2/registration/gift_card/${code}`,
-  }).pipe(
-    Effect.map(({ gift_card }) => gift_card),
-    (effect) => withOperationErrors(effect, GiftCardLookupErrorSpec),
-  );
+  }).pipe(selectJsonField("gift_card"), withOperationErrors(GiftCardLookupErrorSpec));
 
 export const getFamilyInvite = (
   code: string,
@@ -482,10 +469,7 @@ export const getFamilyInvite = (
     },
     method: "GET",
     path: `/v2/registration/family/${code}`,
-  }).pipe(
-    Effect.map(({ invite }) => invite),
-    (effect) => withOperationErrors(effect, FamilyInviteLookupErrorSpec),
-  );
+  }).pipe(selectJsonField("invite"), withOperationErrors(FamilyInviteLookupErrorSpec));
 
 export const getFriendInvite = (
   code: string,
@@ -500,10 +484,7 @@ export const getFriendInvite = (
     },
     method: "GET",
     path: `/v2/registration/friend/${code}`,
-  }).pipe(
-    Effect.map(({ invite }) => invite),
-    (effect) => withOperationErrors(effect, FriendInviteLookupErrorSpec),
-  );
+  }).pipe(selectJsonField("invite"), withOperationErrors(FriendInviteLookupErrorSpec));
 
 export const forgotPassword = (
   mail: string,
@@ -524,7 +505,7 @@ export const forgotPassword = (
     },
     method: "POST",
     path: "/v2/registration/password/forgot",
-  }).pipe((effect) => withOperationErrors(effect, ForgotPasswordErrorSpec));
+  }).pipe(withOperationErrors(ForgotPasswordErrorSpec));
 
 export const resetPassword = (
   key: string,
@@ -543,10 +524,7 @@ export const resetPassword = (
     },
     method: "POST",
     path: "/v2/registration/password/reset",
-  }).pipe(
-    Effect.map(({ access_token }) => ({ access_token })),
-    (effect) => withOperationErrors(effect, ResetPasswordErrorSpec),
-  );
+  }).pipe(selectJsonFields("access_token"), withOperationErrors(ResetPasswordErrorSpec));
 
 export const getCode = (input: {
   readonly appId: number | string;
@@ -566,7 +544,7 @@ export const getCode = (input: {
       app_id: input.appId,
       client_name: input.clientName,
     },
-  }).pipe(Effect.map(({ code, qr_code_url }) => ({ code, qr_code_url })));
+  }).pipe(selectJsonFields("code", "qr_code_url"));
 
 export const checkCodeMatch = (
   code: string,
@@ -577,7 +555,7 @@ export const checkCodeMatch = (
     },
     method: "GET",
     path: `/v2/oauth2/oob/code/${code}`,
-  }).pipe(Effect.map(({ oauth_token }) => oauth_token));
+  }).pipe(selectJsonField("oauth_token"));
 
 export const linkDevice = (
   code: string,
@@ -591,10 +569,7 @@ export const linkDevice = (
     },
     method: "POST",
     path: "/v2/oauth2/oob/code",
-  }).pipe(
-    Effect.map(({ app }) => app),
-    (effect) => withOperationErrors(effect, LinkDeviceErrorSpec),
-  );
+  }).pipe(selectJsonField("app"), withOperationErrors(LinkDeviceErrorSpec));
 
 export const grants = (): Effect.Effect<
   ReadonlyArray<Schema.Schema.Type<typeof OAuthAppSchema>>,
@@ -604,10 +579,7 @@ export const grants = (): Effect.Effect<
   requestJson(GrantsEnvelopeSchema, {
     method: "GET",
     path: "/v2/oauth/grants/",
-  }).pipe(
-    Effect.map(({ apps }) => apps),
-    (effect) => withOperationErrors(effect, GrantsErrorSpec),
-  );
+  }).pipe(selectJsonField("apps"), withOperationErrors(GrantsErrorSpec));
 
 export const revokeApp = (
   id: number,
@@ -619,7 +591,7 @@ export const revokeApp = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/oauth/grants/${id}/delete`,
-  }).pipe((effect) => withOperationErrors(effect, RevokeOAuthGrantErrorSpec));
+  }).pipe(withOperationErrors(RevokeOAuthGrantErrorSpec));
 
 export const clients = (): Effect.Effect<
   ReadonlyArray<Schema.Schema.Type<typeof OAuthAppSessionSchema>>,
@@ -629,10 +601,7 @@ export const clients = (): Effect.Effect<
   requestJson(ClientsEnvelopeSchema, {
     method: "GET",
     path: "/v2/oauth/clients/",
-  }).pipe(
-    Effect.map(({ clients }) => clients),
-    (effect) => withOperationErrors(effect, ClientsErrorSpec),
-  );
+  }).pipe(selectJsonField("clients"), withOperationErrors(ClientsErrorSpec));
 
 export const revokeClient = (
   id: number,
@@ -644,7 +613,7 @@ export const revokeClient = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/oauth/clients/${id}/delete`,
-  }).pipe((effect) => withOperationErrors(effect, RevokeOAuthClientErrorSpec));
+  }).pipe(withOperationErrors(RevokeOAuthClientErrorSpec));
 
 export const revokeAllClients = (): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
@@ -654,7 +623,7 @@ export const revokeAllClients = (): Effect.Effect<
   requestJson(OkResponseSchema, {
     method: "POST",
     path: "/v2/oauth/clients/delete-all",
-  }).pipe((effect) => withOperationErrors(effect, RevokeAllOAuthClientsErrorSpec));
+  }).pipe(withOperationErrors(RevokeAllOAuthClientsErrorSpec));
 
 export const validateToken = (
   token: string,
@@ -684,7 +653,7 @@ export const generateTOTP = (): Effect.Effect<
       secret,
       uri,
     })),
-    (effect) => withOperationErrors(effect, GenerateTOTPErrorSpec),
+    withOperationErrors(GenerateTOTPErrorSpec),
   );
 
 export const verifyTOTP = (
@@ -711,7 +680,7 @@ export const verifyTOTP = (
       token,
       user_id,
     })),
-    (effect) => withOperationErrors(effect, VerifyTOTPErrorSpec),
+    withOperationErrors(VerifyTOTPErrorSpec),
   );
 
 export const getRecoveryCodes = (): Effect.Effect<
@@ -722,10 +691,7 @@ export const getRecoveryCodes = (): Effect.Effect<
   requestJson(RecoveryCodesEnvelopeSchema, {
     method: "GET",
     path: "/v2/two_factor/recovery_codes",
-  }).pipe(
-    Effect.map(({ recovery_codes }) => recovery_codes),
-    (effect) => withOperationErrors(effect, RecoveryCodesErrorSpec),
-  );
+  }).pipe(selectJsonField("recovery_codes"), withOperationErrors(RecoveryCodesErrorSpec));
 
 export const regenerateRecoveryCodes = (): Effect.Effect<
   TwoFactorRecoveryCodes,
@@ -735,7 +701,4 @@ export const regenerateRecoveryCodes = (): Effect.Effect<
   requestJson(RecoveryCodesEnvelopeSchema, {
     method: "POST",
     path: "/v2/two_factor/recovery_codes/refresh",
-  }).pipe(
-    Effect.map(({ recovery_codes }) => recovery_codes),
-    (effect) => withOperationErrors(effect, RegenerateRecoveryCodesErrorSpec),
-  );
+  }).pipe(selectJsonField("recovery_codes"), withOperationErrors(RegenerateRecoveryCodesErrorSpec));

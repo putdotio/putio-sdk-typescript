@@ -1,12 +1,19 @@
 import { Effect, Schema } from "effect";
 
+import { joinCsv } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
   type PutioSdkError,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonField,
+  selectJsonFields,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 export const TransferTypeSchema = Schema.Literal(
   "URL",
@@ -291,7 +298,7 @@ export const listTransfers = (
     method: "GET",
     path: "/v2/transfers/list",
     query,
-  }).pipe((effect) => withOperationErrors(effect, ListTransfersErrorSpec));
+  }).pipe(withOperationErrors(ListTransfersErrorSpec));
 
 export const continueTransfers = (
   cursor: string,
@@ -309,7 +316,7 @@ export const continueTransfers = (
     method: "POST",
     path: "/v2/transfers/list/continue",
     query,
-  }).pipe((effect) => withOperationErrors(effect, ListTransfersErrorSpec));
+  }).pipe(withOperationErrors(ListTransfersErrorSpec));
 
 export const getTransfer = (
   id: number,
@@ -317,16 +324,13 @@ export const getTransfer = (
   requestJson(TransferEnvelopeSchema, {
     method: "GET",
     path: `/v2/transfers/${id}`,
-  }).pipe(
-    Effect.map(({ transfer }) => transfer),
-    (effect) => withOperationErrors(effect, GetTransferErrorSpec),
-  );
+  }).pipe(selectJsonField("transfer"), withOperationErrors(GetTransferErrorSpec));
 
 export const countTransfers = (): Effect.Effect<number, PutioSdkError, PutioSdkContext> =>
   requestJson(TransferCountEnvelopeSchema, {
     method: "GET",
     path: "/v2/transfers/count",
-  }).pipe(Effect.map(({ count }) => count));
+  }).pipe(selectJsonField("count"));
 
 export const getTransferInfo = (
   urls: ReadonlyArray<string>,
@@ -347,7 +351,7 @@ export const getTransferInfo = (
     },
     method: "POST",
     path: "/v2/transfers/info",
-  }).pipe(Effect.map(({ disk_avail, ret }) => ({ disk_avail, ret })));
+  }).pipe(selectJsonFields("disk_avail", "ret"));
 
 export const addTransfer = (
   input: TransferAddInput,
@@ -359,10 +363,7 @@ export const addTransfer = (
     },
     method: "POST",
     path: "/v2/transfers/add",
-  }).pipe(
-    Effect.map(({ transfer }) => transfer),
-    (effect) => withOperationErrors(effect, AddTransferErrorSpec),
-  );
+  }).pipe(selectJsonField("transfer"), withOperationErrors(AddTransferErrorSpec));
 
 export const addManyTransfers = (
   inputs: ReadonlyArray<TransferAddInput>,
@@ -383,10 +384,7 @@ export const addManyTransfers = (
     },
     method: "POST",
     path: "/v2/transfers/add-multi",
-  }).pipe(
-    Effect.map(({ errors, transfers }) => ({ errors, transfers })),
-    (effect) => withOperationErrors(effect, AddManyTransfersErrorSpec),
-  );
+  }).pipe(selectJsonFields("errors", "transfers"), withOperationErrors(AddManyTransfersErrorSpec));
 
 export const cancelTransfers = (
   ids: ReadonlyArray<number>,
@@ -395,7 +393,7 @@ export const cancelTransfers = (
     body: {
       type: "form",
       value: {
-        transfer_ids: ids.join(","),
+        transfer_ids: joinCsv(ids),
       },
     },
     method: "POST",
@@ -414,11 +412,11 @@ export const cleanTransfers = (
   requestJson(TransfersCleanEnvelopeSchema, {
     body: {
       type: "form",
-      value: ids.length > 0 ? { transfer_ids: ids.join(",") } : {},
+      value: ids.length > 0 ? { transfer_ids: joinCsv(ids) } : {},
     },
     method: "POST",
     path: "/v2/transfers/clean",
-  }).pipe(Effect.map(({ deleted_ids }) => ({ deleted_ids })));
+  }).pipe(selectJsonFields("deleted_ids"));
 
 export const retryTransfer = (
   id: number,
@@ -432,10 +430,7 @@ export const retryTransfer = (
     },
     method: "POST",
     path: "/v2/transfers/retry",
-  }).pipe(
-    Effect.map(({ transfer }) => transfer),
-    (effect) => withOperationErrors(effect, RetryTransferErrorSpec),
-  );
+  }).pipe(selectJsonField("transfer"), withOperationErrors(RetryTransferErrorSpec));
 
 export const reannounceTransfer = (
   id: number,
@@ -453,7 +448,7 @@ export const reannounceTransfer = (
     },
     method: "POST",
     path: "/v2/transfers/reannounce",
-  }).pipe((effect) => withOperationErrors(effect, ReannounceTransferErrorSpec));
+  }).pipe(withOperationErrors(ReannounceTransferErrorSpec));
 
 export const stopTransferRecording = (
   id: number,
@@ -471,4 +466,4 @@ export const stopTransferRecording = (
     },
     method: "POST",
     path: "/v2/transfers/stop-recording",
-  }).pipe((effect) => withOperationErrors(effect, StopRecordingTransferErrorSpec));
+  }).pipe(withOperationErrors(StopRecordingTransferErrorSpec));

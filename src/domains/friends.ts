@@ -6,7 +6,13 @@ import {
   type PutioOperationFailure,
 } from "../core/errors.js";
 import { FileBroadSchema, type FileBroad } from "./files.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonField,
+  selectJsonFields,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 export const FriendBaseSchema = Schema.Struct({
   avatar_url: Schema.String,
@@ -161,10 +167,7 @@ export const listFriends = (): Effect.Effect<
   requestJson(FriendsListEnvelopeSchema, {
     method: "GET",
     path: "/v2/friends/list",
-  }).pipe(
-    Effect.map(({ friends, total }) => ({ friends, total })),
-    (effect) => withOperationErrors(effect, ListFriendsErrorSpec),
-  );
+  }).pipe(selectJsonFields("friends", "total"), withOperationErrors(ListFriendsErrorSpec));
 
 export const searchFriends = (
   username: string,
@@ -172,10 +175,7 @@ export const searchFriends = (
   requestJson(FriendSearchEnvelopeSchema, {
     method: "GET",
     path: `/v2/friends/user-search/${encodeURIComponent(username)}`,
-  }).pipe(
-    Effect.map(({ users }) => users),
-    (effect) => withOperationErrors(effect, SearchFriendsErrorSpec),
-  );
+  }).pipe(selectJsonField("users"), withOperationErrors(SearchFriendsErrorSpec));
 
 export const listWaitingRequests = (): Effect.Effect<
   ReadonlyArray<FriendBase>,
@@ -185,10 +185,7 @@ export const listWaitingRequests = (): Effect.Effect<
   requestJson(FriendRequestsEnvelopeSchema, {
     method: "GET",
     path: "/v2/friends/waiting-requests",
-  }).pipe(
-    Effect.map(({ friends }) => friends),
-    (effect) => withOperationErrors(effect, ListWaitingRequestsErrorSpec),
-  );
+  }).pipe(selectJsonField("friends"), withOperationErrors(ListWaitingRequestsErrorSpec));
 
 export const countWaitingRequests = (): Effect.Effect<
   number,
@@ -198,10 +195,7 @@ export const countWaitingRequests = (): Effect.Effect<
   requestJson(FriendRequestsCountEnvelopeSchema, {
     method: "GET",
     path: "/v2/friends/waiting-requests-count",
-  }).pipe(
-    Effect.map(({ count }) => count),
-    (effect) => withOperationErrors(effect, CountWaitingRequestsErrorSpec),
-  );
+  }).pipe(selectJsonField("count"), withOperationErrors(CountWaitingRequestsErrorSpec));
 
 export const listSentRequests = (): Effect.Effect<
   ReadonlyArray<FriendBase>,
@@ -211,10 +205,7 @@ export const listSentRequests = (): Effect.Effect<
   requestJson(FriendRequestsEnvelopeSchema, {
     method: "GET",
     path: "/v2/friends/sent-requests",
-  }).pipe(
-    Effect.map(({ friends }) => friends),
-    (effect) => withOperationErrors(effect, ListSentRequestsErrorSpec),
-  );
+  }).pipe(selectJsonField("friends"), withOperationErrors(ListSentRequestsErrorSpec));
 
 export const sendFriendRequest = (
   username: string,
@@ -226,7 +217,7 @@ export const sendFriendRequest = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/friends/${encodeURIComponent(username)}/request`,
-  }).pipe((effect) => withOperationErrors(effect, SendFriendRequestErrorSpec));
+  }).pipe(withOperationErrors(SendFriendRequestErrorSpec));
 
 export const removeFriend = (
   username: string,
@@ -234,7 +225,7 @@ export const removeFriend = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/friends/${encodeURIComponent(username)}/unfriend`,
-  }).pipe((effect) => withOperationErrors(effect, RemoveFriendErrorSpec));
+  }).pipe(withOperationErrors(RemoveFriendErrorSpec));
 
 export const approveFriendRequest = (
   username: string,
@@ -246,7 +237,7 @@ export const approveFriendRequest = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/friends/${encodeURIComponent(username)}/approve`,
-  }).pipe((effect) => withOperationErrors(effect, ApproveFriendRequestErrorSpec));
+  }).pipe(withOperationErrors(ApproveFriendRequestErrorSpec));
 
 export const denyFriendRequest = (
   username: string,
@@ -258,7 +249,7 @@ export const denyFriendRequest = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/friends/${encodeURIComponent(username)}/deny`,
-  }).pipe((effect) => withOperationErrors(effect, DenyFriendRequestErrorSpec));
+  }).pipe(withOperationErrors(DenyFriendRequestErrorSpec));
 
 export const getFriendSharedFolder = (
   username: string,
@@ -266,7 +257,4 @@ export const getFriendSharedFolder = (
   requestJson(FriendSharedFolderEnvelopeSchema, {
     method: "GET",
     path: `/v2/friends/${encodeURIComponent(username)}/files`,
-  }).pipe(
-    Effect.map(({ file }) => file),
-    (effect) => withOperationErrors(effect, FriendSharedFolderErrorSpec),
-  );
+  }).pipe(selectJsonField("file"), withOperationErrors(FriendSharedFolderErrorSpec));

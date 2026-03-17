@@ -245,7 +245,7 @@ export const parseErrorBody = (status: number, json: unknown) =>
     Effect.orElseSucceed(() => fallbackPutioErrorEnvelope(status)),
   );
 
-export const withOperationErrors = <
+export function withOperationErrors<
   A,
   E extends PutioSdkError,
   R,
@@ -255,8 +255,42 @@ export const withOperationErrors = <
 >(
   effect: Effect.Effect<A, E, R>,
   spec: PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
-): Effect.Effect<A, E | PutioOperationError<TDomain, TOperation, TContracts[number]>, R> =>
-  effect.pipe(
+): Effect.Effect<A, E | PutioOperationError<TDomain, TOperation, TContracts[number]>, R>;
+export function withOperationErrors<
+  const TDomain extends string,
+  const TOperation extends string,
+  const TContracts extends ReadonlyArray<PutioKnownErrorContract>,
+>(
+  spec: PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
+): <A, E extends PutioSdkError, R>(
+  effect: Effect.Effect<A, E, R>,
+) => Effect.Effect<A, E | PutioOperationError<TDomain, TOperation, TContracts[number]>, R>;
+export function withOperationErrors<
+  A,
+  E extends PutioSdkError,
+  R,
+  const TDomain extends string,
+  const TOperation extends string,
+  const TContracts extends ReadonlyArray<PutioKnownErrorContract>,
+>(
+  effectOrSpec: Effect.Effect<A, E, R> | PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
+  maybeSpec?: PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
+):
+  | Effect.Effect<A, E | PutioOperationError<TDomain, TOperation, TContracts[number]>, R>
+  | (<A2, E2 extends PutioSdkError, R2>(
+      effect: Effect.Effect<A2, E2, R2>,
+    ) => Effect.Effect<A2, E2 | PutioOperationError<TDomain, TOperation, TContracts[number]>, R2>) {
+  if (maybeSpec === undefined) {
+    const spec = effectOrSpec as PutioOperationErrorSpec<TDomain, TOperation, TContracts>;
+
+    return <A2, E2 extends PutioSdkError, R2>(effect: Effect.Effect<A2, E2, R2>) =>
+      withOperationErrors(effect, spec);
+  }
+
+  const effect = effectOrSpec as Effect.Effect<A, E, R>;
+  const spec = maybeSpec;
+
+  return effect.pipe(
     Effect.mapError((error) => {
       if (!isMatchableApiError(error)) {
         return error;
@@ -278,3 +312,4 @@ export const withOperationErrors = <
       });
     }),
   );
+}

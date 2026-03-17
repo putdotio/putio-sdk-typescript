@@ -4,6 +4,7 @@ import {
   OkResponseSchema,
   buildPutioUrl,
   requestJson,
+  selectJsonField,
   type PutioSdkContext,
   type PutioQueryValue,
 } from "../core/http.js";
@@ -224,10 +225,7 @@ export const queryOAuthApps = (): Effect.Effect<
   requestJson(OAuthAppsEnvelopeSchema, {
     method: "GET",
     path: "/v2/oauth/apps",
-  }).pipe(
-    Effect.map(({ apps }) => apps),
-    (effect) => withOperationErrors(effect, QueryOAuthAppsErrorSpec),
-  );
+  }).pipe(selectJsonField("apps"), withOperationErrors(QueryOAuthAppsErrorSpec));
 
 export const getOAuthApp = (
   id: number,
@@ -242,7 +240,7 @@ export const getOAuthApp = (
   requestJson(OAuthAppWithTokenSchema, {
     method: "GET",
     path: options?.edit ? `/v2/oauth/apps/${id}/edit` : `/v2/oauth/apps/${id}`,
-  }).pipe((effect) => withOperationErrors(effect, GetOAuthAppErrorSpec));
+  }).pipe(withOperationErrors(GetOAuthAppErrorSpec));
 
 export const setOAuthAppIcon = (
   id: number,
@@ -275,7 +273,7 @@ export const createOAuthApp = (
     },
     method: "POST",
     path: "/v2/oauth/apps/register",
-  }).pipe((effect) => withOperationErrors(effect, CreateOAuthAppErrorSpec));
+  }).pipe(withOperationErrors(CreateOAuthAppErrorSpec));
 
 export const updateOAuthApp = (
   input: OAuthAppUpdateInput,
@@ -291,7 +289,7 @@ export const updateOAuthApp = (
     },
     method: "POST",
     path: `/v2/oauth/apps/${input.id}`,
-  }).pipe((effect) => withOperationErrors(effect, UpdateOAuthAppErrorSpec));
+  }).pipe(withOperationErrors(UpdateOAuthAppErrorSpec));
 
 export const deleteOAuthApp = (
   id: number,
@@ -303,7 +301,7 @@ export const deleteOAuthApp = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/oauth/apps/${id}/delete`,
-  }).pipe((effect) => withOperationErrors(effect, DeleteOAuthAppErrorSpec));
+  }).pipe(withOperationErrors(DeleteOAuthAppErrorSpec));
 
 export const regenerateOAuthAppToken = (
   id: number,
@@ -311,10 +309,7 @@ export const regenerateOAuthAppToken = (
   requestJson(OAuthRegeneratedTokenEnvelopeSchema, {
     method: "POST",
     path: `/v2/oauth/apps/${id}/regenerate_token`,
-  }).pipe(
-    Effect.map(({ access_token }) => access_token),
-    (effect) => withOperationErrors(effect, RegenerateOAuthAppTokenErrorSpec),
-  );
+  }).pipe(selectJsonField("access_token"), withOperationErrors(RegenerateOAuthAppTokenErrorSpec));
 
 export const getPopularOAuthApps = (): Effect.Effect<
   ReadonlyArray<PopularOAuthApp>,
@@ -324,4 +319,4 @@ export const getPopularOAuthApps = (): Effect.Effect<
   requestJson(PopularOAuthAppsEnvelopeSchema, {
     method: "GET",
     path: "/v2/oauth/apps/popular",
-  }).pipe(Effect.map(({ apps }) => apps));
+  }).pipe(selectJsonField("apps"));

@@ -1,7 +1,12 @@
 import { Effect, Schema } from "effect";
 
 import type { PutioSdkError } from "../core/errors.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonField,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 export type PutioJsonPrimitive = string | number | boolean | null;
 export type PutioJsonValue =
@@ -60,7 +65,7 @@ export const readConfig = (): Effect.Effect<PutioJsonObject, PutioSdkError, Puti
   requestJson(ConfigEnvelopeSchema, {
     method: "GET",
     path: "/v2/config",
-  }).pipe(Effect.map(({ config }) => config));
+  }).pipe(selectJsonField("config"));
 
 export const readConfigWith = <A, I>(
   schema: Schema.Schema<A, I, never>,
@@ -74,7 +79,7 @@ export const readConfigWith = <A, I>(
       method: "GET",
       path: "/v2/config",
     },
-  ).pipe(Effect.map(({ config }) => config));
+  ).pipe(selectJsonField("config"));
 
 export const writeConfig = (
   config: PutioJsonObject,
@@ -96,7 +101,7 @@ export const getConfigKey = (
   requestJson(ConfigValueEnvelopeSchema, {
     method: "GET",
     path: `/v2/config/${key}`,
-  }).pipe(Effect.map(({ value }) => value));
+  }).pipe(selectJsonField("value"));
 
 export const getConfigKeyWith = <A, I>(
   key: string,
@@ -111,7 +116,7 @@ export const getConfigKeyWith = <A, I>(
       method: "GET",
       path: `/v2/config/${key}`,
     },
-  ).pipe(Effect.map(({ value }) => value));
+  ).pipe(selectJsonField("value"));
 
 export const setConfigKey = (
   key: string,

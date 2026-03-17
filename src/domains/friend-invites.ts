@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { requestJson, type PutioSdkContext } from "../core/http.js";
+import { requestJson, selectJsonFields, type PutioSdkContext } from "../core/http.js";
 
 export const FriendInviteJoinedUserStatusSchema = Schema.Literal(
   "CONVERTED",
@@ -78,8 +78,8 @@ export const listFriendInvites = (): Effect.Effect<
     method: "GET",
     path: "/v2/account/friend_invites",
   }).pipe(
-    Effect.map(({ invites, remaining_limit }) => ({ invites, remaining_limit })),
-    (effect) => withOperationErrors(effect, ListFriendInvitesErrorSpec),
+    selectJsonFields("invites", "remaining_limit"),
+    withOperationErrors(ListFriendInvitesErrorSpec),
   );
 
 export const createFriendInvite = (): Effect.Effect<
@@ -92,7 +92,4 @@ export const createFriendInvite = (): Effect.Effect<
   requestJson(FriendInviteCreateEnvelopeSchema, {
     method: "POST",
     path: "/v2/account/create_friend_invitation",
-  }).pipe(
-    Effect.map(({ code }) => ({ code })),
-    (effect) => withOperationErrors(effect, CreateFriendInviteErrorSpec),
-  );
+  }).pipe(selectJsonFields("code"), withOperationErrors(CreateFriendInviteErrorSpec));

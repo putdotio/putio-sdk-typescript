@@ -5,7 +5,12 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonFields,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 const IFTTTStatusEnvelopeSchema = Schema.Struct({
   enabled: Schema.Boolean,
@@ -59,10 +64,7 @@ export const getIftttStatus = (): Effect.Effect<
   requestJson(IFTTTStatusEnvelopeSchema, {
     method: "GET",
     path: "/v2/ifttt-client/status",
-  }).pipe(
-    Effect.map(({ enabled }) => ({ enabled })),
-    (effect) => withOperationErrors(effect, GetIftttStatusErrorSpec),
-  );
+  }).pipe(selectJsonFields("enabled"), withOperationErrors(GetIftttStatusErrorSpec));
 
 export const sendIftttEvent = (
   input: IftttEventInput,
@@ -78,4 +80,4 @@ export const sendIftttEvent = (
     },
     method: "POST",
     path: "/v2/ifttt-client/event",
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, SendIftttEventErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(SendIftttEventErrorSpec));

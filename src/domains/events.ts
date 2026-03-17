@@ -227,7 +227,7 @@ export const listEvents = (
     method: "GET",
     path: "/v2/events/list",
     query,
-  }).pipe((effect) => withOperationErrors(effect, ListEventsErrorSpec));
+  }).pipe(withOperationErrors(ListEventsErrorSpec));
 
 export const deleteEvent = (
   id: number,
@@ -235,7 +235,7 @@ export const deleteEvent = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/events/delete/${id}`,
-  }).pipe((effect) => withOperationErrors(effect, DeleteEventErrorSpec));
+  }).pipe(withOperationErrors(DeleteEventErrorSpec));
 
 export const clearEvents = (): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
@@ -245,7 +245,7 @@ export const clearEvents = (): Effect.Effect<
   requestJson(OkResponseSchema, {
     method: "POST",
     path: "/v2/events/delete",
-  }).pipe((effect) => withOperationErrors(effect, ClearEventsErrorSpec));
+  }).pipe(withOperationErrors(ClearEventsErrorSpec));
 
 export const getEventTorrent = (
   id: number,
@@ -253,4 +253,4 @@ export const getEventTorrent = (
   requestArrayBuffer({
     method: "GET",
     path: `/v2/events/${id}/torrent`,
-  }).pipe((effect) => withOperationErrors(effect, GetEventTorrentErrorSpec));
+  }).pipe(withOperationErrors(GetEventTorrentErrorSpec));

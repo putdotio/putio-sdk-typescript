@@ -5,7 +5,13 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonField,
+  selectJsonFields,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 const NonNegativeIntegerSchema = Schema.Number.pipe(Schema.int(), Schema.nonNegative());
 const NonNegativeIntegerFromStringSchema = Schema.NumberFromString.pipe(
@@ -116,12 +122,8 @@ export const listFamilyInvites = (): Effect.Effect<
     method: "GET",
     path: "/v2/family/invites",
   }).pipe(
-    Effect.map(({ invites, limit, remaining_limit }) => ({
-      invites,
-      limit,
-      remaining_limit,
-    })),
-    (effect) => withOperationErrors(effect, ListFamilyInvitesErrorSpec),
+    selectJsonFields("invites", "limit", "remaining_limit"),
+    withOperationErrors(ListFamilyInvitesErrorSpec),
   );
 
 export const listFamilyMembers = (): Effect.Effect<
@@ -132,10 +134,7 @@ export const listFamilyMembers = (): Effect.Effect<
   requestJson(FamilyMembersEnvelopeSchema, {
     method: "GET",
     path: "/v2/family/members",
-  }).pipe(
-    Effect.map(({ members }) => members),
-    (effect) => withOperationErrors(effect, ListFamilyMembersErrorSpec),
-  );
+  }).pipe(selectJsonField("members"), withOperationErrors(ListFamilyMembersErrorSpec));
 
 export const createFamilyInvite = (): Effect.Effect<
   { readonly code: string },
@@ -145,10 +144,7 @@ export const createFamilyInvite = (): Effect.Effect<
   requestJson(FamilyCreateInviteEnvelopeSchema, {
     method: "POST",
     path: "/v2/family/sub_account",
-  }).pipe(
-    Effect.map(({ code }) => ({ code })),
-    (effect) => withOperationErrors(effect, CreateFamilyInviteErrorSpec),
-  );
+  }).pipe(selectJsonFields("code"), withOperationErrors(CreateFamilyInviteErrorSpec));
 
 export const removeFamilyMember = (
   username: string,
@@ -156,7 +152,7 @@ export const removeFamilyMember = (
   requestJson(OkResponseSchema, {
     method: "DELETE",
     path: `/v2/family/sub_account/${encodeURIComponent(username)}`,
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, RemoveFamilyMemberErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(RemoveFamilyMemberErrorSpec));
 
 export const joinFamily = (
   inviteCode: string,
@@ -164,4 +160,4 @@ export const joinFamily = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/family/join/${encodeURIComponent(inviteCode)}`,
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, JoinFamilyErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(JoinFamilyErrorSpec));

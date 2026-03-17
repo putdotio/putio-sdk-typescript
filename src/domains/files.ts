@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 
+import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
 import {
   mapConfigurationError,
   PutioValidationError,
@@ -14,6 +15,7 @@ import {
   buildPutioUrl,
   requestJson,
   requestVoid,
+  selectJsonField,
   type PutioSdkConfigShape,
   type PutioSdkContext,
   type PutioQuery,
@@ -644,7 +646,7 @@ const widenValidationError = <A, E, R>(
 
 const normalizeFilesSearchQuery = (query: FilesSearchQuery): PutioQuery => {
   const type: PutioQueryValue =
-    query.type === undefined || typeof query.type === "string" ? query.type : query.type.join(",");
+    query.type === undefined || typeof query.type === "string" ? query.type : joinCsv(query.type);
 
   return {
     per_page: query.per_page,
@@ -652,12 +654,6 @@ const normalizeFilesSearchQuery = (query: FilesSearchQuery): PutioQuery => {
     type,
   };
 };
-
-const selectionToForm = (selection: FilesBulkSelection, idsFieldName = "file_ids") => ({
-  cursor: selection.cursor,
-  exclude_ids: selection.excludeIds?.join(","),
-  [idsFieldName]: selection.ids?.join(","),
-});
 
 const hasStreamUrl = (
   value: FileBroad,
@@ -809,7 +805,7 @@ export const buildFileHlsStreamUrl = (
     oauth_token: options.oauthToken,
     original:
       typeof options.playOriginal === "boolean" ? (options.playOriginal ? 1 : 0) : undefined,
-    subtitle_languages: options.subtitleLanguages?.join(","),
+    subtitle_languages: joinCsv(options.subtitleLanguages),
   });
 
 export const createFileUploadFormData = (input: FileUploadInput): FormData => {
@@ -883,7 +879,7 @@ export const queryFiles = (
             ...query,
             parent_id: parent,
           },
-  }).pipe((effect) => withOperationErrors(effect, QueryFilesErrorSpec));
+  }).pipe(withOperationErrors(QueryFilesErrorSpec));
 
 export const continueFiles = (
   cursor: string,
@@ -901,7 +897,7 @@ export const continueFiles = (
     method: "POST",
     path: "/v2/files/list/continue",
     query,
-  }).pipe((effect) => withOperationErrors(effect, ContinueFilesErrorSpec));
+  }).pipe(withOperationErrors(ContinueFilesErrorSpec));
 
 export function getFile(input: {
   readonly id: number;
@@ -915,10 +911,7 @@ export function getFile(input: { readonly id: number; readonly query?: FileQuery
     method: "GET",
     path: `/v2/files/${input.id}`,
     query: input.query,
-  }).pipe(
-    Effect.map(({ file }) => file),
-    (requestEffect) => withOperationErrors(requestEffect, GetFileErrorSpec),
-  );
+  }).pipe(selectJsonField("file"), withOperationErrors(GetFileErrorSpec));
 
   if (input.query === undefined) {
     return effect;
@@ -934,7 +927,7 @@ export const searchFiles = (
     method: "GET",
     path: "/v2/files/search",
     query: normalizeFilesSearchQuery(query),
-  }).pipe((effect) => withOperationErrors(effect, SearchFilesErrorSpec));
+  }).pipe(withOperationErrors(SearchFilesErrorSpec));
 
 export const continueSearch = (
   cursor: string,
@@ -952,7 +945,7 @@ export const continueSearch = (
     method: "POST",
     path: "/v2/files/search/continue",
     query,
-  }).pipe((effect) => withOperationErrors(effect, SearchFilesErrorSpec));
+  }).pipe(withOperationErrors(SearchFilesErrorSpec));
 
 export const createFolder = (
   input: FileCreateFolderInput,
@@ -964,10 +957,7 @@ export const createFolder = (
     },
     method: "POST",
     path: "/v2/files/create-folder",
-  }).pipe(
-    Effect.map(({ file }) => file),
-    (effect) => withOperationErrors(effect, CreateFolderErrorSpec),
-  );
+  }).pipe(selectJsonField("file"), withOperationErrors(CreateFolderErrorSpec));
 
 export const renameFile = (
   input: FileRenameInput,
@@ -979,7 +969,7 @@ export const renameFile = (
     },
     method: "POST",
     path: "/v2/files/rename",
-  }).pipe((effect) => withOperationErrors(effect, RenameFileErrorSpec));
+  }).pipe(withOperationErrors(RenameFileErrorSpec));
 
 export const deleteFiles = (
   ids: ReadonlyArray<number>,
@@ -997,7 +987,7 @@ export const deleteFiles = (
     body: {
       type: "form",
       value: {
-        file_ids: ids.join(","),
+        file_ids: joinCsv(ids),
       },
     },
     method: "POST",
@@ -1024,7 +1014,7 @@ export const deleteFileSelection = (
   requestJson(FileDeleteResultEnvelopeSchema, {
     body: {
       type: "form",
-      value: selectionToForm(selection),
+      value: toCursorSelectionForm(selection),
     },
     method: "POST",
     path: "/v2/files/delete",
@@ -1043,13 +1033,13 @@ export const moveFiles = (
     body: {
       type: "form",
       value: {
-        file_ids: ids.join(","),
+        file_ids: joinCsv(ids),
         parent_id: parentId,
       },
     },
     method: "POST",
     path: "/v2/files/move",
-  }).pipe(Effect.map(({ errors }) => errors));
+  }).pipe(selectJsonField("errors"));
 
 export const moveFileSelection = (
   selection: FilesBulkSelection,
@@ -1059,13 +1049,13 @@ export const moveFileSelection = (
     body: {
       type: "form",
       value: {
-        ...selectionToForm(selection),
+        ...toCursorSelectionForm(selection),
         parent_id: parentId,
       },
     },
     method: "POST",
     path: "/v2/files/move",
-  }).pipe(Effect.map(({ errors }) => errors));
+  }).pipe(selectJsonField("errors"));
 
 export const getStartFrom = (
   fileId: number,
@@ -1073,10 +1063,7 @@ export const getStartFrom = (
   requestJson(FileStartFromEnvelopeSchema, {
     method: "GET",
     path: `/v2/files/${fileId}/start-from`,
-  }).pipe(
-    Effect.map(({ start_from }) => start_from),
-    (effect) => withOperationErrors(effect, StartFromErrorSpec),
-  );
+  }).pipe(selectJsonField("start_from"), withOperationErrors(StartFromErrorSpec));
 
 export const getDownloadUrl = (
   fileId: number,
@@ -1084,10 +1071,7 @@ export const getDownloadUrl = (
   requestJson(FileDownloadUrlEnvelopeSchema, {
     method: "GET",
     path: `/v2/files/${fileId}/url`,
-  }).pipe(
-    Effect.map(({ url }) => url),
-    (effect) => withOperationErrors(effect, DownloadUrlErrorSpec),
-  );
+  }).pipe(selectJsonField("url"), withOperationErrors(DownloadUrlErrorSpec));
 
 export const getApiDownloadUrl = (
   fileId: number,
@@ -1156,10 +1140,10 @@ export const listFileSubtitles = (
     path: `/v2/files/${fileId}/subtitles`,
     query: options.languages
       ? {
-          languages: options.languages.join(","),
+          languages: joinCsv(options.languages),
         }
       : undefined,
-  }).pipe((effect) => withOperationErrors(effect, FileSubtitlesErrorSpec));
+  }).pipe(withOperationErrors(FileSubtitlesErrorSpec));
 
 export const setStartFrom = (
   input: FileStartFromSetInput,
@@ -1173,7 +1157,7 @@ export const setStartFrom = (
     },
     method: "POST",
     path: `/v2/files/${input.file_id}/start-from/set`,
-  }).pipe((effect) => withOperationErrors(effect, StartFromErrorSpec));
+  }).pipe(withOperationErrors(StartFromErrorSpec));
 
 export const resetStartFrom = (
   fileId: number,
@@ -1181,7 +1165,7 @@ export const resetStartFrom = (
   requestJson(OkResponseSchema, {
     method: "GET",
     path: `/v2/files/${fileId}/start-from/delete`,
-  }).pipe((effect) => withOperationErrors(effect, StartFromErrorSpec));
+  }).pipe(withOperationErrors(StartFromErrorSpec));
 
 export const getMp4Status = (
   fileId: number,
@@ -1189,10 +1173,7 @@ export const getMp4Status = (
   requestJson(FileConversionStatusEnvelopeSchema, {
     method: "GET",
     path: `/v2/files/${fileId}/mp4`,
-  }).pipe(
-    Effect.map(({ mp4 }) => mp4),
-    (effect) => withOperationErrors(effect, FileMp4ErrorSpec),
-  );
+  }).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
 
 export const convertFileToMp4 = (
   fileId: number,
@@ -1200,10 +1181,7 @@ export const convertFileToMp4 = (
   requestJson(FileConversionStatusEnvelopeSchema, {
     method: "POST",
     path: `/v2/files/${fileId}/mp4`,
-  }).pipe(
-    Effect.map(({ mp4 }) => mp4),
-    (effect) => withOperationErrors(effect, FileMp4ErrorSpec),
-  );
+  }).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
 
 export const deleteFileMp4 = (
   fileId: number,
@@ -1211,7 +1189,7 @@ export const deleteFileMp4 = (
   requestVoid({
     method: "DELETE",
     path: `/v2/files/${fileId}/mp4`,
-  }).pipe((effect) => withOperationErrors(effect, FileMp4MutationErrorSpec));
+  }).pipe(withOperationErrors(FileMp4MutationErrorSpec));
 
 export const putMp4ToMyFiles = (
   fileId: number,
@@ -1219,7 +1197,7 @@ export const putMp4ToMyFiles = (
   requestVoid({
     method: "GET",
     path: `/v2/files/${fileId}/put-mp4-to-my-folders`,
-  }).pipe((effect) => withOperationErrors(effect, FileMp4MutationErrorSpec));
+  }).pipe(withOperationErrors(FileMp4MutationErrorSpec));
 
 export const convertFilesToMp4 = (
   ids: ReadonlyArray<number>,
@@ -1228,12 +1206,12 @@ export const convertFilesToMp4 = (
     body: {
       type: "form",
       value: {
-        file_ids: ids.join(","),
+        file_ids: joinCsv(ids),
       },
     },
     method: "POST",
     path: "/v2/files/convert_mp4",
-  }).pipe(Effect.map(({ count }) => count));
+  }).pipe(selectJsonField("count"));
 
 export const convertFileSelectionToMp4 = (
   selection: FilesBulkSelection,
@@ -1241,11 +1219,11 @@ export const convertFileSelectionToMp4 = (
   requestJson(FilesBulkConvertEnvelopeSchema, {
     body: {
       type: "form",
-      value: selectionToForm(selection),
+      value: toCursorSelectionForm(selection),
     },
     method: "POST",
     path: "/v2/files/convert_mp4",
-  }).pipe(Effect.map(({ count }) => count));
+  }).pipe(selectJsonField("count"));
 
 export const listActiveMp4Conversions = (): Effect.Effect<
   ReadonlyArray<FileActiveConversion>,
@@ -1255,10 +1233,7 @@ export const listActiveMp4Conversions = (): Effect.Effect<
   requestJson(FileActiveConversionsEnvelopeSchema, {
     method: "GET",
     path: "/v2/mp4/queue",
-  }).pipe(
-    Effect.map(({ mp4s }) => mp4s),
-    (effect) => withOperationErrors(effect, FileActiveConversionsErrorSpec),
-  );
+  }).pipe(selectJsonField("mp4s"), withOperationErrors(FileActiveConversionsErrorSpec));
 
 export const setFilesWatchStatus = (
   selection: FilesBulkSelection & {
@@ -1269,13 +1244,13 @@ export const setFilesWatchStatus = (
     body: {
       type: "form",
       value: {
-        ...selectionToForm(selection),
+        ...toCursorSelectionForm(selection),
         watched: selection.watched,
       },
     },
     method: "POST",
     path: "/v2/files/watch-status",
-  }).pipe((effect) => withOperationErrors(effect, FileWatchStatusErrorSpec));
+  }).pipe(withOperationErrors(FileWatchStatusErrorSpec));
 
 export const extractFiles = (
   selection: FilesBulkSelection & {
@@ -1286,16 +1261,13 @@ export const extractFiles = (
     body: {
       type: "form",
       value: {
-        ...selectionToForm(selection, "user_file_ids"),
+        ...toCursorSelectionForm(selection, "user_file_ids"),
         password: selection.password,
       },
     },
     method: "POST",
     path: "/v2/files/extract",
-  }).pipe(
-    Effect.map(({ extractions }) => extractions),
-    (effect) => withOperationErrors(effect, FileExtractionsErrorSpec),
-  );
+  }).pipe(selectJsonField("extractions"), withOperationErrors(FileExtractionsErrorSpec));
 
 export const listFileExtractions = (): Effect.Effect<
   ReadonlyArray<FileExtraction>,
@@ -1305,10 +1277,7 @@ export const listFileExtractions = (): Effect.Effect<
   requestJson(FileExtractionsEnvelopeSchema, {
     method: "GET",
     path: "/v2/files/extract",
-  }).pipe(
-    Effect.map(({ extractions }) => extractions),
-    (effect) => withOperationErrors(effect, FileExtractionsErrorSpec),
-  );
+  }).pipe(selectJsonField("extractions"), withOperationErrors(FileExtractionsErrorSpec));
 
 export const deleteFileExtraction = (
   extractionId: number,
@@ -1328,7 +1297,7 @@ export const findNextFile = (
     query: {
       file_type: fileType,
     },
-  }).pipe(Effect.map(({ next_file }) => next_file));
+  }).pipe(selectJsonField("next_file"));
 
 export const findNextVideo = (
   fileId: number,
@@ -1336,7 +1305,7 @@ export const findNextVideo = (
   requestJson(FilesNextVideoEnvelopeSchema, {
     method: "GET",
     path: `/v2/files/${fileId}/next-video`,
-  }).pipe(Effect.map(({ next_video }) => next_video));
+  }).pipe(selectJsonField("next_video"));
 
 export const createFileUploadRequest = (
   input: FileUploadInput,
@@ -1379,5 +1348,5 @@ export const uploadFile = (
       }),
     ),
     Effect.map(toUploadResult),
-    (effect) => withOperationErrors(effect, FileUploadErrorSpec),
+    withOperationErrors(FileUploadErrorSpec),
   );

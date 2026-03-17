@@ -7,7 +7,12 @@ import {
   type PutioOperationFailure,
   type PutioSdkError,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonField,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 const RequestedFlag = Schema.Literal(1);
 
@@ -184,6 +189,13 @@ const missingFieldError = (field: string) =>
     cause: `Expected put.io to include "${field}" because it was requested`,
   });
 
+const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
+  Effect.fail(missingFieldError(field));
+
+const widenValidationError = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E | PutioValidationError, R> => effect;
+
 const hasDownloadToken = (
   value: AccountInfoBroad,
 ): value is AccountInfoBroad & { readonly download_token: string } =>
@@ -211,6 +223,45 @@ const hasPushToken = (
   value: AccountInfoBroad,
 ): value is AccountInfoBroad & { readonly push_token: string } =>
   typeof value.push_token === "string";
+
+const ensureAccountInfoFields = <TQuery extends AccountInfoQuery>(
+  effect: Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext>,
+  query: TQuery,
+): Effect.Effect<
+  AccountInfoResponseFor<TQuery>,
+  PutioSdkError | PutioValidationError,
+  PutioSdkContext
+> =>
+  Effect.gen(function* () {
+    const info = yield* widenValidationError(effect);
+
+    if (query.download_token === 1 && !hasDownloadToken(info)) {
+      return yield* failMissingField("download_token");
+    }
+
+    if (query.features === 1 && !hasFeatures(info)) {
+      return yield* failMissingField("features");
+    }
+
+    if (query.intercom === 1 && !hasIntercomUserHash(info)) {
+      return yield* failMissingField("user_hash");
+    }
+
+    if (query.pas === 1 && !hasPas(info)) {
+      return yield* failMissingField("pas");
+    }
+
+    if (query.profitwell === 1 && !hasPaddleUserId(info)) {
+      return yield* failMissingField("paddle_user_id");
+    }
+
+    if (query.push_token === 1 && !hasPushToken(info)) {
+      return yield* failMissingField("push_token");
+    }
+
+    // Requested-field checks above establish the query-conditioned contract.
+    return info as AccountInfoResponseFor<TQuery>;
+  });
 
 export const SaveAccountSettingsErrorSpec = definePutioOperationErrorSpec({
   domain: "account",
@@ -297,46 +348,9 @@ export function getAccountInfo(query: AccountInfoQuery) {
     method: "GET",
     path: "/v2/account/info",
     query,
-  }).pipe(Effect.map(({ info }) => info));
+  }).pipe(selectJsonField("info"));
 
-  if (query.download_token === 1 && query.pas === 1) {
-    return effect.pipe(
-      Effect.filterOrFail(hasDownloadToken, () => missingFieldError("download_token")),
-      Effect.filterOrFail(hasPas, () => missingFieldError("pas")),
-    );
-  }
-
-  if (query.download_token === 1) {
-    return effect.pipe(
-      Effect.filterOrFail(hasDownloadToken, () => missingFieldError("download_token")),
-    );
-  }
-
-  if (query.features === 1) {
-    return effect.pipe(Effect.filterOrFail(hasFeatures, () => missingFieldError("features")));
-  }
-
-  if (query.intercom === 1) {
-    return effect.pipe(
-      Effect.filterOrFail(hasIntercomUserHash, () => missingFieldError("user_hash")),
-    );
-  }
-
-  if (query.pas === 1) {
-    return effect.pipe(Effect.filterOrFail(hasPas, () => missingFieldError("pas")));
-  }
-
-  if (query.profitwell === 1) {
-    return effect.pipe(
-      Effect.filterOrFail(hasPaddleUserId, () => missingFieldError("paddle_user_id")),
-    );
-  }
-
-  if (query.push_token === 1) {
-    return effect.pipe(Effect.filterOrFail(hasPushToken, () => missingFieldError("push_token")));
-  }
-
-  return effect;
+  return ensureAccountInfoFields(effect, query);
 }
 
 export const getAccountSettings = (): Effect.Effect<
@@ -347,7 +361,7 @@ export const getAccountSettings = (): Effect.Effect<
   requestJson(AccountSettingsEnvelopeSchema, {
     method: "GET",
     path: "/v2/account/settings",
-  }).pipe(Effect.map(({ settings }) => settings));
+  }).pipe(selectJsonField("settings"));
 
 export const saveAccountSettings = (
   payload: SaveAccountSettingsPayload,
@@ -363,7 +377,7 @@ export const saveAccountSettings = (
     },
     method: "POST",
     path: "/v2/account/settings",
-  }).pipe((effect) => withOperationErrors(effect, SaveAccountSettingsErrorSpec));
+  }).pipe(withOperationErrors(SaveAccountSettingsErrorSpec));
 
 export const clearAccount = (
   options: AccountClearOptions,
@@ -402,7 +416,4 @@ export const listAccountConfirmations = (
           type: subject,
         }
       : undefined,
-  }).pipe(
-    Effect.map(({ confirmations }) => confirmations),
-    (effect) => withOperationErrors(effect, AccountConfirmationsErrorSpec),
-  );
+  }).pipe(selectJsonField("confirmations"), withOperationErrors(AccountConfirmationsErrorSpec));

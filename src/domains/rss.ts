@@ -5,7 +5,13 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonField,
+  selectJsonFields,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 export const RssFeedSchema = Schema.Struct({
   created_at: Schema.String,
@@ -247,19 +253,13 @@ export const listRssFeeds = (): Effect.Effect<
   requestJson(RssFeedsEnvelopeSchema, {
     method: "GET",
     path: "/v2/rss/list",
-  }).pipe(
-    Effect.map(({ feeds }) => feeds),
-    (effect) => withOperationErrors(effect, ListRssFeedsErrorSpec),
-  );
+  }).pipe(selectJsonField("feeds"), withOperationErrors(ListRssFeedsErrorSpec));
 
 export const getRssFeed = (id: number): Effect.Effect<RssFeed, GetRssFeedError, PutioSdkContext> =>
   requestJson(RssFeedEnvelopeSchema, {
     method: "GET",
     path: `/v2/rss/${id}`,
-  }).pipe(
-    Effect.map(({ feed }) => feed),
-    (effect) => withOperationErrors(effect, GetRssFeedErrorSpec),
-  );
+  }).pipe(selectJsonField("feed"), withOperationErrors(GetRssFeedErrorSpec));
 
 export const createRssFeed = (
   params: RssFeedParams,
@@ -271,10 +271,7 @@ export const createRssFeed = (
     },
     method: "POST",
     path: "/v2/rss/create",
-  }).pipe(
-    Effect.map(({ feed }) => feed),
-    (effect) => withOperationErrors(effect, CreateRssFeedErrorSpec),
-  );
+  }).pipe(selectJsonField("feed"), withOperationErrors(CreateRssFeedErrorSpec));
 
 export const updateRssFeed = (
   id: number,
@@ -291,7 +288,7 @@ export const updateRssFeed = (
     },
     method: "POST",
     path: `/v2/rss/${id}`,
-  }).pipe((effect) => withOperationErrors(effect, UpdateRssFeedErrorSpec));
+  }).pipe(withOperationErrors(UpdateRssFeedErrorSpec));
 
 export const pauseRssFeed = (
   id: number,
@@ -299,7 +296,7 @@ export const pauseRssFeed = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/rss/${id}/pause`,
-  }).pipe((effect) => withOperationErrors(effect, PauseRssFeedErrorSpec));
+  }).pipe(withOperationErrors(PauseRssFeedErrorSpec));
 
 export const resumeRssFeed = (
   id: number,
@@ -311,7 +308,7 @@ export const resumeRssFeed = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/rss/${id}/resume`,
-  }).pipe((effect) => withOperationErrors(effect, ResumeRssFeedErrorSpec));
+  }).pipe(withOperationErrors(ResumeRssFeedErrorSpec));
 
 export const deleteRssFeed = (
   id: number,
@@ -323,7 +320,7 @@ export const deleteRssFeed = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/rss/${id}/delete`,
-  }).pipe((effect) => withOperationErrors(effect, DeleteRssFeedErrorSpec));
+  }).pipe(withOperationErrors(DeleteRssFeedErrorSpec));
 
 export const listRssFeedItems = (
   id: number,
@@ -338,10 +335,7 @@ export const listRssFeedItems = (
   requestJson(RssFeedItemsEnvelopeSchema, {
     method: "GET",
     path: `/v2/rss/${id}/items`,
-  }).pipe(
-    Effect.map(({ feed, items }) => ({ feed, items })),
-    (effect) => withOperationErrors(effect, ListRssFeedItemsErrorSpec),
-  );
+  }).pipe(selectJsonFields("feed", "items"), withOperationErrors(ListRssFeedItemsErrorSpec));
 
 export const clearRssFeedLogs = (
   id: number,
@@ -353,7 +347,7 @@ export const clearRssFeedLogs = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/rss/${id}/clear-log`,
-  }).pipe((effect) => withOperationErrors(effect, ClearRssFeedLogsErrorSpec));
+  }).pipe(withOperationErrors(ClearRssFeedLogsErrorSpec));
 
 export const retryRssFeedItem = (
   feedId: number,
@@ -366,7 +360,7 @@ export const retryRssFeedItem = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/rss/${feedId}/items/${itemId}/retry`,
-  }).pipe((effect) => withOperationErrors(effect, RetryRssFeedItemErrorSpec));
+  }).pipe(withOperationErrors(RetryRssFeedItemErrorSpec));
 
 export const retryAllRssFeedItems = (
   feedId: number,
@@ -378,4 +372,4 @@ export const retryAllRssFeedItems = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/rss/${feedId}/retry-all`,
-  }).pipe((effect) => withOperationErrors(effect, RetryAllRssFeedItemsErrorSpec));
+  }).pipe(withOperationErrors(RetryAllRssFeedItemsErrorSpec));

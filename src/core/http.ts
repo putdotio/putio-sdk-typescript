@@ -224,6 +224,23 @@ export const requestJson = <A, I, R>(
     ),
   );
 
+export const selectJsonField =
+  <K extends string>(field: K) =>
+  <A extends Record<K, unknown>, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A[K], E, R> =>
+    effect.pipe(Effect.map((value) => value[field]));
+
+export const selectJsonFields =
+  <const K extends readonly string[]>(...fields: K) =>
+  <A extends Record<K[number], unknown>, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<Pick<A, K[number]>, E, R> =>
+    effect.pipe(
+      Effect.map(
+        (value) =>
+          Object.fromEntries(fields.map((field) => [field, value[field]])) as Pick<A, K[number]>,
+      ),
+    );
+
 export const requestArrayBuffer = (
   options: PutioRequestOptions,
 ): Effect.Effect<Uint8Array, PutioSdkError, PutioSdkContext> =>

@@ -1,11 +1,12 @@
 import { Effect, Schema } from "effect";
 
+import { toCursorSelectionForm } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { requestJson, type PutioSdkContext } from "../core/http.js";
+import { requestJson, selectJsonFields, type PutioSdkContext } from "../core/http.js";
 
 export const DownloadLinksStatusSchema = Schema.Literal("NEW", "PROCESSING", "DONE", "ERROR");
 
@@ -96,18 +97,11 @@ export const createDownloadLinks = (
   requestJson(DownloadLinksCreateEnvelopeSchema, {
     body: {
       type: "form",
-      value: {
-        cursor: input.cursor,
-        exclude_ids: input.excludeIds?.join(","),
-        file_ids: input.ids?.join(","),
-      },
+      value: toCursorSelectionForm(input),
     },
     method: "POST",
     path: "/v2/download_links/create",
-  }).pipe(
-    Effect.map(({ id }) => ({ id })),
-    (effect) => withOperationErrors(effect, CreateDownloadLinksErrorSpec),
-  );
+  }).pipe(selectJsonFields("id"), withOperationErrors(CreateDownloadLinksErrorSpec));
 
 export const getDownloadLinks = (
   id: number,
@@ -115,4 +109,4 @@ export const getDownloadLinks = (
   requestJson(DownloadLinksInfoSchema, {
     method: "GET",
     path: `/v2/download_links/${id}`,
-  }).pipe((effect) => withOperationErrors(effect, GetDownloadLinksErrorSpec));
+  }).pipe(withOperationErrors(GetDownloadLinksErrorSpec));

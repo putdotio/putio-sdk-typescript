@@ -1,11 +1,17 @@
 import { Effect, Schema } from "effect";
 
+import { joinCsv } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestJson,
+  selectJsonField,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 export const PaymentPlanTypeSchema = Schema.Literal("onetime", "subscription");
 export const PaymentOptionPlanTypeSchema = Schema.Literal("onetime", "subscription", "trial");
@@ -602,7 +608,7 @@ export const getPaymentInfo = (): Effect.Effect<
   requestJson(PaymentInfoSchema, {
     method: "GET",
     path: "/v2/payment/info",
-  }).pipe((effect) => withOperationErrors(effect, GetPaymentInfoErrorSpec));
+  }).pipe(withOperationErrors(GetPaymentInfoErrorSpec));
 
 export const listPaymentPlans = (): Effect.Effect<
   ReadonlyArray<PaymentPlanGroup>,
@@ -612,10 +618,7 @@ export const listPaymentPlans = (): Effect.Effect<
   requestJson(PaymentPlansEnvelopeSchema, {
     method: "GET",
     path: "/v2/payment/plans",
-  }).pipe(
-    Effect.map(({ plans }) => plans),
-    (effect) => withOperationErrors(effect, ListPaymentPlansErrorSpec),
-  );
+  }).pipe(selectJsonField("plans"), withOperationErrors(ListPaymentPlansErrorSpec));
 
 export const listPaymentOptions = (): Effect.Effect<
   ReadonlyArray<Schema.Schema.Type<typeof PaymentOptionSchema>>,
@@ -626,10 +629,7 @@ export const listPaymentOptions = (): Effect.Effect<
     auth: { type: "none" },
     method: "GET",
     path: "/v2/payment/options",
-  }).pipe(
-    Effect.map(({ options }) => options),
-    (effect) => withOperationErrors(effect, ListPaymentOptionsErrorSpec),
-  );
+  }).pipe(selectJsonField("options"), withOperationErrors(ListPaymentOptionsErrorSpec));
 
 export const listPaymentHistory = (
   query?: PaymentHistoryQuery,
@@ -638,10 +638,7 @@ export const listPaymentHistory = (
     method: "GET",
     path: "/v2/payment/history",
     query,
-  }).pipe(
-    Effect.map(({ payments }) => payments),
-    (effect) => withOperationErrors(effect, ListPaymentHistoryErrorSpec),
-  );
+  }).pipe(selectJsonField("payments"), withOperationErrors(ListPaymentHistoryErrorSpec));
 
 export const listPaymentInvites = (): Effect.Effect<
   ReadonlyArray<Schema.Schema.Type<typeof PaymentInviteSchema>>,
@@ -651,10 +648,7 @@ export const listPaymentInvites = (): Effect.Effect<
   requestJson(PaymentInvitesEnvelopeSchema, {
     method: "GET",
     path: "/v2/payment/invites",
-  }).pipe(
-    Effect.map(({ vouchers }) => vouchers),
-    (effect) => withOperationErrors(effect, ListPaymentInvitesErrorSpec),
-  );
+  }).pipe(selectJsonField("vouchers"), withOperationErrors(ListPaymentInvitesErrorSpec));
 
 export const previewPaymentChangePlan = (
   input: PaymentChangePlanPreviewInput,
@@ -666,7 +660,7 @@ export const previewPaymentChangePlan = (
       coupon_code: input.coupon_code,
       payment_type: input.payment_type,
     },
-  }).pipe((effect) => withOperationErrors(effect, PreviewPaymentChangePlanErrorSpec));
+  }).pipe(withOperationErrors(PreviewPaymentChangePlanErrorSpec));
 
 export const submitPaymentChangePlan = (
   input: PaymentChangePlanSubmitInput,
@@ -684,7 +678,7 @@ export const submitPaymentChangePlan = (
     query: {
       coupon_code: input.coupon_code,
     },
-  }).pipe((effect) => withOperationErrors(effect, SubmitPaymentChangePlanErrorSpec));
+  }).pipe(withOperationErrors(SubmitPaymentChangePlanErrorSpec));
 
 export const confirmFastspringOrder = (
   reference: string,
@@ -692,10 +686,7 @@ export const confirmFastspringOrder = (
   requestJson(PaymentFastspringConfirmEnvelopeSchema, {
     method: "GET",
     path: `/v2/payment/fs-confirm/${encodeURIComponent(reference)}`,
-  }).pipe(
-    Effect.map(({ confirmed }) => confirmed),
-    (effect) => withOperationErrors(effect, ConfirmFastspringOrderErrorSpec),
-  );
+  }).pipe(selectJsonField("confirmed"), withOperationErrors(ConfirmFastspringOrderErrorSpec));
 
 export const stopPaymentSubscription = (): Effect.Effect<
   void,
@@ -705,7 +696,7 @@ export const stopPaymentSubscription = (): Effect.Effect<
   requestJson(OkResponseSchema, {
     method: "POST",
     path: "/v2/payment/stop_subscription",
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, StopSubscriptionErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(StopSubscriptionErrorSpec));
 
 export const getPaymentVoucherInfo = (
   code: string,
@@ -713,7 +704,7 @@ export const getPaymentVoucherInfo = (
   requestJson(PaymentVoucherInfoSchema, {
     method: "GET",
     path: `/v2/payment/redeem_voucher/${encodeURIComponent(code)}`,
-  }).pipe((effect) => withOperationErrors(effect, GetPaymentVoucherInfoErrorSpec));
+  }).pipe(withOperationErrors(GetPaymentVoucherInfoErrorSpec));
 
 export const redeemPaymentVoucher = (
   code: string,
@@ -721,7 +712,7 @@ export const redeemPaymentVoucher = (
   requestJson(OkResponseSchema, {
     method: "POST",
     path: `/v2/payment/redeem_voucher/${encodeURIComponent(code)}`,
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, RedeemPaymentVoucherErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(RedeemPaymentVoucherErrorSpec));
 
 export const reportPayments = (
   paymentIds: ReadonlyArray<number>,
@@ -730,12 +721,12 @@ export const reportPayments = (
     body: {
       type: "form",
       value: {
-        payment_ids: paymentIds.join(","),
+        payment_ids: joinCsv(paymentIds),
       },
     },
     method: "POST",
     path: "/v2/payment/report",
-  }).pipe(Effect.asVoid, (effect) => withOperationErrors(effect, ReportPaymentsErrorSpec));
+  }).pipe(Effect.asVoid, withOperationErrors(ReportPaymentsErrorSpec));
 
 export const createPaddleWaitingPayment = (
   input: PaymentPaddleWaitingPaymentInput,
@@ -747,9 +738,7 @@ export const createPaddleWaitingPayment = (
     },
     method: "POST",
     path: "/v2/payment/paddle_waiting_payment",
-  }).pipe(Effect.asVoid, (effect) =>
-    withOperationErrors(effect, CreatePaddleWaitingPaymentErrorSpec),
-  );
+  }).pipe(Effect.asVoid, withOperationErrors(CreatePaddleWaitingPaymentErrorSpec));
 
 export const createCoinbaseCharge = (
   planPath: string,
@@ -764,8 +753,9 @@ export const createCoinbaseCharge = (
     method: "POST",
     path: "/v2/payment/methods/coinbase/charge",
   }).pipe(
-    Effect.map(({ coinbase }) => coinbase.code),
-    (effect) => withOperationErrors(effect, CreateCoinbaseChargeErrorSpec),
+    selectJsonField("coinbase"),
+    Effect.map(({ code }) => code),
+    withOperationErrors(CreateCoinbaseChargeErrorSpec),
   );
 
 export const createOpenNodeCharge = (
@@ -781,8 +771,9 @@ export const createOpenNodeCharge = (
     method: "POST",
     path: "/v2/payment/methods/opennode/charge",
   }).pipe(
-    Effect.map(({ opennode }) => opennode.checkout_url),
-    (effect) => withOperationErrors(effect, CreateOpenNodeChargeErrorSpec),
+    selectJsonField("opennode"),
+    Effect.map(({ checkout_url }) => checkout_url),
+    withOperationErrors(CreateOpenNodeChargeErrorSpec),
   );
 
 export const createNanoPaymentRequest = (
@@ -798,6 +789,7 @@ export const createNanoPaymentRequest = (
     method: "POST",
     path: "/v2/payment/methods/nano/request",
   }).pipe(
-    Effect.map(({ nano }) => nano.token),
-    (effect) => withOperationErrors(effect, CreateNanoPaymentRequestErrorSpec),
+    selectJsonField("nano"),
+    Effect.map(({ token }) => token),
+    withOperationErrors(CreateNanoPaymentRequestErrorSpec),
   );

@@ -17,6 +17,8 @@ import {
   requestArrayBuffer,
   requestJson,
   requestVoid,
+  selectJsonField,
+  selectJsonFields,
   type PutioSdkContext,
 } from "./http.js";
 
@@ -71,6 +73,30 @@ describe("sdk core http", () => {
         start_from: undefined,
       }),
     ).toBe("https://api.put.io/v2/files/list?offset=20&parent_id=0&reverse=false");
+  });
+
+  it("projects decoded JSON envelopes with shared selectors", async () => {
+    const field = await Effect.runPromise(
+      Effect.succeed({
+        code: "PUTIO1",
+        qr_code_url: "https://api.put.io/qrcode/PUTIO1",
+        status: "OK" as const,
+      }).pipe(selectJsonField("code")),
+    );
+
+    const fields = await Effect.runPromise(
+      Effect.succeed({
+        access_token: "token-123",
+        status: "OK" as const,
+        user_id: 7,
+      }).pipe(selectJsonFields("access_token", "user_id")),
+    );
+
+    expect(field).toBe("PUTIO1");
+    expect(fields).toEqual({
+      access_token: "token-123",
+      user_id: 7,
+    });
   });
 
   it("sends token-authenticated requests and decodes successful JSON", async () => {

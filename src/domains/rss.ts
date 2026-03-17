@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const RssFeedSchema = Schema.Struct({
   created_at: Schema.String,
@@ -80,10 +80,6 @@ const RssFeedItemsEnvelopeSchema = Schema.Struct({
   items: Schema.Array(RssFeedItemSchema),
   status: Schema.Literal("OK"),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type RssFeed = Schema.Schema.Type<typeof RssFeedSchema>;
 export type RssFeedParams = Schema.Schema.Type<typeof RssFeedParamsSchema>;

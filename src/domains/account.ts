@@ -7,7 +7,7 @@ import {
   type PutioOperationFailure,
   type PutioSdkError,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 const RequestedFlag = Schema.Literal(1);
 
@@ -211,10 +211,6 @@ const hasPushToken = (
   value: AccountInfoBroad,
 ): value is AccountInfoBroad & { readonly push_token: string } =>
   typeof value.push_token === "string";
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export const SaveAccountSettingsErrorSpec = definePutioOperationErrorSpec({
   domain: "account",

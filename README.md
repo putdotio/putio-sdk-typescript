@@ -22,8 +22,10 @@
 
 ## Installation
 
+Install with your package manager of choice:
+
 ```bash
-vp add @putdotio/sdk
+npm install @putdotio/sdk
 ```
 
 ## Promise Example
@@ -39,8 +41,6 @@ const info = await sdk.account.getInfo({
   download_token: 1,
   pas: 1,
 });
-
-await sdk.dispose();
 ```
 
 ## Effect Example
@@ -91,6 +91,8 @@ Effect is the canonical typed surface. The Promise client is an adapter for envi
 - Effect client: keeps errors in the Effect error channel with operation-specific typing
 - Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`
 - Promise client: owns a managed Effect runtime and exposes `dispose()` for explicit teardown
+
+If you create a long-lived Promise client in a script, test harness, or server integration, call `await sdk.dispose()` during teardown.
 
 ## Namespace Surface
 
@@ -257,6 +259,8 @@ export const useFiles = (parentId: number) =>
 
 ## Verification
 
+Repo-local verification uses `vp`:
+
 Local checks:
 
 ```bash
@@ -279,11 +283,6 @@ Custom package scripts:
 vp run verify
 vp run bootstrap:tokens
 ```
-
-## Release Flow
-
-Pushes to `main` verify the repo and then run `semantic-release`.
-Add `NPM_TOKEN` in GitHub secrets and use conventional commits to drive version bumps.
 
 Implementation and confidence notes live in `docs/READINESS.md`.
 Target-by-target live verification guidance lives in `docs/TESTING.md`.

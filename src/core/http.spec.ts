@@ -17,6 +17,7 @@ import {
   requestArrayBuffer,
   requestJson,
   requestVoid,
+  type PutioSdkContext,
 } from "./http.js";
 
 type MockRequestHandler = (request: HttpClientRequest.HttpClientRequest) => Response;
@@ -41,7 +42,7 @@ const makeMockHttpClient = (handler: MockRequestHandler) =>
   );
 
 const provideSdkTest = <A, E>(
-  effect: Effect.Effect<A, E, HttpClient.HttpClient | import("./http.js").PutioSdkConfig>,
+  effect: Effect.Effect<A, E, PutioSdkContext>,
   handler: MockRequestHandler,
   config: Parameters<typeof makePutioSdkConfig>[0] = {},
 ) =>

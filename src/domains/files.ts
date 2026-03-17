@@ -14,6 +14,8 @@ import {
   buildPutioUrl,
   requestJson,
   requestVoid,
+  type PutioSdkConfigShape,
+  type PutioSdkContext,
   type PutioQuery,
   type PutioQueryValue,
 } from "../core/http.js";
@@ -633,6 +635,13 @@ const missingFieldError = (field: string) =>
     cause: `Expected put.io to include "${field}" because it was requested`,
   });
 
+const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
+  Effect.fail(missingFieldError(field));
+
+const widenValidationError = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E | PutioValidationError, R> => effect;
+
 const normalizeFilesSearchQuery = (query: FilesSearchQuery): PutioQuery => {
   const type: PutioQueryValue =
     query.type === undefined || typeof query.type === "string" ? query.type : query.type.join(",");
@@ -690,10 +699,6 @@ const hasMediaInfo = (
   value: FileBroad,
 ): value is FileBroad & { readonly media_info: FileMediaInfo | null } => "media_info" in value;
 
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
-
 const useTunnelToQuery = (useTunnel?: boolean) =>
   useTunnel === false
     ? {
@@ -701,17 +706,25 @@ const useTunnelToQuery = (useTunnel?: boolean) =>
       }
     : {};
 
-const resolveRouteToken = (
+const resolveRouteContext = (
   oauthToken?: string,
-): Effect.Effect<string, PutioSdkError, import("../core/http.js").PutioSdkConfig> =>
+): Effect.Effect<
+  {
+    readonly config: PutioSdkConfigShape;
+    readonly oauthToken: string;
+  },
+  PutioSdkError,
+  PutioSdkConfig
+> =>
   Effect.gen(function* () {
-    if (oauthToken) {
-      return oauthToken;
-    }
-
     const config = yield* PutioSdkConfig;
-    if (config.accessToken) {
-      return config.accessToken;
+    const resolvedOauthToken = oauthToken ?? config.accessToken;
+
+    if (resolvedOauthToken) {
+      return {
+        config,
+        oauthToken: resolvedOauthToken,
+      };
     }
 
     return yield* Effect.fail(
@@ -817,59 +830,44 @@ export const createFileUploadFormData = (input: FileUploadInput): FormData => {
 const ensureFileQueryFields = <TQuery extends FileQuery, E>(
   effect: Effect.Effect<FileBroad, E, PutioSdkContext>,
   query: TQuery,
-): Effect.Effect<FileResponseFor<TQuery>, E | PutioValidationError, PutioSdkContext> => {
-  let narrowed = effect as Effect.Effect<FileBroad, E | PutioValidationError, PutioSdkContext>;
+): Effect.Effect<FileResponseFor<TQuery>, E | PutioValidationError, PutioSdkContext> =>
+  Effect.gen(function* () {
+    const file = yield* widenValidationError(effect);
 
-  if (query.stream_url === 1) {
-    narrowed = narrowed.pipe(
-      Effect.filterOrFail(hasStreamUrl, () => missingFieldError("stream_url")),
-    );
-  }
+    if (query.stream_url === 1 && !hasStreamUrl(file)) {
+      return yield* failMissingField("stream_url");
+    }
 
-  if (query.mp4_status === 1 || query.mp4_stream_url === 1) {
-    narrowed = narrowed.pipe(
-      Effect.filterOrFail(hasMp4StatusFields, () =>
-        missingFieldError(query.mp4_stream_url === 1 ? "mp4_size/need_convert" : "mp4_size"),
-      ),
-    );
-  }
+    if ((query.mp4_status === 1 || query.mp4_stream_url === 1) && !hasMp4StatusFields(file)) {
+      return yield* failMissingField(
+        query.mp4_stream_url === 1 ? "mp4_size/need_convert" : "mp4_size",
+      );
+    }
 
-  if (query.mp4_stream_url === 1) {
-    narrowed = narrowed.pipe(
-      Effect.filterOrFail(hasMp4StreamUrlWhenAvailable, () => missingFieldError("mp4_stream_url")),
-    );
-  }
+    if (query.mp4_stream_url === 1 && !hasMp4StreamUrlWhenAvailable(file)) {
+      return yield* failMissingField("mp4_stream_url");
+    }
 
-  if (query.video_metadata === 1 && query.media_metadata !== 1) {
-    narrowed = narrowed.pipe(
-      Effect.filterOrFail(hasVideoMetadata, () => missingFieldError("video_metadata")),
-    );
-  }
+    if (query.video_metadata === 1 && query.media_metadata !== 1 && !hasVideoMetadata(file)) {
+      return yield* failMissingField("video_metadata");
+    }
 
-  if (query.media_metadata === 1) {
-    narrowed = narrowed.pipe(
-      Effect.filterOrFail(hasMediaMetadata, () => missingFieldError("media_metadata")),
-    );
-  }
+    if (query.media_metadata === 1 && !hasMediaMetadata(file)) {
+      return yield* failMissingField("media_metadata");
+    }
 
-  if (query.codecs === 1) {
-    narrowed = narrowed.pipe(
-      Effect.filterOrFail(hasCodecs, () => missingFieldError("content_type_and_codecs")),
-    );
-  }
+    if (query.codecs === 1 && !hasCodecs(file)) {
+      return yield* failMissingField("content_type_and_codecs");
+    }
 
-  if (query.media_info === 1) {
-    narrowed = narrowed.pipe(
-      Effect.filterOrFail(hasMediaInfo, () => missingFieldError("media_info")),
-    );
-  }
+    if (query.media_info === 1 && !hasMediaInfo(file)) {
+      return yield* failMissingField("media_info");
+    }
 
-  return narrowed as Effect.Effect<
-    FileResponseFor<TQuery>,
-    E | PutioValidationError,
-    PutioSdkContext
-  >;
-};
+    // Requested-field checks above turn the decoded broad payload into the
+    // query-conditioned response contract the rest of the SDK can trust.
+    return file as FileResponseFor<TQuery>;
+  });
 
 export const queryFiles = (
   parent: number | "friends",
@@ -905,21 +903,28 @@ export const continueFiles = (
     query,
   }).pipe((effect) => withOperationErrors(effect, ContinueFilesErrorSpec));
 
-export function getFile<TQuery extends FileQuery = {}>(input: {
+export function getFile(input: {
   readonly id: number;
-  readonly query?: TQuery;
-}): Effect.Effect<FileResponseFor<TQuery>, GetFileError | PutioValidationError, PutioSdkContext> {
-  const query = (input.query ?? {}) as TQuery;
+}): Effect.Effect<FileCore, GetFileError | PutioValidationError, PutioSdkContext>;
+export function getFile<TQuery extends FileQuery>(input: {
+  readonly id: number;
+  readonly query: TQuery;
+}): Effect.Effect<FileResponseFor<TQuery>, GetFileError | PutioValidationError, PutioSdkContext>;
+export function getFile(input: { readonly id: number; readonly query?: FileQuery }) {
   const effect = requestJson(FileEnvelopeSchema, {
     method: "GET",
     path: `/v2/files/${input.id}`,
-    query,
+    query: input.query,
   }).pipe(
     Effect.map(({ file }) => file),
     (requestEffect) => withOperationErrors(requestEffect, GetFileErrorSpec),
   );
 
-  return ensureFileQueryFields(effect, query);
+  if (input.query === undefined) {
+    return effect;
+  }
+
+  return ensureFileQueryFields(effect, input.query);
 }
 
 export const searchFiles = (
@@ -1087,60 +1092,52 @@ export const getDownloadUrl = (
 export const getApiDownloadUrl = (
   fileId: number,
   options: FileApiDownloadUrlOptions = {},
-): Effect.Effect<string, PutioSdkError, import("../core/http.js").PutioSdkConfig> =>
-  resolveRouteToken(options.oauthToken).pipe(
-    Effect.flatMap((oauthToken) =>
-      Effect.map(PutioSdkConfig, (config) =>
-        buildFileApiDownloadUrl(config.baseUrl ?? "https://api.put.io", fileId, {
-          ...options,
-          oauthToken,
-        }),
-      ),
+): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
+  resolveRouteContext(options.oauthToken).pipe(
+    Effect.map(({ config, oauthToken }) =>
+      buildFileApiDownloadUrl(config.baseUrl ?? "https://api.put.io", fileId, {
+        ...options,
+        oauthToken,
+      }),
     ),
   );
 
 export const getApiContentUrl = (
   fileId: number,
   options: FileDirectAccessOptions = {},
-): Effect.Effect<string, PutioSdkError, import("../core/http.js").PutioSdkConfig> =>
-  resolveRouteToken(options.oauthToken).pipe(
-    Effect.flatMap((oauthToken) =>
-      Effect.map(PutioSdkConfig, (config) =>
-        buildFileApiContentUrl(config.baseUrl ?? "https://api.put.io", fileId, {
-          ...options,
-          oauthToken,
-        }),
-      ),
+): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
+  resolveRouteContext(options.oauthToken).pipe(
+    Effect.map(({ config, oauthToken }) =>
+      buildFileApiContentUrl(config.baseUrl ?? "https://api.put.io", fileId, {
+        ...options,
+        oauthToken,
+      }),
     ),
   );
 
 export const getApiMp4DownloadUrl = (
   fileId: number,
   options: FileApiMp4DownloadUrlOptions = {},
-): Effect.Effect<string, PutioSdkError, import("../core/http.js").PutioSdkConfig> =>
-  resolveRouteToken(options.oauthToken).pipe(
-    Effect.flatMap((oauthToken) =>
-      Effect.map(PutioSdkConfig, (config) =>
-        buildFileApiMp4DownloadUrl(config.baseUrl ?? "https://api.put.io", fileId, {
-          ...options,
-          oauthToken,
-        }),
-      ),
+): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
+  resolveRouteContext(options.oauthToken).pipe(
+    Effect.map(({ config, oauthToken }) =>
+      buildFileApiMp4DownloadUrl(config.baseUrl ?? "https://api.put.io", fileId, {
+        ...options,
+        oauthToken,
+      }),
     ),
   );
 
 export const getHlsStreamUrl = (
   fileId: number,
   options: FileHlsStreamUrlOptions = {},
-): Effect.Effect<string, PutioSdkError, import("../core/http.js").PutioSdkConfig> =>
-  resolveRouteToken(options.oauthToken).pipe(
-    Effect.flatMap((oauthToken) =>
-      Effect.map(PutioSdkConfig, (config) =>
-        buildFileHlsStreamUrl(config.baseUrl ?? "https://api.put.io", fileId, {
-          ...options,
-          oauthToken,
-        }),
-      ),
+): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
+  resolveRouteContext(options.oauthToken).pipe(
+    Effect.map(({ config, oauthToken }) =>
+      buildFileHlsStreamUrl(config.baseUrl ?? "https://api.put.io", fileId, {
+        ...options,
+        oauthToken,
+      }),
     ),
   );
 
@@ -1346,21 +1343,15 @@ export const createFileUploadRequest = (
   options: {
     readonly oauthToken?: string;
   } = {},
-): Effect.Effect<
-  FileUploadRequestDescriptor,
-  PutioSdkError,
-  import("../core/http.js").PutioSdkConfig
-> =>
-  resolveRouteToken(options.oauthToken).pipe(
-    Effect.flatMap((oauthToken) =>
-      Effect.map(PutioSdkConfig, (config) => ({
-        body: createFileUploadFormData(input),
-        method: "POST" as const,
-        url: buildPutioUrl(config.uploadBaseUrl ?? "https://upload.put.io", "/v2/files/upload", {
-          oauth_token: oauthToken,
-        }),
-      })),
-    ),
+): Effect.Effect<FileUploadRequestDescriptor, PutioSdkError, PutioSdkConfig> =>
+  resolveRouteContext(options.oauthToken).pipe(
+    Effect.map(({ config, oauthToken }) => ({
+      body: createFileUploadFormData(input),
+      method: "POST" as const,
+      url: buildPutioUrl(config.uploadBaseUrl ?? "https://upload.put.io", "/v2/files/upload", {
+        oauth_token: oauthToken,
+      }),
+    })),
   );
 
 export const uploadFile = (
@@ -1369,19 +1360,13 @@ export const uploadFile = (
     readonly oauthToken?: string;
   } = {},
 ): Effect.Effect<FileUploadResult, FileUploadError | PutioValidationError, PutioSdkContext> =>
-  resolveRouteToken(options.oauthToken).pipe(
-    Effect.flatMap((oauthToken) =>
-      Effect.map(PutioSdkConfig, (config) => ({
-        oauthToken,
-        uploadBaseUrl: config.uploadBaseUrl ?? "https://upload.put.io",
-      })),
-    ),
-    Effect.flatMap(({ oauthToken, uploadBaseUrl }) =>
+  resolveRouteContext(options.oauthToken).pipe(
+    Effect.flatMap(({ config, oauthToken }) =>
       requestJson(FileUploadEnvelopeSchema, {
         auth: {
           type: "none",
         },
-        baseUrl: uploadBaseUrl,
+        baseUrl: config.uploadBaseUrl ?? "https://upload.put.io",
         body: {
           type: "form-data",
           value: createFileUploadFormData(input),

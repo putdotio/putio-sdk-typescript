@@ -6,7 +6,7 @@ import {
   type PutioOperationFailure,
 } from "../core/errors.js";
 import { FileTypeSchema } from "./files.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const TrashFileSchema = Schema.Struct({
   content_type: Schema.NullOr(Schema.String),
@@ -38,10 +38,6 @@ const TrashContinueEnvelopeSchema = Schema.Struct({
   files: Schema.Array(TrashFileSchema),
   status: Schema.Literal("OK"),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type TrashFile = Schema.Schema.Type<typeof TrashFileSchema>;
 export type TrashListResponse = Schema.Schema.Type<typeof TrashListEnvelopeSchema>;

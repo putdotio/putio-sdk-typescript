@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { requestJson } from "../core/http.js";
+import { requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const DownloadLinksStatusSchema = Schema.Literal("NEW", "PROCESSING", "DONE", "ERROR");
 
@@ -52,10 +52,6 @@ export const DownloadLinksInfoSchema = Schema.Union(
   DownloadLinksDoneEnvelopeSchema,
   DownloadLinksErrorEnvelopeSchema,
 );
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type DownloadLinksStatus = Schema.Schema.Type<typeof DownloadLinksStatusSchema>;
 export type DownloadLinksCreateInput = Schema.Schema.Type<typeof DownloadLinksCreateInputSchema>;

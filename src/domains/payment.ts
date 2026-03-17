@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const PaymentPlanTypeSchema = Schema.Literal("onetime", "subscription");
 export const PaymentOptionPlanTypeSchema = Schema.Literal("onetime", "subscription", "trial");
@@ -307,10 +307,6 @@ const PaymentCoinbaseChargeEnvelopeSchema = Schema.Struct({
   }),
   status: Schema.Literal("OK"),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type PaymentInfo = Schema.Schema.Type<typeof PaymentInfoSchema>;
 export type PaymentPlanGroup = Schema.Schema.Type<typeof PaymentPlanGroupSchema>;

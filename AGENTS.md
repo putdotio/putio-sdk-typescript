@@ -30,6 +30,7 @@
 - Keep the public surface domain-first and Effect-first.
 - Validate external data at the boundary with schemas and keep typed failures explicit.
 - Prefer feature/domain modules over layering by technical concern.
+- Keep `README.md` consumer-facing; put repo-operator detail in `docs/*` and keep `AGENTS.md` as a routing layer.
 - Prefer `vp` for toolchain and package-manager operations; use `vp run <script>` for custom package scripts.
 - Keep public package boundaries explicit and open-source-safe.
 - Avoid unsafe casts, ignored checks, and weakened thresholds unless explicitly approved.
@@ -44,3 +45,4 @@
 ## Skills
 
 - Repo-local development skills live in `.agents/skills/*-dev`.
+- `.claude/*` mirrors the same guidance through symlinks for Claude-compatible tooling.

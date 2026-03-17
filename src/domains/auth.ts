@@ -6,7 +6,12 @@ import {
   type PutioOperationFailure,
   type PutioSdkError,
 } from "../core/errors.js";
-import { OkResponseSchema, buildPutioUrl, requestJson } from "../core/http.js";
+import {
+  OkResponseSchema,
+  buildPutioUrl,
+  requestJson,
+  type PutioSdkContext,
+} from "../core/http.js";
 import { OAuthAppSchema, OAuthAppSessionSchema } from "./oauth.js";
 
 export const LoginResponseSchema = Schema.Struct({
@@ -165,10 +170,6 @@ export type TwoFactorRecoveryCodes = Schema.Schema.Type<typeof TwoFactorRecovery
 export type GenerateTOTPResponse = Schema.Schema.Type<typeof GenerateTOTPResponseSchema>;
 export type VerifyTOTPResponse = Schema.Schema.Type<typeof VerifyTOTPResponseSchema>;
 export type RegisterInput = Schema.Schema.Type<typeof RegisterInputSchema>;
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export const LoginErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",

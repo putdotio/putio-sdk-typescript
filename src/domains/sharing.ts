@@ -6,7 +6,7 @@ import {
   type PutioOperationFailure,
 } from "../core/errors.js";
 import { FileBroadSchema } from "./files.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const SharingCloneStatusSchema = Schema.Literal("NEW", "PROCESSING", "DONE", "ERROR");
 
@@ -157,10 +157,6 @@ export const PublicShareListQuerySchema = Schema.Struct({
   total: Schema.optional(Schema.Literal(1)),
   video_metadata_parent: Schema.optional(Schema.Literal(1)),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type SharingCloneInput = Schema.Schema.Type<typeof SharingCloneInputSchema>;
 export type SharingCloneInfo = Schema.Schema.Type<typeof SharingCloneInfoSchema>;

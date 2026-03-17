@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { requestJson } from "../core/http.js";
+import { requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const TunnelRouteSchema = Schema.Struct({
   description: Schema.String,
@@ -17,10 +17,6 @@ const TunnelRoutesEnvelopeSchema = Schema.Struct({
   routes: Schema.Array(TunnelRouteSchema),
   status: Schema.Literal("OK"),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type TunnelRoute = Schema.Schema.Type<typeof TunnelRouteSchema>;
 

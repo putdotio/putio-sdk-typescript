@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { requestJson } from "../core/http.js";
+import { requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const FriendInviteJoinedUserStatusSchema = Schema.Literal(
   "CONVERTED",
@@ -39,10 +39,6 @@ const FriendInviteCreateEnvelopeSchema = Schema.Struct({
   code: Schema.String,
   status: Schema.optional(Schema.Literal("OK")),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type FriendInviteJoinedUserStatus = Schema.Schema.Type<
   typeof FriendInviteJoinedUserStatusSchema

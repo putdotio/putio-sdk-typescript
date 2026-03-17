@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 const IFTTTStatusEnvelopeSchema = Schema.Struct({
   enabled: Schema.Boolean,
@@ -29,10 +29,6 @@ export type IftttEventInput =
       readonly eventType: IftttEventType;
       readonly ingredients: Record<string, unknown>;
     };
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export const GetIftttStatusErrorSpec = definePutioOperationErrorSpec({
   domain: "ifttt",

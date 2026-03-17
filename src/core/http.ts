@@ -32,6 +32,8 @@ export class PutioSdkConfig extends Context.Tag("PutioSdkConfig")<
   PutioSdkConfigShape
 >() {}
 
+export type PutioSdkContext = PutioSdkConfig | HttpClient.HttpClient;
+
 export const makePutioSdkConfig = (config: PutioSdkConfigShape): PutioSdkConfigShape => ({
   accessToken: config.accessToken,
   baseUrl: config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
@@ -81,8 +83,6 @@ interface PutioRequestOptions {
   readonly auth?: PutioAuth;
   readonly body?: PutioRequestBody;
 }
-
-type PutioSdkHttpContext = PutioSdkConfig | HttpClient.HttpClient;
 
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
@@ -215,7 +215,7 @@ const executeRequest = (options: PutioRequestOptions) =>
 export const requestJson = <A, I, R>(
   schema: Schema.Schema<A, I, R>,
   options: PutioRequestOptions,
-): Effect.Effect<A, PutioSdkError, PutioSdkHttpContext | R> =>
+): Effect.Effect<A, PutioSdkError, PutioSdkContext | R> =>
   executeRequest(options).pipe(
     Effect.flatMap((response) =>
       isSuccessStatus(response.status)
@@ -226,7 +226,7 @@ export const requestJson = <A, I, R>(
 
 export const requestArrayBuffer = (
   options: PutioRequestOptions,
-): Effect.Effect<Uint8Array, PutioSdkError, PutioSdkHttpContext> =>
+): Effect.Effect<Uint8Array, PutioSdkError, PutioSdkContext> =>
   executeRequest(options).pipe(
     Effect.flatMap((response) =>
       isSuccessStatus(response.status)
@@ -240,7 +240,7 @@ export const requestArrayBuffer = (
 
 export const requestVoid = (
   options: PutioRequestOptions,
-): Effect.Effect<void, PutioSdkError, PutioSdkHttpContext> =>
+): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
   executeRequest(options).pipe(
     Effect.flatMap((response) =>
       isSuccessStatus(response.status)

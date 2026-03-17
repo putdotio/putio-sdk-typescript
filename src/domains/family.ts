@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 const NonNegativeIntegerSchema = Schema.Number.pipe(Schema.int(), Schema.nonNegative());
 const NonNegativeIntegerFromStringSchema = Schema.NumberFromString.pipe(
@@ -44,10 +44,6 @@ const FamilyCreateInviteEnvelopeSchema = Schema.Struct({
   code: Schema.String,
   status: Schema.Literal("OK"),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type FamilyInvite = Schema.Schema.Type<typeof FamilyInviteSchema>;
 export type FamilyMember = Schema.Schema.Type<typeof FamilyMemberSchema>;

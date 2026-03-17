@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 
 import type { PutioSdkError } from "../core/errors.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 export type PutioJsonPrimitive = string | number | boolean | null;
 export type PutioJsonValue =
@@ -55,10 +55,6 @@ const ConfigValueEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   value: JsonValueSchema,
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export const readConfig = (): Effect.Effect<PutioJsonObject, PutioSdkError, PutioSdkContext> =>
   requestJson(ConfigEnvelopeSchema, {

@@ -6,7 +6,7 @@ import {
   type PutioOperationFailure,
   type PutioSdkError,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const TransferTypeSchema = Schema.Literal(
   "URL",
@@ -187,10 +187,6 @@ const TransfersCleanEnvelopeSchema = Schema.Struct({
   deleted_ids: Schema.Array(Schema.Number.pipe(Schema.int())),
   status: Schema.Literal("OK"),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type TransferType = Schema.Schema.Type<typeof TransferTypeSchema>;
 export type TransferStatus = Schema.Schema.Type<typeof TransferStatusSchema>;

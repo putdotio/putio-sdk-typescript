@@ -4,6 +4,7 @@ import {
   OkResponseSchema,
   buildPutioUrl,
   requestJson,
+  type PutioSdkContext,
   type PutioQueryValue,
 } from "../core/http.js";
 import {
@@ -117,10 +118,6 @@ export type OAuthAppSession = Schema.Schema.Type<typeof OAuthAppSessionSchema>;
 export type OAuthAppCreateInput = Schema.Schema.Type<typeof OAuthAppCreateInputSchema>;
 export type OAuthAppUpdateInput = Schema.Schema.Type<typeof OAuthAppUpdateInputSchema>;
 export type OAuthSetIconInput = Schema.Schema.Type<typeof OAuthSetIconInputSchema>;
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export const QueryOAuthAppsErrorSpec = definePutioOperationErrorSpec({
   domain: "oauth",

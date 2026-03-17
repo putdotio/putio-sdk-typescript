@@ -5,7 +5,12 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestArrayBuffer, requestJson } from "../core/http.js";
+import {
+  OkResponseSchema,
+  requestArrayBuffer,
+  requestJson,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 const HistoryEventBaseSchema = Schema.Struct({
   created_at: Schema.String,
@@ -166,10 +171,6 @@ const EventsListEnvelopeSchema = Schema.Struct({
   has_more: Schema.Boolean,
   status: Schema.Literal("OK"),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type HistoryKnownEventType = Schema.Schema.Type<typeof HistoryKnownEventTypeSchema>;
 export type HistoryEvent = Schema.Schema.Type<typeof HistoryEventSchema>;

@@ -122,7 +122,7 @@ vp pack && vp test run --config vitest.live.config.ts test/live/consumer.test.ts
 
 What it checks:
 
-- `pnpm pack` produces an installable tarball for an external consumer install check
+- `vp pack` produces an installable tarball for an external consumer install check
 - an external temp project can install that tarball
 - TypeScript can typecheck against the published exports
 - Node can import the built package at runtime

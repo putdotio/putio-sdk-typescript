@@ -155,7 +155,7 @@ import {
   type FriendBase,
   type UserSearchResult,
 } from "../domains/friends.js";
-import { makePutioSdkLayer, type PutioSdkConfigShape } from "./http.js";
+import { makePutioSdkLayer, type PutioSdkConfigShape, type PutioSdkContext } from "./http.js";
 import {
   buildOAuthAppIconUrl,
   buildOAuthAuthorizeUrl,
@@ -286,11 +286,7 @@ import {
 } from "../domains/zips.js";
 import { mapConfigurationError } from "./errors.js";
 
-type PutioSdkPromiseRuntimeContext =
-  | import("./http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
-
-type PutioSdkPromiseRuntime = ManagedRuntime.ManagedRuntime<PutioSdkPromiseRuntimeContext, never>;
+type PutioSdkPromiseRuntime = ManagedRuntime.ManagedRuntime<PutioSdkContext, never>;
 
 const promiseClientRuntimeCache = new WeakMap<PutioSdkConfigShape, PutioSdkPromiseRuntime>();
 const disposedPromiseClientConfigs = new WeakSet<PutioSdkConfigShape>();
@@ -330,7 +326,7 @@ const disposePromiseClientRuntime = async (config: PutioSdkConfigShape): Promise
 
 const provideSdk = async <A, E>(
   config: PutioSdkConfigShape,
-  effect: Effect.Effect<A, E, PutioSdkPromiseRuntimeContext>,
+  effect: Effect.Effect<A, E, PutioSdkContext>,
 ) => getPromiseClientRuntime(config).runPromise(effect);
 
 export const createPutioSdkEffectClient = () => ({

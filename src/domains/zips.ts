@@ -5,7 +5,7 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const ZipStatusSchema = Schema.Literal("NEW", "PROCESSING", "DONE", "ERROR");
 
@@ -47,10 +47,6 @@ const ZipInfoDoneSchema = Schema.Struct({
 });
 
 const ZipInfoSchema = Schema.Union(ZipInfoPendingSchema, ZipInfoErrorSchema, ZipInfoDoneSchema);
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type ZipSummary = Schema.Schema.Type<typeof ZipSummarySchema>;
 export type ZipCreateResponse = Schema.Schema.Type<typeof ZipCreateEnvelopeSchema>;

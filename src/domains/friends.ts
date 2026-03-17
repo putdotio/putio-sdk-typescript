@@ -6,7 +6,7 @@ import {
   type PutioOperationFailure,
 } from "../core/errors.js";
 import { FileBroadSchema, type FileBroad } from "./files.js";
-import { OkResponseSchema, requestJson } from "../core/http.js";
+import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
 
 export const FriendBaseSchema = Schema.Struct({
   avatar_url: Schema.String,
@@ -54,10 +54,6 @@ const FriendSharedFolderEnvelopeSchema = Schema.Struct({
   file: Schema.NullOr(FileBroadSchema),
   status: Schema.Literal("OK"),
 });
-
-type PutioSdkContext =
-  | import("../core/http.js").PutioSdkConfig
-  | import("@effect/platform").HttpClient.HttpClient;
 
 export type FriendBase = Schema.Schema.Type<typeof FriendBaseSchema>;
 export type Friend = Schema.Schema.Type<typeof FriendSchema>;

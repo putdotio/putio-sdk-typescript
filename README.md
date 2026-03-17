@@ -13,26 +13,10 @@
   </p>
 
   <p>
-    <a href="https://github.com/putdotio/putio-sdk-typescript/actions/workflows/ci.yml?query=branch%3Amain">
-      <img
-        src="https://img.shields.io/github/actions/workflow/status/putdotio/putio-sdk-typescript/ci.yml?branch=main&style=flat&label=ci&colorA=000000&colorB=000000"
-        alt="CI">
-    </a>
-    <a href="https://www.npmjs.com/package/@putdotio/sdk">
-      <img
-        src="https://img.shields.io/npm/v/%40putdotio%2Fsdk?style=flat&colorA=000000&colorB=000000"
-        alt="npm version">
-    </a>
-    <a href="https://www.npmjs.com/package/@putdotio/sdk">
-      <img
-        src="https://img.shields.io/npm/dm/%40putdotio%2Fsdk?style=flat&colorA=000000&colorB=000000"
-        alt="npm downloads">
-    </a>
-    <a href="https://github.com/putdotio/putio-sdk-typescript/blob/main/LICENSE">
-      <img
-        src="https://img.shields.io/github/license/putdotio/putio-sdk-typescript?style=flat&colorA=000000&colorB=000000"
-        alt="license">
-    </a>
+    <a href="https://github.com/putdotio/putio-sdk-typescript/actions/workflows/ci.yml?query=branch%3Amain" style="text-decoration:none;"><img src="https://img.shields.io/github/actions/workflow/status/putdotio/putio-sdk-typescript/ci.yml?branch=main&style=flat&label=ci&colorA=000000&colorB=000000" alt="CI"></a>
+    <a href="https://www.npmjs.com/package/@putdotio/sdk" style="text-decoration:none;"><img src="https://img.shields.io/npm/v/%40putdotio%2Fsdk?style=flat&colorA=000000&colorB=000000" alt="npm version"></a>
+    <a href="https://www.npmjs.com/package/@putdotio/sdk" style="text-decoration:none;"><img src="https://img.shields.io/npm/dm/%40putdotio%2Fsdk?style=flat&colorA=000000&colorB=000000" alt="npm downloads"></a>
+    <a href="https://github.com/putdotio/putio-sdk-typescript/blob/main/LICENSE" style="text-decoration:none;"><img src="https://img.shields.io/github/license/putdotio/putio-sdk-typescript?style=flat&colorA=000000&colorB=000000" alt="license"></a>
   </p>
 </div>
 

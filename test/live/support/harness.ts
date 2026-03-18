@@ -1,8 +1,8 @@
 import { test } from "vitest";
 
-import type { FileUploadResult, createPutioSdkPromiseClient } from "../../../src/index.js";
+import type { FileUploadResult, createPutioSdkPromiseClient } from "../../../dist/index.js";
 import { hydrateLiveTokenEnv } from "./secrets.ts";
-import { createPutioSdkPromiseClient as createPromiseSdkClient } from "../../../src/index.js";
+import { createPutioSdkPromiseClient as createPromiseSdkClient } from "../../../dist/index.js";
 
 type PutioSdkPromiseClientFactory = typeof createPutioSdkPromiseClient;
 type PutioSdkPromiseClient = ReturnType<PutioSdkPromiseClientFactory>;

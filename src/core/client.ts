@@ -1,5 +1,4 @@
-import { FetchHttpClient } from "@effect/platform";
-import { Cause, Effect, Exit, Layer, ManagedRuntime, Option, Schema } from "effect";
+import { Cause, Effect, Exit, ManagedRuntime, Option, Schema } from "effect";
 
 import {
   clearAccount,
@@ -155,7 +154,7 @@ import {
   type FriendBase,
   type UserSearchResult,
 } from "../domains/friends.js";
-import { makePutioSdkLayer, type PutioSdkConfigShape, type PutioSdkContext } from "./http.js";
+import { makePutioSdkLiveLayer, type PutioSdkConfigShape, type PutioSdkContext } from "./http.js";
 import {
   buildOAuthAppIconUrl,
   buildOAuthAuthorizeUrl,
@@ -304,9 +303,7 @@ const getPromiseClientRuntime = (config: PutioSdkConfigShape): PutioSdkPromiseRu
     return cachedRuntime;
   }
 
-  const runtime = ManagedRuntime.make(
-    Layer.mergeAll(makePutioSdkLayer(config), FetchHttpClient.layer),
-  );
+  const runtime = ManagedRuntime.make(makePutioSdkLiveLayer(config));
   promiseClientRuntimeCache.set(config, runtime);
   return runtime;
 };

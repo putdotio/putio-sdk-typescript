@@ -1,6 +1,6 @@
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { assertPresent, createLiveHarness } from "../support/harness.js";
@@ -9,6 +9,18 @@ const live = createLiveHarness("consumer live");
 const { assert, finish, run } = live;
 
 const packageDir = process.cwd();
+const nodeExecutable = process.execPath;
+const npmCliPath = join(
+  dirname(nodeExecutable),
+  "..",
+  "lib",
+  "node_modules",
+  "npm",
+  "bin",
+  "npm-cli.js",
+);
+const typescriptCliPath = join(packageDir, "node_modules", "typescript", "bin", "tsc");
+
 const runCommand = (
   command: string,
   args: readonly string[],
@@ -31,24 +43,36 @@ const runCommand = (
   };
 };
 
+const runNodeCommand = (args: readonly string[], cwd: string) =>
+  runCommand(nodeExecutable, args, cwd);
+
+const runNpmCommand = (args: readonly string[], cwd: string) =>
+  runNodeCommand([npmCliPath, ...args], cwd);
+
+const createPackedTarball = (cwd: string, destination: string): string => {
+  const packResult = runNpmCommand(["pack", "--pack-destination", destination], cwd);
+  assert(packResult.status === 0, `npm pack failed: ${packResult.stderr || packResult.stdout}`);
+
+  const tarball = assertPresent(
+    readdirSync(destination).find((fileName) => fileName.endsWith(".tgz")),
+    "expected packed tarball",
+  );
+
+  return join(destination, tarball);
+};
+
 await run("consumer tarball installs in temp project", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "putio-sdk-consumer-"));
 
   try {
-    const packResult = runCommand("pnpm", ["pack", "--pack-destination", tempDir], packageDir);
-    assert(packResult.status === 0, `pnpm pack failed: ${packResult.stderr || packResult.stdout}`);
-
-    const tarball = assertPresent(
-      readdirSync(tempDir).find((fileName) => fileName.endsWith(".tgz")),
-      "expected packed tarball",
-    );
+    const tarball = createPackedTarball(packageDir, tempDir);
 
     writeFileSync(
       join(tempDir, "package.json"),
       JSON.stringify(
         {
           dependencies: {
-            "@putdotio/sdk": `file:${join(tempDir, tarball)}`,
+            "@putdotio/sdk": `file:${tarball}`,
           },
           name: "putio-sdk-consumer-live",
           private: true,
@@ -59,10 +83,10 @@ await run("consumer tarball installs in temp project", async () => {
       ),
     );
 
-    const installResult = runCommand("pnpm", ["install"], tempDir);
+    const installResult = runNpmCommand(["install", "--ignore-scripts"], tempDir);
     assert(
       installResult.status === 0,
-      `pnpm install failed: ${installResult.stderr || installResult.stdout}`,
+      `npm install failed: ${installResult.stderr || installResult.stdout}`,
     );
 
     return {
@@ -77,20 +101,14 @@ await run("consumer type exports compile outside workspace", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "putio-sdk-types-"));
 
   try {
-    const packResult = runCommand("pnpm", ["pack", "--pack-destination", tempDir], packageDir);
-    assert(packResult.status === 0, `pnpm pack failed: ${packResult.stderr || packResult.stdout}`);
-
-    const tarball = assertPresent(
-      readdirSync(tempDir).find((fileName) => fileName.endsWith(".tgz")),
-      "expected packed tarball",
-    );
+    const tarball = createPackedTarball(packageDir, tempDir);
 
     writeFileSync(
       join(tempDir, "package.json"),
       JSON.stringify(
         {
           dependencies: {
-            "@putdotio/sdk": `file:${join(tempDir, tarball)}`,
+            "@putdotio/sdk": `file:${tarball}`,
           },
           name: "putio-sdk-consumer-types",
           private: true,
@@ -144,15 +162,14 @@ await run("consumer type exports compile outside workspace", async () => {
       ].join("\n"),
     );
 
-    const installResult = runCommand("pnpm", ["install"], tempDir);
+    const installResult = runNpmCommand(["install", "--ignore-scripts"], tempDir);
     assert(
       installResult.status === 0,
-      `pnpm install failed: ${installResult.stderr || installResult.stdout}`,
+      `npm install failed: ${installResult.stderr || installResult.stdout}`,
     );
 
-    const typecheckResult = runCommand(
-      "pnpm",
-      ["exec", "tsc", "--project", "tsconfig.json"],
+    const typecheckResult = runNodeCommand(
+      [typescriptCliPath, "--project", "tsconfig.json"],
       tempDir,
     );
     assert(
@@ -172,20 +189,14 @@ await run("consumer runtime import works from installed package", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "putio-sdk-runtime-"));
 
   try {
-    const packResult = runCommand("pnpm", ["pack", "--pack-destination", tempDir], packageDir);
-    assert(packResult.status === 0, `pnpm pack failed: ${packResult.stderr || packResult.stdout}`);
-
-    const tarball = assertPresent(
-      readdirSync(tempDir).find((fileName) => fileName.endsWith(".tgz")),
-      "expected packed tarball",
-    );
+    const tarball = createPackedTarball(packageDir, tempDir);
 
     writeFileSync(
       join(tempDir, "package.json"),
       JSON.stringify(
         {
           dependencies: {
-            "@putdotio/sdk": `file:${join(tempDir, tarball)}`,
+            "@putdotio/sdk": `file:${tarball}`,
           },
           name: "putio-sdk-consumer-runtime",
           private: true,
@@ -214,13 +225,13 @@ await run("consumer runtime import works from installed package", async () => {
       ].join("\n"),
     );
 
-    const installResult = runCommand("pnpm", ["install"], tempDir);
+    const installResult = runNpmCommand(["install", "--ignore-scripts"], tempDir);
     assert(
       installResult.status === 0,
-      `pnpm install failed: ${installResult.stderr || installResult.stdout}`,
+      `npm install failed: ${installResult.stderr || installResult.stdout}`,
     );
 
-    const runtimeResult = runCommand("node", ["runtime.mjs"], tempDir);
+    const runtimeResult = runNodeCommand(["runtime.mjs"], tempDir);
     assert(
       runtimeResult.status === 0,
       `consumer runtime failed: ${runtimeResult.stderr || runtimeResult.stdout}`,
@@ -236,20 +247,14 @@ await run("consumer cannot import internal package paths", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "putio-sdk-exports-"));
 
   try {
-    const packResult = runCommand("pnpm", ["pack", "--pack-destination", tempDir], packageDir);
-    assert(packResult.status === 0, `pnpm pack failed: ${packResult.stderr || packResult.stdout}`);
-
-    const tarball = assertPresent(
-      readdirSync(tempDir).find((fileName) => fileName.endsWith(".tgz")),
-      "expected packed tarball",
-    );
+    const tarball = createPackedTarball(packageDir, tempDir);
 
     writeFileSync(
       join(tempDir, "package.json"),
       JSON.stringify(
         {
           dependencies: {
-            "@putdotio/sdk": `file:${join(tempDir, tarball)}`,
+            "@putdotio/sdk": `file:${tarball}`,
           },
           name: "putio-sdk-consumer-exports",
           private: true,
@@ -274,13 +279,13 @@ await run("consumer cannot import internal package paths", async () => {
       ].join("\n"),
     );
 
-    const installResult = runCommand("pnpm", ["install"], tempDir);
+    const installResult = runNpmCommand(["install", "--ignore-scripts"], tempDir);
     assert(
       installResult.status === 0,
-      `pnpm install failed: ${installResult.stderr || installResult.stdout}`,
+      `npm install failed: ${installResult.stderr || installResult.stdout}`,
     );
 
-    const runtimeResult = runCommand("node", ["internal-path.mjs"], tempDir);
+    const runtimeResult = runNodeCommand(["internal-path.mjs"], tempDir);
     assert(
       runtimeResult.status === 0,
       `internal export fence check failed: ${runtimeResult.stderr || runtimeResult.stdout}`,

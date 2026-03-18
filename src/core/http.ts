@@ -1,4 +1,10 @@
-import { Headers, HttpClient, HttpClientRequest, HttpClientResponse } from "@effect/platform";
+import {
+  FetchHttpClient,
+  Headers,
+  HttpClient,
+  HttpClientRequest,
+  HttpClientResponse,
+} from "@effect/platform";
 import { Context, Effect, Layer, Schema } from "effect";
 
 import {
@@ -43,6 +49,9 @@ export const makePutioSdkConfig = (config: PutioSdkConfigShape): PutioSdkConfigS
 
 export const makePutioSdkLayer = (config: PutioSdkConfigShape) =>
   Layer.succeed(PutioSdkConfig, makePutioSdkConfig(config));
+
+export const makePutioSdkLiveLayer = (config: PutioSdkConfigShape) =>
+  Layer.mergeAll(makePutioSdkLayer(config), FetchHttpClient.layer);
 
 export const buildPutioUrl = (baseUrl: string | URL, path: string, query?: PutioQuery): string => {
   const url = new URL(path, baseUrl);

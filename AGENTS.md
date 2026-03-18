@@ -19,8 +19,8 @@
 - `vp install`
 - `vp check .`
 - `vp pack`
-- `vp test run --passWithNoTests`
-- `vp test run --coverage --passWithNoTests`
+- `vp run test`
+- `vp run coverage`
 - `vp run test:live`
 - `vp run verify`
 - `vp run bootstrap:tokens`

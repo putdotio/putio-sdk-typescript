@@ -36,12 +36,12 @@
     "build": "vp pack",
     "check": "vp check .",
     "clean": "rm -rf .live-build .turbo coverage dist",
-    "coverage": "vp test run --coverage --passWithNoTests",
+    "coverage": "vitest run --coverage --passWithNoTests",
     "dev": "vp pack --watch",
     "prepack": "vp pack",
-    "test": "vp test run --passWithNoTests",
+    "test": "vitest run --passWithNoTests",
     "test:live": "vp pack && vp test run --config vitest.live.config.ts",
-    "verify": "vp check . && vp pack && vp test run --passWithNoTests && vp test run --coverage --passWithNoTests"
+    "verify": "vp check . && vp pack && vitest run --passWithNoTests && vitest run --coverage --passWithNoTests"
   },
   "dependencies": {
     "@effect/platform": "0.94.5",
@@ -49,10 +49,10 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/coverage-v8": "4.1.0",
     "typescript": "^5.9.3",
     "vite-plus": "^0.1.11",
-    "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+    "vitest": "4.1.0"
   },
   "engines": {
     "node": ">=24.14.0 <25"

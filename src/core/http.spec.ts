@@ -14,6 +14,8 @@ import {
   buildPutioUrl,
   makePutioSdkConfig,
   makePutioSdkLayer,
+  makePutioSdkLiveLayer,
+  PutioSdkConfig,
   requestArrayBuffer,
   requestJson,
   requestVoid,
@@ -61,6 +63,23 @@ describe("sdk core http", () => {
       uploadBaseUrl: "https://upload.put.io",
       webAppUrl: "https://app.put.io",
     });
+  });
+
+  it("provides both config and an http client through the live layer", async () => {
+    const result = await Effect.runPromise(
+      Effect.all({
+        config: PutioSdkConfig,
+        httpClient: HttpClient.HttpClient,
+      }).pipe(Effect.provide(makePutioSdkLiveLayer({ accessToken: "token-123" }))),
+    );
+
+    expect(result.config).toEqual({
+      accessToken: "token-123",
+      baseUrl: "https://api.put.io",
+      uploadBaseUrl: "https://upload.put.io",
+      webAppUrl: "https://app.put.io",
+    });
+    expect(result.httpClient).toBeDefined();
   });
 
   it("builds URLs and skips nullish query values", () => {

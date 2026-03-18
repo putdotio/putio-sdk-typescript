@@ -162,6 +162,31 @@ describe("sdk core errors", () => {
     }
   });
 
+  it("requires both error_type and status_code when a contract declares both", async () => {
+    const spec = definePutioOperationErrorSpec({
+      domain: "files",
+      operation: "move",
+      knownErrors: [{ errorType: "FILE_LOST", statusCode: 404 }] as const,
+    });
+
+    const originalError = new PutioApiError({
+      status: 409,
+      body: {
+        error_message: "File was lost",
+        error_type: "FILE_LOST",
+        status_code: 409,
+      },
+    });
+
+    const exit = await Effect.runPromiseExit(withOperationErrors(Effect.fail(originalError), spec));
+
+    expect(Exit.isFailure(exit)).toBe(true);
+
+    if (Exit.isFailure(exit)) {
+      expect(expectFailure(exit)).toBe(originalError);
+    }
+  });
+
   it("supports pipe-friendly operation error wrapping", async () => {
     const spec = definePutioOperationErrorSpec({
       domain: "files",

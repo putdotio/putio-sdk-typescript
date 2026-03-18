@@ -22,6 +22,7 @@ describe("sdk root entry", () => {
       listRssFeeds: expect.any(Function),
       listTunnelRoutes: expect.any(Function),
       listZips: expect.any(Function),
+      makePutioSdkLiveLayer: expect.any(Function),
       requestArrayBuffer: expect.any(Function),
       requestJson: expect.any(Function),
       requestVoid: expect.any(Function),

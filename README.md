@@ -71,7 +71,7 @@ const duration = secondsToReadableDuration(444);
 
 ```ts
 import { Effect } from "effect";
-import { createPutioSdkEffectClient, makePutioSdkLayer } from "@putdotio/sdk";
+import { createPutioSdkEffectClient, makePutioSdkLiveLayer } from "@putdotio/sdk";
 
 const sdk = createPutioSdkEffectClient();
 
@@ -80,16 +80,13 @@ const program = sdk.files
     per_page: 20,
     total: 1,
   })
-  .pipe(
-    Effect.provide(
-      makePutioSdkLayer({
-        accessToken: process.env.PUTIO_TOKEN!,
-      }),
-    ),
-  );
+  .pipe(Effect.provide(makePutioSdkLiveLayer({ accessToken: process.env.PUTIO_TOKEN! })));
 
 const result = await Effect.runPromise(program);
 ```
+
+`makePutioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed `HttpClient`.
+Use `makePutioSdkLayer(...)` only when you want to supply your own `HttpClient` service.
 
 ## Side-By-Side Usage
 
@@ -161,6 +158,7 @@ The package is designed around standard Web APIs. Host runtimes should provide:
 - `URL` and `URLSearchParams`
 - `AbortController`
 - `FormData`
+- `btoa` for username/password auth flows such as `auth.login(...)`
 
 For upload flows, the host should also provide file-compatible inputs such as `File` or `Blob`.
 
@@ -203,7 +201,7 @@ Effect consumers keep errors in the typed error channel instead of throwing:
 
 ```ts
 import { Effect } from "effect";
-import { createPutioSdkEffectClient, makePutioSdkLayer } from "@putdotio/sdk";
+import { createPutioSdkEffectClient, makePutioSdkLiveLayer } from "@putdotio/sdk";
 
 const sdk = createPutioSdkEffectClient();
 
@@ -220,11 +218,7 @@ const handled = sdk.files
 
       return Effect.fail(error);
     }),
-    Effect.provide(
-      makePutioSdkLayer({
-        accessToken: process.env.PUTIO_TOKEN!,
-      }),
-    ),
+    Effect.provide(makePutioSdkLiveLayer({ accessToken: process.env.PUTIO_TOKEN! })),
   );
 ```
 
@@ -269,10 +263,10 @@ The Effect client also works well when you want the canonical typed API:
 ```ts
 import { useQuery } from "@tanstack/react-query";
 import { Effect } from "effect";
-import { createPutioSdkEffectClient, makePutioSdkLayer } from "@putdotio/sdk";
+import { createPutioSdkEffectClient, makePutioSdkLiveLayer } from "@putdotio/sdk";
 
 const sdk = createPutioSdkEffectClient();
-const sdkLayer = makePutioSdkLayer({
+const sdkLayer = makePutioSdkLiveLayer({
   accessToken: token,
 });
 

@@ -79,7 +79,11 @@ const isKnownContractMatch = <TContract extends PutioKnownErrorContract>(
   error: PutioApiError | PutioAuthError,
 ): contract is Extract<TContract, PutioMatchableKnownErrorContract> => {
   if (contract.errorType !== undefined) {
-    return error.body.error_type === contract.errorType;
+    if (error.body.error_type !== contract.errorType) {
+      return false;
+    }
+
+    return contract.statusCode === undefined || error.status === contract.statusCode;
   }
 
   if (contract.statusCode !== undefined) {

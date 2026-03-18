@@ -22,6 +22,8 @@ The live verification layer lives in:
 - `test/live/domains/*.ts`
 - `test/live/support/*`
 
+Live tests execute the built SDK from `dist/**`, so direct live targets should always run after `vp pack`.
+
 ## Local Checks
 
 Default test runs intentionally exclude `test/live/**`.
@@ -32,8 +34,8 @@ Run:
 vp install
 vp check .
 vp pack
-vp test run --passWithNoTests
-vp test run --coverage --passWithNoTests
+vp run test
+vp run coverage
 ```
 
 The local suite focuses on the shared runtime in `src/core`.
@@ -61,30 +63,36 @@ Example env file:
 
 - `.env.example`
 
-Expected variables:
+Bootstrap-first variables:
 
-- `PUTIO_TOKEN_FIRST_PARTY`
-- `PUTIO_TOKEN_THIRD_PARTY`
-- `PUTIO_CLIENT_ID`
+- `PUTIO_TEST_USERNAME`
+- `PUTIO_TEST_PASSWORD`
 - `PUTIO_CLIENT_ID_FIRST_PARTY`
 - `PUTIO_CLIENT_SECRET_FIRST_PARTY`
 
 Optional credential-fixture variables:
 
-- `PUTIO_TEST_USERNAME`
-- `PUTIO_TEST_PASSWORD`
 - `PUTIO_TEST_TOTP_REFERENCE`
 - `PUTIO_TEST_TOTP`
 - `PUTIO_TEST_SECONDARY_USERNAME`
 - `PUTIO_TEST_SECONDARY_PASSWORD`
 - `PUTIO_TEST_SECONDARY_TOTP_REFERENCE`
 - `PUTIO_TEST_SECONDARY_TOTP`
+- `PUTIO_CLIENT_ID_THIRD_PARTY`
 - `PUTIO_1PASSWORD_RUNTIME_ITEM_ID`
 
-If the explicit token vars are missing, the live harness can still hydrate them from:
+Optional direct runtime variables:
+
+- `PUTIO_TOKEN_FIRST_PARTY`
+- `PUTIO_TOKEN_THIRD_PARTY`
+- `PUTIO_CLIENT_ID`
+
+If direct token vars are missing, the live harness can still hydrate them from:
 
 1. legacy local aliases
 2. a runtime-token 1Password item when `OP_SERVICE_ACCOUNT_TOKEN` and `PUTIO_1PASSWORD_RUNTIME_ITEM_ID` are set
+
+See `.env.example` for the current bootstrap-oriented layout and supported optional aliases.
 
 Never print token values in command output, docs, comments, or commits.
 
@@ -113,8 +121,8 @@ Run a credentialed live target with 1Password:
 
 ```bash
 export OP_SERVICE_ACCOUNT_TOKEN="$OP_SERVICE_ACCOUNT_PUTIO_FRONTEND_CI"
-op run --env-file=.env.example -- \
-  vp pack && vp test run --config vitest.live.config.ts test/live/auth-credentials.test.ts
+op run --env-file=.env.example -- sh -lc \
+  'vp pack && vp test run --config vitest.live.config.ts test/live/auth-credentials.test.ts'
 ```
 
 ## Consumer Verification

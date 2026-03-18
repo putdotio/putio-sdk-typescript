@@ -1,6 +1,6 @@
 import { Headers } from "@effect/platform";
 import { Cause, Effect, Exit, Option } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   PutioApiError,

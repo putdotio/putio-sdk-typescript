@@ -1,7 +1,7 @@
 import { Headers, HttpClient, HttpClientResponse } from "@effect/platform";
 import type * as HttpClientRequest from "@effect/platform/HttpClientRequest";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   PutioApiError,

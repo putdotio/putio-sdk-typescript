@@ -1,4 +1,4 @@
-import { test } from "vitest";
+import { test } from "vite-plus/test";
 
 import type { FileUploadResult, createPutioSdkPromiseClient } from "../../../dist/index.js";
 import { hydrateLiveTokenEnv } from "./secrets.ts";

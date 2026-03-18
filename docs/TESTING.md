@@ -34,8 +34,8 @@ Run:
 vp install
 vp check .
 vp pack
-vp run test
-vp run coverage
+vp test
+vp test --coverage
 ```
 
 The local suite focuses on the shared runtime in `src/core`.

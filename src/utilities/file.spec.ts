@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { getFileRenderType } from "./file-render-type.js";
 import { toHumanFileSize } from "./file-size.js";

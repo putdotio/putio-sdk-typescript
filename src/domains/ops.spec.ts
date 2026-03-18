@@ -1,5 +1,5 @@
 import { PutioOperationError } from "../core/errors.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import * as oauth from "./oauth.js";
 import * as rss from "./rss.js";

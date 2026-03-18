@@ -1,6 +1,6 @@
 import { PutioOperationError } from "../core/errors.js";
 import { Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import * as configDomain from "./config.js";
 import * as downloadLinks from "./download-links.js";

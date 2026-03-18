@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import * as sdk from "../index.js";
 import { createPutioSdkEffectClient, createPutioSdkPromiseClient } from "./client.js";

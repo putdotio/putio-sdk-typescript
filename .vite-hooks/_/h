@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+{ [ "$HUSKY" = "2" ] || [ "$VITE_GIT_HOOKS" = "2" ]; } && set -x
+n=$(basename "$0")
+s=$(dirname "$(dirname "$0")")/$n
+
+[ ! -f "$s" ] && exit 0
+
+i="${XDG_CONFIG_HOME:-$HOME/.config}/vite-plus/hooks-init.sh"
+[ ! -f "$i" ] && i="${XDG_CONFIG_HOME:-$HOME/.config}/husky/init.sh"
+[ -f "$i" ] && . "$i"
+
+{ [ "${HUSKY-}" = "0" ] || [ "${VITE_GIT_HOOKS-}" = "0" ]; } && exit 0
+
+d="$(dirname "$(dirname "$(dirname "$0")")")"
+export PATH="$d/node_modules/.bin:$PATH"
+sh -e "$s" "$@"
+c=$?
+
+[ $c != 0 ] && echo "VITE+ - $n script failed (code $c)"
+[ $c = 127 ] && echo "VITE+ - command not found in PATH=$PATH"
+exit $c

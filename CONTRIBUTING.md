@@ -10,6 +10,12 @@ Install dependencies with Vite+:
 vp install
 ```
 
+Then install the stock VitePlus hook wiring for this clone:
+
+```bash
+vp config
+```
+
 ## Validation
 
 Run the full repo guardrail before opening or updating a pull request:

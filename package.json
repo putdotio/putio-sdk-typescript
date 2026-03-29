@@ -51,8 +51,8 @@
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "4.1.0",
     "typescript": "^5.9.3",
-    "vite-plus": "^0.1.12",
-    "vitest": "npm:@voidzero-dev/vite-plus-test@0.1.12"
+    "vite-plus": "^0.1.14",
+    "vitest": "npm:@voidzero-dev/vite-plus-test@0.1.14"
   },
   "engines": {
     "node": ">=24.14.0 <25"
@@ -60,8 +60,8 @@
   "packageManager": "pnpm@10.32.1",
   "pnpm": {
     "overrides": {
-      "vite": "npm:@voidzero-dev/vite-plus-core@0.1.12",
-      "vitest": "npm:@voidzero-dev/vite-plus-test@0.1.12"
+      "vite": "npm:@voidzero-dev/vite-plus-core@0.1.14",
+      "vitest": "npm:@voidzero-dev/vite-plus-test@0.1.14"
     }
   }
 }

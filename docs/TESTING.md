@@ -53,6 +53,8 @@ Live tests stay separate on purpose:
 - they do not gate CI coverage
 - they exist to sanity-check real API behavior before releases and deeper changes
 
+The `consumer` target is the exception: it is safe to run without real credentials and is intended to gate CI as the publication-surface check.
+
 ## Live Environment
 
 Default local env file:
@@ -133,6 +135,12 @@ Run:
 
 ```bash
 vp pack && vp test run --config vitest.live.config.ts test/live/consumer.test.ts
+```
+
+Or through the package script:
+
+```bash
+vp run test:live:consumer
 ```
 
 What it checks:

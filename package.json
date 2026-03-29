@@ -41,6 +41,7 @@
     "prepack": "vp pack",
     "test": "vp test --passWithNoTests",
     "test:live": "vp pack && vp test run --config vitest.live.config.ts",
+    "test:live:consumer": "vp pack && vp test run --config vitest.live.config.ts test/live/consumer.test.ts",
     "verify": "vp check . && vp pack && vp test --passWithNoTests && vp test --coverage --passWithNoTests"
   },
   "dependencies": {

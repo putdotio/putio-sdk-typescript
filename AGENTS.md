@@ -46,4 +46,4 @@
 ## Skills
 
 - Repo-local development skills live in `.agents/skills/*-dev`.
-- `.claude/*` mirrors the same guidance through symlinks for Claude-compatible tooling.
+- `CLAUDE.md` should remain a symlink to this file, and `.claude/skills` mirrors repo-local skills for Claude-compatible tooling.

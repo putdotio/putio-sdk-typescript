@@ -22,8 +22,6 @@ The release lane:
 - creates the GitHub release
 - commits the released `package.json` version back to `main`
 
-Release commits created by `@semantic-release/git` are authored and committed as `devsputio <devs@put.io>`.
-
 ## Required Secrets
 
 - `NPM_TOKEN`

@@ -53,6 +53,7 @@ export type BootstrappedTokens = {
 const THIRD_PARTY_BOOTSTRAP_APP_NAME = "Codex SDK Live App";
 const THIRD_PARTY_BOOTSTRAP_CALLBACK = "https://example.com/codex-sdk-live/callback";
 const THIRD_PARTY_BOOTSTRAP_WEBSITE = "https://example.com/codex-sdk-live";
+const RUNTIME_ITEM_TITLE = "putio-sdk-testing";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -279,20 +280,30 @@ export const persistRuntimeTokens = (
     return false;
   }
 
-  const note = JSON.stringify(
-    {
-      updated_at: new Date().toISOString(),
-      first_party: payload.firstParty,
-      third_party: payload.thirdParty,
-      third_party_app_id: payload.thirdParty.app.id,
-    },
-    null,
-    2,
-  );
-
   const editResult = spawnSync(
     "op",
-    ["item", "edit", secrets.runtimeItemId, `notesPlain=${note}`],
+    [
+      "item",
+      "edit",
+      secrets.runtimeItemId,
+      "--vault",
+      secrets.runtimeItemVault ?? "frontend-ci",
+      "--title",
+      RUNTIME_ITEM_TITLE,
+      `meta.updated_at=${new Date().toISOString()}`,
+      `first_party.access_token[concealed]=${payload.firstParty.accessToken}`,
+      `first_party.scope=${payload.firstParty.scope ?? ""}`,
+      `first_party.token_id=${payload.firstParty.tokenId ?? ""}`,
+      `first_party.user_id=${payload.firstParty.userId ?? ""}`,
+      `third_party.access_token[concealed]=${payload.thirdParty.accessToken}`,
+      `third_party.scope=${payload.thirdParty.scope ?? ""}`,
+      `third_party.token_id=${payload.thirdParty.tokenId ?? ""}`,
+      `third_party.user_id=${payload.thirdParty.userId ?? ""}`,
+      `third_party.app_id=${payload.thirdParty.app.id}`,
+      `third_party.app_name=${payload.thirdParty.app.name}`,
+      "third_party_app_id[delete]",
+      "notesPlain=",
+    ],
     {
       env: process.env,
       stdio: "pipe",

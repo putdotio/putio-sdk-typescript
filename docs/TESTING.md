@@ -91,8 +91,9 @@ Optional direct runtime variables:
 
 If direct token vars are missing, the live harness can still hydrate them from:
 
-1. legacy local aliases
-2. a runtime-token 1Password item when `OP_SERVICE_ACCOUNT_TOKEN` and `PUTIO_1PASSWORD_RUNTIME_ITEM_ID` are set
+1. a runtime-token 1Password item when `OP_SERVICE_ACCOUNT_TOKEN` and `PUTIO_1PASSWORD_RUNTIME_ITEM_ID` are set
+   The shared default vault is `frontend-ci`, and `PUTIO_1PASSWORD_RUNTIME_VAULT` can override it when needed
+2. legacy local aliases
 
 See `.env.example` for the current bootstrap-oriented layout and supported optional aliases.
 

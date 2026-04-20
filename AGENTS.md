@@ -45,6 +45,5 @@
 
 ## Skills
 
-- Shared frontend skills live in `/Users/altay/projects/putio/skills/skills/frontend/*`.
 - Add repo-local `.agents/skills/*` only for TypeScript SDK guidance that would be too specific for the shared frontend skills.
 - `CLAUDE.md` should remain a symlink to this file, and `.claude/skills` mirrors repo-local skills for Claude-compatible tooling.

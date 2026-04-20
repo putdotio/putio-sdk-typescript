@@ -54,6 +54,7 @@ Live tests stay separate on purpose:
 - they exist to sanity-check real API behavior before releases and deeper changes
 
 The `consumer` target is the exception: it is safe to run without real credentials and is intended to gate CI as the publication-surface check.
+GitHub Actions runs both the verify and consumer-surface lanes on `blacksmith-2vcpu-ubuntu-2404`.
 
 ## Live Environment
 

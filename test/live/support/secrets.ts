@@ -175,7 +175,8 @@ export const readFirstPartyClientCredentials = (): PutioClientCredentials => ({
   clientSecret: requireSecret("PUTIO_CLIENT_SECRET_FIRST_PARTY"),
 });
 
-const getRuntimeItemVault = (runtimeItemVault?: string): string => runtimeItemVault ?? "frontend-ci";
+const getRuntimeItemVault = (runtimeItemVault?: string): string =>
+  runtimeItemVault ?? "frontend-ci";
 
 const readRuntimeItem = (
   runtimeItemId: string,
@@ -234,7 +235,9 @@ const findFieldValue = (
   return value.length > 0 ? value : undefined;
 };
 
-const readRuntimeTokensFromStructuredFields = (item: OnePasswordItem): RuntimeTokenPayload | null => {
+const readRuntimeTokensFromStructuredFields = (
+  item: OnePasswordItem,
+): RuntimeTokenPayload | null => {
   const firstPartyToken = findFieldValue(item, "access_token", "first_party");
   const thirdPartyToken = findFieldValue(item, "access_token", "third_party");
   const thirdPartyAppId =

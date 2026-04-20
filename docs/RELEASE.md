@@ -4,7 +4,7 @@
 
 Every merge to `main` should already be releasable.
 
-GitHub Actions owns releases for this repo.
+GitHub Actions owns releases for this repo and the workflow runs on Blacksmith-hosted Ubuntu runners.
 
 The pipeline does three things on `main`:
 

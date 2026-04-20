@@ -61,21 +61,21 @@ export OP_SERVICE_ACCOUNT_TOKEN="$OP_SERVICE_ACCOUNT_PUTIO_FRONTEND_CI"
 op run --env-file=.env.example -- vp run bootstrap:tokens
 ```
 
-For single-target commands, safety rules, and fixture expectations, see [docs/TESTING.md](./docs/TESTING.md).
+For single-target commands, safety rules, and fixture expectations, see [Testing](./docs/TESTING.md).
 
 ## Development Notes
 
 - Prefer `vp` for repo commands.
 - Treat `@putdotio/sdk` as a new public package, not a compatibility wrapper around `putio-js`.
 - Keep the public surface domain-first and Effect-first.
-- Put end-user usage in [README.md](./README.md). Put deeper contributor and architecture notes in `docs/*`.
+- Put end-user usage in [Overview](./README.md). Put deeper contributor and architecture notes in `docs/*`.
 
 Useful references:
 
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
-- [docs/TESTING.md](./docs/TESTING.md)
-- [docs/RELEASE.md](./docs/RELEASE.md)
-- [docs/READINESS.md](./docs/READINESS.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Testing](./docs/TESTING.md)
+- [Release](./docs/RELEASE.md)
+- [Readiness](./docs/READINESS.md)
 
 ## Pull Requests
 

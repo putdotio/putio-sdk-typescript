@@ -8,11 +8,11 @@
 
 ## Start Here
 
-- package overview: [README.md](./README.md)
-- architecture: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
-- testing and live verification: [docs/TESTING.md](./docs/TESTING.md)
-- readiness snapshot: [docs/READINESS.md](./docs/READINESS.md)
-- release automation: [docs/RELEASE.md](./docs/RELEASE.md)
+- [Overview](./README.md)
+- [Architecture](./docs/ARCHITECTURE.md)
+- [Testing](./docs/TESTING.md)
+- [Readiness](./docs/READINESS.md)
+- [Release](./docs/RELEASE.md)
 
 ## Commands
 
@@ -40,7 +40,7 @@
 ## Testing
 
 - Default tests exclude `test/live/**`.
-- Use `vp run test:live` or the single-target live commands in [docs/TESTING.md](./docs/TESTING.md) when verifying against the real API.
+- Use `vp run test:live` or the single-target live commands in [Testing](./docs/TESTING.md) when verifying against the real API.
 - Keep consumer-package verification healthy; the `consumer` live test is the publication safety net.
 
 ## Skills

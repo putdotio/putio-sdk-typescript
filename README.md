@@ -279,15 +279,15 @@ export const useFiles = (parentId: number) =>
 
 ## Docs
 
-- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for package shape and boundaries
-- [docs/TESTING.md](./docs/TESTING.md) for local and live verification
-- [docs/READINESS.md](./docs/READINESS.md) for domain readiness
-- [docs/RELEASE.md](./docs/RELEASE.md) for release automation
-- [SECURITY.md](./SECURITY.md) for private-first vulnerability disclosure
+- [Architecture](./docs/ARCHITECTURE.md) for package shape and boundaries
+- [Testing](./docs/TESTING.md) for local and live verification
+- [Readiness](./docs/READINESS.md) for domain readiness
+- [Release](./docs/RELEASE.md) for release automation
+- [Security](./SECURITY.md) for private-first vulnerability disclosure
 
 ## Contributing
 
-Contributor setup, validation, and live-test workflow live in [CONTRIBUTING.md](./CONTRIBUTING.md).
+Contributor setup, validation, and live-test workflow live in [Contributing](./CONTRIBUTING.md).
 
 ## License
 

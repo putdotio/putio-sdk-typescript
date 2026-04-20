@@ -4,7 +4,7 @@
 
 Every merge to `main` should already be releasable.
 
-GitHub Actions owns releases for this repo. Verify jobs run on Blacksmith-hosted Ubuntu runners, while the release job stays on GitHub-hosted Ubuntu.
+GitHub Actions owns releases for this repo and the workflow runs on Blacksmith-hosted Ubuntu runners.
 
 The pipeline does three things on `main`:
 

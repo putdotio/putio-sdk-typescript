@@ -72,7 +72,7 @@ jobs:
     needs:
       - verify
       - verify-consumer-surface
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 20
     permissions:
       contents: write

@@ -45,5 +45,5 @@
 
 ## Skills
 
-- Add repo-local `.agents/skills/*` only for TypeScript SDK guidance that would be too specific for the shared frontend skills.
+- Use the shared `putio-sdk-dev` skill from `putio-skills` for cross-SDK guidance. Add repo-local `.agents/skills/*` only for TypeScript SDK guidance that would be too specific for that shared skill.
 - `CLAUDE.md` should remain a symlink to this file, and `.claude/skills` mirrors repo-local skills for Claude-compatible tooling.

@@ -1,4 +1,0 @@
-interface:
-  display_name: "put.io SDK dev"
-  short_description: "Develop the put.io TypeScript SDK"
-  default_prompt: "Use $putio-sdk-dev when developing the put.io TypeScript SDK in this repository."

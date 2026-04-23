@@ -13,6 +13,21 @@ const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = liv
 void assertOperationError;
 void sleep;
 
+const getPaymentActionFixture = async () => {
+  const account = await authClient.account.getInfo({});
+
+  if (account.is_sub_account) {
+    return {
+      reason: "payment action fixture is a family sub-account",
+      skipped: true,
+    };
+  }
+
+  return {
+    skipped: false,
+  };
+};
+
 await run("payment info shape", async () => {
   const info = await authClient.payment.getInfo();
   assert(info.plan?.type === "onetime", "expected prepaid onetime payment info on test account");
@@ -128,6 +143,12 @@ await run("payment fastspring confirm requires restricted scope", async () => {
 });
 
 await run("payment fastspring confirm bogus reference currently yields generic 500", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.confirmFastspringOrder("codex-bogus-reference");
     throw new Error("expected bogus fastspring reference to fail");
@@ -140,6 +161,12 @@ await run("payment fastspring confirm bogus reference currently yields generic 5
 });
 
 await run("payment preview for one-time target", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   const preview = await authClient.payment.changePlan.preview({
     payment_type: "credit-card",
     plan_path: "1TB_365_once",
@@ -153,6 +180,12 @@ await run("payment preview for one-time target", async () => {
 });
 
 await run("payment preview for subscription target", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   const preview = await authClient.payment.changePlan.preview({
     payment_type: "credit-card",
     plan_path: "1TB_365_subscription",
@@ -166,6 +199,12 @@ await run("payment preview for subscription target", async () => {
 });
 
 await run("payment preview invalid coupon yields typed 404", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.changePlan.preview({
       coupon_code: "codex_invalid_coupon",
@@ -184,6 +223,12 @@ await run("payment preview invalid coupon yields typed 404", async () => {
 });
 
 await run("payment preview invalid plan yields typed 404", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.changePlan.preview({
       payment_type: "credit-card",
@@ -201,6 +246,12 @@ await run("payment preview invalid plan yields typed 404", async () => {
 });
 
 await run("payment submit invalid plan yields typed 404", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.changePlan.submit({
       payment_type: "credit-card",
@@ -218,6 +269,12 @@ await run("payment submit invalid plan yields typed 404", async () => {
 });
 
 await run("payment voucher info invalid code yields typed 404", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.voucher.getInfo("codex-invalid-voucher");
     throw new Error("expected invalid voucher info to fail");
@@ -232,6 +289,12 @@ await run("payment voucher info invalid code yields typed 404", async () => {
 });
 
 await run("payment redeem invalid code yields typed 404", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.voucher.redeem("codex-invalid-voucher");
     throw new Error("expected invalid voucher redeem to fail");
@@ -246,6 +309,12 @@ await run("payment redeem invalid code yields typed 404", async () => {
 });
 
 await run("payment stop subscription on prepaid account yields typed 404", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.stopSubscription();
     throw new Error("expected stopSubscription to fail on prepaid account");
@@ -273,6 +342,12 @@ await run("payment report with empty ids yields typed 400", async () => {
 });
 
 await run("payment paddle waiting invalid checkout yields typed 404", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.methods.addPaddleWaitingPayment({
       checkout_id: "bogus-checkout-id",
@@ -290,6 +365,12 @@ await run("payment paddle waiting invalid checkout yields typed 404", async () =
 });
 
 await run("payment coinbase invalid plan yields typed 400", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.methods.createCoinbaseCharge("");
     throw new Error("expected invalid coinbase plan to fail");
@@ -304,6 +385,12 @@ await run("payment coinbase invalid plan yields typed 400", async () => {
 });
 
 await run("payment opennode invalid plan yields typed 400", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.methods.createOpenNodeCharge("");
     throw new Error("expected invalid opennode plan to fail");
@@ -318,6 +405,12 @@ await run("payment opennode invalid plan yields typed 400", async () => {
 });
 
 await run("payment nano invalid plan yields typed 400", async () => {
+  const fixture = await getPaymentActionFixture();
+
+  if (fixture.skipped) {
+    return fixture;
+  }
+
   try {
     await authClient.payment.methods.createNanoPaymentRequest("");
     throw new Error("expected invalid nano plan to fail");

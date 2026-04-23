@@ -48,8 +48,8 @@ export const PaymentInfoPlanSchema = Schema.Struct({
 });
 
 const PaymentLastPaymentSchema = Schema.Struct({
-  method: Schema.String,
-  provider: Schema.String,
+  method: Schema.optional(Schema.String),
+  provider: Schema.optional(Schema.String),
 });
 
 export const PaymentInfoSchema = Schema.Struct({

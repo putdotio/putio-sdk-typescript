@@ -93,6 +93,23 @@ describe("payment domain", () => {
 
     expect(
       await runSdkEffect(
+        payment.getPaymentInfo(),
+        () =>
+          jsonResponse({
+            ...paymentInfo,
+            last_payment: {},
+          }),
+        {
+          accessToken: "token-123",
+        },
+      ),
+    ).toEqual({
+      ...paymentInfo,
+      last_payment: {},
+    });
+
+    expect(
+      await runSdkEffect(
         payment.listPaymentPlans(),
         () => jsonResponse({ plans: [paymentPlan], status: "OK" }),
         { accessToken: "token-123" },

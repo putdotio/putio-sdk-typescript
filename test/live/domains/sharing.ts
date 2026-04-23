@@ -5,6 +5,7 @@ import {
   createLiveHarness,
   expectOperationError,
 } from "../support/harness.js";
+import { findLiveFriend, liveFriendFixtureSkip } from "../support/friends.js";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -176,6 +177,12 @@ await run("sharing everyone lifecycle", async () => {
 });
 
 await run("sharing specific-friend lifecycle", async () => {
+  const friend = await findLiveFriend(authClient);
+
+  if (!friend) {
+    return liveFriendFixtureSkip("no existing friend fixture available");
+  }
+
   const seed = Date.now();
   const folder = await authClient.files.createFolder({
     name: `codex_sdk_sharing_friend_${seed}`,
@@ -186,7 +193,7 @@ await run("sharing specific-friend lifecycle", async () => {
     await authClient.sharing.shareFiles({
       ids: [folder.id],
       target: {
-        friendNames: ["altay"],
+        friendNames: [friend.name],
         type: "friends",
       },
     });
@@ -217,6 +224,7 @@ await run("sharing specific-friend lifecycle", async () => {
     assert(!after.some((file) => file.id === folder.id), "expected folder to be unshared");
 
     return {
+      friend: friend.name,
       file_id: folder.id,
       share_count: sharedWith.shares.length,
     };
@@ -226,6 +234,12 @@ await run("sharing specific-friend lifecycle", async () => {
 });
 
 await run("sharing child of shared parent yields typed already shared", async () => {
+  const friend = await findLiveFriend(authClient);
+
+  if (!friend) {
+    return liveFriendFixtureSkip("no existing friend fixture available");
+  }
+
   const seed = Date.now();
   const parent = await authClient.files.createFolder({
     name: `codex_sdk_sharing_parent_${seed}`,
@@ -240,7 +254,7 @@ await run("sharing child of shared parent yields typed already shared", async ()
     await authClient.sharing.shareFiles({
       ids: [parent.id],
       target: {
-        friendNames: ["altay"],
+        friendNames: [friend.name],
         type: "friends",
       },
     });
@@ -249,7 +263,7 @@ await run("sharing child of shared parent yields typed already shared", async ()
       await authClient.sharing.shareFiles({
         ids: [child.id],
         target: {
-          friendNames: ["altay"],
+          friendNames: [friend.name],
           type: "friends",
         },
       });

@@ -1,4 +1,5 @@
 import { assertPresent, createClients, createLiveHarness } from "../support/harness.js";
+import { findLiveFriend, liveFriendFixtureSkip } from "../support/friends.js";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -71,15 +72,27 @@ await run("friends sent requests shape", async () => {
 });
 
 await run("friends search excludes existing friend", async () => {
-  const users = await authClient.friends.search("altay");
+  const friend = await findLiveFriend(authClient);
+
+  if (!friend) {
+    return liveFriendFixtureSkip("no existing friend fixture available");
+  }
+
+  const users = await authClient.friends.search(friend.name);
   assert(Array.isArray(users), "expected search array");
-  assert(users.length === 0, "expected existing friend to be excluded from search");
-  return { count: users.length };
+  assert(
+    !users.some((user) => user.name === friend.name),
+    "expected existing friend to be excluded from search",
+  );
+  return { count: users.length, friend: friend.name };
 });
 
 await run("friends search requires restricted scope for oauth token", async () => {
+  const friend = await findLiveFriend(authClient);
+  const query = friend?.name ?? "altay";
+
   try {
-    await oauthClient.friends.search("altay");
+    await oauthClient.friends.search(query);
     throw new Error("expected default-scope search to fail");
   } catch (error) {
     return assertOperationError(error, {
@@ -92,13 +105,20 @@ await run("friends search requires restricted scope for oauth token", async () =
 });
 
 await run("friends shared folder shape", async () => {
+  const friend = await findLiveFriend(authClient, (candidate) => candidate.has_shared_files);
+
+  if (!friend) {
+    return liveFriendFixtureSkip("no friend with shared files available");
+  }
+
   const file = assertPresent(
-    await authClient.friends.sharedFolder("altay"),
+    await authClient.friends.sharedFolder(friend.name),
     "expected shared folder",
   );
-  assert(file.id === -7000, "expected fake shared friend root id");
+  assert(typeof file.id === "number", "expected shared friend root id");
   assert(file.folder_type === "SHARED_FRIEND", "expected shared friend folder");
   return {
+    friend: friend.name,
     id: file.id,
     name: file.name,
   };
@@ -119,12 +139,19 @@ await run("friends missing shared folder yields typed not found", async () => {
 });
 
 await run("friends shared folder is readable with oauth token", async () => {
+  const friend = await findLiveFriend(authClient, (candidate) => candidate.has_shared_files);
+
+  if (!friend) {
+    return liveFriendFixtureSkip("no friend with shared files available");
+  }
+
   const file = assertPresent(
-    await oauthClient.friends.sharedFolder("altay"),
+    await oauthClient.friends.sharedFolder(friend.name),
     "expected oauth token shared folder",
   );
-  assert(file.id === -7000, "expected fake shared friend root id for oauth token");
+  assert(typeof file.id === "number", "expected shared friend root id for oauth token");
   return {
+    friend: friend.name,
     id: file.id,
     name: file.name,
   };

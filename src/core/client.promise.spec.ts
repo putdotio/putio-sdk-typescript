@@ -6,7 +6,7 @@ vi.mock("../domains/account.js", async () => {
   return {
     clearAccount: vi.fn((options) => Effect.succeed({ cleared: options })),
     destroyAccount: vi.fn((password) => Effect.succeed({ destroyed: password })),
-    getAccountInfo: vi.fn((query) => Effect.succeed({ id: 1, query, username: "altay" })),
+    getAccountInfo: vi.fn((query) => Effect.succeed({ id: 1, query, username: "sdk-user" })),
     getAccountSettings: vi.fn(() => Effect.succeed({ locale: "en" })),
     listAccountConfirmations: vi.fn((subject) => Effect.succeed([{ subject }])),
     saveAccountSettings: vi.fn((payload) => Effect.succeed({ saved: payload })),
@@ -20,7 +20,7 @@ vi.mock("../domains/auth.js", async () => {
     buildAuthLoginUrl: vi.fn(({ state }) => `https://app.put.io/authenticate?state=${state}`),
     checkCodeMatch: vi.fn((code) => Effect.succeed(code === "MATCH")),
     clients: vi.fn(() => Effect.succeed([{ id: 1, name: "cli" }])),
-    exists: vi.fn((key, value) => Effect.succeed(key === "username" && value === "altay")),
+    exists: vi.fn((key, value) => Effect.succeed(key === "username" && value === "sdk-user")),
     forgotPassword: vi.fn((mail) => Effect.succeed({ mail, status: "OK" })),
     generateTOTP: vi.fn(() =>
       Effect.succeed({
@@ -109,7 +109,7 @@ vi.mock("../domains/family.js", async () => {
     createFamilyInvite: vi.fn(() => Effect.succeed({ code: "family-code" })),
     joinFamily: vi.fn((inviteCode) => Effect.succeed({ inviteCode, status: "joined" })),
     listFamilyInvites: vi.fn(() => Effect.succeed({ invites: [] })),
-    listFamilyMembers: vi.fn(() => Effect.succeed([{ username: "altay" }])),
+    listFamilyMembers: vi.fn(() => Effect.succeed([{ username: "sdk-user" }])),
     removeFamilyMember: vi.fn((username) => Effect.succeed({ removed: username })),
   };
 });
@@ -274,7 +274,7 @@ vi.mock("../domains/friends.js", async () => {
     countWaitingRequests: vi.fn(() => Effect.succeed(2)),
     denyFriendRequest: vi.fn((username) => Effect.succeed({ denied: username })),
     getFriendSharedFolder: vi.fn((username) => Effect.succeed({ id: 1, name: username })),
-    listFriends: vi.fn(() => Effect.succeed({ friends: [{ username: "altay" }], total: 1 })),
+    listFriends: vi.fn(() => Effect.succeed({ friends: [{ username: "sdk-user" }], total: 1 })),
     listSentRequests: vi.fn(() => Effect.succeed([{ username: "sent" }])),
     listWaitingRequests: vi.fn(() => Effect.succeed([{ username: "waiting" }])),
     removeFriend: vi.fn((username) => Effect.succeed({ removed: username })),
@@ -510,7 +510,7 @@ describe("sdk promise client adapters", () => {
     ).toContain("state=abc");
     expect(await client.auth.checkCodeMatch("MATCH")).toBe(true);
     expect(await client.auth.clients()).toEqual([{ id: 1, name: "cli" }]);
-    expect(await client.auth.exists("username", "altay")).toBe(true);
+    expect(await client.auth.exists("username", "sdk-user")).toBe(true);
     expect(await client.auth.forgotPassword("a@put.io")).toEqual({
       mail: "a@put.io",
       status: "OK",
@@ -578,7 +578,7 @@ describe("sdk promise client adapters", () => {
     expect(await client.family.createInvite()).toEqual({ code: "family-code" });
     expect(await client.family.join("invite")).toEqual({ inviteCode: "invite", status: "joined" });
     expect(await client.family.listInvites()).toEqual({ invites: [] });
-    expect(await client.family.listMembers()).toEqual([{ username: "altay" }]);
+    expect(await client.family.listMembers()).toEqual([{ username: "sdk-user" }]);
     expect(await client.family.removeMember("friend")).toEqual({ removed: "friend" });
 
     expect(await client.ifttt.getStatus()).toEqual({ enabled: true });
@@ -660,11 +660,11 @@ describe("sdk promise client adapters", () => {
     expect(await client.friends.approve("friend")).toEqual({ approved: "friend" });
     expect(await client.friends.countWaitingRequests()).toBe(2);
     expect(await client.friends.deny("friend")).toEqual({ denied: "friend" });
-    expect(await client.friends.list()).toEqual({ friends: [{ username: "altay" }], total: 1 });
+    expect(await client.friends.list()).toEqual({ friends: [{ username: "sdk-user" }], total: 1 });
     expect(await client.friends.listSentRequests()).toEqual([{ username: "sent" }]);
     expect(await client.friends.listWaitingRequests()).toEqual([{ username: "waiting" }]);
     expect(await client.friends.remove("friend")).toEqual({ removed: "friend" });
-    expect(await client.friends.search("altay")).toEqual([{ username: "altay" }]);
+    expect(await client.friends.search("sdk-user")).toEqual([{ username: "sdk-user" }]);
     expect(await client.friends.sendRequest("friend")).toEqual({ sent: "friend" });
     expect(await client.friends.sharedFolder("friend")).toEqual({ id: 1, name: "friend" });
 

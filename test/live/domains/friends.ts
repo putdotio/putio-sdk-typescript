@@ -89,7 +89,7 @@ await run("friends search excludes existing friend", async () => {
 
 await run("friends search requires restricted scope for oauth token", async () => {
   const friend = await findLiveFriend(authClient);
-  const query = friend?.name ?? "altay";
+  const query = friend?.name ?? "codex-scope-probe";
 
   try {
     await oauthClient.friends.search(query);

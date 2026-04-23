@@ -186,12 +186,12 @@ describe("account domain", () => {
 
     const result = await runSdkEffect(
       saveAccountSettings({
-        username: "altay",
+        username: "sdk-user",
       }),
       (request) => {
         expect(request.url).toBe("https://api.put.io/v2/account/settings");
         expect(getJsonBody(request)).toEqual({
-          username: "altay",
+          username: "sdk-user",
         });
 
         return jsonResponse({ status: "OK" });

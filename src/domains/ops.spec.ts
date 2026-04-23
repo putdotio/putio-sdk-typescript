@@ -426,7 +426,7 @@ describe("operational domain boundaries", () => {
           cursor: "cursor-1",
           ids: [7],
           target: {
-            friendNames: ["altay", "sdk"],
+            friendNames: ["sdk-user", "sdk"],
             type: "friends",
           },
         }),
@@ -434,7 +434,7 @@ describe("operational domain boundaries", () => {
           const body = getFormBody(request);
           expect(body.get("cursor")).toBe("cursor-1");
           expect(body.get("file_ids")).toBe("7");
-          expect(body.get("friends")).toBe("altay,sdk");
+          expect(body.get("friends")).toBe("sdk-user,sdk");
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },

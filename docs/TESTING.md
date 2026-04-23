@@ -92,8 +92,7 @@ Optional direct runtime variables:
 
 If direct token vars are missing, the live harness can still hydrate them from:
 
-1. a runtime-token 1Password item when `OP_SERVICE_ACCOUNT_TOKEN` and `PUTIO_1PASSWORD_RUNTIME_ITEM_ID` are set
-   The shared default vault is `frontend-ci`, and `PUTIO_1PASSWORD_RUNTIME_VAULT` can override it when needed
+1. a runtime-token 1Password item when `OP_SERVICE_ACCOUNT_TOKEN`, `PUTIO_1PASSWORD_RUNTIME_ITEM_ID`, and `PUTIO_1PASSWORD_RUNTIME_VAULT` are set
 2. legacy local aliases
 
 See `.env.example` for the current bootstrap-oriented layout and supported optional aliases.
@@ -117,14 +116,14 @@ vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
 Bootstrap runtime tokens with 1Password:
 
 ```bash
-export OP_SERVICE_ACCOUNT_TOKEN="$OP_SERVICE_ACCOUNT_PUTIO_FRONTEND_CI"
+export OP_SERVICE_ACCOUNT_TOKEN="<service-account-token>"
 op run --env-file=.env.example -- vp run bootstrap:tokens
 ```
 
 Run a credentialed live target with 1Password:
 
 ```bash
-export OP_SERVICE_ACCOUNT_TOKEN="$OP_SERVICE_ACCOUNT_PUTIO_FRONTEND_CI"
+export OP_SERVICE_ACCOUNT_TOKEN="<service-account-token>"
 op run --env-file=.env.example -- sh -lc \
   'vp pack && vp test run --config vitest.live.config.ts test/live/auth-credentials.test.ts'
 ```

@@ -57,7 +57,7 @@ This is optional for normal contributions and requires real credentials. Use it 
 Bootstrap runtime tokens with 1Password:
 
 ```bash
-export OP_SERVICE_ACCOUNT_TOKEN="$OP_SERVICE_ACCOUNT_PUTIO_FRONTEND_CI"
+export OP_SERVICE_ACCOUNT_TOKEN="<service-account-token>"
 op run --env-file=.env.example -- vp run bootstrap:tokens
 ```
 

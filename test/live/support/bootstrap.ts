@@ -287,7 +287,12 @@ export const persistRuntimeTokens = (
       "edit",
       secrets.runtimeItemId,
       "--vault",
-      secrets.runtimeItemVault ?? "frontend-ci",
+      secrets.runtimeItemVault ??
+        (() => {
+          throw new Error(
+            "Missing PUTIO_1PASSWORD_RUNTIME_VAULT. Set it explicitly when persisting runtime tokens to 1Password.",
+          );
+        })(),
       "--title",
       RUNTIME_ITEM_TITLE,
       `meta.updated_at=${new Date().toISOString()}`,

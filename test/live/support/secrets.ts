@@ -175,8 +175,15 @@ export const readFirstPartyClientCredentials = (): PutioClientCredentials => ({
   clientSecret: requireSecret("PUTIO_CLIENT_SECRET_FIRST_PARTY"),
 });
 
-const getRuntimeItemVault = (runtimeItemVault?: string): string =>
-  runtimeItemVault ?? "frontend-ci";
+const getRuntimeItemVault = (runtimeItemVault?: string): string => {
+  if (!runtimeItemVault) {
+    throw new Error(
+      "Missing PUTIO_1PASSWORD_RUNTIME_VAULT. Set it explicitly when reading runtime tokens from 1Password.",
+    );
+  }
+
+  return runtimeItemVault;
+};
 
 const readRuntimeItem = (
   runtimeItemId: string,

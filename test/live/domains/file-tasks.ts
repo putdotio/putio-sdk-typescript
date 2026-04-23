@@ -114,6 +114,10 @@ await run("files start_from roundtrip semantics", async () => {
 
 await run("files next-file natural ordering with disposable fixtures", async () => {
   const created: Array<{ readonly id: number; readonly name: string }> = [];
+  const folder = await authClient.files.createFolder({
+    name: `codex_sdk_next_file_${Date.now()}`,
+    parent_id: 0,
+  });
 
   try {
     for (const name of [
@@ -126,7 +130,7 @@ await run("files next-file natural ordering with disposable fixtures", async () 
           type: "text/plain",
         }),
         fileName: name,
-        parentId: 0,
+        parentId: folder.id,
       });
 
       if (!isFileUploadFileResult(upload)) {
@@ -154,14 +158,9 @@ await run("files next-file natural ordering with disposable fixtures", async () 
       next_id: next.id,
     };
   } finally {
-    if (created.length > 0) {
-      await authClient.files.delete(
-        created.map((file) => file.id),
-        {
-          skipTrash: true,
-        },
-      );
-    }
+    await authClient.files.delete([folder.id], {
+      skipTrash: true,
+    });
   }
 });
 

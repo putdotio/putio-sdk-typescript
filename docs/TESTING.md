@@ -83,6 +83,7 @@ Optional credential-fixture variables:
 - `PUTIO_TEST_SECONDARY_TOTP`
 - `PUTIO_CLIENT_ID_THIRD_PARTY`
 - `PUTIO_1PASSWORD_RUNTIME_ITEM_ID`
+- `PUTIO_1PASSWORD_RUNTIME_VAULT`
 
 Optional direct runtime variables:
 

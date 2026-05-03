@@ -114,20 +114,16 @@ Single target:
 vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
 ```
 
-Copy `.env.example` to `.env.local` and replace the `<vault>` and account placeholders with concrete `op://Vault/Item/field` references for your team's 1Password items (or with plain literal values). Then bootstrap runtime tokens with 1Password:
+Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from `.env.example` via `op inject`. The materialised file is `0600` and gitignored. Subsequent commands read the resolved values from process env after sourcing `.env.local` (or via your shell loader of choice).
 
 ```bash
-op run --env-file=.env.local -- vp run bootstrap:tokens
+pnpm secrets:setup        # one-time per worktree
+pnpm bootstrap:tokens     # mints fresh tokens
+pnpm test:live            # runs the broader live suite against pre-existing tokens
+pnpm secrets:clean        # before `git worktree remove`
 ```
 
-Run a credentialed live target with 1Password:
-
-```bash
-op run --env-file=.env.local -- sh -lc \
-  'vp pack && vp test run --config vitest.live.config.ts test/live/auth-credentials.test.ts'
-```
-
-`op run` requires an unlocked 1Password CLI session locally, or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. After bootstrap, subsequent live runs can hydrate from a shared 1Password runtime item by setting `PUTIO_1PASSWORD_RUNTIME_ITEM_ID` and `PUTIO_1PASSWORD_RUNTIME_VAULT` instead of filling all per-account fields locally.
+`secrets:setup` requires an unlocked 1Password CLI session locally, or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. The `.env.example` references are committer-only; external contributors do not need them for unit tests.
 
 ## Consumer Verification
 

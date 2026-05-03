@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # Two groups by change risk so a broken major bump doesn't park the
+    # weekly patch/minor rollup (including security patches for sibling
+    # actions). Dependabot still opens at most two PRs per week.
+    groups:
+      actions-patch-minor:
+        update-types: ["patch", "minor"]
+      actions-major:
+        update-types: ["major"]
+    commit-message:
+      prefix: "ci"

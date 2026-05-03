@@ -39,6 +39,8 @@
     "coverage": "vp test --coverage --passWithNoTests",
     "dev": "vp pack --watch",
     "prepack": "vp pack",
+    "secrets:setup": "OP_ACCOUNT=putdotio.1password.com op whoami >/dev/null && OP_ACCOUNT=putdotio.1password.com op inject -f -i .env.example -o .env.local",
+    "secrets:clean": "rm -f .env.local .env.local.* .env.local.swp",
     "test": "vp test --passWithNoTests",
     "test:live": "vp pack && vp test run --config vitest.live.config.ts",
     "test:live:consumer": "vp pack && vp test run --config vitest.live.config.ts test/live/consumer.test.ts",

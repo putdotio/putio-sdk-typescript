@@ -56,9 +56,11 @@ This is optional for normal contributions and requires real credentials. Use it 
 
 Bootstrap runtime tokens with 1Password:
 
+1. Copy `.env.example` to `.env.local` and replace the `<vault>` and account placeholders with concrete `op://Vault/Item/field` references for your team's 1Password items (or with plain literal values).
+2. Run with an unlocked 1Password CLI session locally, or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI:
+
 ```bash
-export OP_SERVICE_ACCOUNT_TOKEN="<service-account-token>"
-op run --env-file=.env.example -- vp run bootstrap:tokens
+op run --env-file=.env.local -- vp run bootstrap:tokens
 ```
 
 For single-target commands, safety rules, and fixture expectations, see [Testing](./docs/TESTING.md).

@@ -22,13 +22,15 @@ The release lane:
 - creates the GitHub release
 - commits the released `package.json` version back to `main`
 
-## Required Secrets
+## Release Environment
 
-- `NPM_TOKEN`
-- `GITHUB_TOKEN`
+The release job declares the protected GitHub Environment named `release`.
 
-`GITHUB_TOKEN` is provided by GitHub Actions automatically.
-`NPM_TOKEN` must be configured in the repository or organization secrets before the release job can publish.
+Configure that Environment with required reviewers and prevent self-review before enabling npm publish automation.
+
+`GITHUB_TOKEN` is provided by GitHub Actions automatically. `NPM_TOKEN` must live in the `release` Environment, not as a plain repository secret, so pull request jobs never receive publish credentials.
+
+Public-repo branch policy may still allow trusted put.io team members to push directly to `main`, but it should block outsiders, force-pushes, and branch deletes where GitHub plan support allows. Release tag policy should restrict `v*` tag creation or updates to the release automation token and release admins.
 
 ## Local Checks
 

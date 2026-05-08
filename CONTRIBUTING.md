@@ -10,7 +10,7 @@ Install dependencies with Vite+:
 vp install
 ```
 
-Then install the stock VitePlus hook wiring for this clone:
+Then install the stock Vite+ hook wiring for this clone:
 
 ```bash
 vp config

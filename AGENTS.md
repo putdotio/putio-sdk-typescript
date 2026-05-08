@@ -12,7 +12,7 @@
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Testing](./docs/TESTING.md)
 - [Readiness](./docs/READINESS.md)
-- [Release](./docs/RELEASE.md)
+- [Distribution](./docs/DISTRIBUTION.md)
 
 ## Commands
 

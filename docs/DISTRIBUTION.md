@@ -1,10 +1,10 @@
-# Release
+# Distribution
 
 ## Delivery Model
 
 Every merge to `main` should already be releasable.
 
-GitHub Actions owns releases for this repo and the workflow runs on Blacksmith-hosted Ubuntu runners.
+GitHub Actions owns releases for this repo and the workflow runs on GitHub-hosted Ubuntu runners.
 
 The pipeline does three things on `main`:
 
@@ -26,7 +26,12 @@ The release lane:
 
 The release job declares the protected GitHub Environment named `release`.
 
-Configure that Environment with required reviewers and prevent self-review before enabling npm publish automation.
+Environment entries:
+
+- secrets: `NPM_TOKEN`, `PUTIO_RELEASE_BOT_PRIVATE_KEY`
+- variables: `PUTIO_RELEASE_BOT_APP_ID`
+- approval: none; releases are continuous after the `main` gate passes
+- refs: release branch/tag policy constrains what can publish
 
 Release GitHub writes use `putio-release-bot` through `PUTIO_RELEASE_BOT_APP_ID` and `PUTIO_RELEASE_BOT_PRIVATE_KEY`. `NPM_TOKEN` must live in the `release` Environment, not as a plain repository secret, so pull request jobs never receive publish credentials.
 
@@ -34,7 +39,7 @@ Public-repo branch policy may still allow trusted put.io team members to push di
 
 ## Local Checks
 
-Before changing release wiring, validate the repo-local guardrails the workflow depends on:
+Before changing distribution wiring, validate the repo-local guardrails the workflow depends on:
 
 ```bash
 vp install

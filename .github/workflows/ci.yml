@@ -21,12 +21,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
 
       - name: Set up Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1 # v1
         with:
           node-version-file: ".node-version"
           cache: true
@@ -47,12 +47,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
 
       - name: Set up Vite+
-        uses: voidzero-dev/setup-vp@v1
+        uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1 # v1
         with:
           node-version-file: ".node-version"
           cache: true
@@ -73,9 +73,7 @@ jobs:
     timeout-minutes: 20
     environment: release
     permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+      contents: read
 
     steps:
       - name: Create release bot token
@@ -93,16 +91,14 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.release-bot.outputs.token }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+      - name: Set up Vite+
+        uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1 # v1
         with:
           node-version-file: ".node-version"
-
-      - name: Enable Corepack
-        run: corepack enable
+          cache: true
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: vp install
 
       - name: Release package
         uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0

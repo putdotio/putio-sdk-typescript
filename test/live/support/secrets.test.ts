@@ -15,6 +15,9 @@ describe("live secret env loading", () => {
     const directKey = "PUTIO_SDK_TEST_DIRECT_PRECEDENCE";
     const localKey = "PUTIO_SDK_TEST_LOCAL_PRECEDENCE";
     const envKey = "PUTIO_SDK_TEST_ENV_FALLBACK";
+    const originalValues = new Map(
+      [directKey, localKey, envKey].map((key) => [key, process.env[key]]),
+    );
 
     try {
       process.env[directKey] = "direct";
@@ -30,9 +33,14 @@ describe("live secret env loading", () => {
       expect(process.env[localKey]).toBe("local");
       expect(process.env[envKey]).toBe("env");
     } finally {
-      delete process.env[directKey];
-      delete process.env[localKey];
-      delete process.env[envKey];
+      for (const [key, value] of originalValues) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+
       rmSync(dir, { force: true, recursive: true });
     }
   });

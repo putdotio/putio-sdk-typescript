@@ -19,6 +19,7 @@ import {
   mapDecodeErrorToValidationError,
   mapTransportError,
   parseErrorBody,
+  PutioConfigurationError,
   type PutioSdkError,
 } from "./errors.js";
 
@@ -81,6 +82,9 @@ export const buildPutioUrl = (baseUrl: string | URL, path: string, query?: Putio
 
   return url.toString();
 };
+
+const mapUrlBuildError = (cause: unknown) =>
+  cause instanceof PutioConfigurationError ? cause : mapConfigurationError(cause);
 
 export const OkResponseSchema = Schema.Struct({
   status: Schema.Literal("OK"),
@@ -233,7 +237,7 @@ const executeRequest = (options: PutioRequestOptions) =>
           options.path,
           options.query,
         ),
-      catch: mapConfigurationError,
+      catch: mapUrlBuildError,
     });
     const request = yield* makeRequest(url, options, authorization);
 

@@ -7,6 +7,7 @@ import {
 } from "../core/errors.js";
 import {
   OkResponseSchema,
+  encodePathSegment,
   requestJson,
   selectJsonField,
   selectJsonFields,
@@ -258,7 +259,7 @@ export const listRssFeeds = (): Effect.Effect<
 export const getRssFeed = (id: number): Effect.Effect<RssFeed, GetRssFeedError, PutioSdkContext> =>
   requestJson(RssFeedEnvelopeSchema, {
     method: "GET",
-    path: `/v2/rss/${id}`,
+    path: `/v2/rss/${encodePathSegment(id)}`,
   }).pipe(selectJsonField("feed"), withOperationErrors(GetRssFeedErrorSpec));
 
 export const createRssFeed = (
@@ -287,7 +288,7 @@ export const updateRssFeed = (
       value: toUpdateBody(params),
     },
     method: "POST",
-    path: `/v2/rss/${id}`,
+    path: `/v2/rss/${encodePathSegment(id)}`,
   }).pipe(withOperationErrors(UpdateRssFeedErrorSpec));
 
 export const pauseRssFeed = (
@@ -295,7 +296,7 @@ export const pauseRssFeed = (
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PauseRssFeedError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/rss/${id}/pause`,
+    path: `/v2/rss/${encodePathSegment(id)}/pause`,
   }).pipe(withOperationErrors(PauseRssFeedErrorSpec));
 
 export const resumeRssFeed = (
@@ -307,7 +308,7 @@ export const resumeRssFeed = (
 > =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/rss/${id}/resume`,
+    path: `/v2/rss/${encodePathSegment(id)}/resume`,
   }).pipe(withOperationErrors(ResumeRssFeedErrorSpec));
 
 export const deleteRssFeed = (
@@ -319,7 +320,7 @@ export const deleteRssFeed = (
 > =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/rss/${id}/delete`,
+    path: `/v2/rss/${encodePathSegment(id)}/delete`,
   }).pipe(withOperationErrors(DeleteRssFeedErrorSpec));
 
 export const listRssFeedItems = (
@@ -334,7 +335,7 @@ export const listRssFeedItems = (
 > =>
   requestJson(RssFeedItemsEnvelopeSchema, {
     method: "GET",
-    path: `/v2/rss/${id}/items`,
+    path: `/v2/rss/${encodePathSegment(id)}/items`,
   }).pipe(selectJsonFields("feed", "items"), withOperationErrors(ListRssFeedItemsErrorSpec));
 
 export const clearRssFeedLogs = (
@@ -346,7 +347,7 @@ export const clearRssFeedLogs = (
 > =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/rss/${id}/clear-log`,
+    path: `/v2/rss/${encodePathSegment(id)}/clear-log`,
   }).pipe(withOperationErrors(ClearRssFeedLogsErrorSpec));
 
 export const retryRssFeedItem = (
@@ -359,7 +360,7 @@ export const retryRssFeedItem = (
 > =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/rss/${feedId}/items/${itemId}/retry`,
+    path: `/v2/rss/${encodePathSegment(feedId)}/items/${encodePathSegment(itemId)}/retry`,
   }).pipe(withOperationErrors(RetryRssFeedItemErrorSpec));
 
 export const retryAllRssFeedItems = (
@@ -371,5 +372,5 @@ export const retryAllRssFeedItems = (
 > =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/rss/${feedId}/retry-all`,
+    path: `/v2/rss/${encodePathSegment(feedId)}/retry-all`,
   }).pipe(withOperationErrors(RetryAllRssFeedItemsErrorSpec));

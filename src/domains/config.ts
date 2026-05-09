@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect";
 import type { PutioSdkError } from "../core/errors.js";
 import {
   OkResponseSchema,
+  encodePathSegment,
   requestJson,
   selectJsonField,
   type PutioSdkContext,
@@ -100,7 +101,7 @@ export const getConfigKey = (
 ): Effect.Effect<PutioJsonValue, PutioSdkError, PutioSdkContext> =>
   requestJson(ConfigValueEnvelopeSchema, {
     method: "GET",
-    path: `/v2/config/${key}`,
+    path: `/v2/config/${encodePathSegment(key)}`,
   }).pipe(selectJsonField("value"));
 
 export const getConfigKeyWith = <A, I>(
@@ -114,7 +115,7 @@ export const getConfigKeyWith = <A, I>(
     }),
     {
       method: "GET",
-      path: `/v2/config/${key}`,
+      path: `/v2/config/${encodePathSegment(key)}`,
     },
   ).pipe(selectJsonField("value"));
 
@@ -130,7 +131,7 @@ export const setConfigKey = (
       },
     },
     method: "PUT",
-    path: `/v2/config/${key}`,
+    path: `/v2/config/${encodePathSegment(key)}`,
   });
 
 export const deleteConfigKey = (
@@ -138,5 +139,5 @@ export const deleteConfigKey = (
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "DELETE",
-    path: `/v2/config/${key}`,
+    path: `/v2/config/${encodePathSegment(key)}`,
   });

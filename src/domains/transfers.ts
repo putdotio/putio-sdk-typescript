@@ -9,6 +9,7 @@ import {
 } from "../core/errors.js";
 import {
   OkResponseSchema,
+  encodePathSegment,
   requestJson,
   selectJsonField,
   selectJsonFields,
@@ -323,7 +324,7 @@ export const getTransfer = (
 ): Effect.Effect<Transfer, GetTransferError, PutioSdkContext> =>
   requestJson(TransferEnvelopeSchema, {
     method: "GET",
-    path: `/v2/transfers/${id}`,
+    path: `/v2/transfers/${encodePathSegment(id)}`,
   }).pipe(selectJsonField("transfer"), withOperationErrors(GetTransferErrorSpec));
 
 export const countTransfers = (): Effect.Effect<number, PutioSdkError, PutioSdkContext> =>

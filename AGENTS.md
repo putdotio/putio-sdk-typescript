@@ -34,7 +34,7 @@
 - Keep `README.md` consumer-facing; put repo-operator detail in `docs/*` and keep `AGENTS.md` as a routing layer.
 - Prefer `vp` for toolchain and package-manager operations; use `vp run <script>` for custom package scripts.
 - Keep public package boundaries explicit and open-source-safe.
-- Avoid unsafe casts, ignored checks, and weakened thresholds unless explicitly approved.
+- Use typed parsing and real checks; change thresholds only with explicit approval.
 - Update docs when the public surface, verification workflow, or repo shape changes.
 
 ## Testing

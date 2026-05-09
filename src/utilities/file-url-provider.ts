@@ -1,5 +1,5 @@
 import { joinCsv } from "../core/forms.js";
-import { buildPutioUrl } from "../core/http.js";
+import { buildPutioUrl, encodePathSegment } from "../core/http.js";
 import type { FileBroad } from "../domains/files.js";
 import { getFileRenderType, type FileRenderTypeInput } from "./file-render-type.js";
 
@@ -28,7 +28,7 @@ export class FileURLProvider {
 
   getDownloadURL(fileOrFileId: FileUrlProviderInput | number): string | null {
     if (typeof fileOrFileId === "number") {
-      return buildPutioUrl(this.baseURL, `/v2/files/${fileOrFileId}/download`, {
+      return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(fileOrFileId)}/download`, {
         oauth_token: this.token,
       });
     }
@@ -37,7 +37,7 @@ export class FileURLProvider {
       return null;
     }
 
-    return buildPutioUrl(this.baseURL, `/v2/files/${fileOrFileId.id}/download`, {
+    return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(fileOrFileId.id)}/download`, {
       oauth_token: this.token,
     });
   }
@@ -54,7 +54,7 @@ export class FileURLProvider {
       return null;
     }
 
-    return buildPutioUrl(this.baseURL, `/v2/files/${file.id}/hls/media.m3u8`, {
+    return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/hls/media.m3u8`, {
       max_subtitle_count: params.maxSubtitleCount,
       oauth_token: this.token,
       original: params.playOriginal ? 1 : undefined,
@@ -67,7 +67,7 @@ export class FileURLProvider {
       return null;
     }
 
-    return buildPutioUrl(this.baseURL, `/v2/files/${file.id}/mp4/download`, {
+    return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/mp4/download`, {
       oauth_token: this.token,
     });
   }
@@ -77,7 +77,7 @@ export class FileURLProvider {
       return null;
     }
 
-    return buildPutioUrl(this.baseURL, `/v2/files/${file.id}/mp4/stream`, {
+    return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/mp4/stream`, {
       oauth_token: this.token,
     });
   }
@@ -85,11 +85,11 @@ export class FileURLProvider {
   getStreamURL(file: FileUrlProviderInput): string | null {
     switch (getFileRenderType(file)) {
       case "audio":
-        return buildPutioUrl(this.baseURL, `/v2/files/${file.id}/stream.mp3`, {
+        return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/stream.mp3`, {
           oauth_token: this.token,
         });
       case "video":
-        return buildPutioUrl(this.baseURL, `/v2/files/${file.id}/stream`, {
+        return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/stream`, {
           oauth_token: this.token,
         });
       default:
@@ -102,7 +102,7 @@ export class FileURLProvider {
       return null;
     }
 
-    return buildPutioUrl(this.baseURL, `/v2/files/${file.id}/xspf`, {
+    return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/xspf`, {
       oauth_token: this.token,
     });
   }

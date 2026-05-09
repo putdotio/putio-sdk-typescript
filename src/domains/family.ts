@@ -7,6 +7,7 @@ import {
 } from "../core/errors.js";
 import {
   OkResponseSchema,
+  encodePathSegment,
   requestJson,
   selectJsonField,
   selectJsonFields,
@@ -151,7 +152,7 @@ export const removeFamilyMember = (
 ): Effect.Effect<void, RemoveFamilyMemberError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "DELETE",
-    path: `/v2/family/sub_account/${encodeURIComponent(username)}`,
+    path: `/v2/family/sub_account/${encodePathSegment(username)}`,
   }).pipe(Effect.asVoid, withOperationErrors(RemoveFamilyMemberErrorSpec));
 
 export const joinFamily = (
@@ -159,5 +160,5 @@ export const joinFamily = (
 ): Effect.Effect<void, JoinFamilyError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/family/join/${encodeURIComponent(inviteCode)}`,
+    path: `/v2/family/join/${encodePathSegment(inviteCode)}`,
   }).pipe(Effect.asVoid, withOperationErrors(JoinFamilyErrorSpec));

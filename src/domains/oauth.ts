@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect";
 import {
   OkResponseSchema,
   buildPutioUrl,
+  encodePathSegment,
   requestJson,
   selectJsonField,
   type PutioSdkContext,
@@ -213,9 +214,13 @@ export const buildOAuthAppIconUrl = (options: {
   readonly id: number;
   readonly oauthToken: string;
 }) =>
-  buildPutioUrl(options.baseUrl ?? "https://api.put.io", `/v2/oauth/apps/${options.id}/icon`, {
-    oauth_token: options.oauthToken,
-  });
+  buildPutioUrl(
+    options.baseUrl ?? "https://api.put.io",
+    `/v2/oauth/apps/${encodePathSegment(options.id)}/icon`,
+    {
+      oauth_token: options.oauthToken,
+    },
+  );
 
 export const queryOAuthApps = (): Effect.Effect<
   ReadonlyArray<MyOAuthApp>,
@@ -239,7 +244,9 @@ export const getOAuthApp = (
 > =>
   requestJson(OAuthAppWithTokenSchema, {
     method: "GET",
-    path: options?.edit ? `/v2/oauth/apps/${id}/edit` : `/v2/oauth/apps/${id}`,
+    path: options?.edit
+      ? `/v2/oauth/apps/${encodePathSegment(id)}/edit`
+      : `/v2/oauth/apps/${encodePathSegment(id)}`,
   }).pipe(withOperationErrors(GetOAuthAppErrorSpec));
 
 export const setOAuthAppIcon = (
@@ -255,7 +262,7 @@ export const setOAuthAppIcon = (
       value: formData,
     },
     method: "POST",
-    path: `/v2/oauth/apps/${id}/icon`,
+    path: `/v2/oauth/apps/${encodePathSegment(id)}/icon`,
   });
 };
 
@@ -288,7 +295,7 @@ export const updateOAuthApp = (
       value: makeUpdateOAuthAppFormData(input),
     },
     method: "POST",
-    path: `/v2/oauth/apps/${input.id}`,
+    path: `/v2/oauth/apps/${encodePathSegment(input.id)}`,
   }).pipe(withOperationErrors(UpdateOAuthAppErrorSpec));
 
 export const deleteOAuthApp = (
@@ -300,7 +307,7 @@ export const deleteOAuthApp = (
 > =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/oauth/apps/${id}/delete`,
+    path: `/v2/oauth/apps/${encodePathSegment(id)}/delete`,
   }).pipe(withOperationErrors(DeleteOAuthAppErrorSpec));
 
 export const regenerateOAuthAppToken = (
@@ -308,7 +315,7 @@ export const regenerateOAuthAppToken = (
 ): Effect.Effect<string, RegenerateOAuthAppTokenError, PutioSdkContext> =>
   requestJson(OAuthRegeneratedTokenEnvelopeSchema, {
     method: "POST",
-    path: `/v2/oauth/apps/${id}/regenerate_token`,
+    path: `/v2/oauth/apps/${encodePathSegment(id)}/regenerate_token`,
   }).pipe(selectJsonField("access_token"), withOperationErrors(RegenerateOAuthAppTokenErrorSpec));
 
 export const getPopularOAuthApps = (): Effect.Effect<

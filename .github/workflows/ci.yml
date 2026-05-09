@@ -14,7 +14,7 @@ jobs:
   verify:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     name: Verify SDK
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
@@ -40,7 +40,7 @@ jobs:
   verify-consumer-surface:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     name: Verify consumer surface
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
@@ -69,9 +69,11 @@ jobs:
     needs:
       - verify
       - verify-consumer-surface
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: release
+    environment:
+      name: release
+      deployment: false
     permissions:
       contents: read
 
@@ -104,12 +106,12 @@ jobs:
         uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0
         with:
           extra_plugins: |
-            @semantic-release/commit-analyzer
-            @semantic-release/release-notes-generator
-            @semantic-release/npm
-            @semantic-release/github
-            @semantic-release/git
-            conventional-changelog-conventionalcommits
+            @semantic-release/commit-analyzer@13.0.1
+            @semantic-release/release-notes-generator@14.1.1
+            @semantic-release/npm@13.1.5
+            @semantic-release/github@12.0.8
+            @semantic-release/git@10.0.1
+            conventional-changelog-conventionalcommits@9.3.1
         env:
           GITHUB_TOKEN: ${{ steps.release-bot.outputs.token }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

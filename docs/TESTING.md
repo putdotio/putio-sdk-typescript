@@ -49,17 +49,19 @@ Unit coverage now includes all production code under `src/**`, including:
 `vp run verify` enforces the repo coverage floor through the unit suite only.
 Live tests stay separate on purpose:
 
-- they do not contribute to the coverage report
-- they do not gate CI coverage
+- they stay outside the coverage report
+- CI coverage gates only the unit suite
 - they exist to sanity-check real API behavior before releases and deeper changes
 
 The `consumer` target is the exception: it is safe to run without real credentials and is intended to gate CI as the publication-surface check.
-GitHub Actions runs both the verify and consumer-surface lanes on `blacksmith-2vcpu-ubuntu-2404`.
+GitHub Actions runs both the verify and consumer-surface lanes on GitHub-hosted Ubuntu runners.
 
 ## Live Environment
 
-Default local env file:
+Default local env files, loaded in order:
 
+- direct process environment
+- `.env.local`
 - `.env`
 
 Example env file:
@@ -98,7 +100,7 @@ If direct token vars are missing, the live harness can still hydrate them from:
 
 See `.env.example` for the current bootstrap-oriented layout and supported optional aliases.
 
-Never print token values in command output, docs, comments, or commits.
+Keep token values out of command output, docs, comments, and commits.
 
 ## Live Commands
 
@@ -114,7 +116,7 @@ Single target:
 vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
 ```
 
-Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from `.env.example` via `op inject`. The materialised file is `0600` and gitignored. Subsequent commands read the resolved values from process env after sourcing `.env.local` (or via your shell loader of choice).
+Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from `.env.example` via `op inject`. The materialised file is `0600` and gitignored. Live commands auto-load `.env.local` first and then `.env`; already-exported environment variables keep highest priority.
 
 ```bash
 pnpm secrets:setup        # one-time per worktree
@@ -123,7 +125,7 @@ pnpm test:live            # runs the broader live suite against pre-existing tok
 pnpm secrets:clean        # before `git worktree remove`
 ```
 
-`secrets:setup` requires an unlocked 1Password CLI session locally, or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. The `.env.example` references are committer-only; external contributors do not need them for unit tests.
+`secrets:setup` requires an unlocked 1Password CLI session locally, or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. The `.env.example` references are committer-only; external contributors can run unit tests without them.
 
 ## Consumer Verification
 
@@ -159,7 +161,7 @@ Allowed for live automatic verification:
 - config read/write roundtrips with cleanup
 - disposable OAuth app resources if the script also deletes them
 
-Do not run automatically on the shared account:
+Keep these checks sandbox-only until a sacrificial account exists:
 
 - password reset
 - 2FA enable or disable

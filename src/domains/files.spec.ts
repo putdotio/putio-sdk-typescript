@@ -150,6 +150,23 @@ describe("files domain", () => {
       ),
     ).toMatchObject({ id: 9 });
 
+    expect(
+      await runSdkEffect(
+        // @ts-expect-error This covers untyped JavaScript callers.
+        files.getFile({
+          id: "1/../../account/info",
+        }),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/files/1%2F..%2F..%2Faccount%2Finfo");
+          return jsonResponse({
+            file: baseFile,
+            status: "OK",
+          });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).toMatchObject({ id: 9 });
+
     const file = await runSdkEffect(
       files.getFile({
         id: 9,
@@ -202,6 +219,20 @@ describe("files domain", () => {
     expect(file.content_type_and_codecs).toContain("codecs");
     expect(file.media_info?.mime_type).toBe("video/mp4");
     expect(file.video_metadata?.width).toBe(1280);
+
+    const nullQueryExit = await runSdkExit(
+      // @ts-expect-error This covers untyped JavaScript callers.
+      files.getFile({
+        id: 9,
+        query: null,
+      }),
+      () => {
+        throw new Error("request should not execute");
+      },
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(nullQueryExit)).toBeInstanceOf(PutioValidationError);
 
     const validationExit = await runSdkExit(
       files.getFile({

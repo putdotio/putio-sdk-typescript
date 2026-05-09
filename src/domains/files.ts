@@ -13,6 +13,7 @@ import {
   OkResponseSchema,
   PutioSdkConfig,
   buildPutioUrl,
+  encodePathSegment,
   requestJson,
   requestVoid,
   selectJsonField,
@@ -760,8 +761,8 @@ export const buildFileApiDownloadUrl = (
   buildPutioUrl(
     baseUrl,
     options.name
-      ? `/v2/files/${fileId}/download/${normalizeFileName(options.name)}`
-      : `/v2/files/${fileId}/download`,
+      ? `/v2/files/${encodePathSegment(fileId)}/download/${normalizeFileName(options.name)}`
+      : `/v2/files/${encodePathSegment(fileId)}/download`,
     {
       ...useTunnelToQuery(options.useTunnel),
       oauth_token: options.oauthToken,
@@ -773,7 +774,7 @@ export const buildFileApiContentUrl = (
   fileId: number,
   options: FileDirectAccessOptions = {},
 ): string =>
-  buildPutioUrl(baseUrl, `/v2/files/${fileId}/stream`, {
+  buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/stream`, {
     ...useTunnelToQuery(options.useTunnel),
     oauth_token: options.oauthToken,
   });
@@ -786,8 +787,8 @@ export const buildFileApiMp4DownloadUrl = (
   buildPutioUrl(
     baseUrl,
     options.name
-      ? `/v2/files/${fileId}/mp4/download/${normalizeFileName(options.name)}`
-      : `/v2/files/${fileId}/mp4/download`,
+      ? `/v2/files/${encodePathSegment(fileId)}/mp4/download/${normalizeFileName(options.name)}`
+      : `/v2/files/${encodePathSegment(fileId)}/mp4/download`,
     {
       ...useTunnelToQuery(options.useTunnel),
       convert: options.convert ? 1 : undefined,
@@ -800,7 +801,7 @@ export const buildFileHlsStreamUrl = (
   fileId: number,
   options: FileHlsStreamUrlOptions = {},
 ): string =>
-  buildPutioUrl(baseUrl, `/v2/files/${fileId}/hls/media.m3u8`, {
+  buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/hls/media.m3u8`, {
     max_subtitle_count: options.maxSubtitleCount,
     oauth_token: options.oauthToken,
     original:
@@ -906,10 +907,18 @@ export function getFile<TQuery extends FileQuery>(input: {
   readonly id: number;
   readonly query: TQuery;
 }): Effect.Effect<FileResponseFor<TQuery>, GetFileError | PutioValidationError, PutioSdkContext>;
-export function getFile(input: { readonly id: number; readonly query?: FileQuery }) {
+export function getFile(input: { readonly id: number; readonly query?: FileQuery | null }) {
+  if (input.query === null) {
+    return Effect.fail(
+      new PutioValidationError({
+        cause: "getFile query must be an object when provided",
+      }),
+    );
+  }
+
   const effect = requestJson(FileEnvelopeSchema, {
     method: "GET",
-    path: `/v2/files/${input.id}`,
+    path: `/v2/files/${encodePathSegment(input.id)}`,
     query: input.query,
   }).pipe(selectJsonField("file"), withOperationErrors(GetFileErrorSpec));
 
@@ -1062,7 +1071,7 @@ export const getStartFrom = (
 ): Effect.Effect<number, StartFromError, PutioSdkContext> =>
   requestJson(FileStartFromEnvelopeSchema, {
     method: "GET",
-    path: `/v2/files/${fileId}/start-from`,
+    path: `/v2/files/${encodePathSegment(fileId)}/start-from`,
   }).pipe(selectJsonField("start_from"), withOperationErrors(StartFromErrorSpec));
 
 export const getDownloadUrl = (
@@ -1070,7 +1079,7 @@ export const getDownloadUrl = (
 ): Effect.Effect<string, DownloadUrlError, PutioSdkContext> =>
   requestJson(FileDownloadUrlEnvelopeSchema, {
     method: "GET",
-    path: `/v2/files/${fileId}/url`,
+    path: `/v2/files/${encodePathSegment(fileId)}/url`,
   }).pipe(selectJsonField("url"), withOperationErrors(DownloadUrlErrorSpec));
 
 export const getApiDownloadUrl = (
@@ -1137,7 +1146,7 @@ export const listFileSubtitles = (
 > =>
   requestJson(FileSubtitlesEnvelopeSchema, {
     method: "GET",
-    path: `/v2/files/${fileId}/subtitles`,
+    path: `/v2/files/${encodePathSegment(fileId)}/subtitles`,
     query: options.languages
       ? {
           languages: joinCsv(options.languages),
@@ -1156,7 +1165,7 @@ export const setStartFrom = (
       },
     },
     method: "POST",
-    path: `/v2/files/${input.file_id}/start-from/set`,
+    path: `/v2/files/${encodePathSegment(input.file_id)}/start-from/set`,
   }).pipe(withOperationErrors(StartFromErrorSpec));
 
 export const resetStartFrom = (
@@ -1164,7 +1173,7 @@ export const resetStartFrom = (
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, StartFromError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "GET",
-    path: `/v2/files/${fileId}/start-from/delete`,
+    path: `/v2/files/${encodePathSegment(fileId)}/start-from/delete`,
   }).pipe(withOperationErrors(StartFromErrorSpec));
 
 export const getMp4Status = (
@@ -1172,7 +1181,7 @@ export const getMp4Status = (
 ): Effect.Effect<FileConversionStatus, FileMp4Error, PutioSdkContext> =>
   requestJson(FileConversionStatusEnvelopeSchema, {
     method: "GET",
-    path: `/v2/files/${fileId}/mp4`,
+    path: `/v2/files/${encodePathSegment(fileId)}/mp4`,
   }).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
 
 export const convertFileToMp4 = (
@@ -1180,7 +1189,7 @@ export const convertFileToMp4 = (
 ): Effect.Effect<FileConversionStatus, FileMp4Error, PutioSdkContext> =>
   requestJson(FileConversionStatusEnvelopeSchema, {
     method: "POST",
-    path: `/v2/files/${fileId}/mp4`,
+    path: `/v2/files/${encodePathSegment(fileId)}/mp4`,
   }).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
 
 export const deleteFileMp4 = (
@@ -1188,7 +1197,7 @@ export const deleteFileMp4 = (
 ): Effect.Effect<void, FileMp4MutationError, PutioSdkContext> =>
   requestVoid({
     method: "DELETE",
-    path: `/v2/files/${fileId}/mp4`,
+    path: `/v2/files/${encodePathSegment(fileId)}/mp4`,
   }).pipe(withOperationErrors(FileMp4MutationErrorSpec));
 
 export const putMp4ToMyFiles = (
@@ -1196,7 +1205,7 @@ export const putMp4ToMyFiles = (
 ): Effect.Effect<void, FileMp4MutationError, PutioSdkContext> =>
   requestVoid({
     method: "GET",
-    path: `/v2/files/${fileId}/put-mp4-to-my-folders`,
+    path: `/v2/files/${encodePathSegment(fileId)}/put-mp4-to-my-folders`,
   }).pipe(withOperationErrors(FileMp4MutationErrorSpec));
 
 export const convertFilesToMp4 = (
@@ -1284,7 +1293,7 @@ export const deleteFileExtraction = (
 ): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
   requestVoid({
     method: "DELETE",
-    path: `/v2/files/extract/${extractionId}`,
+    path: `/v2/files/extract/${encodePathSegment(extractionId)}`,
   });
 
 export const findNextFile = (
@@ -1293,7 +1302,7 @@ export const findNextFile = (
 ): Effect.Effect<Schema.Schema.Type<typeof FilesNextFileSchema>, PutioSdkError, PutioSdkContext> =>
   requestJson(FilesNextFileEnvelopeSchema, {
     method: "GET",
-    path: `/v2/files/${fileId}/next-file`,
+    path: `/v2/files/${encodePathSegment(fileId)}/next-file`,
     query: {
       file_type: fileType,
     },
@@ -1304,7 +1313,7 @@ export const findNextVideo = (
 ): Effect.Effect<Schema.Schema.Type<typeof FilesNextFileSchema>, PutioSdkError, PutioSdkContext> =>
   requestJson(FilesNextVideoEnvelopeSchema, {
     method: "GET",
-    path: `/v2/files/${fileId}/next-video`,
+    path: `/v2/files/${encodePathSegment(fileId)}/next-video`,
   }).pipe(selectJsonField("next_video"));
 
 export const createFileUploadRequest = (

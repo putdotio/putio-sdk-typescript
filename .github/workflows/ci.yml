@@ -71,7 +71,9 @@ jobs:
       - verify-consumer-surface
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    environment: release
+    environment:
+      name: release
+      deployment: false
     permissions:
       contents: read
 

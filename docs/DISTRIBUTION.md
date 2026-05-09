@@ -32,6 +32,7 @@ Environment entries:
 - variables: `PUTIO_RELEASE_BOT_APP_ID`
 - approval: none; releases are continuous after the `main` gate passes
 - refs: release branch/tag policy constrains what can publish
+- deployment records: disabled with `deployment: false` because this is package publishing, not an app deploy
 
 Release GitHub writes use `putio-release-bot` through `PUTIO_RELEASE_BOT_APP_ID` and `PUTIO_RELEASE_BOT_PRIVATE_KEY`. Keep `NPM_TOKEN` in the `release` Environment so pull request jobs stay publish-secret-free.
 

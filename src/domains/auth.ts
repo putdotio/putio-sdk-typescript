@@ -9,6 +9,7 @@ import {
 import {
   OkResponseSchema,
   buildPutioUrl,
+  encodePathSegment,
   requestJson,
   selectJsonField,
   selectJsonFields,
@@ -378,8 +379,8 @@ export const login = (input: {
     },
     method: "PUT",
     path: input.fingerprint
-      ? `/v2/oauth2/authorizations/clients/${input.clientId}/${input.fingerprint}`
-      : `/v2/oauth2/authorizations/clients/${input.clientId}`,
+      ? `/v2/oauth2/authorizations/clients/${encodePathSegment(input.clientId)}/${encodePathSegment(input.fingerprint)}`
+      : `/v2/oauth2/authorizations/clients/${encodePathSegment(input.clientId)}`,
     query: {
       client_name: input.clientName,
       client_secret: input.clientSecret,
@@ -420,7 +421,7 @@ export const exists = (
       type: "none",
     },
     method: "GET",
-    path: `/v2/registration/exists/${key}`,
+    path: `/v2/registration/exists/${encodePathSegment(key)}`,
     query: {
       value,
     },
@@ -438,7 +439,7 @@ export const getVoucher = (
       type: "none",
     },
     method: "GET",
-    path: `/v2/registration/voucher/${code}`,
+    path: `/v2/registration/voucher/${encodePathSegment(code)}`,
   }).pipe(selectJsonField("voucher"), withOperationErrors(VoucherLookupErrorSpec));
 
 export const getGiftCard = (
@@ -453,7 +454,7 @@ export const getGiftCard = (
       type: "none",
     },
     method: "GET",
-    path: `/v2/registration/gift_card/${code}`,
+    path: `/v2/registration/gift_card/${encodePathSegment(code)}`,
   }).pipe(selectJsonField("gift_card"), withOperationErrors(GiftCardLookupErrorSpec));
 
 export const getFamilyInvite = (
@@ -468,7 +469,7 @@ export const getFamilyInvite = (
       type: "none",
     },
     method: "GET",
-    path: `/v2/registration/family/${code}`,
+    path: `/v2/registration/family/${encodePathSegment(code)}`,
   }).pipe(selectJsonField("invite"), withOperationErrors(FamilyInviteLookupErrorSpec));
 
 export const getFriendInvite = (
@@ -483,7 +484,7 @@ export const getFriendInvite = (
       type: "none",
     },
     method: "GET",
-    path: `/v2/registration/friend/${code}`,
+    path: `/v2/registration/friend/${encodePathSegment(code)}`,
   }).pipe(selectJsonField("invite"), withOperationErrors(FriendInviteLookupErrorSpec));
 
 export const forgotPassword = (
@@ -554,7 +555,7 @@ export const checkCodeMatch = (
       type: "none",
     },
     method: "GET",
-    path: `/v2/oauth2/oob/code/${code}`,
+    path: `/v2/oauth2/oob/code/${encodePathSegment(code)}`,
   }).pipe(selectJsonField("oauth_token"));
 
 export const linkDevice = (
@@ -590,7 +591,7 @@ export const revokeApp = (
 > =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/oauth/grants/${id}/delete`,
+    path: `/v2/oauth/grants/${encodePathSegment(id)}/delete`,
   }).pipe(withOperationErrors(RevokeOAuthGrantErrorSpec));
 
 export const clients = (): Effect.Effect<
@@ -612,7 +613,7 @@ export const revokeClient = (
 > =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/oauth/clients/${id}/delete`,
+    path: `/v2/oauth/clients/${encodePathSegment(id)}/delete`,
   }).pipe(withOperationErrors(RevokeOAuthClientErrorSpec));
 
 export const revokeAllClients = (): Effect.Effect<

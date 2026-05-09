@@ -12,7 +12,7 @@ The pipeline does three things on `main`:
 2. `vp run verify`
 3. run `semantic-release` through the release action
 
-The workflow uses `.releaserc.json` as the release source of truth. The package itself does not carry a local `release` script or `semantic-release` devDependencies.
+The workflow uses `.releaserc.json` as the release source of truth. The release action is SHA-pinned and every `extra_plugins` entry is version-pinned, so the secret-bearing release job does not fetch unversioned semantic-release plugins.
 
 The release lane:
 
@@ -45,6 +45,8 @@ Before changing distribution wiring, validate the repo-local guardrails the work
 vp install
 vp run verify
 ```
+
+Keep release plugins version-pinned in the workflow when updating `.releaserc.json`.
 
 ## Versioning Notes
 

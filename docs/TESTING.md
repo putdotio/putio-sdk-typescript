@@ -54,12 +54,14 @@ Live tests stay separate on purpose:
 - they exist to sanity-check real API behavior before releases and deeper changes
 
 The `consumer` target is the exception: it is safe to run without real credentials and is intended to gate CI as the publication-surface check.
-GitHub Actions runs both the verify and consumer-surface lanes on `blacksmith-2vcpu-ubuntu-2404`.
+GitHub Actions runs both the verify and consumer-surface lanes on GitHub-hosted Ubuntu runners.
 
 ## Live Environment
 
-Default local env file:
+Default local env files, loaded in order:
 
+- direct process environment
+- `.env.local`
 - `.env`
 
 Example env file:
@@ -114,7 +116,7 @@ Single target:
 vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
 ```
 
-Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from `.env.example` via `op inject`. The materialised file is `0600` and gitignored. Subsequent commands read the resolved values from process env after sourcing `.env.local` (or via your shell loader of choice).
+Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from `.env.example` via `op inject`. The materialised file is `0600` and gitignored. Live commands auto-load `.env.local` first and then `.env`; already-exported environment variables keep highest priority.
 
 ```bash
 pnpm secrets:setup        # one-time per worktree

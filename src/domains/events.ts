@@ -7,6 +7,7 @@ import {
 } from "../core/errors.js";
 import {
   OkResponseSchema,
+  encodePathSegment,
   requestArrayBuffer,
   requestJson,
   type PutioSdkContext,
@@ -234,7 +235,7 @@ export const deleteEvent = (
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, DeleteEventError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "POST",
-    path: `/v2/events/delete/${id}`,
+    path: `/v2/events/delete/${encodePathSegment(id)}`,
   }).pipe(withOperationErrors(DeleteEventErrorSpec));
 
 export const clearEvents = (): Effect.Effect<
@@ -252,5 +253,5 @@ export const getEventTorrent = (
 ): Effect.Effect<Uint8Array, GetEventTorrentError, PutioSdkContext> =>
   requestArrayBuffer({
     method: "GET",
-    path: `/v2/events/${id}/torrent`,
+    path: `/v2/events/${encodePathSegment(id)}/torrent`,
   }).pipe(withOperationErrors(GetEventTorrentErrorSpec));

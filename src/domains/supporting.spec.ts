@@ -120,6 +120,28 @@ describe("supporting domain boundaries", () => {
 
     expect(
       await runSdkEffect(
+        configDomain.getConfigKey("../account/info"),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/config/..%2Faccount%2Finfo");
+          return jsonResponse({ status: "OK", value: "encoded" });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).toBe("encoded");
+
+    expect(
+      await runSdkEffect(
+        configDomain.getConfigKey("https://evil.test/path"),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/config/https%3A%2F%2Fevil.test%2Fpath");
+          return jsonResponse({ status: "OK", value: "encoded" });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).toBe("encoded");
+
+    expect(
+      await runSdkEffect(
         configDomain.getConfigKeyWith("autoplay", configDomain.JsonValueSchema),
         () => jsonResponse({ status: "OK", value: true }),
         { accessToken: "token-123" },
@@ -164,6 +186,28 @@ describe("supporting domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toEqual({ id: 17 });
+
+    expect(
+      await runSdkEffect(
+        // @ts-expect-error This covers untyped JavaScript callers.
+        downloadLinks.getDownloadLinks("abc/def"),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/download_links/abc%2Fdef");
+          return jsonResponse({
+            links: {
+              download_links: ["https://download.put.io/1"],
+              media_links: [],
+              mp4_links: [],
+            },
+            links_status: "DONE",
+            status: "OK",
+          });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).toMatchObject({
+      links_status: "DONE",
+    });
 
     expect(
       await runSdkEffect(

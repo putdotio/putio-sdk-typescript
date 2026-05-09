@@ -1,4 +1,4 @@
-import { PutioOperationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError } from "../core/errors.js";
 import { describe, expect, it } from "vite-plus/test";
 
 import * as oauth from "./oauth.js";
@@ -440,6 +440,23 @@ describe("operational domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toEqual({ status: "OK" });
+
+    const emptyFriendsExit = await runSdkExit(
+      // @ts-expect-error This covers untyped JavaScript callers.
+      sharing.shareFiles({
+        ids: [7],
+        target: {
+          friendNames: [],
+          type: "friends",
+        },
+      }),
+      () => {
+        throw new Error("request should not execute");
+      },
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(emptyFriendsExit)).toBeInstanceOf(PutioValidationError);
 
     expect(
       await runSdkEffect(

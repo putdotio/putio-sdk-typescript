@@ -26,6 +26,8 @@ export type PutioQueryValue = string | number | boolean | null | undefined;
 
 export type PutioQuery = Readonly<Record<string, PutioQueryValue>>;
 
+export type PutioPathSegment = string | number | boolean;
+
 export interface PutioSdkConfigShape {
   readonly accessToken?: string;
   readonly baseUrl?: string | URL;
@@ -53,8 +55,21 @@ export const makePutioSdkLayer = (config: PutioSdkConfigShape) =>
 export const makePutioSdkLiveLayer = (config: PutioSdkConfigShape) =>
   Layer.mergeAll(makePutioSdkLayer(config), FetchHttpClient.layer);
 
+export const encodePathSegment = (value: PutioPathSegment): string =>
+  encodeURIComponent(String(value));
+
+const absoluteUrlPattern = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
+
+const normalizeApiPath = (path: string): string => {
+  if (absoluteUrlPattern.test(path)) {
+    throw mapConfigurationError("SDK API request paths must be relative to the configured baseUrl");
+  }
+
+  return path.startsWith("/") ? path : `/${path}`;
+};
+
 export const buildPutioUrl = (baseUrl: string | URL, path: string, query?: PutioQuery): string => {
-  const url = new URL(path, baseUrl);
+  const url = new URL(normalizeApiPath(path), baseUrl);
 
   if (query) {
     for (const [key, value] of Object.entries(query)) {
@@ -211,11 +226,15 @@ const executeRequest = (options: PutioRequestOptions) =>
   Effect.gen(function* () {
     const config = yield* PutioSdkConfig;
     const authorization = yield* resolveAuthorization(config, options.auth);
-    const url = buildPutioUrl(
-      options.baseUrl ?? config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
-      options.path,
-      options.query,
-    );
+    const url = yield* Effect.try({
+      try: () =>
+        buildPutioUrl(
+          options.baseUrl ?? config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
+          options.path,
+          options.query,
+        ),
+      catch: mapConfigurationError,
+    });
     const request = yield* makeRequest(url, options, authorization);
 
     return yield* HttpClient.execute(request).pipe(Effect.mapError(mapTransportError));

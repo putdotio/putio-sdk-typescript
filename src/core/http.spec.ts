@@ -92,6 +92,38 @@ describe("sdk core http", () => {
         start_from: undefined,
       }),
     ).toBe("https://api.put.io/v2/files/list?offset=20&parent_id=0&reverse=false");
+
+    expect(buildPutioUrl("https://api.put.io", "v2/files/list")).toBe(
+      "https://api.put.io/v2/files/list",
+    );
+  });
+
+  it("rejects absolute request paths", async () => {
+    expect(() => buildPutioUrl("https://api.put.io", "https://evil.test/path")).toThrow(
+      PutioConfigurationError,
+    );
+    expect(() => buildPutioUrl("https://api.put.io", "//evil.test/path")).toThrow(
+      PutioConfigurationError,
+    );
+
+    const exit = await Effect.runPromiseExit(
+      provideSdkTest(
+        requestJson(OkResponseSchema, {
+          method: "GET",
+          path: "https://evil.test/path",
+        }),
+        () => {
+          throw new Error("request should not execute");
+        },
+        { accessToken: "token-123" },
+      ),
+    );
+
+    expect(Exit.isFailure(exit)).toBe(true);
+
+    if (Exit.isFailure(exit)) {
+      expect(expectFailure(exit)).toBeInstanceOf(PutioConfigurationError);
+    }
   });
 
   it("projects decoded JSON envelopes with shared selectors", async () => {

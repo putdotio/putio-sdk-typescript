@@ -6,7 +6,12 @@ import {
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { requestJson, selectJsonFields, type PutioSdkContext } from "../core/http.js";
+import {
+  encodePathSegment,
+  requestJson,
+  selectJsonFields,
+  type PutioSdkContext,
+} from "../core/http.js";
 
 export const DownloadLinksStatusSchema = Schema.Literal("NEW", "PROCESSING", "DONE", "ERROR");
 
@@ -108,5 +113,5 @@ export const getDownloadLinks = (
 ): Effect.Effect<DownloadLinksInfo, GetDownloadLinksError, PutioSdkContext> =>
   requestJson(DownloadLinksInfoSchema, {
     method: "GET",
-    path: `/v2/download_links/${id}`,
+    path: `/v2/download_links/${encodePathSegment(id)}`,
   }).pipe(withOperationErrors(GetDownloadLinksErrorSpec));

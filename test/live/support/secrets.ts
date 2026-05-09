@@ -40,6 +40,22 @@ const readEnv = (key: string): string | undefined => {
 
 let packageEnvLoaded = false;
 
+export const loadEnvFiles = (envFilePaths: ReadonlyArray<string>): void => {
+  if (typeof process.loadEnvFile !== "function") {
+    return;
+  }
+
+  for (const envFilePath of envFilePaths) {
+    try {
+      process.loadEnvFile(envFilePath);
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+};
+
 const loadPackageEnvFile = (): void => {
   if (packageEnvLoaded) {
     return;
@@ -47,19 +63,8 @@ const loadPackageEnvFile = (): void => {
 
   packageEnvLoaded = true;
 
-  if (typeof process.loadEnvFile !== "function") {
-    return;
-  }
-
-  const envFilePath = join(dirname(fileURLToPath(import.meta.url)), "../../..", ".env");
-
-  try {
-    process.loadEnvFile(envFilePath);
-  } catch (error) {
-    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
-      throw error;
-    }
-  }
+  const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+  loadEnvFiles([join(packageRoot, ".env.local"), join(packageRoot, ".env")]);
 };
 
 export const requireSecret = <TKey extends RequiredSecretKey>(key: TKey): string => {

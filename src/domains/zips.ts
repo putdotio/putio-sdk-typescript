@@ -8,6 +8,7 @@ import {
 } from "../core/errors.js";
 import {
   OkResponseSchema,
+  encodePathSegment,
   requestJson,
   selectJsonField,
   type PutioSdkContext,
@@ -144,11 +145,11 @@ export const createZip = (
 export const getZip = (id: number): Effect.Effect<ZipInfo, GetZipError, PutioSdkContext> =>
   requestJson(ZipInfoSchema, {
     method: "GET",
-    path: `/v2/zips/${id}`,
+    path: `/v2/zips/${encodePathSegment(id)}`,
   }).pipe(withOperationErrors(GetZipErrorSpec));
 
 export const cancelZip = (id: number): Effect.Effect<void, CancelZipError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "GET",
-    path: `/v2/zips/${id}/cancel`,
+    path: `/v2/zips/${encodePathSegment(id)}/cancel`,
   }).pipe(Effect.asVoid, withOperationErrors(CancelZipErrorSpec));

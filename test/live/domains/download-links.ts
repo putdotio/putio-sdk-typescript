@@ -3,7 +3,6 @@ import { assertPresent, createClients, createLiveHarness } from "../support/harn
 const { client } = await createClients({
   client: "PUTIO_TOKEN_THIRD_PARTY",
 });
-const probeFileId = 1165541233;
 
 const live = createLiveHarness("download-links live");
 const { assert, assertOperationError, finish, run, sleep } = live;
@@ -25,7 +24,30 @@ const waitForDone = async (id: number) => {
   throw new Error("timed out waiting for download links task to settle");
 };
 
+const findProbeFileId = async (): Promise<number | null> => {
+  const root = await client.files.list(0, {
+    per_page: 20,
+  });
+  const owned = root.files.find((file) => file.file_type !== "FOLDER");
+
+  if (owned) {
+    return owned.id;
+  }
+
+  const shared = await client.files.list("friends", {
+    per_page: 20,
+  });
+  const sharedFile = shared.files.find((file) => file.file_type !== "FOLDER");
+
+  return sharedFile?.id ?? null;
+};
+
 await run("download links create and fetch", async () => {
+  const probeFileId = await findProbeFileId();
+  if (!probeFileId) {
+    return { skipped: true, reason: "no owned or shared non-folder probe file available" };
+  }
+
   const created = await client.downloadLinks.create({
     ids: [probeFileId],
   });
@@ -71,6 +93,11 @@ await run("download links create and fetch", async () => {
 });
 
 await run("download links repeated create reuses cached task id", async () => {
+  const probeFileId = await findProbeFileId();
+  if (!probeFileId) {
+    return { skipped: true, reason: "no owned or shared non-folder probe file available" };
+  }
+
   const first = await client.downloadLinks.create({
     ids: [probeFileId],
   });

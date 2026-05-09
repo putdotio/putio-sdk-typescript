@@ -29,12 +29,12 @@ The release job declares the protected GitHub Environment named `release`.
 Environment entries:
 
 - secrets: `NPM_TOKEN`, `PUTIO_RELEASE_BOT_PRIVATE_KEY`
-- variables: `PUTIO_RELEASE_BOT_APP_ID`
+- variables: `PUTIO_RELEASE_BOT_CLIENT_ID`
 - approval: none; releases are continuous after the `main` gate passes
 - refs: release branch/tag policy constrains what can publish
 - deployment records: disabled with `deployment: false` because this is package publishing, not an app deploy
 
-Release GitHub writes use `putio-release-bot` through `PUTIO_RELEASE_BOT_APP_ID` and `PUTIO_RELEASE_BOT_PRIVATE_KEY`. Keep `NPM_TOKEN` in the `release` Environment so pull request jobs stay publish-secret-free.
+Release GitHub writes use `putio-release-bot` through `PUTIO_RELEASE_BOT_CLIENT_ID` and `PUTIO_RELEASE_BOT_PRIVATE_KEY`. Keep `NPM_TOKEN` in the `release` Environment so pull request jobs stay publish-secret-free.
 
 Public-repo branch policy may still allow trusted put.io team members to push directly to `main`, but it should block outsiders, force-pushes, and branch deletes where GitHub plan support allows. Release tag policy restricts `v*` tag creation, update, and deletion to `putio-release-bot` and org admins.
 

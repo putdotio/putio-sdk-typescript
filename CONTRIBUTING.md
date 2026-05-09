@@ -27,7 +27,7 @@ vp run verify
 That command runs formatting, linting, package build, unit tests, and coverage using the same repo-local entrypoint CI relies on.
 
 The coverage guardrail is unit-only and counts all production files under `src/**`.
-Live tests are intentionally separate confidence checks and do not count toward the coverage threshold.
+Live tests are separate confidence checks outside the coverage threshold.
 The low-risk `consumer` publication-surface target is the exception and runs in CI on every push and pull request.
 
 ## Live Verification

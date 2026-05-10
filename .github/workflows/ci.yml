@@ -6,16 +6,15 @@ on:
     branches:
       - main
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   verify:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     name: Verify SDK
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: verify-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: read
 
@@ -24,6 +23,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Vite+
         uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1 # v1
@@ -42,6 +42,9 @@ jobs:
     name: Verify consumer surface
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: verify-consumer-surface-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     permissions:
       contents: read
 
@@ -50,6 +53,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Vite+
         uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1 # v1
@@ -71,6 +75,9 @@ jobs:
       - verify-consumer-surface
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: release-${{ github.repository }}-main
+      cancel-in-progress: false
     environment:
       name: release
       deployment: false

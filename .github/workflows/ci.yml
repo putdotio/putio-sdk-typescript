@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Vite+
-        uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1 # v1
+        uses: voidzero-dev/setup-vp@ca1c46663915d6c1042ae23bd39ab85718bfb0fa # v1.10.0
         with:
           node-version-file: ".node-version"
           cache: true
@@ -56,7 +56,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Vite+
-        uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1 # v1
+        uses: voidzero-dev/setup-vp@ca1c46663915d6c1042ae23bd39ab85718bfb0fa # v1.10.0
         with:
           node-version-file: ".node-version"
           cache: true
@@ -101,7 +101,7 @@ jobs:
           token: ${{ steps.release-bot.outputs.token }}
 
       - name: Set up Vite+
-        uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1 # v1
+        uses: voidzero-dev/setup-vp@ca1c46663915d6c1042ae23bd39ab85718bfb0fa # v1.10.0
         with:
           node-version-file: ".node-version"
           cache: false

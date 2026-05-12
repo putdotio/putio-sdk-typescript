@@ -36,6 +36,8 @@ Environment entries:
 
 Release GitHub writes use `putio-release-bot` through `PUTIO_RELEASE_BOT_CLIENT_ID` and `PUTIO_RELEASE_BOT_PRIVATE_KEY`. Keep `NPM_TOKEN` in the `release` Environment so pull request jobs stay publish-secret-free.
 
+The workflow keeps dependency caches only on secretless verify jobs. The secret-bearing release job runs a fresh `vp install` with package-manager caching disabled before publishing to npm.
+
 Public-repo branch policy may still allow trusted put.io team members to push directly to `main`, but it should block outsiders, force-pushes, and branch deletes where GitHub plan support allows. Release tag policy restricts `v*` tag creation, update, and deletion to `putio-release-bot` and org admins.
 
 ## Local Checks

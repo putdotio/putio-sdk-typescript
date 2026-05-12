@@ -104,7 +104,7 @@ jobs:
         uses: voidzero-dev/setup-vp@45e5c098f1095cc6b65fd92534603e7be70386c1 # v1
         with:
           node-version-file: ".node-version"
-          cache: true
+          cache: false
 
       - name: Install dependencies
         run: vp install

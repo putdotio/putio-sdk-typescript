@@ -48,7 +48,7 @@
     "lint:unused:prod": "vp pack && knip --production",
     "prepare": "./scripts/prepare-effect.sh",
     "prepack": "vp pack",
-    "secrets:setup": "OP_ACCOUNT=putdotio.1password.com op whoami >/dev/null && OP_ACCOUNT=putdotio.1password.com op inject -f -i .env.example -o .env.local",
+    "secrets:setup": "bash ./scripts/secrets-setup.sh",
     "secrets:clean": "rm -f .env.local .env.local.* .env.local.swp",
     "test": "vp test --passWithNoTests",
     "test:live": "vp pack && vp test run --config vitest.live.config.ts",

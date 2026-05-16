@@ -7,6 +7,7 @@ describe("sdk root entry", () => {
     expect(sdk).toMatchObject({
       PutioConfigurationError: expect.any(Function),
       PutioOperationError: expect.any(Function),
+      PutioHttpClient: expect.any(Function),
       PutioSdk: expect.any(Function),
       PutioValidationError: expect.any(Function),
       buildPutioUrl: expect.any(Function),

@@ -1,20 +1,23 @@
-import { Cause, Effect, Exit, Option, Schema } from "effect";
-import { Headers, HttpClient, HttpClientResponse } from "effect/unstable/http";
-import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import { Cause, Effect, Exit, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   PutioApiError,
   PutioAuthError,
   PutioConfigurationError,
+  PutioTransportError,
   PutioRateLimitError,
 } from "./errors.js";
 import {
   OkResponseSchema,
+  PutioHttpClient,
   buildPutioUrl,
+  makePutioFetchClient,
   makePutioSdkConfig,
   makePutioSdkLayer,
   makePutioSdkLiveLayer,
+  type PutioHttpClientShape,
+  type PutioHttpRequest,
   PutioSdkConfig,
   requestArrayBuffer,
   requestJson,
@@ -24,7 +27,7 @@ import {
   type PutioSdkContext,
 } from "./http.js";
 
-type MockRequestHandler = (request: HttpClientRequest.HttpClientRequest) => Response;
+type MockRequestHandler = (request: PutioHttpRequest) => Response;
 
 const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
   if (Exit.isSuccess(exit)) {
@@ -40,10 +43,24 @@ const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
   return failure.error;
 };
 
-const makeMockHttpClient = (handler: MockRequestHandler) =>
-  HttpClient.make((request) =>
-    Effect.succeed(HttpClientResponse.fromWeb(request, handler(request))),
-  );
+const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientShape => ({
+  execute: (request) => {
+    const response = handler(request);
+
+    return Effect.succeed({
+      arrayBuffer: Effect.tryPromise({
+        try: () => response.arrayBuffer(),
+        catch: (cause) => new PutioTransportError({ cause }),
+      }),
+      headers: response.headers,
+      json: Effect.tryPromise({
+        try: () => response.json(),
+        catch: (cause) => new PutioTransportError({ cause }),
+      }),
+      status: response.status,
+    });
+  },
+});
 
 const provideSdkTest = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
@@ -51,7 +68,7 @@ const provideSdkTest = <A, E>(
   config: Parameters<typeof makePutioSdkConfig>[0] = {},
 ) =>
   effect.pipe(
-    Effect.provideService(HttpClient.HttpClient, makeMockHttpClient(handler)),
+    Effect.provideService(PutioHttpClient, makeMockHttpClient(handler)),
     Effect.provide(makePutioSdkLayer(config)),
   );
 
@@ -69,7 +86,7 @@ describe("sdk core http", () => {
     const result = await Effect.runPromise(
       Effect.all({
         config: PutioSdkConfig,
-        httpClient: HttpClient.HttpClient,
+        httpClient: PutioHttpClient,
       }).pipe(Effect.provide(makePutioSdkLiveLayer({ accessToken: "token-123" }))),
     );
 
@@ -80,6 +97,26 @@ describe("sdk core http", () => {
       webAppUrl: "https://app.put.io",
     });
     expect(result.httpClient).toBeDefined();
+  });
+
+  it("passes the Effect cancellation signal to fetch transport", async () => {
+    let observedSignal: AbortSignal | undefined;
+    const httpClient = makePutioFetchClient((_input, init) => {
+      observedSignal = init?.signal ?? undefined;
+
+      return Promise.resolve(new Response(JSON.stringify({ status: "OK" }), { status: 200 }));
+    });
+
+    const response = await Effect.runPromise(
+      httpClient.execute({
+        headers: new Headers(),
+        method: "GET",
+        url: "https://api.put.io/v2/test",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(observedSignal).toBeInstanceOf(AbortSignal);
   });
 
   it("builds URLs and skips nullish query values", () => {
@@ -160,9 +197,7 @@ describe("sdk core http", () => {
         }),
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/test?page=2");
-          expect(Option.getOrUndefined(Headers.get(request.headers, "authorization"))).toBe(
-            "Token token-123",
-          );
+          expect(request.headers.get("authorization")).toBe("Token token-123");
 
           return new Response(JSON.stringify({ status: "OK" }), {
             status: 200,
@@ -209,9 +244,7 @@ describe("sdk core http", () => {
           auth: { type: "token", token: "override-token" },
         }),
         (request) => {
-          expect(Option.getOrUndefined(Headers.get(request.headers, "authorization"))).toBe(
-            "Token override-token",
-          );
+          expect(request.headers.get("authorization")).toBe("Token override-token");
 
           return new Response(
             JSON.stringify({

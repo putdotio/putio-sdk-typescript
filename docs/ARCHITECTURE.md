@@ -78,7 +78,7 @@ That split is deliberate:
 | Concern      | Choice                                               |
 | ------------ | ---------------------------------------------------- |
 | Core runtime | `effect`                                             |
-| Transport    | `effect/unstable/http` `HttpClient`                  |
+| Transport    | SDK-owned `PutioHttpClient` service over `fetch`     |
 | Validation   | `Schema`                                             |
 | Auth         | config token, explicit token, basic auth, or no-auth |
 | Portability  | standard Web APIs first                              |

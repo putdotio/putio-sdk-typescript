@@ -107,9 +107,9 @@ const serviceProgram = Effect.gen(function* () {
 }).pipe(Effect.provide(makePutioSdkLiveClientLayer({ accessToken: userAccessToken })));
 ```
 
-`makePutioSdkLiveClientLayer(...)` provides the SDK service, SDK config, and default fetch-backed `HttpClient`.
-`makePutioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed `HttpClient`.
-Use `makePutioSdkLayer(...)` only when you want to supply your own `HttpClient` service.
+`makePutioSdkLiveClientLayer(...)` provides the SDK service, SDK config, and default fetch-backed transport.
+`makePutioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed transport.
+Use `makePutioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioHttpClient` service when you want to supply custom transport.
 
 ## Side-By-Side Usage
 
@@ -188,6 +188,8 @@ The package is designed around standard Web APIs. Host runtimes should provide:
 For upload flows, the host should also provide file-compatible inputs such as `File` or `Blob`.
 
 If a target runtime is missing these APIs, provide them with host-level polyfills or adapters instead of patching the SDK surface.
+
+The package compatibility gate installs the packed tarball into external consumers and runs strict Node type/runtime checks, bundled browser checks in Chromium, Firefox, and WebKit, and a Bun runtime import check.
 
 ## Error Handling
 

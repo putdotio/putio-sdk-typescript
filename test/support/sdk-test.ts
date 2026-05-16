@@ -1,14 +1,16 @@
-import { Cause, Effect, Exit, Option } from "effect";
-import { Headers, HttpClient, HttpClientResponse } from "effect/unstable/http";
-import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
+import { Cause, Effect, Exit } from "effect";
 
+import { PutioTransportError } from "../../src/core/errors.js";
 import {
+  PutioHttpClient,
   makePutioSdkLayer,
+  type PutioHttpClientShape,
+  type PutioHttpRequest,
   type PutioSdkConfigShape,
   type PutioSdkContext,
 } from "../../src/core/http.js";
 
-export type MockRequestHandler = (request: HttpClientRequest.HttpClientRequest) => Response;
+export type MockRequestHandler = (request: PutioHttpRequest) => Response;
 
 export const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
   if (Exit.isSuccess(exit)) {
@@ -27,7 +29,7 @@ export const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
 export const jsonResponse = (
   body: unknown,
   init: Omit<ResponseInit, "headers"> & {
-    readonly headers?: Headers.Headers | Headers.Input | ResponseInit["headers"];
+    readonly headers?: ResponseInit["headers"];
   } = {},
 ): Response =>
   new Response(JSON.stringify(body), {
@@ -43,10 +45,24 @@ export const emptyResponse = (init: ResponseInit = {}): Response => new Response
 export const arrayBufferResponse = (body: ArrayLike<number>, init: ResponseInit = {}): Response =>
   new Response(new Uint8Array(Array.from(body)), init);
 
-const makeMockHttpClient = (handler: MockRequestHandler) =>
-  HttpClient.make((request) =>
-    Effect.succeed(HttpClientResponse.fromWeb(request, handler(request))),
-  );
+const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientShape => ({
+  execute: (request) => {
+    const response = handler(request);
+
+    return Effect.succeed({
+      arrayBuffer: Effect.tryPromise({
+        try: () => response.arrayBuffer(),
+        catch: (cause) => new PutioTransportError({ cause }),
+      }),
+      headers: response.headers,
+      json: Effect.tryPromise({
+        try: () => response.json(),
+        catch: (cause) => new PutioTransportError({ cause }),
+      }),
+      status: response.status,
+    });
+  },
+});
 
 const provideSdkTest = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
@@ -54,7 +70,7 @@ const provideSdkTest = <A, E>(
   config: PutioSdkConfigShape = {},
 ) =>
   effect.pipe(
-    Effect.provideService(HttpClient.HttpClient, makeMockHttpClient(handler)),
+    Effect.provideService(PutioHttpClient, makeMockHttpClient(handler)),
     Effect.provide(makePutioSdkLayer(config)),
   );
 
@@ -80,24 +96,30 @@ export const runConfigExit = <A, E>(
   config: PutioSdkConfigShape = {},
 ) => Effect.runPromiseExit(effect.pipe(Effect.provide(makePutioSdkLayer(config))));
 
-export const getAuthorizationHeader = (request: HttpClientRequest.HttpClientRequest) =>
-  Option.getOrUndefined(Headers.get(request.headers, "authorization"));
+export const getAuthorizationHeader = (request: PutioHttpRequest) =>
+  request.headers.get("authorization") ?? undefined;
 
-const getBodyText = (request: HttpClientRequest.HttpClientRequest): string | null => {
-  if (request.body._tag === "Empty") {
+const getBodyText = (request: PutioHttpRequest): string | null => {
+  if (!request.body) {
     return null;
   }
 
-  if (request.body._tag === "Uint8Array") {
-    return typeof request.body.body === "string"
-      ? request.body.body
-      : new TextDecoder().decode(request.body.body);
+  if (typeof request.body === "string") {
+    return request.body;
   }
 
-  return null;
+  if (request.body instanceof URLSearchParams) {
+    return request.body.toString();
+  }
+
+  if (request.body instanceof Uint8Array) {
+    return new TextDecoder().decode(request.body);
+  }
+
+  throw new Error("Expected a textual request body.");
 };
 
-export const getJsonBody = <T>(request: HttpClientRequest.HttpClientRequest): T => {
+export const getJsonBody = <T>(request: PutioHttpRequest): T => {
   const body = getBodyText(request);
 
   if (body === null) {
@@ -107,7 +129,7 @@ export const getJsonBody = <T>(request: HttpClientRequest.HttpClientRequest): T 
   return JSON.parse(body) as T;
 };
 
-export const getFormBody = (request: HttpClientRequest.HttpClientRequest): URLSearchParams => {
+export const getFormBody = (request: PutioHttpRequest): URLSearchParams => {
   const body = getBodyText(request);
 
   if (body === null) {
@@ -117,10 +139,10 @@ export const getFormBody = (request: HttpClientRequest.HttpClientRequest): URLSe
   return new URLSearchParams(body);
 };
 
-export const getFormDataBody = (request: HttpClientRequest.HttpClientRequest): FormData => {
-  if (request.body._tag !== "FormData") {
+export const getFormDataBody = (request: PutioHttpRequest): FormData => {
+  if (!(request.body instanceof FormData)) {
     throw new Error("Expected a FormData body.");
   }
 
-  return request.body.formData;
+  return request.body;
 };

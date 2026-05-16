@@ -1,5 +1,4 @@
 import { Cause, Effect, Exit, Schema } from "effect";
-import { Headers } from "effect/unstable/http";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -44,7 +43,7 @@ describe("sdk core errors", () => {
   });
 
   it("extracts rate-limit metadata from response headers", () => {
-    const headers = Headers.fromInput({
+    const headers = new Headers({
       "retry-after": "12",
       "x-ratelimit-action": "captcha-needed",
       "x-ratelimit-id": "abc123",
@@ -66,7 +65,7 @@ describe("sdk core errors", () => {
   it("maps 429 responses to PutioRateLimitError", () => {
     const error = makeResponseError(
       429,
-      Headers.fromInput({
+      new Headers({
         "x-ratelimit-action": "captcha-needed",
         "x-ratelimit-id": "limit-id",
       }),
@@ -87,11 +86,11 @@ describe("sdk core errors", () => {
   });
 
   it("maps auth and generic API errors to the right classes", () => {
-    const authError = makeResponseError(401, Headers.empty, {
+    const authError = makeResponseError(401, new Headers(), {
       error_message: "Unauthorized",
       status_code: 401,
     });
-    const apiError = makeResponseError(500, Headers.empty, {
+    const apiError = makeResponseError(500, new Headers(), {
       error_message: "Server error",
       status_code: 500,
     });

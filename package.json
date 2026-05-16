@@ -51,6 +51,11 @@
     "secrets:setup": "bash ./scripts/secrets-setup.sh",
     "secrets:clean": "rm -f .env.local .env.local.* .env.local.swp",
     "test": "vp test --passWithNoTests",
+    "test:compat": "pnpm run test:compat:node && pnpm run test:compat:browser && pnpm run test:compat:bun",
+    "test:compat:browser": "node ./scripts/test-compat-browser.mts",
+    "test:compat:browser:install": "playwright install chromium firefox webkit",
+    "test:compat:bun": "node ./scripts/test-compat-bun.mts",
+    "test:compat:node": "node ./scripts/test-compat-node.mts",
     "test:live": "vp pack && vp test run --config vitest.live.config.ts",
     "verify": "vp check . && vp pack && vp test --passWithNoTests && vp test --coverage --passWithNoTests"
   },
@@ -63,8 +68,10 @@
     "@vitest/coverage-v8": "4.1.5",
     "is-ci": "^4.1.0",
     "knip": "^6.14.0",
+    "playwright": "^1.60.0",
     "publint": "^0.3.21",
     "typescript": "^5.9.3",
+    "vite": "^8.0.0",
     "vite-plus": "^0.1.20"
   },
   "engines": {

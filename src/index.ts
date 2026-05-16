@@ -1,3 +1,22 @@
+/// <reference lib="esnext.disposable" />
+
+declare global {
+  interface SymbolConstructor {
+    readonly asyncDispose: unique symbol;
+    readonly dispose: unique symbol;
+  }
+
+  interface AsyncDisposable {
+    [Symbol.asyncDispose](): PromiseLike<void>;
+  }
+
+  interface Disposable {
+    [Symbol.dispose](): void;
+  }
+
+  var SchemaErrorTypeId: symbol;
+}
+
 export * from "./core/client.js";
 export * from "./core/defaults.js";
 export * from "./core/errors.js";

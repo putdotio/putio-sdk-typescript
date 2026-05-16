@@ -44,12 +44,45 @@ Additional package and cleanup checks:
 pnpm lint:unused
 pnpm lint:unused:prod
 pnpm lint:package
+pnpm test:compat
 ```
 
 `lint:unused` runs Knip against source, tests, live tests, scripts, and config files to detect unused files, dependencies, and exports.
 `lint:unused:prod` builds the package and runs Knip's production-only graph for package-surface cleanup.
 `lint:package` packs the package and runs `publint` plus Are The Types Wrong against the published ESM entrypoints.
 CI runs `lint:package` after `vp run verify`; the Knip checks remain local/advisory until their baseline is stable enough to make blocking.
+
+## Runtime Compatibility Checks
+
+Compatibility checks are package-consumer smoke tests, not live API tests. They pack the SDK, install the tarball into throwaway external projects, and verify the public ESM entrypoints from outside the repo.
+
+Run all compatibility checks:
+
+```bash
+pnpm test:compat
+```
+
+Target one runtime:
+
+```bash
+pnpm test:compat:node
+PUTIO_COMPAT_BROWSERS=chromium pnpm test:compat:browser
+pnpm test:compat:bun
+```
+
+The browser check uses Playwright. Install local browser engines once when needed:
+
+```bash
+pnpm test:compat:browser:install
+```
+
+The compatibility layer proves:
+
+- Node can typecheck a strict external TypeScript consumer with `skipLibCheck: false`
+- Node can import and execute the public ESM entrypoints at runtime
+- browser bundlers can bundle the package and run it in Chromium, Firefox, and WebKit
+- Bun can install the packed SDK and import the public ESM entrypoints at runtime
+- internal package paths remain fenced by the `exports` map through the package checks
 
 The local suite focuses on the shared runtime in `src/core`.
 Unit coverage now includes all production code under `src/**`, including:

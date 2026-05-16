@@ -1,5 +1,4 @@
-import { Data, Effect, Option, Schema } from "effect";
-import { Headers } from "effect/unstable/http";
+import { Data, Effect, Schema } from "effect";
 
 export const PutioErrorEnvelopeSchema = Schema.Struct({
   error_message: Schema.optional(Schema.String),
@@ -14,8 +13,8 @@ export interface PutioKnownErrorContract<
   TType extends string = string,
   TStatus extends number = number,
 > {
-  readonly errorType?: TType;
-  readonly statusCode?: TStatus;
+  readonly errorType?: TType | undefined;
+  readonly statusCode?: TStatus | undefined;
 }
 
 type ContractErrorType<TContract extends PutioKnownErrorContract> =
@@ -140,20 +139,26 @@ const isOperationReason = (
   return false;
 };
 
-function toOperationReason<TContract extends PutioKnownOperationErrorContract>(
+function toOperationReason<TContract extends { readonly errorType: string }>(
   contract: TContract,
-): PutioOperationErrorReason<TContract> {
+): PutioOperationErrorReason<TContract>;
+function toOperationReason<TContract extends { readonly statusCode: number }>(
+  contract: TContract,
+): PutioOperationErrorReason<TContract>;
+function toOperationReason(
+  contract: PutioKnownOperationErrorContract,
+): PutioOperationErrorReason<PutioKnownOperationErrorContract> {
   if (contract.errorType !== undefined) {
     return {
       kind: "error_type",
       errorType: contract.errorType,
-    } as PutioOperationErrorReason<TContract>;
+    };
   }
 
   return {
     kind: "status_code",
     statusCode: contract.statusCode,
-  } as PutioOperationErrorReason<TContract>;
+  };
 }
 
 export class PutioTransportError extends Data.TaggedError("PutioTransportError")<{
@@ -296,13 +301,16 @@ export const fallbackPutioErrorEnvelope = (status: number): PutioErrorEnvelope =
   status_code: status,
 });
 
-export const responseRateLimitHeaders = (headers: Headers.Headers) => ({
-  action: Option.getOrUndefined(Headers.get(headers, "x-ratelimit-action")),
-  id: Option.getOrUndefined(Headers.get(headers, "x-ratelimit-id")),
-  limit: Option.getOrUndefined(Headers.get(headers, "x-ratelimit-limit")),
-  remaining: Option.getOrUndefined(Headers.get(headers, "x-ratelimit-remaining")),
-  retryAfter: Option.getOrUndefined(Headers.get(headers, "retry-after")),
-  reset: Option.getOrUndefined(Headers.get(headers, "x-ratelimit-reset")),
+const getHeader = (headers: Headers, name: string): string | undefined =>
+  headers.get(name) ?? undefined;
+
+export const responseRateLimitHeaders = (headers: Headers) => ({
+  action: getHeader(headers, "x-ratelimit-action"),
+  id: getHeader(headers, "x-ratelimit-id"),
+  limit: getHeader(headers, "x-ratelimit-limit"),
+  remaining: getHeader(headers, "x-ratelimit-remaining"),
+  retryAfter: getHeader(headers, "retry-after"),
+  reset: getHeader(headers, "x-ratelimit-reset"),
 });
 
 export const mapDecodeErrorToValidationError = (cause: unknown) =>
@@ -314,7 +322,7 @@ export const mapTransportError = (cause: unknown) => new PutioTransportError({ c
 
 export const makeResponseError = (
   status: number,
-  headers: Headers.Headers,
+  headers: Headers,
   body: PutioErrorEnvelope,
 ): PutioSdkError => {
   if (status === 429) {

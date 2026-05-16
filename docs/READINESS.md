@@ -79,4 +79,5 @@ These are now in place:
 
 1. the built `dist` artifact is what live verification exercises
 2. `lint:package` runs standard package-surface checks with `publint` and Are The Types Wrong
-3. runtime expectations and required host Web APIs are documented in `README.md`
+3. compatibility checks install the packed tarball into external Node, browser, and Bun consumers
+4. runtime expectations and required host Web APIs are documented in `README.md`

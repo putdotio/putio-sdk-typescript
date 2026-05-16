@@ -8,10 +8,9 @@
     "test/live/domains/**/*.ts",
     "test/live/support/**/*.ts",
     "scripts/**/*.mts",
-    "vite.config.ts",
     "vitest.live.config.ts"
   ],
   "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.mts", "*.config.ts"],
   "ignoreBinaries": ["op"],
-  "ignoreDependencies": ["@vitest/coverage-v8", "is-ci"]
+  "ignoreDependencies": ["is-ci"]
 }

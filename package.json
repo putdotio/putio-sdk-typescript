@@ -11,6 +11,10 @@
   ],
   "license": "MIT",
   "author": "put.io <devs@put.io>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/putdotio/putio-sdk-typescript.git"
+  },
   "files": [
     "dist"
   ],

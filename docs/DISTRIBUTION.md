@@ -6,7 +6,7 @@ Every merge to `main` should already be releasable.
 
 GitHub Actions owns releases for this repo and the workflow runs on GitHub-hosted Ubuntu runners.
 
-The pipeline does three things on `main`:
+The pipeline runs these release steps on `main`:
 
 1. `vp install`
 2. `vp run verify`
@@ -37,7 +37,7 @@ Environment entries:
 
 The npm package uses Trusted Publishing from GitHub Actions. On npm, configure owner `putdotio`, repository `putio-sdk-typescript`, workflow `ci.yml`, and Environment named `release` for the package.
 
-The workflow grants `id-token: write` so npm mints short-lived publish credentials and provenance for the release job. The package repository metadata points at `putdotio/putio-sdk-typescript` so npm can match the OIDC publisher identity.
+During the `@semantic-release/npm` publish step, npm detects the GitHub OIDC identity, mints short-lived publish credentials, and publishes provenance for the release job. The package repository metadata points at `putdotio/putio-sdk-typescript` so npm can match the OIDC publisher identity.
 
 Release GitHub writes use `putio-release-bot` through `PUTIO_RELEASE_BOT_CLIENT_ID` and `PUTIO_RELEASE_BOT_PRIVATE_KEY`.
 

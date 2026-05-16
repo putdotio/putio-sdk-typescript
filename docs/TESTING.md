@@ -155,7 +155,7 @@ Single target:
 vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
 ```
 
-Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from `.env.example` via `op inject`. The materialised file is `0600` and gitignored. Live commands auto-load `.env.local` first and then `.env`; already-exported environment variables keep highest priority.
+Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from a gitignored `.env.1password` file via `op inject`. The materialized file is `0600` and gitignored. Live commands auto-load `.env.local` first and then `.env`; already-exported environment variables keep highest priority.
 
 ```bash
 pnpm secrets:setup        # one-time per worktree
@@ -165,7 +165,7 @@ pnpm test:live            # runs the broader live suite against pre-existing tok
 pnpm secrets:clean        # before `git worktree remove`
 ```
 
-`secrets:setup` requires an unlocked 1Password CLI session locally, or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. The `.env.example` references are committer-only; external contributors can run unit tests without them.
+`secrets:setup` requires private maintainer `op://` references in `.env.1password`, plus an unlocked 1Password CLI session locally or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. External contributors can copy `.env.example` manually for their own live credentials, and unit tests do not require live credentials.
 
 `bootstrap:live-fixtures` validates and seeds the live fixtures that are safe to
 prepare through the public SDK. It establishes the secondary friendship/shared

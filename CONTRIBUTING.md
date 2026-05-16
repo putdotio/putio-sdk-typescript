@@ -57,11 +57,11 @@ The package-surface checks do not require live credentials. Use live tests when 
 Bootstrap runtime tokens with 1Password:
 
 ```bash
-pnpm secrets:setup        # materializes .env.local from .env.example via op inject
+pnpm secrets:setup        # materializes .env.local from a private .env.1password file
 pnpm bootstrap:tokens     # mints fresh first/third-party tokens against the live API
 ```
 
-`secrets:setup` requires an unlocked 1Password CLI session locally, or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. Run `pnpm secrets:clean` before tearing down the worktree.
+`secrets:setup` requires a gitignored `.env.1password` file with private `op://` references, plus an unlocked 1Password CLI session locally or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. Run `pnpm secrets:clean` before tearing down the worktree.
 
 For single-target commands, safety rules, and fixture expectations, see [Testing](./docs/TESTING.md).
 

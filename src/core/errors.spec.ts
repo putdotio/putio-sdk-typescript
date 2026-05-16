@@ -1,5 +1,5 @@
-import { Headers } from "@effect/platform";
-import { Cause, Effect, Exit, Option } from "effect";
+import { Cause, Effect, Exit, Schema } from "effect";
+import { Headers } from "effect/unstable/http";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -10,6 +10,11 @@ import {
   PutioOperationError,
   definePutioOperationErrorSpec,
   fallbackPutioErrorEnvelope,
+  isPutioApiError,
+  isPutioAuthError,
+  isPutioErrorEnvelope,
+  isPutioOperationError,
+  isPutioRateLimitError,
   makeResponseError,
   parseErrorBody,
   responseRateLimitHeaders,
@@ -21,13 +26,13 @@ const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
     throw new Error("Expected the effect to fail.");
   }
 
-  const failure = Cause.failureOption(exit.cause);
+  const failure = exit.cause.reasons.find(Cause.isFailReason);
 
-  if (Option.isNone(failure)) {
+  if (!failure) {
     throw Cause.squash(exit.cause);
   }
 
-  return failure.value;
+  return failure.error;
 };
 
 describe("sdk core errors", () => {
@@ -95,6 +100,71 @@ describe("sdk core errors", () => {
     expect(apiError).toBeInstanceOf(PutioApiError);
   });
 
+  it("narrows public SDK response errors with exported type guards", () => {
+    const apiError = new PutioApiError({
+      status: 500,
+      body: {
+        error_message: "Server error",
+        status_code: 500,
+      },
+    });
+    const authError = new PutioAuthError({
+      status: 403,
+      body: {
+        error_type: "invalid_scope",
+        status_code: 403,
+      },
+    });
+    const rateLimitError = new PutioRateLimitError({
+      status: 429,
+      body: {
+        error_type: "TooManyRequests",
+        status_code: 429,
+      },
+      retryAfter: "12",
+    });
+
+    expect(isPutioErrorEnvelope(apiError.body)).toBe(true);
+    expect(isPutioErrorEnvelope({})).toBe(true);
+    expect(isPutioErrorEnvelope({ error_message: 500 })).toBe(false);
+    expect(isPutioApiError(apiError)).toBe(true);
+    expect(isPutioAuthError(authError)).toBe(true);
+    expect(isPutioRateLimitError(rateLimitError)).toBe(true);
+    expect(isPutioRateLimitError(apiError)).toBe(false);
+    expect(
+      isPutioRateLimitError({
+        _tag: "PutioRateLimitError",
+        body: {},
+        retryAfter: 12,
+        status: 429,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps protocol response errors schema-decodable", async () => {
+    const decoded = await Effect.runPromise(
+      Schema.decodeUnknownEffect(PutioRateLimitError)({
+        _tag: "PutioRateLimitError",
+        action: "captcha-needed",
+        body: {
+          error_message: "Too many requests",
+          error_type: "TooManyRequests",
+          status_code: 429,
+        },
+        retryAfter: "12",
+        status: 429,
+      }),
+    );
+
+    expect(decoded).toBeInstanceOf(PutioRateLimitError);
+    expect(decoded).toMatchObject({
+      _tag: "PutioRateLimitError",
+      action: "captcha-needed",
+      retryAfter: "12",
+      status: 429,
+    });
+  });
+
   it("parses a valid API error body", async () => {
     const body = await Effect.runPromise(
       parseErrorBody(400, {
@@ -150,6 +220,7 @@ describe("sdk core errors", () => {
     if (Exit.isFailure(exit)) {
       const error = expectFailure(exit);
       expect(error).toBeInstanceOf(PutioOperationError);
+      expect(isPutioOperationError(error)).toBe(true);
       expect(error).toMatchObject({
         _tag: "PutioOperationError",
         domain: "files",

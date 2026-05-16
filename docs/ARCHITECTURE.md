@@ -24,7 +24,7 @@ graph LR
 | Component           | Responsibility                                                 |
 | ------------------- | -------------------------------------------------------------- |
 | Promise client      | ergonomic app-facing entrypoint with managed runtime ownership |
-| Effect client       | Effect-native entrypoint for workflows                         |
+| Effect client       | Effect-native entrypoint and service for workflows             |
 | Domain namespaces   | grouped API operations by domain                               |
 | Utilities subpath   | file URLs, localized errors, and shared formatting helpers     |
 | Shared HTTP runtime | fetch-native transport, auth resolution, base URLs             |
@@ -78,11 +78,13 @@ That split is deliberate:
 | Concern      | Choice                                               |
 | ------------ | ---------------------------------------------------- |
 | Core runtime | `effect`                                             |
-| Transport    | `@effect/platform` `HttpClient`                      |
+| Transport    | `effect/unstable/http` `HttpClient`                  |
 | Validation   | `Schema`                                             |
 | Auth         | config token, explicit token, basic auth, or no-auth |
 | Portability  | standard Web APIs first                              |
 
+The Effect client is available as both a factory value and a `PutioSdk` service layer for workflows that prefer dependency injection.
+`makePutioSdkLiveClientLayer(...)` composes the SDK service, SDK config, and fetch-backed transport for the normal live boundary.
 The Promise client owns a managed Effect runtime per client instance and exposes `dispose()` so host applications can tear it down explicitly.
 
 ## What This Package Is Not

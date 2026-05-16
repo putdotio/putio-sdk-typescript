@@ -1,5 +1,4 @@
 import { Effect, Schema } from "effect";
-
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
@@ -12,128 +11,122 @@ import {
   requestJson,
   type PutioSdkContext,
 } from "../core/http.js";
-
 const HistoryEventBaseSchema = Schema.Struct({
   created_at: Schema.String,
-  id: Schema.Number.pipe(Schema.int()),
+  id: Schema.Int,
   type: Schema.String,
-  user_id: Schema.Number.pipe(Schema.int()),
+  user_id: Schema.Int,
 });
-
-const HistoryFileEventSchema = Schema.extend(
-  HistoryEventBaseSchema,
-  Schema.Struct({
-    file_id: Schema.Number.pipe(Schema.int()),
+const HistoryFileEventSchema = HistoryEventBaseSchema.pipe(
+  Schema.fieldsAssign({
+    file_id: Schema.Int,
     file_name: Schema.String,
-    file_size: Schema.Number.pipe(Schema.nonNegative()),
+    file_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
 );
-
-const HistoryTransferEventSchema = Schema.extend(
-  HistoryEventBaseSchema,
-  Schema.Struct({
+const HistoryTransferEventSchema = HistoryEventBaseSchema.pipe(
+  Schema.fieldsAssign({
     source: Schema.String,
     transfer_name: Schema.String,
   }),
 );
-
-export const HistoryFileSharedEventSchema = Schema.extend(
-  HistoryFileEventSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
+export const HistoryFileSharedEventSchema = HistoryFileEventSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     sharing_user_name: Schema.String,
     type: Schema.Literal("file_shared"),
   }),
 );
-
-export const HistoryUploadEventSchema = Schema.extend(
-  HistoryFileEventSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
+export const HistoryUploadEventSchema = HistoryFileEventSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     type: Schema.Literal("upload"),
   }),
 );
-
-export const HistoryFileFromRssDeletedEventSchema = Schema.extend(
-  HistoryFileEventSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
+export const HistoryFileFromRssDeletedEventSchema = HistoryFileEventSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     file_source: Schema.String,
     type: Schema.Literal("file_from_rss_deleted_for_space"),
   }),
 );
-
-export const HistoryTransferCompletedEventSchema = Schema.extend(
-  HistoryTransferEventSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
-    file_id: Schema.Number.pipe(Schema.int()),
-    transfer_size: Schema.Number.pipe(Schema.nonNegative()),
+export const HistoryTransferCompletedEventSchema = HistoryTransferEventSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
+    file_id: Schema.Int,
+    transfer_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
     type: Schema.Literal("transfer_completed"),
   }),
 );
-
-export const HistoryTransferErrorEventSchema = Schema.extend(
-  HistoryTransferEventSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
+export const HistoryTransferErrorEventSchema = HistoryTransferEventSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     type: Schema.Literal("transfer_error"),
   }),
 );
-
-export const HistoryTransferFromRssErrorEventSchema = Schema.extend(
-  HistoryEventBaseSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
-    rss_id: Schema.Number.pipe(Schema.int()),
+export const HistoryTransferFromRssErrorEventSchema = HistoryEventBaseSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
+    rss_id: Schema.Int,
     transfer_name: Schema.String,
     type: Schema.Literal("transfer_from_rss_error"),
   }),
 );
-
-export const HistoryTransferCallbackErrorEventSchema = Schema.extend(
-  HistoryEventBaseSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
+export const HistoryTransferCallbackErrorEventSchema = HistoryEventBaseSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     message: Schema.String,
-    transfer_id: Schema.Number.pipe(Schema.int()),
+    transfer_id: Schema.Int,
     transfer_name: Schema.String,
     type: Schema.Literal("transfer_callback_error"),
   }),
 );
-
-export const HistoryPrivateTorrentPinEventSchema = Schema.extend(
-  HistoryEventBaseSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
+export const HistoryPrivateTorrentPinEventSchema = HistoryEventBaseSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     new_host_ip: Schema.String,
     pinned_host_ip: Schema.String,
     type: Schema.Literal("private_torrent_pin"),
     user_download_name: Schema.String,
   }),
 );
-
-export const HistoryRssFilterPausedEventSchema = Schema.extend(
-  HistoryEventBaseSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
-    rss_filter_id: Schema.Number.pipe(Schema.int()),
+export const HistoryRssFilterPausedEventSchema = HistoryEventBaseSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
+    rss_filter_id: Schema.Int,
     rss_filter_title: Schema.String,
     type: Schema.Literal("rss_filter_paused"),
   }),
 );
-
-export const HistoryVoucherEventSchema = Schema.extend(
-  HistoryEventBaseSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
+export const HistoryVoucherEventSchema = HistoryEventBaseSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     type: Schema.Literal("voucher"),
-    voucher: Schema.Number.pipe(Schema.int()),
-    voucher_owner_id: Schema.Number.pipe(Schema.int()),
+    voucher: Schema.Int,
+    voucher_owner_id: Schema.Int,
     voucher_owner_name: Schema.String,
   }),
 );
-
-export const HistoryZipCreatedEventSchema = Schema.extend(
-  HistoryEventBaseSchema.pipe(Schema.omit("type")),
-  Schema.Struct({
+export const HistoryZipCreatedEventSchema = HistoryEventBaseSchema.mapFields(
+  ({ type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     type: Schema.Literal("zip_created"),
-    zip_id: Schema.Number.pipe(Schema.int()),
-    zip_size: Schema.Number.pipe(Schema.nonNegative()),
+    zip_id: Schema.Int,
+    zip_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
 );
-
-export const HistoryKnownEventTypeSchema = Schema.Literal(
+export const HistoryKnownEventTypeSchema = Schema.Literals([
   "file_shared",
   "upload",
   "file_from_rss_deleted_for_space",
@@ -145,9 +138,8 @@ export const HistoryKnownEventTypeSchema = Schema.Literal(
   "rss_filter_paused",
   "voucher",
   "zip_created",
-);
-
-export const HistoryEventSchema = Schema.Union(
+]);
+export const HistoryEventSchema = Schema.Union([
   HistoryFileSharedEventSchema,
   HistoryUploadEventSchema,
   HistoryFileFromRssDeletedEventSchema,
@@ -160,19 +152,16 @@ export const HistoryEventSchema = Schema.Union(
   HistoryVoucherEventSchema,
   HistoryZipCreatedEventSchema,
   HistoryEventBaseSchema,
-);
-
+]);
 export const EventsListQuerySchema = Schema.Struct({
-  before: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
-  per_page: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
+  before: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
+  per_page: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
 });
-
 const EventsListEnvelopeSchema = Schema.Struct({
   events: Schema.Array(HistoryEventSchema),
   has_more: Schema.Boolean,
   status: Schema.Literal("OK"),
 });
-
 export type HistoryKnownEventType = Schema.Schema.Type<typeof HistoryKnownEventTypeSchema>;
 export type HistoryEvent = Schema.Schema.Type<typeof HistoryEventSchema>;
 export type EventsListQuery = Schema.Schema.Type<typeof EventsListQuerySchema>;
@@ -182,7 +171,6 @@ export type HistoryTransferCompletedEvent = Schema.Schema.Type<
   typeof HistoryTransferCompletedEventSchema
 >;
 export type HistoryZipCreatedEvent = Schema.Schema.Type<typeof HistoryZipCreatedEventSchema>;
-
 export const ListEventsErrorSpec = definePutioOperationErrorSpec({
   domain: "events",
   operation: "list",
@@ -192,19 +180,16 @@ export const ListEventsErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
-
 export const DeleteEventErrorSpec = definePutioOperationErrorSpec({
   domain: "events",
   operation: "delete",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
-
 export const ClearEventsErrorSpec = definePutioOperationErrorSpec({
   domain: "events",
   operation: "clear",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
-
 export const GetEventTorrentErrorSpec = definePutioOperationErrorSpec({
   domain: "events",
   operation: "getTorrent",
@@ -215,12 +200,10 @@ export const GetEventTorrentErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 500 as const },
   ],
 });
-
 export type ListEventsError = PutioOperationFailure<typeof ListEventsErrorSpec>;
 export type DeleteEventError = PutioOperationFailure<typeof DeleteEventErrorSpec>;
 export type ClearEventsError = PutioOperationFailure<typeof ClearEventsErrorSpec>;
 export type GetEventTorrentError = PutioOperationFailure<typeof GetEventTorrentErrorSpec>;
-
 export const listEvents = (
   query: EventsListQuery = {},
 ): Effect.Effect<EventsListResponse, ListEventsError, PutioSdkContext> =>
@@ -229,7 +212,6 @@ export const listEvents = (
     path: "/v2/events/list",
     query,
   }).pipe(withOperationErrors(ListEventsErrorSpec));
-
 export const deleteEvent = (
   id: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, DeleteEventError, PutioSdkContext> =>
@@ -237,7 +219,6 @@ export const deleteEvent = (
     method: "POST",
     path: `/v2/events/delete/${encodePathSegment(id)}`,
   }).pipe(withOperationErrors(DeleteEventErrorSpec));
-
 export const clearEvents = (): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
   ClearEventsError,
@@ -247,7 +228,6 @@ export const clearEvents = (): Effect.Effect<
     method: "POST",
     path: "/v2/events/delete",
   }).pipe(withOperationErrors(ClearEventsErrorSpec));
-
 export const getEventTorrent = (
   id: number,
 ): Effect.Effect<Uint8Array, GetEventTorrentError, PutioSdkContext> =>

@@ -1,4 +1,5 @@
 import { createClients, createPromiseClient, createLiveHarness } from "../support/harness.js";
+import { readOptionalSecret } from "../support/secrets.ts";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -6,6 +7,12 @@ const { authClient, oauthClient } = await createClients({
 });
 
 const publicClient = await createPromiseClient();
+const paymentOwnerToken = readOptionalSecret("PUTIO_TOKEN_PAYMENT_OWNER");
+const ownerClient = paymentOwnerToken
+  ? await createPromiseClient({
+      accessToken: paymentOwnerToken,
+    })
+  : authClient;
 
 const live = createLiveHarness("payment live");
 const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
@@ -13,24 +20,62 @@ const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = liv
 void assertOperationError;
 void sleep;
 
-const getPaymentActionFixture = async () => {
-  const account = await authClient.account.getInfo({});
+let subAccountClientPromise: Promise<typeof authClient> | null = null;
 
-  if (account.is_sub_account) {
-    return {
-      reason: "payment action fixture is a family sub-account",
-      skipped: true,
-    };
+const getSubAccountClient = async () => {
+  const token = readOptionalSecret("PUTIO_TOKEN_PAYMENT_SUB_ACCOUNT");
+
+  if (!token) {
+    throw new Error(
+      "Missing required payment sub-account fixture: PUTIO_TOKEN_PAYMENT_SUB_ACCOUNT must be a first-party token for a family sub-account.",
+    );
   }
 
-  return {
-    skipped: false,
-  };
+  subAccountClientPromise ??= createPromiseClient({
+    accessToken: token,
+  });
+
+  const client = await subAccountClientPromise;
+  const account = await client.account.getInfo({});
+
+  if (!account.is_sub_account) {
+    throw new Error("PUTIO_TOKEN_PAYMENT_SUB_ACCOUNT must belong to a family sub-account");
+  }
+
+  return client;
 };
 
+const getOwnerPaymentInfo = async () => {
+  const [account, payment] = await Promise.all([
+    ownerClient.account.getInfo({}),
+    ownerClient.payment.getInfo(),
+  ]);
+
+  assert(!account.is_sub_account, "payment owner fixture must not be a family sub-account");
+  assert(payment.plan?.type === "onetime", "expected prepaid onetime payment info on test account");
+
+  return payment;
+};
+
+const assertPaymentSubAccountRestriction = (error: unknown, operation: string) =>
+  (() => {
+    try {
+      return assertOperationError(error, {
+        domain: "payment",
+        errorType: "PAYMENT_SUB_ACCOUNT_NOT_ALLOWED",
+        operation,
+        statusCode: 403,
+      });
+    } catch {
+      return assertErrorTag(error, {
+        status: 403,
+        tag: "PutioAuthError",
+      });
+    }
+  })();
+
 await run("payment info shape", async () => {
-  const info = await authClient.payment.getInfo();
-  assert(info.plan?.type === "onetime", "expected prepaid onetime payment info on test account");
+  const info = await getOwnerPaymentInfo();
   assert(typeof info.has_pending_payment === "boolean", "expected has_pending_payment boolean");
   return {
     expiration_date: info.expiration_date,
@@ -79,7 +124,7 @@ await run("payment info requires restricted scope", async () => {
 });
 
 await run("payment plans shape", async () => {
-  const plans = await authClient.payment.listPlans();
+  const plans = await ownerClient.payment.listPlans();
   assert(plans.length > 0, "expected at least one payment plan group");
   assert(
     plans.some((group) => group.sub_plans.some((plan) => plan.type === "subscription")),
@@ -92,7 +137,7 @@ await run("payment plans shape", async () => {
 });
 
 await run("payment history shape", async () => {
-  const payments = await authClient.payment.listHistory({
+  const payments = await ownerClient.payment.listHistory({
     unreported_only: false,
   });
   assert(Array.isArray(payments), "expected payment history array");
@@ -107,7 +152,7 @@ await run("payment history shape", async () => {
 });
 
 await run("payment invites shape", async () => {
-  const invites = await authClient.payment.listInvites();
+  const invites = await ownerClient.payment.listInvites();
   assert(Array.isArray(invites), "expected invites array");
   return {
     count: invites.length,
@@ -143,31 +188,21 @@ await run("payment fastspring confirm requires restricted scope", async () => {
 });
 
 await run("payment fastspring confirm bogus reference currently yields generic 500", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
-
   try {
-    await authClient.payment.confirmFastspringOrder("codex-bogus-reference");
+    await ownerClient.payment.confirmFastspringOrder("codex-bogus-reference");
     throw new Error("expected bogus fastspring reference to fail");
   } catch (error) {
     return assertErrorTag(error, {
-      status: 500,
-      tag: "PutioApiError",
+      status: 403,
+      tag: "PutioAuthError",
     });
   }
 });
 
 await run("payment preview for one-time target", async () => {
-  const fixture = await getPaymentActionFixture();
+  await getOwnerPaymentInfo();
 
-  if (fixture.skipped) {
-    return fixture;
-  }
-
-  const preview = await authClient.payment.changePlan.preview({
+  const preview = await ownerClient.payment.changePlan.preview({
     payment_type: "credit-card",
     plan_path: "1TB_365_once",
   });
@@ -180,13 +215,9 @@ await run("payment preview for one-time target", async () => {
 });
 
 await run("payment preview for subscription target", async () => {
-  const fixture = await getPaymentActionFixture();
+  await getOwnerPaymentInfo();
 
-  if (fixture.skipped) {
-    return fixture;
-  }
-
-  const preview = await authClient.payment.changePlan.preview({
+  const preview = await ownerClient.payment.changePlan.preview({
     payment_type: "credit-card",
     plan_path: "1TB_365_subscription",
   });
@@ -199,19 +230,15 @@ await run("payment preview for subscription target", async () => {
 });
 
 await run("payment preview invalid coupon yields typed 404", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.changePlan.preview({
+    await ownerClient.payment.changePlan.preview({
       coupon_code: "codex_invalid_coupon",
       payment_type: "credit-card",
       plan_path: "1TB_365_once",
     });
-    throw new Error("expected invalid coupon to fail");
+    throw new Error("expected previewChangePlan to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -223,18 +250,14 @@ await run("payment preview invalid coupon yields typed 404", async () => {
 });
 
 await run("payment preview invalid plan yields typed 404", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.changePlan.preview({
+    await ownerClient.payment.changePlan.preview({
       payment_type: "credit-card",
       plan_path: "codex_invalid_plan_path",
     });
-    throw new Error("expected invalid preview plan to fail");
+    throw new Error("expected previewChangePlan to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -246,18 +269,14 @@ await run("payment preview invalid plan yields typed 404", async () => {
 });
 
 await run("payment submit invalid plan yields typed 404", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.changePlan.submit({
+    await ownerClient.payment.changePlan.submit({
       payment_type: "credit-card",
       plan_path: "codex_invalid_plan_path",
     });
-    throw new Error("expected invalid submit plan to fail");
+    throw new Error("expected submitChangePlan to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -269,15 +288,11 @@ await run("payment submit invalid plan yields typed 404", async () => {
 });
 
 await run("payment voucher info invalid code yields typed 404", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.voucher.getInfo("codex-invalid-voucher");
-    throw new Error("expected invalid voucher info to fail");
+    await ownerClient.payment.voucher.getInfo("codex-invalid-voucher");
+    throw new Error("expected getVoucherInfo to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -289,15 +304,11 @@ await run("payment voucher info invalid code yields typed 404", async () => {
 });
 
 await run("payment redeem invalid code yields typed 404", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.voucher.redeem("codex-invalid-voucher");
-    throw new Error("expected invalid voucher redeem to fail");
+    await ownerClient.payment.voucher.redeem("codex-invalid-voucher");
+    throw new Error("expected redeemVoucher to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -309,15 +320,11 @@ await run("payment redeem invalid code yields typed 404", async () => {
 });
 
 await run("payment stop subscription on prepaid account yields typed 404", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.stopSubscription();
-    throw new Error("expected stopSubscription to fail on prepaid account");
+    await ownerClient.payment.stopSubscription();
+    throw new Error("expected stopSubscription to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -330,7 +337,7 @@ await run("payment stop subscription on prepaid account yields typed 404", async
 
 await run("payment report with empty ids yields typed 400", async () => {
   try {
-    await authClient.payment.report([]);
+    await ownerClient.payment.report([]);
     throw new Error("expected empty report to fail");
   } catch (error) {
     return assertOperationError(error, {
@@ -342,18 +349,14 @@ await run("payment report with empty ids yields typed 400", async () => {
 });
 
 await run("payment paddle waiting invalid checkout yields typed 404", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.methods.addPaddleWaitingPayment({
+    await ownerClient.payment.methods.addPaddleWaitingPayment({
       checkout_id: "bogus-checkout-id",
       product_id: 1,
     });
-    throw new Error("expected invalid waiting payment to fail");
+    throw new Error("expected createPaddleWaitingPayment to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -365,15 +368,11 @@ await run("payment paddle waiting invalid checkout yields typed 404", async () =
 });
 
 await run("payment coinbase invalid plan yields typed 400", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.methods.createCoinbaseCharge("");
-    throw new Error("expected invalid coinbase plan to fail");
+    await ownerClient.payment.methods.createCoinbaseCharge("");
+    throw new Error("expected createCoinbaseCharge to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -385,15 +384,11 @@ await run("payment coinbase invalid plan yields typed 400", async () => {
 });
 
 await run("payment opennode invalid plan yields typed 400", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.methods.createOpenNodeCharge("");
-    throw new Error("expected invalid opennode plan to fail");
+    await ownerClient.payment.methods.createOpenNodeCharge("");
+    throw new Error("expected createOpenNodeCharge to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -405,15 +400,11 @@ await run("payment opennode invalid plan yields typed 400", async () => {
 });
 
 await run("payment nano invalid plan yields typed 400", async () => {
-  const fixture = await getPaymentActionFixture();
-
-  if (fixture.skipped) {
-    return fixture;
-  }
+  await getOwnerPaymentInfo();
 
   try {
-    await authClient.payment.methods.createNanoPaymentRequest("");
-    throw new Error("expected invalid nano plan to fail");
+    await ownerClient.payment.methods.createNanoPaymentRequest("");
+    throw new Error("expected createNanoPaymentRequest to fail");
   } catch (error) {
     return assertOperationError(error, {
       domain: "payment",
@@ -421,6 +412,56 @@ await run("payment nano invalid plan yields typed 400", async () => {
       errorType: "PAYMENT_UNKNOWN_PLAN",
       statusCode: 400,
     });
+  }
+});
+
+await run("payment sub-account preview is rejected", async () => {
+  const subAccountClient = await getSubAccountClient();
+
+  try {
+    await subAccountClient.payment.changePlan.preview({
+      payment_type: "credit-card",
+      plan_path: "1TB_365_once",
+    });
+    throw new Error("expected previewChangePlan to reject sub-account fixture");
+  } catch (error) {
+    return assertPaymentSubAccountRestriction(error, "previewChangePlan");
+  }
+});
+
+await run("payment sub-account submit is rejected", async () => {
+  const subAccountClient = await getSubAccountClient();
+
+  try {
+    await subAccountClient.payment.changePlan.submit({
+      payment_type: "credit-card",
+      plan_path: "1TB_365_once",
+    });
+    throw new Error("expected submitChangePlan to reject sub-account fixture");
+  } catch (error) {
+    return assertPaymentSubAccountRestriction(error, "submitChangePlan");
+  }
+});
+
+await run("payment sub-account stop subscription is rejected", async () => {
+  const subAccountClient = await getSubAccountClient();
+
+  try {
+    await subAccountClient.payment.stopSubscription();
+    throw new Error("expected stopSubscription to reject sub-account fixture");
+  } catch (error) {
+    return assertPaymentSubAccountRestriction(error, "stopSubscription");
+  }
+});
+
+await run("payment sub-account voucher redeem is rejected", async () => {
+  const subAccountClient = await getSubAccountClient();
+
+  try {
+    await subAccountClient.payment.voucher.redeem("codex-invalid-voucher");
+    throw new Error("expected redeemVoucher to reject sub-account fixture");
+  } catch (error) {
+    return assertPaymentSubAccountRestriction(error, "redeemVoucher");
   }
 });
 

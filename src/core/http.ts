@@ -1,11 +1,11 @@
+import { Context, Effect, Layer, Schema } from "effect";
 import {
   FetchHttpClient,
   Headers,
   HttpClient,
   HttpClientRequest,
   HttpClientResponse,
-} from "@effect/platform";
-import { Context, Effect, Layer, Schema } from "effect";
+} from "effect/unstable/http";
 
 import {
   DEFAULT_PUTIO_API_BASE_URL,
@@ -36,10 +36,9 @@ export interface PutioSdkConfigShape {
   readonly webAppUrl?: string | URL;
 }
 
-export class PutioSdkConfig extends Context.Tag("PutioSdkConfig")<
-  PutioSdkConfig,
-  PutioSdkConfigShape
->() {}
+export class PutioSdkConfig extends Context.Service<PutioSdkConfig, PutioSdkConfigShape>()(
+  "PutioSdkConfig",
+) {}
 
 export type PutioSdkContext = PutioSdkConfig | HttpClient.HttpClient;
 
@@ -114,8 +113,8 @@ interface PutioRequestOptions {
 
 const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
-const decodeSuccessJson = <A, I, R>(
-  schema: Schema.Schema<A, I, R>,
+const decodeSuccessJson = <S extends Schema.Top>(
+  schema: S,
   response: HttpClientResponse.HttpClientResponse,
 ) =>
   HttpClientResponse.schemaBodyJson(schema)(response).pipe(
@@ -244,10 +243,10 @@ const executeRequest = (options: PutioRequestOptions) =>
     return yield* HttpClient.execute(request).pipe(Effect.mapError(mapTransportError));
   });
 
-export const requestJson = <A, I, R>(
-  schema: Schema.Schema<A, I, R>,
+export const requestJson = <S extends Schema.Top>(
+  schema: S,
   options: PutioRequestOptions,
-): Effect.Effect<A, PutioSdkError, PutioSdkContext | R> =>
+): Effect.Effect<S["Type"], PutioSdkError, PutioSdkContext | S["DecodingServices"]> =>
   executeRequest(options).pipe(
     Effect.flatMap((response) =>
       isSuccessStatus(response.status)
@@ -258,18 +257,23 @@ export const requestJson = <A, I, R>(
 
 export const selectJsonField =
   <K extends string>(field: K) =>
-  <A extends Record<K, unknown>, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A[K], E, R> =>
+  <A extends { readonly [P in K]: unknown }, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A[K], E, R> =>
     effect.pipe(Effect.map((value) => value[field]));
 
 export const selectJsonFields =
   <const K extends readonly string[]>(...fields: K) =>
-  <A extends Record<K[number], unknown>, E, R>(
+  <A extends { readonly [P in K[number]]: unknown }, E, R>(
     effect: Effect.Effect<A, E, R>,
   ): Effect.Effect<Pick<A, K[number]>, E, R> =>
     effect.pipe(
       Effect.map(
         (value) =>
-          Object.fromEntries(fields.map((field) => [field, value[field]])) as Pick<A, K[number]>,
+          Object.fromEntries(fields.map((field) => [field, value[field as K[number]]])) as Pick<
+            A,
+            K[number]
+          >,
       ),
     );
 

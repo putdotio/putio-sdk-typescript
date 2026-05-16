@@ -1,9 +1,5 @@
-import {
-  assertPresent,
-  createClients,
-  createLiveHarness,
-  isFileUploadFileResult,
-} from "../support/harness.js";
+import { createClients, createLiveHarness, isFileUploadFileResult } from "../support/harness.js";
+import { requireOwnedVideoFixture } from "../support/media.ts";
 
 const { client } = await createClients({
   client: "PUTIO_TOKEN_FIRST_PARTY",
@@ -15,68 +11,114 @@ const { assert, assertOperationError, finish, run, sleep } = live;
 void assertOperationError;
 void sleep;
 
-const getOwnedFileCandidate = async () => {
-  const root = await client.files.list(0, {
-    per_page: 20,
-    total: 1,
+const createDisposableTextFile = async (label: string) => {
+  const name = `codex_sdk_${label}_${Date.now()}.txt`;
+  const upload = await client.files.upload({
+    file: new File(["sdk live probe\n"], name, {
+      type: "text/plain",
+    }),
+    fileName: name,
+    parentId: 0,
   });
 
-  const candidate = root.files.find((file) => file.file_type !== "FOLDER") ?? root.files[0];
-  return assertPresent(candidate, "expected at least one file candidate in root");
-};
+  if (!isFileUploadFileResult(upload)) {
+    throw new Error("expected file upload result");
+  }
 
-const getOwnedVideoCandidate = async () => {
-  const search = await client.files.search({
-    per_page: 10,
-    query: "mp4",
-  });
-
-  return (
-    search.files.find((file) => file.file_type === "VIDEO" && file.is_shared === false) ?? null
-  );
+  return upload.file;
 };
 
 await run("files api download url redirects", async () => {
-  const file = await getOwnedFileCandidate();
-  const url = await client.files.getApiDownloadUrl(file.id);
-  const response = await fetch(url, {
-    redirect: "manual",
-  });
+  const file = await createDisposableTextFile("download_redirect");
 
-  assert(response.status === 302, "expected api download route to redirect");
+  try {
+    const url = await client.files.getApiDownloadUrl(file.id);
+    const response = await fetch(url, {
+      redirect: "manual",
+    });
 
-  return {
-    file_id: file.id,
-    location_prefix: response.headers.get("location")?.slice(0, 24) ?? null,
-    status: response.status,
-  };
+    assert(response.status === 302, "expected api download route to redirect");
+
+    return {
+      file_id: file.id,
+      location_prefix: response.headers.get("location")?.slice(0, 24) ?? null,
+      status: response.status,
+    };
+  } finally {
+    await client.files.delete([file.id], {
+      skipTrash: true,
+    });
+  }
 });
 
 await run("files api content url redirects", async () => {
-  const file = await getOwnedFileCandidate();
-  const url = await client.files.getApiContentUrl(file.id);
+  const file = await createDisposableTextFile("content_redirect");
+
+  try {
+    const url = await client.files.getApiContentUrl(file.id);
+    const response = await fetch(url, {
+      redirect: "manual",
+    });
+
+    assert(response.status === 302, "expected api content route to redirect");
+
+    return {
+      file_id: file.id,
+      location_prefix: response.headers.get("location")?.slice(0, 24) ?? null,
+      status: response.status,
+    };
+  } finally {
+    await client.files.delete([file.id], {
+      skipTrash: true,
+    });
+  }
+});
+
+await run("files direct download url fetches disposable file", async () => {
+  const file = await createDisposableTextFile("direct_download");
+
+  try {
+    const url = await client.files.getDownloadUrl(file.id);
+    const response = await fetch(url);
+    const body = await response.text();
+
+    assert(response.ok, "expected direct download url to be fetchable");
+    assert(body === "sdk live probe\n", "expected direct download body");
+
+    return {
+      file_id: file.id,
+      status: response.status,
+    };
+  } finally {
+    await client.files.delete([file.id], {
+      skipTrash: true,
+    });
+  }
+});
+
+await run("files api mp4 download url redirects for owned video", async () => {
+  const video = await requireOwnedVideoFixture(client, {
+    requireMp4Available: true,
+  });
+
+  const url = await client.files.getApiMp4DownloadUrl(video.id, {
+    name: "codex-sdk-live.mp4",
+  });
   const response = await fetch(url, {
     redirect: "manual",
   });
 
-  assert(response.status === 302, "expected api content route to redirect");
+  assert(response.status === 302, "expected api mp4 download route to redirect");
 
   return {
-    file_id: file.id,
     location_prefix: response.headers.get("location")?.slice(0, 24) ?? null,
     status: response.status,
+    video_id: video.id,
   };
 });
 
 await run("files hls url is tokenized", async () => {
-  const video = await getOwnedVideoCandidate();
-
-  if (!video) {
-    return {
-      checked: false,
-      reason: "no owned video candidate found",
-    };
-  }
+  const video = await requireOwnedVideoFixture(client);
 
   const url = await client.files.getHlsStreamUrl(video.id, {
     maxSubtitleCount: 1,

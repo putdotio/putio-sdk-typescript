@@ -1,4 +1,9 @@
-import { assertPresent, createClients, createLiveHarness } from "../support/harness.js";
+import {
+  assertPresent,
+  createClients,
+  createLiveHarness,
+  isFileUploadFileResult,
+} from "../support/harness.js";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -40,7 +45,35 @@ const findProbeFile = async (
   return null;
 };
 
-const findProbeCursor = async () => {
+const createCursorProbeFiles = async () => {
+  const ids: number[] = [];
+
+  for (let index = 0; index < 6; index += 1) {
+    const name = `codex_sdk_zip_cursor_${Date.now()}_${index}.txt`;
+    const upload = await authClient.files.upload({
+      file: new File([`sdk zip cursor probe ${index}\n`], name, {
+        type: "text/plain",
+      }),
+      fileName: name,
+      parentId: 0,
+    });
+
+    if (!isFileUploadFileResult(upload)) {
+      throw new Error("expected cursor zip probe upload to return a file");
+    }
+
+    ids.push(upload.file.id);
+  }
+
+  return ids;
+};
+
+const findProbeCursor = async (): Promise<{
+  readonly cleanupIds: ReadonlyArray<number>;
+  readonly cursor: string;
+  readonly firstFileId: number;
+} | null> => {
+  const cleanupIds = await createCursorProbeFiles();
   const listing = await authClient.files.list(0, {
     per_page: 5,
     total: 1,
@@ -48,11 +81,13 @@ const findProbeCursor = async () => {
 
   if (listing.cursor && listing.files.length > 0) {
     return {
+      cleanupIds,
       cursor: listing.cursor,
       firstFileId: listing.files[0].id,
     };
   }
 
+  await authClient.files.delete(cleanupIds, { skipTrash: true }).catch(() => undefined);
   return null;
 };
 
@@ -211,48 +246,51 @@ await run("zips create with cursor and exclude_ids completes", async () => {
     "expected a root listing cursor for cursor zip checks",
   );
 
-  const zipId = await authClient.zips.create({
-    cursor: cursorZipProbe.cursor,
-    exclude_ids: [cursorZipProbe.firstFileId],
-  });
-  assert(typeof zipId === "number", "expected cursor zip id");
-
-  const firstInfo = await authClient.zips.get(zipId);
-  assert(
-    ["DONE", "ERROR", "NEW", "PROCESSING"].includes(firstInfo.zip_status),
-    "expected known cursor zip status",
-  );
-
-  let info;
-
   try {
-    info = await pollZip(zipId);
-  } catch (error) {
-    if (isZipTimeoutError(error)) {
-      return {
-        cursor_zip_id: zipId,
-        excluded_file_id: cursorZipProbe.firstFileId,
-        reason: error.message,
-        skipped: true,
-      };
+    const zipId = await authClient.zips.create({
+      cursor: cursorZipProbe.cursor,
+      exclude_ids: [cursorZipProbe.firstFileId],
+    });
+    assert(typeof zipId === "number", "expected cursor zip id");
+
+    const firstInfo = await authClient.zips.get(zipId);
+    assert(
+      ["DONE", "ERROR", "NEW", "PROCESSING"].includes(firstInfo.zip_status),
+      "expected known cursor zip status",
+    );
+
+    let info;
+
+    try {
+      info = await pollZip(zipId);
+    } catch (error) {
+      if (isZipTimeoutError(error)) {
+        throw error;
+      }
+
+      throw error;
     }
 
-    throw error;
-  }
+    assert(info.zip_status === "DONE", "expected cursor zip to complete");
+    assert(typeof info.url === "string", "expected cursor zip download url");
+    if (!("missing_files" in info)) {
+      throw new Error("expected cursor zip missing_files array");
+    }
+    assert(Array.isArray(info.missing_files), "expected cursor zip missing_files array");
 
-  assert(info.zip_status === "DONE", "expected cursor zip to complete");
-  assert(typeof info.url === "string", "expected cursor zip download url");
-  if (!("missing_files" in info)) {
-    throw new Error("expected cursor zip missing_files array");
+    return {
+      cursor_zip_id: zipId,
+      excluded_file_id: cursorZipProbe.firstFileId,
+      final_status: info.zip_status,
+      missing_files: info.missing_files.length,
+    };
+  } finally {
+    await authClient.files
+      .delete(cursorZipProbe.cleanupIds, {
+        skipTrash: true,
+      })
+      .catch(() => undefined);
   }
-  assert(Array.isArray(info.missing_files), "expected cursor zip missing_files array");
-
-  return {
-    cursor_zip_id: zipId,
-    excluded_file_id: cursorZipProbe.firstFileId,
-    final_status: info.zip_status,
-    missing_files: info.missing_files.length,
-  };
 });
 
 finish();

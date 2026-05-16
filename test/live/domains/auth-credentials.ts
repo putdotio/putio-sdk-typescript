@@ -17,10 +17,7 @@ await run(
         error instanceof Error &&
         error.message.startsWith("Missing required secret environment variable:")
       ) {
-        return {
-          reason: error.message,
-          skipped: true,
-        };
+        throw error;
       }
 
       throw error;

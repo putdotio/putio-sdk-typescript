@@ -38,6 +38,19 @@ vp test
 vp test --coverage
 ```
 
+Additional package and cleanup checks:
+
+```bash
+pnpm lint:unused
+pnpm lint:unused:prod
+pnpm lint:package
+```
+
+`lint:unused` runs Knip against source, tests, live tests, scripts, and config files to detect unused files, dependencies, and exports.
+`lint:unused:prod` builds the package and runs Knip's production-only graph for package-surface cleanup.
+`lint:package` packs the package and runs `publint` plus Are The Types Wrong against the published ESM entrypoints.
+CI runs `lint:package` after `vp run verify`; the Knip checks remain local/advisory until their baseline is stable enough to make blocking.
+
 The local suite focuses on the shared runtime in `src/core`.
 Unit coverage now includes all production code under `src/**`, including:
 
@@ -52,9 +65,6 @@ Live tests stay separate on purpose:
 - they stay outside the coverage report
 - CI coverage gates only the unit suite
 - they exist to sanity-check real API behavior before releases and deeper changes
-
-The `consumer` target is the exception: it is safe to run without real credentials and is intended to gate CI as the publication-surface check.
-GitHub Actions runs both the verify and consumer-surface lanes on GitHub-hosted Ubuntu runners.
 
 ## Live Environment
 
@@ -75,7 +85,7 @@ Bootstrap-first variables:
 - `PUTIO_CLIENT_ID_FIRST_PARTY`
 - `PUTIO_CLIENT_SECRET_FIRST_PARTY`
 
-Optional credential-fixture variables:
+Credential-fixture variables:
 
 - `PUTIO_TEST_TOTP_REFERENCE`
 - `PUTIO_TEST_TOTP`
@@ -87,11 +97,40 @@ Optional credential-fixture variables:
 - `PUTIO_1PASSWORD_RUNTIME_ITEM_ID`
 - `PUTIO_1PASSWORD_RUNTIME_VAULT`
 
+The secondary-account variables are required for live targets that need durable
+friendship or invite fixtures, including `friends`, `sharing`,
+`friend-invites`, and `family`. The secondary account must have unused
+pre-seeded friend and family invite codes for the positive public lookup tests;
+the live suite does not mint reusable invite codes during routine verification.
+
 Optional direct runtime variables:
 
 - `PUTIO_TOKEN_FIRST_PARTY`
 - `PUTIO_TOKEN_THIRD_PARTY`
 - `PUTIO_CLIENT_ID`
+- `PUTIO_LIVE_OWNED_VIDEO_FILE_ID`
+- `PUTIO_LIVE_RSS_SOURCE_URL`
+- `PUTIO_TOKEN_PAYMENT_OWNER`
+- `PUTIO_TOKEN_PAYMENT_SUB_ACCOUNT`
+
+`PUTIO_LIVE_OWNED_VIDEO_FILE_ID` can pin media live tests to an explicit safe,
+owned, unshared MP4 fixture. If it is unset, the live harness only accepts
+owned MP4s with SDK/example fixture names such as `codex_sdk_*`,
+`codex-sdk-*`, `Mario1_507_512kb.mp4`, `Sintel.mp4`, or
+`Big Buck Bunny.mp4`; it never selects an arbitrary private video from the
+account.
+
+`PUTIO_LIVE_RSS_SOURCE_URL` must point at a known-good RSS feed when running the
+`rss` target. `PUTIO_TOKEN_PAYMENT_OWNER` must belong to a prepaid owner account
+when running owner payment action checks; if unset, those checks use
+`PUTIO_TOKEN_FIRST_PARTY` and fail if that token is a family sub-account.
+`PUTIO_TOKEN_PAYMENT_SUB_ACCOUNT` must belong to a family sub-account for the
+payment sub-account restriction checks.
+
+The `sharing`, `files`, `file-direct`, and `file-tasks` targets also expect a
+safe owned MP4 fixture for media flag, URL, HLS, watch status, and start-from
+coverage. The shared-friend clone fixture is seeded from the configured
+secondary account.
 
 If direct token vars are missing, the live harness can still hydrate them from:
 
@@ -121,36 +160,32 @@ Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from `.en
 ```bash
 pnpm secrets:setup        # one-time per worktree
 pnpm bootstrap:tokens     # mints fresh tokens
+pnpm bootstrap:live-fixtures
 pnpm test:live            # runs the broader live suite against pre-existing tokens
 pnpm secrets:clean        # before `git worktree remove`
 ```
 
 `secrets:setup` requires an unlocked 1Password CLI session locally, or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. The `.env.example` references are committer-only; external contributors can run unit tests without them.
 
-## Consumer Verification
+`bootstrap:live-fixtures` validates and seeds the live fixtures that are safe to
+prepare through the public SDK. It establishes the secondary friendship/shared
+folder fixture, validates the RSS URL, payment owner/sub-account roles, owned
+MP4 fixture, and pre-seeded unused invite codes. In normal preflight mode it
+does not mint reusable friend or family invite codes because there is no public
+cleanup route for those unused invites. It also does not preflight public-share
+quota because creating a share consumes the same daily quota that the `sharing`
+live target needs; use the `sharing` live test itself as the public-share
+behavior check.
 
-The `consumer` live test is the package-publication safety net.
-
-Run:
+When the secondary account is intentionally being prepared for live verification,
+an operator can seed missing unused invite codes explicitly:
 
 ```bash
-vp pack && vp test run --config vitest.live.config.ts test/live/consumer.test.ts
+pnpm bootstrap:live-fixtures -- --seed-invite-codes
 ```
 
-Or through the package script:
-
-```bash
-vp run test:live:consumer
-```
-
-What it checks:
-
-- `vp pack` produces an installable tarball for an external consumer install check
-- an external temp project can install that tarball
-- TypeScript can typecheck against the published exports
-- Node can import the built package at runtime
-- the public `@putdotio/sdk/utilities` subpath resolves for external consumers
-- internal package paths stay fenced off
+Use this only for fixture setup. It can consume one friend-invite and one
+family-invite quota on the secondary account when those fixtures are missing.
 
 ## Safety Rules
 
@@ -196,4 +231,3 @@ Those stay source-backed or sandbox-only until we have a sacrificial account spe
 | `family`           | family members and invites                                           |
 | `ifttt`            | IFTTT integration                                                    |
 | `tunnel`           | tunnel routes                                                        |
-| `consumer`         | external package-consumer install checks                             |

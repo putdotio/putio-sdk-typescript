@@ -29,11 +29,14 @@ npm install @putdotio/sdk
 
 ## Quick Start
 
+`userAccessToken` in these examples is an already-issued user token from your app or auth flow.
+The SDK itself can be constructed without a token.
+
 ```ts
 import { createPutioSdkPromiseClient } from "@putdotio/sdk";
 
 const sdk = createPutioSdkPromiseClient({
-  accessToken: process.env.PUTIO_TOKEN,
+  accessToken: userAccessToken,
 });
 
 const account = await sdk.account.getInfo({
@@ -46,7 +49,13 @@ The SDK can also be created without a default token:
 ```ts
 const sdk = createPutioSdkPromiseClient();
 
-const validation = await sdk.auth.validateToken(process.env.PUTIO_TOKEN!);
+const validation = await sdk.auth.validateToken(tokenToCheck);
+const login = await sdk.auth.login({
+  clientId,
+  clientSecret,
+  password,
+  username,
+});
 ```
 
 ## Utilities
@@ -70,7 +79,12 @@ const duration = secondsToReadableDuration(444);
 
 ```ts
 import { Effect } from "effect";
-import { createPutioSdkEffectClient, makePutioSdkLiveLayer } from "@putdotio/sdk";
+import {
+  PutioSdk,
+  createPutioSdkEffectClient,
+  makePutioSdkLiveClientLayer,
+  makePutioSdkLiveLayer,
+} from "@putdotio/sdk";
 
 const sdk = createPutioSdkEffectClient();
 
@@ -79,17 +93,29 @@ const program = sdk.files
     per_page: 20,
     total: 1,
   })
-  .pipe(Effect.provide(makePutioSdkLiveLayer({ accessToken: process.env.PUTIO_TOKEN! })));
+  .pipe(Effect.provide(makePutioSdkLiveLayer({ accessToken: userAccessToken })));
 
 const result = await Effect.runPromise(program);
 ```
 
+Effect workflows can also depend on the SDK as a service:
+
+```ts
+const serviceProgram = Effect.gen(function* () {
+  const sdk = yield* PutioSdk;
+  return yield* sdk.files.list(0, { per_page: 20 });
+}).pipe(Effect.provide(makePutioSdkLiveClientLayer({ accessToken: userAccessToken })));
+```
+
+`makePutioSdkLiveClientLayer(...)` provides the SDK service, SDK config, and default fetch-backed `HttpClient`.
 `makePutioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed `HttpClient`.
 Use `makePutioSdkLayer(...)` only when you want to supply your own `HttpClient` service.
 
 ## Side-By-Side Usage
 
-Both client styles expose the same domain surface:
+Both client styles expose the same domain surface. The Promise client also exposes
+`dispose()` for runtime teardown and `files.createUploadFormData(...)` for pure
+FormData construction.
 
 ```ts
 promiseClient.files.list(0, { per_page: 20 });
@@ -169,13 +195,13 @@ Promise consumers receive tagged SDK error objects:
 
 ```ts
 import {
-  PutioOperationError,
-  PutioRateLimitError,
   createPutioSdkPromiseClient,
+  isPutioOperationError,
+  isPutioRateLimitError,
 } from "@putdotio/sdk";
 
 const sdk = createPutioSdkPromiseClient({
-  accessToken: process.env.PUTIO_TOKEN,
+  accessToken: userAccessToken,
 });
 
 try {
@@ -184,13 +210,13 @@ try {
     parent_id: 0,
   });
 } catch (error) {
-  if (error instanceof PutioOperationError) {
+  if (isPutioOperationError(error)) {
     if (error.operation === "createFolder") {
       console.log(error.body.error_type);
     }
   }
 
-  if (error instanceof PutioRateLimitError) {
+  if (isPutioRateLimitError(error)) {
     console.log(error.retryAfter);
   }
 }
@@ -200,25 +226,24 @@ Effect consumers keep errors in the typed error channel instead of throwing:
 
 ```ts
 import { Effect } from "effect";
-import { createPutioSdkEffectClient, makePutioSdkLiveLayer } from "@putdotio/sdk";
+import { PutioSdk, makePutioSdkLiveClientLayer } from "@putdotio/sdk";
 
-const sdk = createPutioSdkEffectClient();
-
-const handled = sdk.files
-  .createFolder({
+const handled = Effect.gen(function* () {
+  const sdk = yield* PutioSdk;
+  return yield* sdk.files.createFolder({
     name: "",
     parent_id: 0,
-  })
-  .pipe(
-    Effect.catchTag("PutioOperationError", (error) => {
-      if (error.operation === "createFolder") {
-        return Effect.succeed(error.body.error_type);
-      }
+  });
+}).pipe(
+  Effect.catchTag("PutioOperationError", (error) => {
+    if (error.operation === "createFolder") {
+      return Effect.succeed(error.body.error_type);
+    }
 
-      return Effect.fail(error);
-    }),
-    Effect.provide(makePutioSdkLiveLayer({ accessToken: process.env.PUTIO_TOKEN! })),
-  );
+    return Effect.fail(error);
+  }),
+  Effect.provide(makePutioSdkLiveClientLayer({ accessToken: userAccessToken })),
+);
 ```
 
 ## Direct File Access
@@ -262,10 +287,9 @@ The Effect client also works well when you want the canonical typed API:
 ```ts
 import { useQuery } from "@tanstack/react-query";
 import { Effect } from "effect";
-import { createPutioSdkEffectClient, makePutioSdkLiveLayer } from "@putdotio/sdk";
+import { PutioSdk, makePutioSdkLiveClientLayer } from "@putdotio/sdk";
 
-const sdk = createPutioSdkEffectClient();
-const sdkLayer = makePutioSdkLiveLayer({
+const sdkLayer = makePutioSdkLiveClientLayer({
   accessToken: token,
 });
 
@@ -273,7 +297,12 @@ export const useFiles = (parentId: number) =>
   useQuery({
     queryKey: ["files", parentId],
     queryFn: () =>
-      Effect.runPromise(sdk.files.list(parentId, { per_page: 50 }).pipe(Effect.provide(sdkLayer))),
+      Effect.runPromise(
+        Effect.gen(function* () {
+          const sdk = yield* PutioSdk;
+          return yield* sdk.files.list(parentId, { per_page: 50 });
+        }).pipe(Effect.provide(sdkLayer)),
+      ),
   });
 ```
 

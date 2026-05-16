@@ -1,4 +1,5 @@
 import { createClients, createLiveHarness } from "../support/harness.js";
+import { readOptionalSecret } from "../support/secrets.ts";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -11,42 +12,34 @@ const { assert, assertOperationError, finish, run, sleep } = live;
 void assertOperationError;
 void sleep;
 
-const getProbeFeedUrl = async () => {
-  const feeds = await authClient.rss.list();
-  return feeds[0]?.rss_source_url ?? null;
+type RssClient = typeof authClient;
+type RssCreateInput = Parameters<RssClient["rss"]["create"]>[0];
+
+const requireRssSourceUrl = (): string => {
+  const rssSourceUrl = readOptionalSecret("PUTIO_LIVE_RSS_SOURCE_URL");
+
+  if (!rssSourceUrl) {
+    throw new Error(
+      "Missing required RSS live fixture: PUTIO_LIVE_RSS_SOURCE_URL must point to a known-good fetchable RSS feed.",
+    );
+  }
+
+  return rssSourceUrl;
 };
 
-const toFeedFetchSkip = (error: unknown) => {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "_tag" in error &&
-    error._tag === "PutioOperationError" &&
-    "body" in error &&
-    typeof error.body === "object" &&
-    error.body !== null &&
-    "error_type" in error.body &&
-    error.body.error_type === "FEED_CANNOT_FETCHED"
-  ) {
-    return {
-      reason: "feed source could not be fetched during live probe",
-      skipped: true,
-    };
-  }
+const createProbeRssFeed = async (
+  client: RssClient,
+  input: Omit<RssCreateInput, "rss_source_url">,
+) => {
+  const rssSourceUrl = requireRssSourceUrl();
 
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "_tag" in error &&
-    error._tag === "PutioRateLimitError"
-  ) {
-    return {
-      reason: "rss live probe hit rate limiting",
-      skipped: true,
-    };
-  }
-
-  throw error;
+  return {
+    feed: await client.rss.create({
+      ...input,
+      rss_source_url: rssSourceUrl,
+    }),
+    rssSourceUrl,
+  };
 };
 
 await run("rss list shape", async () => {
@@ -71,28 +64,19 @@ await run("rss list is readable with oauth token", async () => {
 });
 
 await run("rss create update lifecycle", async () => {
-  const probeFeedUrl = await getProbeFeedUrl();
-
-  if (!probeFeedUrl) {
-    return { skipped: true, reason: "no existing rss feed url available for probe" };
-  }
-
   const seed = Date.now();
-  let created;
 
-  try {
-    created = await authClient.rss.create({
-      delete_old_files: false,
-      dont_process_whole_feed: true,
-      keyword: "",
-      parent_dir_id: 0,
-      rss_source_url: probeFeedUrl,
-      title: `codex sdk rss ${seed}`,
-      unwanted_keywords: "",
-    });
-  } catch (error) {
-    return toFeedFetchSkip(error);
-  }
+  const createdProbe = await createProbeRssFeed(authClient, {
+    delete_old_files: false,
+    dont_process_whole_feed: true,
+    keyword: "",
+    parent_dir_id: 0,
+    title: `codex sdk rss ${seed}`,
+    unwanted_keywords: "",
+  });
+
+  const created = createdProbe.feed;
+  const probeFeedUrl = createdProbe.rssSourceUrl;
 
   try {
     assert(created.title.includes(String(seed)), "expected created feed title");
@@ -147,30 +131,17 @@ await run("rss create update lifecycle", async () => {
       item_count: logs.items.length,
       updated_title: updated.title,
     };
-  } catch (error) {
-    return toFeedFetchSkip(error);
   } finally {
     await authClient.rss.delete(created.id).catch(() => undefined);
   }
 });
 
 await run("rss create is writable with oauth token", async () => {
-  const probeFeedUrl = await getProbeFeedUrl();
+  const createdProbe = await createProbeRssFeed(oauthClient, {
+    title: `codex oauth rss ${Date.now()}`,
+  });
 
-  if (!probeFeedUrl) {
-    return { skipped: true, reason: "no existing rss feed url available for oauth probe" };
-  }
-
-  let created;
-
-  try {
-    created = await oauthClient.rss.create({
-      rss_source_url: probeFeedUrl,
-      title: `codex oauth rss ${Date.now()}`,
-    });
-  } catch (error) {
-    return toFeedFetchSkip(error);
-  }
+  const created = createdProbe.feed;
 
   try {
     assert(typeof created.id === "number", "expected created oauth rss id");
@@ -198,11 +169,7 @@ await run("rss invalid url yields typed error", async () => {
 });
 
 await run("rss missing title yields typed error", async () => {
-  const probeFeedUrl = await getProbeFeedUrl();
-
-  if (!probeFeedUrl) {
-    return { skipped: true, reason: "no existing rss feed url available for title probe" };
-  }
+  const probeFeedUrl = requireRssSourceUrl();
 
   try {
     await authClient.rss.create({
@@ -211,23 +178,6 @@ await run("rss missing title yields typed error", async () => {
     });
     throw new Error("expected missing title to fail");
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "_tag" in error &&
-      error._tag === "PutioOperationError" &&
-      "body" in error &&
-      typeof error.body === "object" &&
-      error.body !== null &&
-      "error_type" in error.body &&
-      error.body.error_type === "FEED_CANNOT_FETCHED"
-    ) {
-      return {
-        reason: "feed source could not be fetched during title probe",
-        skipped: true,
-      };
-    }
-
     return assertOperationError(error, {
       domain: "rss",
       errorType: "TITLE_REQUIRED",
@@ -267,43 +217,15 @@ await run("rss missing item retry yields typed not found", async () => {
 
 await run("rss missing retry-all feed yields typed not found", async () => {
   try {
-    const result = await authClient.rss.retryAll(2147483647);
-    return {
-      result,
-      status: "OK",
-    };
+    await authClient.rss.retryAll(2147483647);
+    throw new Error("expected missing retry-all feed to fail");
   } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "_tag" in error &&
-      error._tag === "PutioRateLimitError"
-    ) {
-      return {
-        reason: "rss missing retry-all probe hit rate limiting",
-        skipped: true,
-      };
-    }
-
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "_tag" in error &&
-      error._tag === "PutioOperationError"
-    ) {
-      return assertOperationError(error, {
-        domain: "rss",
-        errorType: "NotFound",
-        operation: "retryAll",
-        statusCode: 404,
-      });
-    }
-
-    return {
-      details: error instanceof Error ? error.message : String(error),
-      reason: "rss missing retry-all probe returned a non-contractual failure shape",
-      skipped: true,
-    };
+    return assertOperationError(error, {
+      domain: "rss",
+      errorType: "NotFound",
+      operation: "retryAll",
+      statusCode: 404,
+    });
   }
 });
 
@@ -364,9 +286,11 @@ await run("rss missing resume feed yields typed not found", async () => {
 });
 
 await run("rss missing update feed yields typed not found", async () => {
+  const rssSourceUrl = requireRssSourceUrl();
+
   try {
     await authClient.rss.update(2147483647, {
-      rss_source_url: "https://hnrss.org/frontpage",
+      rss_source_url: rssSourceUrl,
       title: "codex missing rss",
     });
     throw new Error("expected missing update feed to fail");

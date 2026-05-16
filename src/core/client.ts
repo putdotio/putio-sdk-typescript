@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, ManagedRuntime, Option, Schema } from "effect";
+import { Cause, Context, Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
 
 import {
   clearAccount,
@@ -325,10 +325,10 @@ const rejectWithSdkFailure = <A, E>(exit: Exit.Exit<A, E>): Promise<A> =>
   Exit.match(exit, {
     onSuccess: (value) => Promise.resolve(value),
     onFailure: (cause) => {
-      const failure = Cause.failureOption(cause);
+      const failure = cause.reasons.find(Cause.isFailReason);
 
-      if (Option.isSome(failure)) {
-        return Promise.reject(failure.value);
+      if (failure) {
+        return Promise.reject(failure.error);
       }
 
       return Promise.reject(Cause.squash(cause));
@@ -561,6 +561,16 @@ export const createPutioSdkEffectClient = () => ({
   },
 });
 
+export type PutioSdkEffectClient = ReturnType<typeof createPutioSdkEffectClient>;
+
+export class PutioSdk extends Context.Service<PutioSdk, PutioSdkEffectClient>()("PutioSdk") {}
+
+export const makePutioSdkEffectClientLayer = () =>
+  Layer.succeed(PutioSdk, createPutioSdkEffectClient());
+
+export const makePutioSdkLiveClientLayer = (config: PutioSdkConfigShape) =>
+  Layer.mergeAll(makePutioSdkEffectClientLayer(), makePutioSdkLiveLayer(config));
+
 export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape = {}) => {
   const config = { ...initialConfig };
 
@@ -684,10 +694,10 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
     config: {
       deleteKey: (key: string) => provideSdk(config, deleteConfigKey(key)),
       getKey: (key: string): Promise<PutioJsonValue> => provideSdk(config, getConfigKey(key)),
-      getKeyWith: <A, I>(key: string, schema: Schema.Schema<A, I, never>): Promise<A> =>
+      getKeyWith: <A>(key: string, schema: Schema.Decoder<A, never>): Promise<A> =>
         provideSdk(config, getConfigKeyWith(key, schema)),
       read: (): Promise<PutioJsonObject> => provideSdk(config, readConfig()),
-      readWith: <A, I>(schema: Schema.Schema<A, I, never>): Promise<A> =>
+      readWith: <A>(schema: Schema.Decoder<A, never>): Promise<A> =>
         provideSdk(config, readConfigWith(schema)),
       setKey: (key: string, value: PutioJsonValue) => provideSdk(config, setConfigKey(key, value)),
       write: (value: PutioJsonObject) => provideSdk(config, writeConfig(value)),
@@ -1050,3 +1060,5 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
     },
   };
 };
+
+export type PutioSdkPromiseClient = ReturnType<typeof createPutioSdkPromiseClient>;

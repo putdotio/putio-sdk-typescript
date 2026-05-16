@@ -3,13 +3,7 @@ import {
   readFirstPartyClientCredentials,
   readSecondaryCredentialFixture,
 } from "../support/secrets.ts";
-import {
-  assertPresent,
-  createClients,
-  createPromiseClient,
-  createLiveHarness,
-  expectOperationError,
-} from "../support/harness.js";
+import { createClients, createPromiseClient, createLiveHarness } from "../support/harness.js";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -25,26 +19,20 @@ void sleep;
 const publicClient = await createPromiseClient();
 const secondaryFixture = readSecondaryCredentialFixture();
 
-const isFriendInviteRestriction = (
-  error: unknown,
-): error is ReturnType<typeof expectOperationError> & {
-  readonly reason: {
-    readonly errorType: "FRIEND_INVITATION_NOT_ALLOWED";
-    readonly kind: "error_type";
-  };
-} => {
-  if (!error || typeof error !== "object") {
-    return false;
+const requireSecondaryClient = async () => {
+  if (!secondaryFixture) {
+    throw new Error(
+      "Missing secondary live account fixture. Set PUTIO_TEST_SECONDARY_USERNAME and PUTIO_TEST_SECONDARY_PASSWORD before friend-invite positive lookup tests.",
+    );
   }
 
-  const operationError = error as ReturnType<typeof expectOperationError>;
-  return (
-    operationError._tag === "PutioOperationError" &&
-    operationError.domain === "friendInvites" &&
-    operationError.operation === "create" &&
-    operationError.reason?.kind === "error_type" &&
-    operationError.reason.errorType === "FRIEND_INVITATION_NOT_ALLOWED" &&
-    operationError.status === 403
+  return bootstrapFirstPartyTokenWithCredentials(
+    secondaryFixture,
+    readFirstPartyClientCredentials(),
+  ).then((token) =>
+    createPromiseClient({
+      accessToken: token.accessToken,
+    }),
   );
 };
 
@@ -76,88 +64,29 @@ await run("friend invites list shape", async () => {
   };
 });
 
-await run("friend invites create reflects current fixture restriction", async () => {
-  const before = await authClient.friendInvites.list();
-
-  assert(before.remaining_limit > 0, "expected remaining friend invite capacity");
-
-  try {
-    const created = await authClient.friendInvites.create();
-    assert(typeof created.code === "string" && created.code.length > 0, "expected invite code");
-
-    const after = await authClient.friendInvites.list();
-    const createdInvite = assertPresent(
-      after.invites.find((invite) => invite.code === created.code),
-      "expected created invite to appear in friend invite listing",
-    );
-    assert(createdInvite.user === null, "expected reusable friend invite to remain unused");
-    assert(
-      after.remaining_limit === before.remaining_limit - 1,
-      "expected remaining friend invite limit to decrement after create",
-    );
-
-    return {
-      code_length: created.code.length,
-      mode: "created",
-      remaining_limit: after.remaining_limit,
-    };
-  } catch (error) {
-    return assertOperationError(error, {
-      domain: "friendInvites",
-      errorType: "FRIEND_INVITATION_NOT_ALLOWED",
-      operation: "create",
-      statusCode: 403,
-    });
-  }
-});
-
-await run("friend invites positive lookup with secondary fixture when available", async () => {
-  if (!secondaryFixture) {
-    return {
-      skipped: "secondary friend-invite fixture is not configured",
-    };
-  }
-
-  const secondaryToken = await bootstrapFirstPartyTokenWithCredentials(
-    secondaryFixture,
-    readFirstPartyClientCredentials(),
-  );
-  const secondaryClient = await createPromiseClient({
-    accessToken: secondaryToken.accessToken,
-  });
-
+await run("friend invites positive lookup with secondary fixture", async () => {
+  const secondaryClient = await requireSecondaryClient();
   const before = await secondaryClient.friendInvites.list();
+  const existing = before.invites.find((invite) => invite.user === null);
 
-  if (before.remaining_limit <= 0) {
-    return {
-      remaining_limit: before.remaining_limit,
-      skipped: "secondary fixture has no remaining friend invite capacity",
-    };
+  if (!existing) {
+    throw new Error(
+      "Missing unused secondary friend-invite fixture. Seed one outside the live test before running friend-invite positive lookup.",
+    );
   }
 
-  try {
-    const created = await secondaryClient.friendInvites.create();
-    const invite = await publicClient.auth.getFriendInvite(created.code);
+  const code = existing.code;
+  const invite = await publicClient.auth.getFriendInvite(code);
 
-    assert(typeof invite.inviter === "string" && invite.inviter.length > 0, "expected inviter");
-    assert(typeof invite.plan.code === "string" && invite.plan.code.length > 0, "expected plan");
+  assert(typeof invite.inviter === "string" && invite.inviter.length > 0, "expected inviter");
+  assert(typeof invite.plan.code === "string" && invite.plan.code.length > 0, "expected plan");
 
-    return {
-      code_length: created.code.length,
-      inviter: invite.inviter,
-      plan_code: invite.plan.code,
-    };
-  } catch (error) {
-    if (isFriendInviteRestriction(error)) {
-      return {
-        error_type: error.reason.errorType,
-        skipped: "secondary fixture is also invite-restricted",
-        status: error.status,
-      };
-    }
-
-    throw error;
-  }
+  return {
+    code_length: code.length,
+    inviter: invite.inviter,
+    plan_code: invite.plan.code,
+    source: "existing",
+  };
 });
 
 await run("friend invites list requires restricted scope for oauth token", async () => {

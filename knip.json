@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/index.ts",
+    "src/utilities.ts",
+    "src/**/*.spec.ts",
+    "test/**/*.test.ts",
+    "test/live/domains/**/*.ts",
+    "test/live/support/**/*.ts",
+    "scripts/**/*.mts",
+    "vite.config.ts",
+    "vitest.live.config.ts"
+  ],
+  "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.mts", "*.config.ts"],
+  "ignoreBinaries": ["op"],
+  "ignoreDependencies": ["@vitest/coverage-v8", "is-ci"]
+}

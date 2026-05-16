@@ -1,5 +1,4 @@
 import { Effect, Schema } from "effect";
-
 import {
   OkResponseSchema,
   buildPutioUrl,
@@ -15,81 +14,66 @@ import {
   type PutioOperationFailure,
   type PutioSdkError,
 } from "../core/errors.js";
-
 const OAuthAppBaseSchema = Schema.Struct({
   description: Schema.String,
   has_icon: Schema.NullOr(Schema.Boolean),
-  id: Schema.Number.pipe(Schema.int()),
+  id: Schema.Int,
   name: Schema.String,
   website: Schema.String,
 });
-
 export const OAuthAppSchema = OAuthAppBaseSchema;
-
-export const OwnedOAuthAppSchema = Schema.extend(
-  OAuthAppBaseSchema,
-  Schema.Struct({
+export const OwnedOAuthAppSchema = OAuthAppBaseSchema.pipe(
+  Schema.fieldsAssign({
     callback: Schema.String,
     hidden: Schema.Boolean,
     secret: Schema.String,
   }),
 );
-
-export const MyOAuthAppSchema = Schema.extend(
-  OwnedOAuthAppSchema,
-  Schema.Struct({
-    users: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+export const MyOAuthAppSchema = OwnedOAuthAppSchema.pipe(
+  Schema.fieldsAssign({
+    users: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
 );
-
-export const PopularOAuthAppSchema = Schema.extend(
-  OAuthAppBaseSchema,
-  Schema.Struct({
+export const PopularOAuthAppSchema = OAuthAppBaseSchema.pipe(
+  Schema.fieldsAssign({
     hidden: Schema.optional(Schema.Boolean),
     maker: Schema.String,
-    users: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.nonNegative())),
+    users: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   }),
 );
-
 export const OAuthAppSessionSchema = Schema.Struct({
   active: Schema.Boolean,
-  app_id: Schema.Number.pipe(Schema.int()),
+  app_id: Schema.Int,
   app_name: Schema.optional(Schema.String),
   client_name: Schema.String,
   created_at: Schema.String,
-  id: Schema.Number.pipe(Schema.int()),
+  id: Schema.Int,
   ip_address: Schema.String,
   last_used_at: Schema.NullOr(Schema.String),
   note: Schema.NullOr(Schema.String),
   user_agent: Schema.String,
 });
-
 export const OAuthAppWithTokenSchema = Schema.Struct({
-  app: Schema.Union(OwnedOAuthAppSchema, OAuthAppSchema),
+  app: Schema.Union([OwnedOAuthAppSchema, OAuthAppSchema]),
   status: Schema.Literal("OK"),
   token: Schema.NullOr(Schema.String),
 });
-
 const OAuthAppsEnvelopeSchema = Schema.Struct({
   apps: Schema.Array(MyOAuthAppSchema),
   status: Schema.Literal("OK"),
 });
-
 const PopularOAuthAppsEnvelopeSchema = Schema.Struct({
   apps: Schema.Array(PopularOAuthAppSchema),
   status: Schema.Literal("OK"),
 });
-
 const OAuthAppEnvelopeSchema = Schema.Struct({
-  app: Schema.Union(OwnedOAuthAppSchema, OAuthAppSchema),
+  app: Schema.Union([OwnedOAuthAppSchema, OAuthAppSchema]),
   status: Schema.Literal("OK"),
 });
-
 const OAuthRegeneratedTokenEnvelopeSchema = Schema.Struct({
   access_token: Schema.String,
   status: Schema.Literal("OK"),
 });
-
 export const OAuthAppCreateInputSchema = Schema.Struct({
   callback: Schema.String,
   description: Schema.String,
@@ -98,20 +82,17 @@ export const OAuthAppCreateInputSchema = Schema.Struct({
   name: Schema.String,
   website: Schema.String,
 });
-
 export const OAuthAppUpdateInputSchema = Schema.Struct({
   callback: Schema.String,
   description: Schema.String,
   hidden: Schema.optional(Schema.Boolean),
   icon: Schema.optional(Schema.instanceOf(Blob)),
-  id: Schema.Number.pipe(Schema.int()),
+  id: Schema.Int,
   website: Schema.String,
 });
-
 export const OAuthSetIconInputSchema = Schema.Struct({
   icon: Schema.instanceOf(Blob),
 });
-
 export type OAuthApp = Schema.Schema.Type<typeof OAuthAppSchema>;
 export type OwnedOAuthApp = Schema.Schema.Type<typeof OwnedOAuthAppSchema>;
 export type MyOAuthApp = Schema.Schema.Type<typeof MyOAuthAppSchema>;
@@ -120,43 +101,36 @@ export type OAuthAppSession = Schema.Schema.Type<typeof OAuthAppSessionSchema>;
 export type OAuthAppCreateInput = Schema.Schema.Type<typeof OAuthAppCreateInputSchema>;
 export type OAuthAppUpdateInput = Schema.Schema.Type<typeof OAuthAppUpdateInputSchema>;
 export type OAuthSetIconInput = Schema.Schema.Type<typeof OAuthSetIconInputSchema>;
-
 export const QueryOAuthAppsErrorSpec = definePutioOperationErrorSpec({
   domain: "oauth",
   operation: "query",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
-
 export const GetOAuthAppErrorSpec = definePutioOperationErrorSpec({
   domain: "oauth",
   operation: "get",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
-
 export const CreateOAuthAppErrorSpec = definePutioOperationErrorSpec({
   domain: "oauth",
   operation: "create",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
-
 export const UpdateOAuthAppErrorSpec = definePutioOperationErrorSpec({
   domain: "oauth",
   operation: "update",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
-
 export const DeleteOAuthAppErrorSpec = definePutioOperationErrorSpec({
   domain: "oauth",
   operation: "delete",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
-
 export const RegenerateOAuthAppTokenErrorSpec = definePutioOperationErrorSpec({
   domain: "oauth",
   operation: "regenerateToken",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
-
 export type QueryOAuthAppsError = PutioOperationFailure<typeof QueryOAuthAppsErrorSpec>;
 export type GetOAuthAppError = PutioOperationFailure<typeof GetOAuthAppErrorSpec>;
 export type CreateOAuthAppError = PutioOperationFailure<typeof CreateOAuthAppErrorSpec>;
@@ -165,19 +139,16 @@ export type DeleteOAuthAppError = PutioOperationFailure<typeof DeleteOAuthAppErr
 export type RegenerateOAuthAppTokenError = PutioOperationFailure<
   typeof RegenerateOAuthAppTokenErrorSpec
 >;
-
 const appendOptionalBoolean = (formData: FormData, key: string, value?: boolean) => {
   if (value !== undefined) {
     formData.append(key, String(value));
   }
 };
-
 const appendOptionalBlob = (formData: FormData, key: string, value?: Blob) => {
   if (value) {
     formData.append(key, value);
   }
 };
-
 const makeCreateOAuthAppFormData = (input: OAuthAppCreateInput) => {
   const formData = new FormData();
   formData.append("name", input.name);
@@ -188,7 +159,6 @@ const makeCreateOAuthAppFormData = (input: OAuthAppCreateInput) => {
   appendOptionalBlob(formData, "icon", input.icon);
   return formData;
 };
-
 const makeUpdateOAuthAppFormData = (input: OAuthAppUpdateInput) => {
   const formData = new FormData();
   formData.append("description", input.description);
@@ -198,7 +168,6 @@ const makeUpdateOAuthAppFormData = (input: OAuthAppUpdateInput) => {
   appendOptionalBlob(formData, "icon", input.icon);
   return formData;
 };
-
 export const buildOAuthAuthorizeUrl = (options: {
   readonly baseUrl?: string | URL;
   readonly oauthToken: string;
@@ -208,7 +177,6 @@ export const buildOAuthAuthorizeUrl = (options: {
     ...options.query,
     oauth_token: options.oauthToken,
   });
-
 export const buildOAuthAppIconUrl = (options: {
   readonly baseUrl?: string | URL;
   readonly id: number;
@@ -221,7 +189,6 @@ export const buildOAuthAppIconUrl = (options: {
       oauth_token: options.oauthToken,
     },
   );
-
 export const queryOAuthApps = (): Effect.Effect<
   ReadonlyArray<MyOAuthApp>,
   QueryOAuthAppsError,
@@ -231,7 +198,6 @@ export const queryOAuthApps = (): Effect.Effect<
     method: "GET",
     path: "/v2/oauth/apps",
   }).pipe(selectJsonField("apps"), withOperationErrors(QueryOAuthAppsErrorSpec));
-
 export const getOAuthApp = (
   id: number,
   options?: {
@@ -248,14 +214,12 @@ export const getOAuthApp = (
       ? `/v2/oauth/apps/${encodePathSegment(id)}/edit`
       : `/v2/oauth/apps/${encodePathSegment(id)}`,
   }).pipe(withOperationErrors(GetOAuthAppErrorSpec));
-
 export const setOAuthAppIcon = (
   id: number,
   input: OAuthSetIconInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> => {
   const formData = new FormData();
   formData.append("icon", input.icon);
-
   return requestJson(OkResponseSchema, {
     body: {
       type: "form-data",
@@ -265,7 +229,6 @@ export const setOAuthAppIcon = (
     path: `/v2/oauth/apps/${encodePathSegment(id)}/icon`,
   });
 };
-
 export const createOAuthApp = (
   input: OAuthAppCreateInput,
 ): Effect.Effect<
@@ -281,7 +244,6 @@ export const createOAuthApp = (
     method: "POST",
     path: "/v2/oauth/apps/register",
   }).pipe(withOperationErrors(CreateOAuthAppErrorSpec));
-
 export const updateOAuthApp = (
   input: OAuthAppUpdateInput,
 ): Effect.Effect<
@@ -297,7 +259,6 @@ export const updateOAuthApp = (
     method: "POST",
     path: `/v2/oauth/apps/${encodePathSegment(input.id)}`,
   }).pipe(withOperationErrors(UpdateOAuthAppErrorSpec));
-
 export const deleteOAuthApp = (
   id: number,
 ): Effect.Effect<
@@ -309,7 +270,6 @@ export const deleteOAuthApp = (
     method: "POST",
     path: `/v2/oauth/apps/${encodePathSegment(id)}/delete`,
   }).pipe(withOperationErrors(DeleteOAuthAppErrorSpec));
-
 export const regenerateOAuthAppToken = (
   id: number,
 ): Effect.Effect<string, RegenerateOAuthAppTokenError, PutioSdkContext> =>
@@ -317,7 +277,6 @@ export const regenerateOAuthAppToken = (
     method: "POST",
     path: `/v2/oauth/apps/${encodePathSegment(id)}/regenerate_token`,
   }).pipe(selectJsonField("access_token"), withOperationErrors(RegenerateOAuthAppTokenErrorSpec));
-
 export const getPopularOAuthApps = (): Effect.Effect<
   ReadonlyArray<PopularOAuthApp>,
   PutioSdkError,

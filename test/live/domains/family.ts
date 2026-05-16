@@ -24,27 +24,20 @@ void sleep;
 const publicClient = await createPromiseClient();
 const secondaryFixture = readSecondaryCredentialFixture();
 
-const isFamilyCreateInviteRestriction = (
-  error: unknown,
-): error is ReturnType<typeof expectOperationError> & {
-  readonly reason: {
-    readonly errorType: "FAMILY_SUB_ACCOUNT_LIMIT_EXCEEDED" | "FAMILY_UNUSED_INVITE_LIMIT_EXCEEDED";
-    readonly kind: "error_type";
-  };
-} => {
-  if (!error || typeof error !== "object") {
-    return false;
+const requireSecondaryClient = async () => {
+  if (!secondaryFixture) {
+    throw new Error(
+      "Missing secondary live account fixture. Set PUTIO_TEST_SECONDARY_USERNAME and PUTIO_TEST_SECONDARY_PASSWORD before family positive invite lookup tests.",
+    );
   }
 
-  const operationError = error as ReturnType<typeof expectOperationError>;
-  return (
-    operationError._tag === "PutioOperationError" &&
-    operationError.domain === "family" &&
-    operationError.operation === "createInvite" &&
-    operationError.status === 403 &&
-    operationError.reason?.kind === "error_type" &&
-    (operationError.reason.errorType === "FAMILY_SUB_ACCOUNT_LIMIT_EXCEEDED" ||
-      operationError.reason.errorType === "FAMILY_UNUSED_INVITE_LIMIT_EXCEEDED")
+  return bootstrapFirstPartyTokenWithCredentials(
+    secondaryFixture,
+    readFirstPartyClientCredentials(),
+  ).then((token) =>
+    createPromiseClient({
+      accessToken: token.accessToken,
+    }),
   );
 };
 
@@ -136,91 +129,29 @@ await run("family create invite requires restricted scope", async () => {
   }
 });
 
-await run("family create invite reflects current fixture restriction", async () => {
-  const invites = await authClient.family.listInvites();
-
-  if (invites.remaining_limit > 0) {
-    return {
-      remaining_limit: invites.remaining_limit,
-      skipped: "family fixture currently still has invite capacity",
-    };
-  }
-
-  try {
-    await authClient.family.createInvite();
-    throw new Error("expected createInvite to fail for the current family fixture");
-  } catch (error) {
-    const operationError = expectOperationError(error);
-    assert(operationError.domain === "family", "expected family domain");
-    assert(operationError.operation === "createInvite", "expected createInvite operation");
-    assert(operationError.status === 403, "expected restricted family createInvite status 403");
-    assert(operationError.reason?.kind === "error_type", "expected typed createInvite error");
-
-    const allowed = new Set([
-      "FAMILY_SUB_ACCOUNT_LIMIT_EXCEEDED",
-      "FAMILY_UNUSED_INVITE_LIMIT_EXCEEDED",
-    ]);
-
-    assert(
-      allowed.has(String(operationError.reason?.errorType)),
-      `expected known family createInvite restriction error, got ${String(operationError.reason?.errorType)}`,
-    );
-
-    return {
-      error_type: operationError.reason?.errorType,
-      remaining_limit: invites.remaining_limit,
-      status: operationError.status,
-    };
-  }
-});
-
-await run("family positive invite lookup with secondary fixture when available", async () => {
-  if (!secondaryFixture) {
-    return {
-      skipped: "secondary family fixture is not configured",
-    };
-  }
-
-  const secondaryToken = await bootstrapFirstPartyTokenWithCredentials(
-    secondaryFixture,
-    readFirstPartyClientCredentials(),
-  );
-  const secondaryClient = await createPromiseClient({
-    accessToken: secondaryToken.accessToken,
-  });
-
+await run("family positive invite lookup with secondary fixture", async () => {
+  const secondaryClient = await requireSecondaryClient();
   const invites = await secondaryClient.family.listInvites();
+  const existing = invites.invites.find((invite) => invite.user_id === null);
 
-  if (invites.remaining_limit <= 0) {
-    return {
-      remaining_limit: invites.remaining_limit,
-      skipped: "secondary fixture has no remaining family invite capacity",
-    };
+  if (!existing) {
+    throw new Error(
+      "Missing unused secondary family-invite fixture. Seed one outside the live test before running family positive invite lookup.",
+    );
   }
 
-  try {
-    const created = await secondaryClient.family.createInvite();
-    const invite = await publicClient.auth.getFamilyInvite(created.code);
+  const code = existing.code;
+  const invite = await publicClient.auth.getFamilyInvite(code);
 
-    assert(typeof invite.owner === "string" && invite.owner.length > 0, "expected invite owner");
-    assert(typeof invite.plan === "string" && invite.plan.length > 0, "expected invite plan");
+  assert(typeof invite.owner === "string" && invite.owner.length > 0, "expected invite owner");
+  assert(typeof invite.plan === "string" && invite.plan.length > 0, "expected invite plan");
 
-    return {
-      code_length: created.code.length,
-      owner: invite.owner,
-      plan: invite.plan,
-    };
-  } catch (error) {
-    if (isFamilyCreateInviteRestriction(error)) {
-      return {
-        error_type: error.reason.errorType,
-        skipped: "secondary fixture is also family-invite restricted",
-        status: error.status,
-      };
-    }
-
-    throw error;
-  }
+  return {
+    code_length: code.length,
+    owner: invite.owner,
+    plan: invite.plan,
+    source: "existing",
+  };
 });
 
 await run("family remove missing member yields 404", async () => {

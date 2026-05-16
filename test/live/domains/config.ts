@@ -19,37 +19,8 @@ const { assert, finish, run } = live;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
-const toAppScopeSkip = (error: unknown) => {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "_tag" in error &&
-    error._tag === "PutioApiError" &&
-    "status" in error &&
-    error.status === 400 &&
-    "body" in error &&
-    typeof error.body === "object" &&
-    error.body !== null &&
-    "error_message" in error.body &&
-    error.body.error_message === "no oauth app attached with token"
-  ) {
-    return {
-      reason: "no oauth app attached with token",
-      skipped: true,
-    };
-  }
-
-  throw error;
-};
-
 await run("config read returns JSON object", async () => {
-  let config;
-
-  try {
-    config = await oauthClient.config.read();
-  } catch (error) {
-    return toAppScopeSkip(error);
-  }
+  const config = await oauthClient.config.read();
 
   assert(typeof config === "object" && config !== null, "expected config object");
 
@@ -59,15 +30,9 @@ await run("config read returns JSON object", async () => {
 });
 
 await run("config key roundtrip", async () => {
-  let roundtrip;
-
-  try {
-    await oauthClient.config.setKey(probeKey, probeValue);
-    roundtrip = await oauthClient.config.getKey(probeKey);
-    await oauthClient.config.deleteKey(probeKey);
-  } catch (error) {
-    return toAppScopeSkip(error);
-  }
+  await oauthClient.config.setKey(probeKey, probeValue);
+  const roundtrip = await oauthClient.config.getKey(probeKey);
+  await oauthClient.config.deleteKey(probeKey);
 
   const roundtripValue = assertPresent(roundtrip, "expected roundtrip object");
   if (!isRecord(roundtripValue)) {

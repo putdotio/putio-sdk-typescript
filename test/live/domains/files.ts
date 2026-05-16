@@ -1,4 +1,5 @@
 import { assertPresent, createClients, createLiveHarness } from "../support/harness.js";
+import { requireOwnedVideoFixture } from "../support/media.ts";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -9,16 +10,72 @@ const live = createLiveHarness("files live");
 const { assert, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
-void sleep;
 
-const getOwnedVideo = async () => {
-  const search = await oauthClient.files.search({
-    per_page: 10,
-    query: "mp4",
+const createTextFile = async (parentId: number, name: string): Promise<number> => {
+  const upload = await authClient.files.upload({
+    file: new File([`sdk files cursor probe ${name}\n`], name, {
+      type: "text/plain",
+    }),
+    fileName: name,
+    parentId,
   });
 
-  const video = search.files.find((file) => file.file_type === "VIDEO" && file.is_shared === false);
-  return assertPresent(video, "expected at least one owned video result");
+  if (upload.type !== "file") {
+    throw new Error("expected files cursor probe upload to return a file");
+  }
+
+  return upload.file.id;
+};
+
+type CursorProbeFolder = {
+  readonly cleanupIds: readonly number[];
+  readonly folderId: number;
+};
+
+const createCursorProbeFolder = async (name: string, fileCount = 3): Promise<CursorProbeFolder> => {
+  const folder = await authClient.files.createFolder({
+    name,
+    parent_id: 0,
+  });
+
+  const childIds: number[] = [];
+
+  try {
+    for (let index = 1; index <= fileCount; index += 1) {
+      childIds.push(await createTextFile(folder.id, `${name}_${index}.txt`));
+    }
+  } catch (error) {
+    await authClient.files
+      .delete([folder.id, ...childIds], { skipTrash: true })
+      .catch(() => undefined);
+    throw error;
+  }
+
+  return {
+    cleanupIds: [folder.id, ...childIds],
+    folderId: folder.id,
+  };
+};
+
+const waitForSearchCursor = async (query: string) => {
+  const deadline = Date.now() + 20_000;
+  let lastTotal = 0;
+
+  while (Date.now() < deadline) {
+    const search = await oauthClient.files.search({
+      per_page: 2,
+      query,
+    });
+    lastTotal = search.total;
+
+    if (typeof search.cursor === "string") {
+      return search;
+    }
+
+    await sleep(1_500);
+  }
+
+  throw new Error(`expected files search cursor for probe query; last total was ${lastTotal}`);
 };
 
 await run("files root list shape", async () => {
@@ -39,27 +96,31 @@ await run("files root list shape", async () => {
 });
 
 await run("files list continue", async () => {
-  const firstPage = await oauthClient.files.list(0, {
-    per_page: 2,
-    total: 1,
-  });
+  const probe = await createCursorProbeFolder(`codex_sdk_files_list_cursor_${Date.now()}`);
 
-  if (!firstPage.cursor) {
+  try {
+    const firstPage = await oauthClient.files.list(probe.folderId, {
+      per_page: 2,
+      total: 1,
+    });
+
+    assert(typeof firstPage.cursor === "string", "expected files list cursor");
+    assert(firstPage.files.length === 2, "expected first page to respect per_page");
+
+    const nextPage = await oauthClient.files.continue(firstPage.cursor, {
+      per_page: 2,
+    });
+
+    assert(Array.isArray(nextPage.files), "expected continued files array");
+    assert(nextPage.files.length === 1, "expected final cursor page");
+
     return {
-      continued: false,
+      first_page: firstPage.files.length,
+      next_page: nextPage.files.length,
     };
+  } finally {
+    await authClient.files.delete(probe.cleanupIds, { skipTrash: true }).catch(() => undefined);
   }
-
-  const nextPage = await oauthClient.files.continue(firstPage.cursor, {
-    per_page: 2,
-  });
-
-  assert(Array.isArray(nextPage.files), "expected continued files array");
-
-  return {
-    continued: true,
-    next_count: nextPage.files.length,
-  };
 });
 
 await run("files shared-with-you list", async () => {
@@ -77,6 +138,37 @@ await run("files shared-with-you list", async () => {
 });
 
 await run("files search and continue", async () => {
+  const seed = Date.now();
+  const query = `codex_sdk_files_search_cursor_${seed}`;
+  const probe = await createCursorProbeFolder(query, 6);
+
+  try {
+    const search = await waitForSearchCursor(query);
+
+    assert(Array.isArray(search.files), "expected search files array");
+    assert(typeof search.total === "number", "expected search total");
+    assert(search.files.length === 2, "expected first search page to respect per_page");
+    assert(typeof search.cursor === "string", "expected files search cursor");
+
+    const nextPage = await oauthClient.files.continueSearch(search.cursor, {
+      per_page: 2,
+    });
+
+    assert(Array.isArray(nextPage.files), "expected continued search files array");
+    assert(nextPage.files.length > 0, "expected continued search page items");
+
+    return {
+      first_page: search.files.length,
+      next_cursor_present: nextPage.cursor === null || typeof nextPage.cursor === "string",
+      next_page: nextPage.files.length,
+      total: search.total,
+    };
+  } finally {
+    await authClient.files.delete(probe.cleanupIds, { skipTrash: true }).catch(() => undefined);
+  }
+});
+
+await run("files mp4 search shape", async () => {
   const search = await oauthClient.files.search({
     per_page: 2,
     query: "mp4",
@@ -85,23 +177,8 @@ await run("files search and continue", async () => {
   assert(Array.isArray(search.files), "expected search files array");
   assert(typeof search.total === "number", "expected search total");
 
-  if (!search.cursor) {
-    return {
-      continued: false,
-      total: search.total,
-    };
-  }
-
-  const nextPage = await oauthClient.files.continueSearch(search.cursor, {
-    per_page: 2,
-  });
-
-  assert(Array.isArray(nextPage.files), "expected continued search files array");
-
   return {
-    continued: true,
     first_page: search.files.length,
-    next_page: nextPage.files.length,
     total: search.total,
   };
 });
@@ -123,7 +200,7 @@ await run("files search too long query yields typed 400", async () => {
 });
 
 await run("files get with conditional media fields", async () => {
-  const video = await getOwnedVideo();
+  const video = await requireOwnedVideoFixture(authClient);
   const mediaQuery = {
     codecs: 1,
     media_info: 1,
@@ -165,7 +242,7 @@ await run("files get with conditional media fields", async () => {
 });
 
 await run("files parent media flags from query(list by file id)", async () => {
-  const video = await getOwnedVideo();
+  const video = await requireOwnedVideoFixture(authClient);
   const parentQuery = {
     breadcrumbs: 1,
     codecs_parent: 1,
@@ -214,7 +291,7 @@ await run("files parent media flags from query(list by file id)", async () => {
 });
 
 await run("files list child media flags", async () => {
-  const video = await getOwnedVideo();
+  const video = await requireOwnedVideoFixture(authClient);
   const list = await oauthClient.files.list(assertPresent(video.parent_id, "expected parent id"), {
     media_metadata: 1,
     per_page: 100,
@@ -241,7 +318,7 @@ await run("files list child media flags", async () => {
 });
 
 await run("files mp4 status", async () => {
-  const video = await getOwnedVideo();
+  const video = await requireOwnedVideoFixture(authClient);
   const status = await oauthClient.files.getMp4Status(video.id);
 
   assert(typeof status.status === "string", "expected mp4 status");
@@ -250,7 +327,7 @@ await run("files mp4 status", async () => {
 });
 
 await run("files subtitles envelope shape", async () => {
-  const video = await getOwnedVideo();
+  const video = await requireOwnedVideoFixture(authClient);
   const result = await oauthClient.files.listSubtitles(video.id);
 
   assert(Array.isArray(result.subtitles), "expected subtitles array");
@@ -267,35 +344,42 @@ await run("files subtitles envelope shape", async () => {
 });
 
 await run("files start_from roundtrip", async () => {
-  const video = await getOwnedVideo();
+  const video = await requireOwnedVideoFixture(authClient);
   const original = await authClient.files.getStartFrom(video.id);
   const probe = original === 0 ? 5 : 0;
 
-  await authClient.files.setStartFrom({
-    file_id: video.id,
-    time: probe,
-  });
+  try {
+    await authClient.files.setStartFrom({
+      file_id: video.id,
+      time: probe,
+    });
 
-  const afterSet = await authClient.files.getStartFrom(video.id);
-  assert(afterSet === probe, "expected start_from to update");
+    const afterSet = await authClient.files.getStartFrom(video.id);
+    assert(afterSet === probe, "expected start_from to update");
 
-  await authClient.files.setStartFrom({
-    file_id: video.id,
-    time: original,
-  });
+    await authClient.files.setStartFrom({
+      file_id: video.id,
+      time: original,
+    });
 
-  const restored = await authClient.files.getStartFrom(video.id);
-  assert(restored === original, "expected start_from to be restored");
+    const restored = await authClient.files.getStartFrom(video.id);
+    assert(restored === original, "expected start_from to be restored");
 
-  return {
-    original,
-    probe,
-    restored,
-  };
+    return {
+      original,
+      probe,
+      restored,
+    };
+  } finally {
+    await authClient.files.setStartFrom({
+      file_id: video.id,
+      time: original,
+    });
+  }
 });
 
 await run("files next-file and next-video", async () => {
-  const video = await getOwnedVideo();
+  const video = await requireOwnedVideoFixture(authClient);
   const nextFile = await oauthClient.files.findNext(video.id, "VIDEO");
   const nextVideo = await oauthClient.files.findNextVideo(video.id);
 
@@ -408,14 +492,10 @@ await run("empty folder name yields typed error", async () => {
 });
 
 await run("folder mp4 status yields typed error", async () => {
-  const root = await oauthClient.files.list(0, {
-    per_page: 10,
-    total: 1,
+  const folder = await authClient.files.createFolder({
+    name: `codex_sdk_mp4_status_folder_${Date.now()}`,
+    parent_id: 0,
   });
-  const folder = assertPresent(
-    root.files.find((file) => file.file_type === "FOLDER"),
-    "expected at least one folder",
-  );
 
   try {
     await oauthClient.files.getMp4Status(folder.id);
@@ -427,6 +507,8 @@ await run("folder mp4 status yields typed error", async () => {
       operation: "mp4",
       statusCode: 400,
     });
+  } finally {
+    await authClient.files.delete([folder.id], { skipTrash: true }).catch(() => undefined);
   }
 });
 

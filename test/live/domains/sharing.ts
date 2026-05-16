@@ -3,9 +3,10 @@ import {
   createClients,
   createPromiseClient,
   createLiveHarness,
-  expectOperationError,
+  isFileUploadFileResult,
 } from "../support/harness.js";
-import { findLiveFriend, liveFriendFixtureSkip } from "../support/friends.js";
+import { requireLiveFriend, requireLiveFriendWithSharedFiles } from "../support/friends.ts";
+import { requireOwnedVideoFixture } from "../support/media.ts";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -17,31 +18,34 @@ const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = liv
 
 void sleep;
 
-const findOwnedProbeFile = async () => {
-  const root = await authClient.files.list(0, {
-    per_page: 20,
-  });
-
-  const candidate = root.files.find(
-    (file) => file.file_type !== "FOLDER" && file.id > 0 && file.parent_id === 0,
-  );
-
-  if (!candidate) {
-    throw new Error("could not find an owned non-folder file for public sharing checks");
-  }
-
-  return candidate;
+type OwnedProbeFile = {
+  readonly cleanupIds: readonly number[];
+  readonly id: number;
 };
 
-const findOwnedVideoProbeFile = async () => {
-  const search = await authClient.files.search({
-    per_page: 20,
-    query: "mp4",
+const cleanupOwnedProbeFiles = async (ids: readonly number[]): Promise<void> => {
+  if (ids.length === 0) {
+    return;
+  }
+
+  await authClient.files.delete(ids, { skipTrash: true }).catch(() => undefined);
+};
+
+const createOwnedProbeFile = async (): Promise<OwnedProbeFile> => {
+  const name = `codex_sdk_public_share_probe_${Date.now()}.txt`;
+  const upload = await authClient.files.upload({
+    file: new File(["sdk public share probe\n"], name, {
+      type: "text/plain",
+    }),
+    fileName: name,
+    parentId: 0,
   });
 
-  return (
-    search.files.find((file) => file.file_type === "VIDEO" && file.is_shared === false) ?? null
-  );
+  if (!isFileUploadFileResult(upload)) {
+    throw new Error("expected public sharing probe upload to return a file");
+  }
+
+  return { cleanupIds: [upload.file.id], id: upload.file.id };
 };
 
 const pollClone = async (cloneId: number) => {
@@ -84,55 +88,8 @@ const findCloneSource = async (parentId: number, depth = 0) => {
   return findCloneSource(folder.id, depth + 1);
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
-const PUBLIC_SHARE_LIMIT_ERROR_TYPES = new Set([
-  "PUBLIC_SHARE_DAILY_TOTAL_LINK_COUNT_EXCEEDED",
-  "PUBLIC_SHARE_WEEKLY_TOTAL_LINK_COUNT_EXCEEDED",
-  "PUBLIC_SHARE_FOLDER_LINK_COUNT_LIMIT_EXCEEDED",
-  "PUBLIC_SHARE_SINGLE_FILE_LIMIT_EXCEEDED",
-  "PUBLIC_SHARE_FOLDER_MAX_SIZE_LIMIT_EXCEEDED",
-  "PUBLIC_SHARE_FOLDER_MAX_CHILDREN_LIMIT_EXCEEDED",
-]);
-
-type DisposablePublicShareResult =
-  | {
-      readonly publicShare: Awaited<ReturnType<typeof authClient.sharing.publicShares.create>>;
-      readonly skipped: false;
-    }
-  | {
-      readonly errorType: string;
-      readonly skipped: true;
-    };
-
-const createDisposablePublicShare = async (
-  fileId: number,
-): Promise<DisposablePublicShareResult> => {
-  try {
-    return {
-      publicShare: await authClient.sharing.publicShares.create(fileId),
-      skipped: false,
-    };
-  } catch (error) {
-    const operationError =
-      isRecord(error) && error._tag === "PutioOperationError" ? expectOperationError(error) : null;
-    if (
-      operationError &&
-      operationError.status === 403 &&
-      isRecord(operationError.body) &&
-      typeof operationError.body.error_type === "string" &&
-      PUBLIC_SHARE_LIMIT_ERROR_TYPES.has(operationError.body.error_type)
-    ) {
-      return {
-        errorType: operationError.body.error_type,
-        skipped: true,
-      };
-    }
-
-    throw error;
-  }
-};
+const createDisposablePublicShare = (fileId: number) =>
+  authClient.sharing.publicShares.create(fileId);
 
 await run("sharing list shared files shape", async () => {
   const sharedFiles = await authClient.sharing.listSharedFiles();
@@ -177,11 +134,7 @@ await run("sharing everyone lifecycle", async () => {
 });
 
 await run("sharing specific-friend lifecycle", async () => {
-  const friend = await findLiveFriend(authClient);
-
-  if (!friend) {
-    return liveFriendFixtureSkip("no existing friend fixture available");
-  }
+  const friend = await requireLiveFriend(authClient, createPromiseClient);
 
   const seed = Date.now();
   const folder = await authClient.files.createFolder({
@@ -234,11 +187,7 @@ await run("sharing specific-friend lifecycle", async () => {
 });
 
 await run("sharing child of shared parent yields typed already shared", async () => {
-  const friend = await findLiveFriend(authClient);
-
-  if (!friend) {
-    return liveFriendFixtureSkip("no existing friend fixture available");
-  }
+  const friend = await requireLiveFriend(authClient, createPromiseClient);
 
   const seed = Date.now();
   const parent = await authClient.files.createFolder({
@@ -314,46 +263,71 @@ await run("sharing shared-with missing file currently yields generic 500", async
 });
 
 await run("sharing public share lifecycle", async () => {
-  const probe = await findOwnedProbeFile();
-  const created = await createDisposablePublicShare(probe.id);
-
-  if (created.skipped) {
-    return {
-      reason: created.errorType,
-      skipped: true,
-    };
-  }
+  const probe = await createOwnedProbeFile();
 
   try {
-    const publicShare = created.publicShare;
-    const listed = await authClient.sharing.publicShares.list();
-    assert(
-      listed.some((share) => share.id === publicShare.id),
-      "expected created public share in list",
-    );
+    const publicShare = await createDisposablePublicShare(probe.id);
 
-    const publicClient = await createPromiseClient({
-      accessToken: publicShare.token,
-    });
+    try {
+      const listed = await authClient.sharing.publicShares.list();
+      assert(
+        listed.some((share) => share.id === publicShare.id),
+        "expected created public share in list",
+      );
 
-    const details = await publicClient.sharing.publicAccess.get();
-    assert(details.id === publicShare.id, "expected public share details id");
+      const publicClient = await createPromiseClient({
+        accessToken: publicShare.token,
+      });
 
-    const files = await publicClient.sharing.publicAccess.listFiles({
-      parent_id: publicShare.user_file.id,
-      total: 1,
-    });
-    assert(files.parent?.id === publicShare.user_file.id, "expected public share parent id");
+      const details = await publicClient.sharing.publicAccess.get();
+      assert(details.id === publicShare.id, "expected public share details id");
 
-    const url = await publicClient.sharing.publicAccess.getFileUrl(publicShare.user_file.id);
-    assert(url.startsWith("https://"), "expected public file url");
+      const files = await publicClient.sharing.publicAccess.listFiles({
+        parent_id: publicShare.user_file.id,
+        total: 1,
+      });
+      assert(files.parent?.id === publicShare.user_file.id, "expected public share parent id");
 
-    return {
-      id: publicShare.id,
-      public_file_id: publicShare.user_file.id,
-    };
+      const url = await publicClient.sharing.publicAccess.getFileUrl(publicShare.user_file.id);
+      assert(url.startsWith("https://"), "expected public file url");
+
+      let missingFileStatus = 0;
+      try {
+        await publicClient.sharing.publicAccess.getFileUrl(2147483647);
+        throw new Error("expected missing public-share file url to fail");
+      } catch (error) {
+        missingFileStatus = assertOperationError(error, {
+          domain: "sharing",
+          operation: "getPublicShareFileUrl",
+          statusCode: 404,
+        }).status;
+      }
+
+      let invalidCursorStatus = 0;
+      try {
+        await publicClient.sharing.publicAccess.continueFiles("definitely-invalid-cursor", {
+          per_page: 1,
+        });
+        throw new Error("expected invalid public-share cursor to fail");
+      } catch (error) {
+        invalidCursorStatus = assertOperationError(error, {
+          domain: "sharing",
+          operation: "continuePublicShareFiles",
+          statusCode: 400,
+        }).status;
+      }
+
+      return {
+        id: publicShare.id,
+        invalid_cursor_status: invalidCursorStatus,
+        missing_file_status: missingFileStatus,
+        public_file_id: publicShare.user_file.id,
+      };
+    } finally {
+      await authClient.sharing.publicShares.delete(publicShare.id);
+    }
   } finally {
-    await authClient.sharing.publicShares.delete(created.publicShare.id).catch(() => undefined);
+    await cleanupOwnedProbeFiles(probe.cleanupIds);
   }
 });
 
@@ -387,17 +361,9 @@ await run("sharing public share pagination mirrors backend contract", async () =
       parent_id: folder.id,
     });
 
-    const created = await createDisposablePublicShare(folder.id);
-
-    if (created.skipped) {
-      return {
-        reason: created.errorType,
-        skipped: true,
-      };
-    }
+    const publicShare = await createDisposablePublicShare(folder.id);
 
     try {
-      const publicShare = created.publicShare;
       const publicClient = await createPromiseClient({
         accessToken: publicShare.token,
       });
@@ -433,7 +399,7 @@ await run("sharing public share pagination mirrors backend contract", async () =
         total: firstPage.total,
       };
     } finally {
-      await authClient.sharing.publicShares.delete(created.publicShare.id).catch(() => undefined);
+      await authClient.sharing.publicShares.delete(publicShare.id);
     }
   } finally {
     await authClient.files.delete([folder.id], { skipTrash: true }).catch(() => undefined);
@@ -441,23 +407,11 @@ await run("sharing public share pagination mirrors backend contract", async () =
 });
 
 await run("sharing public share parent media flags", async () => {
-  const probe = await findOwnedVideoProbeFile();
+  const probe = await requireOwnedVideoFixture(authClient);
 
-  if (!probe) {
-    return { skipped: true, reason: "no owned video probe found" };
-  }
-
-  const created = await createDisposablePublicShare(probe.id);
-
-  if (created.skipped) {
-    return {
-      reason: created.errorType,
-      skipped: true,
-    };
-  }
+  const publicShare = await createDisposablePublicShare(probe.id);
 
   try {
-    const publicShare = created.publicShare;
     const publicClient = await createPromiseClient({
       accessToken: publicShare.token,
     });
@@ -484,39 +438,7 @@ await run("sharing public share parent media flags", async () => {
       total: files.total ?? null,
     };
   } finally {
-    await authClient.sharing.publicShares.delete(created.publicShare.id).catch(() => undefined);
-  }
-});
-
-await run("sharing public share missing file url yields typed 404", async () => {
-  const probe = await findOwnedProbeFile();
-  const created = await createDisposablePublicShare(probe.id);
-
-  if (created.skipped) {
-    return {
-      reason: created.errorType,
-      skipped: true,
-    };
-  }
-
-  try {
-    const publicShare = created.publicShare;
-    const publicClient = await createPromiseClient({
-      accessToken: publicShare.token,
-    });
-
-    try {
-      await publicClient.sharing.publicAccess.getFileUrl(2147483647);
-      throw new Error("expected missing public-share file url to fail");
-    } catch (error) {
-      return assertOperationError(error, {
-        domain: "sharing",
-        operation: "getPublicShareFileUrl",
-        statusCode: 404,
-      });
-    }
-  } finally {
-    await authClient.sharing.publicShares.delete(created.publicShare.id).catch(() => undefined);
+    await authClient.sharing.publicShares.delete(publicShare.id);
   }
 });
 
@@ -548,40 +470,6 @@ await run("sharing public share list requires restricted scope for oauth token",
   }
 });
 
-await run("sharing public share continue invalid cursor yields typed 400", async () => {
-  const probe = await findOwnedProbeFile();
-  const created = await createDisposablePublicShare(probe.id);
-
-  if (created.skipped) {
-    return {
-      reason: created.errorType,
-      skipped: true,
-    };
-  }
-
-  try {
-    const publicShare = created.publicShare;
-    const publicClient = await createPromiseClient({
-      accessToken: publicShare.token,
-    });
-
-    try {
-      await publicClient.sharing.publicAccess.continueFiles("definitely-invalid-cursor", {
-        per_page: 1,
-      });
-      throw new Error("expected invalid public-share cursor to fail");
-    } catch (error) {
-      return assertOperationError(error, {
-        domain: "sharing",
-        operation: "continuePublicShareFiles",
-        statusCode: 400,
-      });
-    }
-  } finally {
-    await authClient.sharing.publicShares.delete(created.publicShare.id).catch(() => undefined);
-  }
-});
-
 await run("sharing clone missing task yields typed not found", async () => {
   try {
     await authClient.sharing.getCloneInfo(2147483647);
@@ -597,20 +485,17 @@ await run("sharing clone missing task yields typed not found", async () => {
 });
 
 await run("sharing clone lifecycle", async () => {
+  await requireLiveFriendWithSharedFiles(authClient, createPromiseClient);
+
   const sharedRoots = await authClient.files.list("friends", {
     per_page: 10,
   });
-  const sharedRoot = sharedRoots.files[0];
+  const sharedRoot = assertPresent(sharedRoots.files[0], "expected shared root fixture");
 
-  if (!sharedRoot) {
-    return { skipped: true };
-  }
-
-  const source = await findCloneSource(sharedRoot.id);
-
-  if (!source) {
-    return { skipped: true, shared_root: sharedRoot.id };
-  }
+  const source = assertPresent(
+    await findCloneSource(sharedRoot.id),
+    "expected clone source fixture under shared root",
+  );
 
   const destination = await authClient.files.createFolder({
     name: `codex_sdk_clone_target_${Date.now()}`,

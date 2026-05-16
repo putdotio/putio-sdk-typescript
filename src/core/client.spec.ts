@@ -1,7 +1,32 @@
+import { Effect } from "effect";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import * as sdk from "../index.js";
-import { createPutioSdkEffectClient, createPutioSdkPromiseClient } from "./client.js";
+import {
+  PutioSdk,
+  createPutioSdkEffectClient,
+  createPutioSdkPromiseClient,
+  makePutioSdkEffectClientLayer,
+  makePutioSdkLiveClientLayer,
+} from "./client.js";
+import { PutioSdkConfig } from "./http.js";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const collectFunctionPaths = (value: unknown, parentPath = ""): ReadonlyArray<string> => {
+  if (typeof value === "function") {
+    return parentPath ? [parentPath] : [];
+  }
+
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  return Object.entries(value).flatMap(([key, child]) =>
+    collectFunctionPaths(child, parentPath ? `${parentPath}.${key}` : key),
+  );
+};
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -20,6 +45,45 @@ describe("sdk client factories", () => {
     expect(client.transfers.list).toBeTypeOf("function");
   });
 
+  it("provides the Effect client as an Effect service", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* PutioSdk;
+
+      expect(client.files.list).toBeTypeOf("function");
+      expect(client.account.getInfo).toBeTypeOf("function");
+
+      return client;
+    }).pipe(Effect.provide(makePutioSdkEffectClientLayer()));
+
+    await expect(Effect.runPromise(program)).resolves.toMatchObject({
+      files: {
+        list: expect.any(Function),
+      },
+    });
+  });
+
+  it("provides the Effect client, SDK config, and live transport as one layer", async () => {
+    const program = Effect.gen(function* () {
+      const client = yield* PutioSdk;
+      const config = yield* PutioSdkConfig;
+
+      expect(client.files.list).toBeTypeOf("function");
+
+      return config;
+    }).pipe(
+      Effect.provide(
+        makePutioSdkLiveClientLayer({
+          accessToken: "token-123",
+        }),
+      ),
+    );
+
+    await expect(Effect.runPromise(program)).resolves.toMatchObject({
+      accessToken: "token-123",
+      baseUrl: "https://api.put.io",
+    });
+  });
+
   it("creates the Promise-based SDK client surface", () => {
     const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
 
@@ -31,6 +95,18 @@ describe("sdk client factories", () => {
     expect(client.payment.changePlan.preview).toBeTypeOf("function");
     expect(client.sharing.publicShares.list).toBeTypeOf("function");
     expect(client.zips.list).toBeTypeOf("function");
+  });
+
+  it("keeps the Promise client aligned with the Effect client domain surface", () => {
+    const effectPaths = collectFunctionPaths(createPutioSdkEffectClient());
+    const promisePaths = collectFunctionPaths(createPutioSdkPromiseClient());
+    const promisePathSet = new Set(promisePaths);
+
+    expect(effectPaths.filter((path) => !promisePathSet.has(path))).toEqual([]);
+    expect(promisePaths.filter((path) => !effectPaths.includes(path)).sort()).toEqual([
+      "dispose",
+      "files.createUploadFormData",
+    ]);
   });
 
   it("re-exports the public SDK entrypoints", () => {

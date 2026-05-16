@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHmac } from "node:crypto";
 
 import type {
   PutioBootstrapSecrets,
@@ -54,6 +55,7 @@ const THIRD_PARTY_BOOTSTRAP_APP_NAME = "Codex SDK Live App";
 const THIRD_PARTY_BOOTSTRAP_CALLBACK = "https://example.com/codex-sdk-live/callback";
 const THIRD_PARTY_BOOTSTRAP_WEBSITE = "https://example.com/codex-sdk-live";
 const RUNTIME_ITEM_TITLE = "putio-sdk-testing";
+const TOTP_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -79,10 +81,53 @@ const parseOpReference = (
   };
 };
 
+const decodeBase32 = (value: string): Buffer => {
+  const normalized = value.replace(/[\s-]/g, "").replace(/=+$/g, "").toUpperCase();
+  const bytes: number[] = [];
+  let accumulator = 0;
+  let bits = 0;
+
+  for (const character of normalized) {
+    const digit = TOTP_ALPHABET.indexOf(character);
+
+    if (digit < 0) {
+      throw new Error("Invalid TOTP secret encoding");
+    }
+
+    accumulator = (accumulator << 5) | digit;
+    bits += 5;
+
+    if (bits >= 8) {
+      bytes.push((accumulator >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+
+  return Buffer.from(bytes);
+};
+
+const generateTotpCode = (secret: string, now = Date.now()): string => {
+  const counter = Math.floor(now / 30_000);
+  const counterBuffer = Buffer.alloc(8);
+  counterBuffer.writeUInt32BE(Math.floor(counter / 0x1_0000_0000), 0);
+  counterBuffer.writeUInt32BE(counter >>> 0, 4);
+
+  const digest = createHmac("sha1", decodeBase32(secret)).update(counterBuffer).digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const code =
+    (((digest[offset] & 0x7f) << 24) |
+      (digest[offset + 1] << 16) |
+      (digest[offset + 2] << 8) |
+      digest[offset + 3]) %
+    1_000_000;
+
+  return String(code).padStart(6, "0");
+};
+
 const readFreshTotp = (secrets: PutioBootstrapSecrets): string => {
   const reference = secrets.credentials.totpReference;
 
-  if (reference && process.env.OP_SERVICE_ACCOUNT_TOKEN) {
+  if (reference?.startsWith("op://")) {
     const parsedReference = parseOpReference(reference);
     const result = parsedReference
       ? spawnSync(
@@ -111,6 +156,10 @@ const readFreshTotp = (secrets: PutioBootstrapSecrets): string => {
     }
 
     return code;
+  }
+
+  if (reference) {
+    return generateTotpCode(reference);
   }
 
   if (!secrets.credentials.totp) {

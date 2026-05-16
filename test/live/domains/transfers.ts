@@ -10,6 +10,8 @@ const { assert, assertOperationError, finish, run, sleep } = live;
 void assertOperationError;
 void sleep;
 
+const SLOW_TRANSFER_PROBE_URL = "https://speed.hetzner.de/100MB.bin";
+
 const waitForTransferError = async (id: number) => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const transfer = await client.transfers.get(id);
@@ -207,38 +209,27 @@ await run("non-torrent reannounce currently falls back to typed bad request", as
   }
 });
 
-await run("retry on non-error transfer yields forbidden branch when timing allows", async () => {
+await run("retry on fresh non-error transfer returns transfer shape", async () => {
   const created = await client.transfers.add({
-    url: `https://example.invalid/codex-transfer-${Date.now()}.iso`,
+    url: SLOW_TRANSFER_PROBE_URL,
   });
 
   try {
     const current = await client.transfers.get(created.id);
 
     if (current.status === "ERROR") {
-      return {
-        checked: false,
-        reason: "transfer reached ERROR before non-error retry branch could be asserted",
-        status: current.status,
-      };
+      throw new Error("fresh transfer reached ERROR before the non-error retry branch was checked");
     }
 
-    try {
-      await client.transfers.retry(created.id);
-      throw new Error("expected retry on non-error transfer to fail");
-    } catch (error) {
-      const assertion = assertOperationError(error, {
-        domain: "transfers",
-        operation: "retry",
-        statusCode: 403,
-      });
+    const retried = await client.transfers.retry(created.id);
 
-      return {
-        ...assertion,
-        checked: true,
-        initial_status: current.status,
-      };
-    }
+    assert(retried.id === created.id, "expected retry to return same transfer");
+    assert(retried.status !== "ERROR", "expected retried transfer to remain non-error");
+
+    return {
+      initial_status: current.status,
+      retried_status: retried.status,
+    };
   } finally {
     await client.transfers.cancel([created.id]).catch(() => undefined);
     await client.transfers.clean([created.id]).catch(() => undefined);

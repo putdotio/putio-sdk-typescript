@@ -1,5 +1,4 @@
 import { Effect, Schema } from "effect";
-
 import { toCursorSelectionForm } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
@@ -12,58 +11,48 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
-
-export const DownloadLinksStatusSchema = Schema.Literal("NEW", "PROCESSING", "DONE", "ERROR");
-
+export const DownloadLinksStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
 export const DownloadLinksCreateInputSchema = Schema.Struct({
   cursor: Schema.optional(Schema.String),
-  excludeIds: Schema.optional(Schema.Array(Schema.Number.pipe(Schema.int(), Schema.nonNegative()))),
-  ids: Schema.optional(Schema.Array(Schema.Number.pipe(Schema.int(), Schema.nonNegative()))),
+  excludeIds: Schema.optional(Schema.Array(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  ids: Schema.optional(Schema.Array(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
 });
-
 export const DownloadLinksPayloadSchema = Schema.Struct({
   download_links: Schema.Array(Schema.String),
   media_links: Schema.Array(Schema.String),
   mp4_links: Schema.Array(Schema.String),
 });
-
 const DownloadLinksCreateEnvelopeSchema = Schema.Struct({
-  id: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  id: Schema.Int.check(Schema.isGreaterThan(0)),
   status: Schema.Literal("OK"),
 });
-
 const DownloadLinksPendingEnvelopeSchema = Schema.Struct({
   error_msg: Schema.optional(Schema.NullOr(Schema.String)),
   links: Schema.Null,
-  links_status: Schema.Literal("NEW", "PROCESSING"),
+  links_status: Schema.Literals(["NEW", "PROCESSING"]),
   status: Schema.Literal("OK"),
 });
-
 const DownloadLinksDoneEnvelopeSchema = Schema.Struct({
   error_msg: Schema.optional(Schema.NullOr(Schema.String)),
   links: DownloadLinksPayloadSchema,
   links_status: Schema.Literal("DONE"),
   status: Schema.Literal("OK"),
 });
-
 const DownloadLinksErrorEnvelopeSchema = Schema.Struct({
   error_msg: Schema.String,
   links: Schema.Null,
   links_status: Schema.Literal("ERROR"),
   status: Schema.Literal("OK"),
 });
-
-export const DownloadLinksInfoSchema = Schema.Union(
+export const DownloadLinksInfoSchema = Schema.Union([
   DownloadLinksPendingEnvelopeSchema,
   DownloadLinksDoneEnvelopeSchema,
   DownloadLinksErrorEnvelopeSchema,
-);
-
+]);
 export type DownloadLinksStatus = Schema.Schema.Type<typeof DownloadLinksStatusSchema>;
 export type DownloadLinksCreateInput = Schema.Schema.Type<typeof DownloadLinksCreateInputSchema>;
 export type DownloadLinksPayload = Schema.Schema.Type<typeof DownloadLinksPayloadSchema>;
 export type DownloadLinksInfo = Schema.Schema.Type<typeof DownloadLinksInfoSchema>;
-
 export const CreateDownloadLinksErrorSpec = definePutioOperationErrorSpec({
   domain: "downloadLinks",
   operation: "create",
@@ -76,7 +65,6 @@ export const CreateDownloadLinksErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
-
 export const GetDownloadLinksErrorSpec = definePutioOperationErrorSpec({
   domain: "downloadLinks",
   operation: "get",
@@ -86,10 +74,8 @@ export const GetDownloadLinksErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
-
 export type CreateDownloadLinksError = PutioOperationFailure<typeof CreateDownloadLinksErrorSpec>;
 export type GetDownloadLinksError = PutioOperationFailure<typeof GetDownloadLinksErrorSpec>;
-
 export const createDownloadLinks = (
   input: DownloadLinksCreateInput = {},
 ): Effect.Effect<
@@ -107,7 +93,6 @@ export const createDownloadLinks = (
     method: "POST",
     path: "/v2/download_links/create",
   }).pipe(selectJsonFields("id"), withOperationErrors(CreateDownloadLinksErrorSpec));
-
 export const getDownloadLinks = (
   id: number,
 ): Effect.Effect<DownloadLinksInfo, GetDownloadLinksError, PutioSdkContext> =>

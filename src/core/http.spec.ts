@@ -1,6 +1,6 @@
-import { Headers, HttpClient, HttpClientResponse } from "@effect/platform";
-import type * as HttpClientRequest from "@effect/platform/HttpClientRequest";
 import { Cause, Effect, Exit, Option, Schema } from "effect";
+import { Headers, HttpClient, HttpClientResponse } from "effect/unstable/http";
+import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -31,13 +31,13 @@ const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
     throw new Error("Expected the effect to fail.");
   }
 
-  const failure = Cause.failureOption(exit.cause);
+  const failure = exit.cause.reasons.find(Cause.isFailReason);
 
-  if (Option.isNone(failure)) {
+  if (!failure) {
     throw Cause.squash(exit.cause);
   }
 
-  return failure.value;
+  return failure.error;
 };
 
 const makeMockHttpClient = (handler: MockRequestHandler) =>

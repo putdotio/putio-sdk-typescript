@@ -36,27 +36,34 @@
     "access": "public"
   },
   "scripts": {
+    "bootstrap:live-fixtures": "node ./scripts/bootstrap-live-fixtures.mts",
     "bootstrap:tokens": "node ./scripts/bootstrap-tokens.mts",
     "build": "vp pack",
     "check": "vp check .",
     "clean": "rm -rf .live-build .turbo coverage dist",
     "coverage": "vp test --coverage --passWithNoTests",
     "dev": "vp pack --watch",
+    "lint:package": "vp pack && publint --pack pnpm && attw --pack . --profile esm-only",
+    "lint:unused": "knip",
+    "lint:unused:prod": "vp pack && knip --production",
+    "prepare": "./scripts/prepare-effect.sh",
     "prepack": "vp pack",
     "secrets:setup": "OP_ACCOUNT=putdotio.1password.com op whoami >/dev/null && OP_ACCOUNT=putdotio.1password.com op inject -f -i .env.example -o .env.local",
     "secrets:clean": "rm -f .env.local .env.local.* .env.local.swp",
     "test": "vp test --passWithNoTests",
     "test:live": "vp pack && vp test run --config vitest.live.config.ts",
-    "test:live:consumer": "vp pack && vp test run --config vitest.live.config.ts test/live/consumer.test.ts",
     "verify": "vp check . && vp pack && vp test --passWithNoTests && vp test --coverage --passWithNoTests"
   },
   "dependencies": {
-    "@effect/platform": "0.94.5",
-    "effect": "3.19.19"
+    "effect": "4.0.0-beta.66"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "4.1.5",
+    "is-ci": "^4.1.0",
+    "knip": "^6.14.0",
+    "publint": "^0.3.21",
     "typescript": "^5.9.3",
     "vite-plus": "^0.1.20"
   },

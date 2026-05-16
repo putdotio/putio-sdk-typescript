@@ -1,5 +1,4 @@
 import { Effect, Schema } from "effect";
-
 import { joinCsv } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
@@ -15,16 +14,14 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
-
-export const TransferTypeSchema = Schema.Literal(
+export const TransferTypeSchema = Schema.Literals([
   "URL",
   "TORRENT",
   "PLAYLIST",
   "LIVE_STREAM",
   "N/A",
-);
-
-export const TransferStatusSchema = Schema.Literal(
+]);
+export const TransferStatusSchema = Schema.Literals([
   "WAITING",
   "PREPARING_DOWNLOAD",
   "IN_QUEUE",
@@ -37,16 +34,15 @@ export const TransferStatusSchema = Schema.Literal(
   "COMPLETED",
   "ERROR",
   "PREPARING_SEED",
-);
-
+]);
 const TransferLinkSchema = Schema.Struct({
   label: Schema.String,
   url: Schema.NullOr(Schema.String),
 });
-
-const NullableInt = Schema.NullOr(Schema.Number.pipe(Schema.int()));
-const NullableNonNegativeNumber = Schema.NullOr(Schema.Number.pipe(Schema.nonNegative()));
-
+const NullableInt = Schema.NullOr(Schema.Int);
+const NullableNonNegativeNumber = Schema.NullOr(
+  Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+);
 export const TransferBaseSchema = Schema.Struct({
   availability: NullableNonNegativeNumber,
   callback_url: Schema.NullOr(Schema.String),
@@ -63,7 +59,7 @@ export const TransferBaseSchema = Schema.Struct({
   file_id: NullableInt,
   finished_at: Schema.NullOr(Schema.String),
   hash: Schema.NullOr(Schema.String),
-  id: Schema.Number.pipe(Schema.int()),
+  id: Schema.Int,
   is_private: Schema.Boolean,
   links: Schema.optional(Schema.Array(TransferLinkSchema)),
   name: Schema.String,
@@ -72,7 +68,7 @@ export const TransferBaseSchema = Schema.Struct({
   peers_sending_to_us: NullableInt,
   percent_done: NullableNonNegativeNumber,
   recorded_seconds: Schema.optional(NullableNonNegativeNumber),
-  save_parent_id: Schema.Number.pipe(Schema.int()),
+  save_parent_id: Schema.Int,
   seconds_seeding: NullableNonNegativeNumber,
   simulated: Schema.Boolean,
   size: NullableNonNegativeNumber,
@@ -88,114 +84,107 @@ export const TransferBaseSchema = Schema.Struct({
   up_speed: NullableNonNegativeNumber,
   userfile_exists: Schema.optional(Schema.Boolean),
 });
-
-const TransferErrorSchema = Schema.extend(
-  TransferBaseSchema.pipe(Schema.omit("error_message", "status")),
-  Schema.Struct({
+const TransferErrorSchema = TransferBaseSchema.mapFields(
+  ({ error_message: _errorMessage, status: _status, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     error_message: Schema.String,
     status: Schema.Literal("ERROR"),
   }),
 );
-
-const TransferCompletedSchema = Schema.extend(
-  TransferBaseSchema.pipe(Schema.omit("status")),
-  Schema.Struct({
+const TransferCompletedSchema = TransferBaseSchema.mapFields(
+  ({ status: _status, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
     status: Schema.Literal("COMPLETED"),
   }),
 );
-
-const TransferLiveSchema = Schema.extend(
-  TransferBaseSchema.pipe(Schema.omit("recorded_seconds", "type")),
-  Schema.Struct({
-    recorded_seconds: Schema.Number.pipe(Schema.nonNegative()),
+const TransferLiveSchema = TransferBaseSchema.mapFields(
+  ({ recorded_seconds: _recordedSeconds, type: _type, ...fields }) => fields,
+).pipe(
+  Schema.fieldsAssign({
+    recorded_seconds: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
     type: Schema.Literal("LIVE_STREAM"),
   }),
 );
-
-const TransferTorrentSeedingSchema = Schema.extend(
-  TransferBaseSchema.pipe(Schema.omit("current_ratio", "seconds_seeding", "status", "type")),
-  Schema.Struct({
-    current_ratio: Schema.Number.pipe(Schema.nonNegative()),
-    seconds_seeding: Schema.Number.pipe(Schema.nonNegative()),
-    status: Schema.Literal("SEEDING", "COMPLETED", "PREPARING_SEED"),
+const TransferTorrentSeedingSchema = TransferBaseSchema.mapFields(
+  ({
+    current_ratio: _currentRatio,
+    seconds_seeding: _secondsSeeding,
+    status: _status,
+    type: _type,
+    ...fields
+  }) => fields,
+).pipe(
+  Schema.fieldsAssign({
+    current_ratio: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+    seconds_seeding: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+    status: Schema.Literals(["SEEDING", "COMPLETED", "PREPARING_SEED"]),
     type: Schema.Literal("TORRENT"),
   }),
 );
-
-export const TransferSchema = Schema.Union(
+export const TransferSchema = Schema.Union([
   TransferErrorSchema,
   TransferLiveSchema,
   TransferTorrentSeedingSchema,
   TransferCompletedSchema,
   TransferBaseSchema,
-);
-
+]);
 export const TransfersListQuerySchema = Schema.Struct({
-  per_page: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
+  per_page: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
 });
-
 export const TransferAddInputSchema = Schema.Struct({
   callback_url: Schema.optional(Schema.String),
-  save_parent_id: Schema.optional(Schema.Number.pipe(Schema.int())),
+  save_parent_id: Schema.optional(Schema.Int),
   url: Schema.String,
 });
-
 const TransferInfoItemSchema = Schema.Struct({
   error: Schema.optional(Schema.String),
   error_message: Schema.optional(Schema.String),
-  file_size: Schema.Number.pipe(Schema.nonNegative()),
+  file_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   human_size: Schema.String,
   name: Schema.String,
   type_name: Schema.String,
   url: Schema.String,
 });
-
 const TransfersListEnvelopeSchema = Schema.Struct({
   cursor: Schema.optional(Schema.NullOr(Schema.String)),
   status: Schema.Literal("OK"),
-  total: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.nonNegative())),
+  total: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   transfers: Schema.Array(TransferSchema),
 });
-
 const TransfersContinueEnvelopeSchema = Schema.Struct({
   cursor: Schema.NullOr(Schema.String),
   status: Schema.Literal("OK"),
   transfers: Schema.Array(TransferSchema),
 });
-
 const TransferEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   transfer: TransferSchema,
 });
-
 const TransferCountEnvelopeSchema = Schema.Struct({
-  count: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+  count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   status: Schema.Literal("OK"),
 });
-
 const TransferInfoEnvelopeSchema = Schema.Struct({
-  disk_avail: Schema.Number.pipe(Schema.nonNegative()),
+  disk_avail: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   ret: Schema.Array(TransferInfoItemSchema),
   status: Schema.Literal("OK"),
 });
-
 const TransfersAddMultiErrorSchema = Schema.Struct({
   error_type: Schema.String,
-  status_code: Schema.Number.pipe(Schema.int()),
+  status_code: Schema.Int,
   url: Schema.String,
 });
-
 const TransfersAddMultiEnvelopeSchema = Schema.Struct({
   errors: Schema.Array(TransfersAddMultiErrorSchema),
   status: Schema.Literal("OK"),
   transfers: Schema.Array(TransferSchema),
 });
-
 const TransfersCleanEnvelopeSchema = Schema.Struct({
-  deleted_ids: Schema.Array(Schema.Number.pipe(Schema.int())),
+  deleted_ids: Schema.Array(Schema.Int),
   status: Schema.Literal("OK"),
 });
-
 export type TransferType = Schema.Schema.Type<typeof TransferTypeSchema>;
 export type TransferStatus = Schema.Schema.Type<typeof TransferStatusSchema>;
 export type TransferLink = Schema.Schema.Type<typeof TransferLinkSchema>;
@@ -206,7 +195,6 @@ export type TransferInfoItem = Schema.Schema.Type<typeof TransferInfoItemSchema>
 export type TransfersListResponse = Schema.Schema.Type<typeof TransfersListEnvelopeSchema>;
 export type TransfersContinueResponse = Schema.Schema.Type<typeof TransfersContinueEnvelopeSchema>;
 export type TransfersAddMultiError = Schema.Schema.Type<typeof TransfersAddMultiErrorSchema>;
-
 export const ListTransfersErrorSpec = definePutioOperationErrorSpec({
   domain: "transfers",
   operation: "list",
@@ -215,7 +203,6 @@ export const ListTransfersErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
-
 export const GetTransferErrorSpec = definePutioOperationErrorSpec({
   domain: "transfers",
   operation: "get",
@@ -224,7 +211,6 @@ export const GetTransferErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
-
 export const AddTransferErrorSpec = definePutioOperationErrorSpec({
   domain: "transfers",
   operation: "add",
@@ -235,7 +221,6 @@ export const AddTransferErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
-
 export const AddManyTransfersErrorSpec = definePutioOperationErrorSpec({
   domain: "transfers",
   operation: "addMany",
@@ -245,7 +230,6 @@ export const AddManyTransfersErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
-
 export const RetryTransferErrorSpec = definePutioOperationErrorSpec({
   domain: "transfers",
   operation: "retry",
@@ -256,7 +240,6 @@ export const RetryTransferErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
-
 export const ReannounceTransferErrorSpec = definePutioOperationErrorSpec({
   domain: "transfers",
   operation: "reannounce",
@@ -270,7 +253,6 @@ export const ReannounceTransferErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 500 as const },
   ],
 });
-
 export const StopRecordingTransferErrorSpec = definePutioOperationErrorSpec({
   domain: "transfers",
   operation: "stopRecording",
@@ -281,7 +263,6 @@ export const StopRecordingTransferErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
-
 export type ListTransfersError = PutioOperationFailure<typeof ListTransfersErrorSpec>;
 export type GetTransferError = PutioOperationFailure<typeof GetTransferErrorSpec>;
 export type AddTransferError = PutioOperationFailure<typeof AddTransferErrorSpec>;
@@ -291,7 +272,6 @@ export type ReannounceTransferError = PutioOperationFailure<typeof ReannounceTra
 export type StopRecordingTransferError = PutioOperationFailure<
   typeof StopRecordingTransferErrorSpec
 >;
-
 export const listTransfers = (
   query: TransfersListQuery = {},
 ): Effect.Effect<TransfersListResponse, ListTransfersError, PutioSdkContext> =>
@@ -300,7 +280,6 @@ export const listTransfers = (
     path: "/v2/transfers/list",
     query,
   }).pipe(withOperationErrors(ListTransfersErrorSpec));
-
 export const continueTransfers = (
   cursor: string,
   query: {
@@ -318,7 +297,6 @@ export const continueTransfers = (
     path: "/v2/transfers/list/continue",
     query,
   }).pipe(withOperationErrors(ListTransfersErrorSpec));
-
 export const getTransfer = (
   id: number,
 ): Effect.Effect<Transfer, GetTransferError, PutioSdkContext> =>
@@ -326,13 +304,11 @@ export const getTransfer = (
     method: "GET",
     path: `/v2/transfers/${encodePathSegment(id)}`,
   }).pipe(selectJsonField("transfer"), withOperationErrors(GetTransferErrorSpec));
-
 export const countTransfers = (): Effect.Effect<number, PutioSdkError, PutioSdkContext> =>
   requestJson(TransferCountEnvelopeSchema, {
     method: "GET",
     path: "/v2/transfers/count",
   }).pipe(selectJsonField("count"));
-
 export const getTransferInfo = (
   urls: ReadonlyArray<string>,
 ): Effect.Effect<
@@ -353,7 +329,6 @@ export const getTransferInfo = (
     method: "POST",
     path: "/v2/transfers/info",
   }).pipe(selectJsonFields("disk_avail", "ret"));
-
 export const addTransfer = (
   input: TransferAddInput,
 ): Effect.Effect<Transfer, AddTransferError, PutioSdkContext> =>
@@ -365,7 +340,6 @@ export const addTransfer = (
     method: "POST",
     path: "/v2/transfers/add",
   }).pipe(selectJsonField("transfer"), withOperationErrors(AddTransferErrorSpec));
-
 export const addManyTransfers = (
   inputs: ReadonlyArray<TransferAddInput>,
 ): Effect.Effect<
@@ -386,7 +360,6 @@ export const addManyTransfers = (
     method: "POST",
     path: "/v2/transfers/add-multi",
   }).pipe(selectJsonFields("errors", "transfers"), withOperationErrors(AddManyTransfersErrorSpec));
-
 export const cancelTransfers = (
   ids: ReadonlyArray<number>,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
@@ -400,7 +373,6 @@ export const cancelTransfers = (
     method: "POST",
     path: "/v2/transfers/cancel",
   });
-
 export const cleanTransfers = (
   ids: ReadonlyArray<number> = [],
 ): Effect.Effect<
@@ -418,7 +390,6 @@ export const cleanTransfers = (
     method: "POST",
     path: "/v2/transfers/clean",
   }).pipe(selectJsonFields("deleted_ids"));
-
 export const retryTransfer = (
   id: number,
 ): Effect.Effect<Transfer, RetryTransferError, PutioSdkContext> =>
@@ -432,7 +403,6 @@ export const retryTransfer = (
     method: "POST",
     path: "/v2/transfers/retry",
   }).pipe(selectJsonField("transfer"), withOperationErrors(RetryTransferErrorSpec));
-
 export const reannounceTransfer = (
   id: number,
 ): Effect.Effect<
@@ -450,7 +420,6 @@ export const reannounceTransfer = (
     method: "POST",
     path: "/v2/transfers/reannounce",
   }).pipe(withOperationErrors(ReannounceTransferErrorSpec));
-
 export const stopTransferRecording = (
   id: number,
 ): Effect.Effect<

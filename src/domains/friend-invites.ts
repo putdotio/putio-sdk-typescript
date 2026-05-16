@@ -7,18 +7,18 @@ import {
 } from "../core/errors.js";
 import { requestJson, selectJsonFields, type PutioSdkContext } from "../core/http.js";
 
-export const FriendInviteJoinedUserStatusSchema = Schema.Literal(
+export const FriendInviteJoinedUserStatusSchema = Schema.Literals([
   "CONVERTED",
   "IN_TRIAL",
   "TRIAL_ENDED",
   "TRIAL_NOT_STARTED",
   "UNKNOWN",
-);
+]);
 
 export const FriendInviteJoinedUserSchema = Schema.Struct({
   avatar_url: Schema.String,
   created_at: Schema.String,
-  earned_amount: Schema.NullOr(Schema.Number.pipe(Schema.nonNegative())),
+  earned_amount: Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
   name: Schema.String,
   status: FriendInviteJoinedUserStatusSchema,
 });
@@ -31,7 +31,7 @@ export const FriendInviteSchema = Schema.Struct({
 
 const FriendInvitesListEnvelopeSchema = Schema.Struct({
   invites: Schema.Array(FriendInviteSchema),
-  remaining_limit: Schema.Number.pipe(Schema.int()),
+  remaining_limit: Schema.Int,
   status: Schema.Literal("OK"),
 });
 

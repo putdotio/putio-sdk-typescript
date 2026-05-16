@@ -19,19 +19,19 @@ export const TrashFileSchema = Schema.Struct({
   first_accessed_at: Schema.NullOr(Schema.String),
   folder_type: Schema.Literal("REGULAR"),
   icon: Schema.NullOr(Schema.String),
-  id: Schema.Number.pipe(Schema.int()),
+  id: Schema.Int,
   name: Schema.String,
-  parent_id: Schema.NullOr(Schema.Number.pipe(Schema.int())),
+  parent_id: Schema.NullOr(Schema.Int),
   screenshot: Schema.Unknown,
-  size: Schema.Number.pipe(Schema.nonNegative()),
+  size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
 });
 
 const TrashListEnvelopeSchema = Schema.Struct({
   cursor: Schema.NullOr(Schema.String),
   files: Schema.Array(TrashFileSchema),
   status: Schema.Literal("OK"),
-  total: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
-  trash_size: Schema.Number.pipe(Schema.nonNegative()),
+  total: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  trash_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
 });
 
 const TrashContinueEnvelopeSchema = Schema.Struct({

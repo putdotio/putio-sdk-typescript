@@ -1,10 +1,5 @@
-import {
-  createPutioSdkPromiseClient,
-  type createPutioSdkPromiseClient as CreatePutioSdkPromiseClient,
-} from "../../../dist/index.js";
+import { createPutioSdkPromiseClient, type PutioSdkPromiseClient } from "../../../dist/index.js";
 import { hydrateLiveTokenEnv, readLiveTokens, type PutioLiveTokens } from "./secrets.ts";
-
-type PutioSdkPromiseClient = ReturnType<typeof CreatePutioSdkPromiseClient>;
 
 export type LiveTokenClients = {
   readonly authClient: PutioSdkPromiseClient;

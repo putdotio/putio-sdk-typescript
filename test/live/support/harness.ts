@@ -1,11 +1,9 @@
 import { test } from "vite-plus/test";
 
-import type { FileUploadResult, createPutioSdkPromiseClient } from "../../../dist/index.js";
+import type { FileUploadResult, PutioSdkPromiseClient } from "../../../dist/index.js";
 import { hydrateLiveTokenEnv } from "./secrets.ts";
 import { createPutioSdkPromiseClient as createPromiseSdkClient } from "../../../dist/index.js";
 
-type PutioSdkPromiseClientFactory = typeof createPutioSdkPromiseClient;
-type PutioSdkPromiseClient = ReturnType<PutioSdkPromiseClientFactory>;
 type JsonPrimitive = boolean | null | number | string;
 type LiveDetails =
   | JsonPrimitive

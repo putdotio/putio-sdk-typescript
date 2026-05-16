@@ -1,5 +1,4 @@
 import { Effect, Schema } from "effect";
-
 import { joinCsv } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
@@ -12,46 +11,41 @@ import {
   selectJsonField,
   type PutioSdkContext,
 } from "../core/http.js";
-
-export const PaymentPlanTypeSchema = Schema.Literal("onetime", "subscription");
-export const PaymentOptionPlanTypeSchema = Schema.Literal("onetime", "subscription", "trial");
-export const PaymentProviderNameSchema = Schema.Literal(
+export const PaymentPlanTypeSchema = Schema.Literals(["onetime", "subscription"]);
+export const PaymentOptionPlanTypeSchema = Schema.Literals(["onetime", "subscription", "trial"]);
+export const PaymentProviderNameSchema = Schema.Literals([
   "Paddle",
   "Fastspring",
   "OpenNode",
   "AcceptNano",
-);
-export const PaymentTypeSchema = Schema.Literal("credit-card", "cryptocurrency", "nano");
-export const UserSubscriptionStatusSchema = Schema.Literal(
+]);
+export const PaymentTypeSchema = Schema.Literals(["credit-card", "cryptocurrency", "nano"]);
+export const UserSubscriptionStatusSchema = Schema.Literals([
   "ACTIVE",
   "CANCELED",
   "PAST_DUE",
   "TRIALING",
-);
-
+]);
 export const PaymentSubscriptionInfoSchema = Schema.Struct({
-  id: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
+  id: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
   need_payment_information_update: Schema.optional(Schema.Boolean),
   next_billing_date: Schema.optional(Schema.NullOr(Schema.String)),
   next_retry_date: Schema.optional(Schema.NullOr(Schema.String)),
   status: Schema.optional(Schema.NullOr(UserSubscriptionStatusSchema)),
   update_url: Schema.optional(Schema.NullOr(Schema.String)),
 });
-
 export const PaymentInfoPlanSchema = Schema.Struct({
   code: Schema.optional(Schema.String),
   group_code: Schema.optional(Schema.String),
-  period_days: Schema.optional(Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.positive()))),
-  storage_space: Schema.optional(Schema.Number.pipe(Schema.nonNegative())),
+  period_days: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0)))),
+  storage_space: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
   subscription: Schema.optional(PaymentSubscriptionInfoSchema),
   type: Schema.optional(Schema.NullOr(PaymentPlanTypeSchema)),
 });
-
 const PaymentLastPaymentSchema = Schema.Struct({
   method: Schema.optional(Schema.String),
   provider: Schema.optional(Schema.String),
 });
-
 export const PaymentInfoSchema = Schema.Struct({
   expiration_date: Schema.optional(Schema.String),
   extend_30: Schema.NullOr(Schema.String),
@@ -62,59 +56,50 @@ export const PaymentInfoSchema = Schema.Struct({
   plan: Schema.optional(PaymentInfoPlanSchema),
   status: Schema.Literal("OK"),
 });
-
 const PaymentPlanCommonPropertiesSchema = Schema.Struct({
-  family_invites: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
-  seed_ratio: Schema.Number.pipe(Schema.nonNegative()),
-  seed_time: Schema.Number.pipe(Schema.nonNegative()),
-  storage_space: Schema.Number.pipe(Schema.nonNegative()),
-  torrent_slot: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+  family_invites: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  seed_ratio: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  seed_time: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  storage_space: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  torrent_slot: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
-
 const PaymentSubPlanSchema = Schema.Struct({
   code: Schema.String,
   daily_price: Schema.NullOr(Schema.String),
   fastspring_url: Schema.NullOr(Schema.String),
   is_trial_subscription: Schema.Boolean,
-  period_days: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.positive())),
+  period_days: Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0))),
   price: Schema.NullOr(Schema.String),
-  subscription_trial_period: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.nonNegative())),
+  subscription_trial_period: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   type: PaymentPlanTypeSchema,
 });
-
 export const PaymentPlanGroupSchema = Schema.Struct({
   common_properties: PaymentPlanCommonPropertiesSchema,
   plan_group_code: Schema.String,
   sub_plans: Schema.Array(PaymentSubPlanSchema),
 });
-
 const PaymentPlansEnvelopeSchema = Schema.Struct({
   plans: Schema.Array(PaymentPlanGroupSchema),
   status: Schema.Literal("OK"),
 });
-
 export const PaymentOptionSchema = Schema.Struct({
-  discount_percent: Schema.Number.pipe(Schema.nonNegative()),
+  discount_percent: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   name: PaymentTypeSchema,
   suitable_plan_types: Schema.Array(PaymentOptionPlanTypeSchema),
 });
-
 const PaymentOptionsEnvelopeSchema = Schema.Struct({
   options: Schema.Array(PaymentOptionSchema),
   status: Schema.Literal("OK"),
 });
-
 const PaymentHistoryPlanSchema = Schema.Struct({
   name: Schema.String,
-  period_days: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.nonNegative())),
+  period_days: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   price: Schema.NullOr(Schema.String),
   type: Schema.NullOr(PaymentPlanTypeSchema),
 });
-
 const PaymentRefundSchema = Schema.Struct({
   amount_actual: Schema.String,
 });
-
 export const PaymentHistoryItemSchema = Schema.Struct({
   amount: Schema.String,
   amount_actual: Schema.optional(Schema.String),
@@ -122,7 +107,7 @@ export const PaymentHistoryItemSchema = Schema.Struct({
   actual_currency_code: Schema.optional(Schema.String),
   coupon_code: Schema.NullOr(Schema.String),
   date: Schema.String,
-  id: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  id: Schema.Int.check(Schema.isGreaterThan(0)),
   invoice: Schema.NullOr(Schema.String),
   plan: PaymentHistoryPlanSchema,
   refunded: Schema.Boolean,
@@ -130,59 +115,50 @@ export const PaymentHistoryItemSchema = Schema.Struct({
   return_status: Schema.String,
   type: Schema.String,
 });
-
 const PaymentHistoryEnvelopeSchema = Schema.Struct({
   payments: Schema.Array(PaymentHistoryItemSchema),
   status: Schema.Literal("OK"),
 });
-
 export const PaymentInviteSchema = Schema.Struct({
   is_converted: Schema.Boolean,
   url: Schema.String,
   used_by: Schema.NullOr(Schema.String),
 });
-
 const PaymentInvitesEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   vouchers: Schema.Array(PaymentInviteSchema),
 });
-
 const PaymentChangePlanCurrentPlanSchema = Schema.Struct({
   plan_type: Schema.NullOr(PaymentPlanTypeSchema),
   subscription_payment_provider: Schema.NullOr(PaymentProviderNameSchema),
 });
-
 const PaymentChangePlanTargetPlanSchema = Schema.Struct({
-  hd_avail: Schema.Number.pipe(Schema.nonNegative()),
+  hd_avail: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   is_trial_subscription: Schema.Boolean,
   new_code: Schema.String,
-  period_days: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.positive())),
+  period_days: Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0))),
   plan_code: Schema.String,
   plan_name: Schema.String,
   plan_type: PaymentPlanTypeSchema,
   price: Schema.String,
   simulated_expiration: Schema.NullOr(Schema.String),
-  subscription_trial_period: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.nonNegative())),
+  subscription_trial_period: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
-
 const PaymentChangePlanProviderPaddlePreviewSchema = Schema.Struct({
   charge_amount: Schema.NullOr(Schema.String),
   currency: Schema.String,
   next_billing_date: Schema.NullOr(Schema.String),
 });
-
 const PaymentChangePlanProviderFastspringPreviewSchema = Schema.Struct({
   charge_amount: Schema.NullOr(Schema.String),
   currency: Schema.String,
   prorated_amount: Schema.NullOr(Schema.String),
   refund_amount: Schema.NullOr(Schema.String),
 });
-
 const PaymentChangePlanDiscountSchema = Schema.Struct({
-  discount: Schema.Number.pipe(Schema.nonNegative()),
-  type: Schema.Literal("percentage", "amount"),
+  discount: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  type: Schema.Literals(["percentage", "amount"]),
 });
-
 export const PaymentChangePlanPreviewSchema = Schema.Struct({
   Fastspring: PaymentChangePlanProviderFastspringPreviewSchema,
   Paddle: PaymentChangePlanProviderPaddlePreviewSchema,
@@ -193,127 +169,108 @@ export const PaymentChangePlanPreviewSchema = Schema.Struct({
   current_plan: PaymentChangePlanCurrentPlanSchema,
   discount: Schema.optional(PaymentChangePlanDiscountSchema),
   is_product_change: Schema.NullOr(Schema.Boolean),
-  new_remaining_days: Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.nonNegative())),
+  new_remaining_days: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   prorated: Schema.NullOr(Schema.String),
   status: Schema.Literal("OK"),
   target_plan: PaymentChangePlanTargetPlanSchema,
 });
-
 const PaddlePaymentProviderSchema = Schema.Struct({
-  plan_id: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  plan_id: Schema.Int.check(Schema.isGreaterThan(0)),
   provider: Schema.Literal("Paddle"),
   type: Schema.Literal("credit-card"),
-  vendor_id: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  vendor_id: Schema.Int.check(Schema.isGreaterThan(0)),
 });
-
 const FastspringPaymentProviderSchema = Schema.Struct({
   provider: Schema.Literal("Fastspring"),
   type: Schema.Literal("credit-card"),
   url: Schema.String,
 });
-
 const OpenNodePaymentProviderSchema = Schema.Struct({
-  discount_percent: Schema.Number.pipe(Schema.nonNegative()),
+  discount_percent: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   provider: Schema.Literal("OpenNode"),
   type: Schema.Literal("cryptocurrency"),
 });
-
 const AcceptNanoPaymentProviderSchema = Schema.Struct({
   amount: Schema.String,
   api_host: Schema.String,
   currency: Schema.Literal("USD"),
-  discount_percent: Schema.Number.pipe(Schema.nonNegative()),
+  discount_percent: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   provider: Schema.Literal("AcceptNano"),
   state: Schema.String,
   type: Schema.Literal("nano"),
 });
-
-export const PaymentProviderSchema = Schema.Union(
+export const PaymentProviderSchema = Schema.Union([
   AcceptNanoPaymentProviderSchema,
   FastspringPaymentProviderSchema,
   OpenNodePaymentProviderSchema,
   PaddlePaymentProviderSchema,
-);
-
+]);
 const PaymentChangePlanCheckoutSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   urls: Schema.Array(PaymentProviderSchema),
 });
-
 const PaymentChangePlanConfirmationSchema = Schema.Struct({
   confirmation: Schema.Literal(true),
   status: Schema.Literal("OK"),
 });
-
 const PaymentSubscriptionUpdateSchema = Schema.Struct({
   amount: Schema.String,
   billing_date: Schema.String,
   currency: Schema.String,
 });
-
 const PaymentChangePlanSubscriptionUpdatedSchema = Schema.Struct({
   charged_amount: Schema.String,
   charged_currency: Schema.String,
   next_payment: PaymentSubscriptionUpdateSchema,
   status: Schema.Literal("OK"),
 });
-
 const PaymentChangePlanSuccessSchema = OkResponseSchema;
-
-export const PaymentChangePlanSubmitSchema = Schema.Union(
+export const PaymentChangePlanSubmitSchema = Schema.Union([
   PaymentChangePlanCheckoutSchema,
   PaymentChangePlanConfirmationSchema,
   PaymentChangePlanSubscriptionUpdatedSchema,
   PaymentChangePlanSuccessSchema,
-);
-
+]);
 const PaymentFastspringConfirmEnvelopeSchema = Schema.Struct({
   confirmed: Schema.Boolean,
   status: Schema.Literal("OK"),
 });
-
 const PaymentVoucherPlanSchema = Schema.Struct({
   expiration_date: Schema.NullOr(Schema.String),
   type: Schema.NullOr(PaymentPlanTypeSchema),
 });
-
 const PaymentVoucherTargetPlanSchema = Schema.Struct({
   code: Schema.String,
   group_code: Schema.String,
-  hd_avail: Schema.Number.pipe(Schema.nonNegative()),
+  hd_avail: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   name: Schema.String,
   simulated_expiration: Schema.optional(Schema.NullOr(Schema.String)),
   type: PaymentPlanTypeSchema,
 });
-
 export const PaymentVoucherInfoSchema = Schema.Struct({
   current_plan: PaymentVoucherPlanSchema,
-  new_remaining_days: Schema.Number.pipe(Schema.int(), Schema.nonNegative()),
+  new_remaining_days: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   status: Schema.Literal("OK"),
   target_plan: PaymentVoucherTargetPlanSchema,
 });
-
 const PaymentNanoRequestEnvelopeSchema = Schema.Struct({
   nano: Schema.Struct({
     token: Schema.String,
   }),
   status: Schema.Literal("OK"),
 });
-
 const PaymentOpenNodeChargeEnvelopeSchema = Schema.Struct({
   opennode: Schema.Struct({
     checkout_url: Schema.String,
   }),
   status: Schema.Literal("OK"),
 });
-
 const PaymentCoinbaseChargeEnvelopeSchema = Schema.Struct({
   coinbase: Schema.Struct({
     code: Schema.String,
   }),
   status: Schema.Literal("OK"),
 });
-
 export type PaymentInfo = Schema.Schema.Type<typeof PaymentInfoSchema>;
 export type PaymentPlanGroup = Schema.Schema.Type<typeof PaymentPlanGroupSchema>;
 export type PaymentOption = Schema.Schema.Type<typeof PaymentOptionSchema>;
@@ -325,66 +282,54 @@ export type PaymentChangePlanSubmitResponse = Schema.Schema.Type<
   typeof PaymentChangePlanSubmitSchema
 >;
 export type PaymentVoucherInfo = Schema.Schema.Type<typeof PaymentVoucherInfoSchema>;
-
 export type PaymentHistoryQuery = {
   readonly unreported_only?: boolean;
 };
-
 export type PaymentChangePlanPreviewInput = {
   readonly coupon_code?: string;
   readonly payment_type?: Schema.Schema.Type<typeof PaymentTypeSchema>;
   readonly plan_path: string;
 };
-
 export type PaymentChangePlanSubmitInput = {
   readonly confirmation_code?: string;
   readonly coupon_code?: string;
   readonly payment_type?: Schema.Schema.Type<typeof PaymentTypeSchema>;
   readonly plan_path: string;
 };
-
 export type PaymentPaddleWaitingPaymentInput = {
   readonly checkout_id: string;
   readonly product_id: number | string;
 };
-
 const RestrictedPaymentError = { errorType: "invalid_scope", statusCode: 401 as const };
-
 const CommonPaymentActionErrors = [
   { errorType: "PAYMENT_SUB_ACCOUNT_NOT_ALLOWED", statusCode: 403 as const },
   RestrictedPaymentError,
 ] as const;
-
 export const GetPaymentInfoErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "getInfo",
   knownErrors: [RestrictedPaymentError],
 });
-
 export const ListPaymentPlansErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "listPlans",
   knownErrors: [RestrictedPaymentError],
 });
-
 export const ListPaymentOptionsErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "listOptions",
   knownErrors: [{ statusCode: 400 as const }],
 });
-
 export const ListPaymentHistoryErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "listHistory",
   knownErrors: [RestrictedPaymentError],
 });
-
 export const ListPaymentInvitesErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "listInvites",
   knownErrors: [RestrictedPaymentError],
 });
-
 export const PreviewPaymentChangePlanErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "previewChangePlan",
@@ -402,7 +347,6 @@ export const PreviewPaymentChangePlanErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 410 as const },
   ],
 });
-
 export const SubmitPaymentChangePlanErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "submitChangePlan",
@@ -431,13 +375,11 @@ export const SubmitPaymentChangePlanErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 410 as const },
   ],
 });
-
 export const ConfirmFastspringOrderErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "confirmFastspringOrder",
   knownErrors: [RestrictedPaymentError],
 });
-
 export const StopSubscriptionErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "stopSubscription",
@@ -447,7 +389,6 @@ export const StopSubscriptionErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
-
 export const GetPaymentVoucherInfoErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "getVoucherInfo",
@@ -459,7 +400,6 @@ export const GetPaymentVoucherInfoErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 410 as const },
   ],
 });
-
 export const RedeemPaymentVoucherErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "redeemVoucher",
@@ -472,7 +412,6 @@ export const RedeemPaymentVoucherErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
-
 export const ReportPaymentsErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "reportPayments",
@@ -482,7 +421,6 @@ export const ReportPaymentsErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
-
 export const CreatePaddleWaitingPaymentErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "createPaddleWaitingPayment",
@@ -492,7 +430,6 @@ export const CreatePaddleWaitingPaymentErrorSpec = definePutioOperationErrorSpec
     { statusCode: 404 as const },
   ],
 });
-
 export const CreateCoinbaseChargeErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "createCoinbaseCharge",
@@ -502,7 +439,6 @@ export const CreateCoinbaseChargeErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
-
 export const CreateOpenNodeChargeErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "createOpenNodeCharge",
@@ -512,7 +448,6 @@ export const CreateOpenNodeChargeErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
-
 export const CreateNanoPaymentRequestErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "createNanoPaymentRequest",
@@ -522,7 +457,6 @@ export const CreateNanoPaymentRequestErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
-
 export type GetPaymentInfoError = PutioOperationFailure<typeof GetPaymentInfoErrorSpec>;
 export type ListPaymentPlansError = PutioOperationFailure<typeof ListPaymentPlansErrorSpec>;
 export type ListPaymentOptionsError = PutioOperationFailure<typeof ListPaymentOptionsErrorSpec>;
@@ -551,7 +485,6 @@ export type CreateOpenNodeChargeError = PutioOperationFailure<typeof CreateOpenN
 export type CreateNanoPaymentRequestError = PutioOperationFailure<
   typeof CreateNanoPaymentRequestErrorSpec
 >;
-
 export type ClassifiedPaymentChangePlanSubmitResponse =
   | {
       readonly data: Schema.Schema.Type<typeof PaymentChangePlanCheckoutSchema>;
@@ -569,7 +502,6 @@ export type ClassifiedPaymentChangePlanSubmitResponse =
       readonly data: Schema.Schema.Type<typeof PaymentChangePlanSuccessSchema>;
       readonly type: "success";
     };
-
 export const classifyPaymentChangePlanResponse = (
   response: PaymentChangePlanSubmitResponse,
 ): ClassifiedPaymentChangePlanSubmitResponse => {
@@ -579,27 +511,23 @@ export const classifyPaymentChangePlanResponse = (
       type: "checkout",
     };
   }
-
   if ("confirmation" in response) {
     return {
       data: response,
       type: "confirmation_required",
     };
   }
-
   if ("next_payment" in response) {
     return {
       data: response,
       type: "subscription_updated",
     };
   }
-
   return {
     data: response,
     type: "success",
   };
 };
-
 export const getPaymentInfo = (): Effect.Effect<
   PaymentInfo,
   GetPaymentInfoError,
@@ -609,7 +537,6 @@ export const getPaymentInfo = (): Effect.Effect<
     method: "GET",
     path: "/v2/payment/info",
   }).pipe(withOperationErrors(GetPaymentInfoErrorSpec));
-
 export const listPaymentPlans = (): Effect.Effect<
   ReadonlyArray<PaymentPlanGroup>,
   ListPaymentPlansError,
@@ -619,7 +546,6 @@ export const listPaymentPlans = (): Effect.Effect<
     method: "GET",
     path: "/v2/payment/plans",
   }).pipe(selectJsonField("plans"), withOperationErrors(ListPaymentPlansErrorSpec));
-
 export const listPaymentOptions = (): Effect.Effect<
   ReadonlyArray<Schema.Schema.Type<typeof PaymentOptionSchema>>,
   ListPaymentOptionsError,
@@ -630,7 +556,6 @@ export const listPaymentOptions = (): Effect.Effect<
     method: "GET",
     path: "/v2/payment/options",
   }).pipe(selectJsonField("options"), withOperationErrors(ListPaymentOptionsErrorSpec));
-
 export const listPaymentHistory = (
   query?: PaymentHistoryQuery,
 ): Effect.Effect<ReadonlyArray<PaymentHistoryItem>, ListPaymentHistoryError, PutioSdkContext> =>
@@ -639,7 +564,6 @@ export const listPaymentHistory = (
     path: "/v2/payment/history",
     query,
   }).pipe(selectJsonField("payments"), withOperationErrors(ListPaymentHistoryErrorSpec));
-
 export const listPaymentInvites = (): Effect.Effect<
   ReadonlyArray<Schema.Schema.Type<typeof PaymentInviteSchema>>,
   ListPaymentInvitesError,
@@ -649,7 +573,6 @@ export const listPaymentInvites = (): Effect.Effect<
     method: "GET",
     path: "/v2/payment/invites",
   }).pipe(selectJsonField("vouchers"), withOperationErrors(ListPaymentInvitesErrorSpec));
-
 export const previewPaymentChangePlan = (
   input: PaymentChangePlanPreviewInput,
 ): Effect.Effect<PaymentChangePlanPreview, PreviewPaymentChangePlanError, PutioSdkContext> =>
@@ -661,7 +584,6 @@ export const previewPaymentChangePlan = (
       payment_type: input.payment_type,
     },
   }).pipe(withOperationErrors(PreviewPaymentChangePlanErrorSpec));
-
 export const submitPaymentChangePlan = (
   input: PaymentChangePlanSubmitInput,
 ): Effect.Effect<PaymentChangePlanSubmitResponse, SubmitPaymentChangePlanError, PutioSdkContext> =>
@@ -679,7 +601,6 @@ export const submitPaymentChangePlan = (
       coupon_code: input.coupon_code,
     },
   }).pipe(withOperationErrors(SubmitPaymentChangePlanErrorSpec));
-
 export const confirmFastspringOrder = (
   reference: string,
 ): Effect.Effect<boolean, ConfirmFastspringOrderError, PutioSdkContext> =>
@@ -687,7 +608,6 @@ export const confirmFastspringOrder = (
     method: "GET",
     path: `/v2/payment/fs-confirm/${encodeURIComponent(reference)}`,
   }).pipe(selectJsonField("confirmed"), withOperationErrors(ConfirmFastspringOrderErrorSpec));
-
 export const stopPaymentSubscription = (): Effect.Effect<
   void,
   StopSubscriptionError,
@@ -697,7 +617,6 @@ export const stopPaymentSubscription = (): Effect.Effect<
     method: "POST",
     path: "/v2/payment/stop_subscription",
   }).pipe(Effect.asVoid, withOperationErrors(StopSubscriptionErrorSpec));
-
 export const getPaymentVoucherInfo = (
   code: string,
 ): Effect.Effect<PaymentVoucherInfo, GetPaymentVoucherInfoError, PutioSdkContext> =>
@@ -705,7 +624,6 @@ export const getPaymentVoucherInfo = (
     method: "GET",
     path: `/v2/payment/redeem_voucher/${encodeURIComponent(code)}`,
   }).pipe(withOperationErrors(GetPaymentVoucherInfoErrorSpec));
-
 export const redeemPaymentVoucher = (
   code: string,
 ): Effect.Effect<void, RedeemPaymentVoucherError, PutioSdkContext> =>
@@ -713,7 +631,6 @@ export const redeemPaymentVoucher = (
     method: "POST",
     path: `/v2/payment/redeem_voucher/${encodeURIComponent(code)}`,
   }).pipe(Effect.asVoid, withOperationErrors(RedeemPaymentVoucherErrorSpec));
-
 export const reportPayments = (
   paymentIds: ReadonlyArray<number>,
 ): Effect.Effect<void, ReportPaymentsError, PutioSdkContext> =>
@@ -727,7 +644,6 @@ export const reportPayments = (
     method: "POST",
     path: "/v2/payment/report",
   }).pipe(Effect.asVoid, withOperationErrors(ReportPaymentsErrorSpec));
-
 export const createPaddleWaitingPayment = (
   input: PaymentPaddleWaitingPaymentInput,
 ): Effect.Effect<void, CreatePaddleWaitingPaymentError, PutioSdkContext> =>
@@ -739,7 +655,6 @@ export const createPaddleWaitingPayment = (
     method: "POST",
     path: "/v2/payment/paddle_waiting_payment",
   }).pipe(Effect.asVoid, withOperationErrors(CreatePaddleWaitingPaymentErrorSpec));
-
 export const createCoinbaseCharge = (
   planPath: string,
 ): Effect.Effect<string, CreateCoinbaseChargeError, PutioSdkContext> =>
@@ -757,7 +672,6 @@ export const createCoinbaseCharge = (
     Effect.map(({ code }) => code),
     withOperationErrors(CreateCoinbaseChargeErrorSpec),
   );
-
 export const createOpenNodeCharge = (
   planPath: string,
 ): Effect.Effect<string, CreateOpenNodeChargeError, PutioSdkContext> =>
@@ -775,7 +689,6 @@ export const createOpenNodeCharge = (
     Effect.map(({ checkout_url }) => checkout_url),
     withOperationErrors(CreateOpenNodeChargeErrorSpec),
   );
-
 export const createNanoPaymentRequest = (
   planCode: string,
 ): Effect.Effect<string, CreateNanoPaymentRequestError, PutioSdkContext> =>

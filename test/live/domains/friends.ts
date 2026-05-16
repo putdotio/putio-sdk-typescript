@@ -1,5 +1,10 @@
-import { assertPresent, createClients, createLiveHarness } from "../support/harness.js";
-import { findLiveFriend, liveFriendFixtureSkip } from "../support/friends.js";
+import {
+  assertPresent,
+  createClients,
+  createPromiseClient,
+  createLiveHarness,
+} from "../support/harness.js";
+import { requireLiveFriend, requireLiveFriendWithSharedFiles } from "../support/friends.ts";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -72,11 +77,7 @@ await run("friends sent requests shape", async () => {
 });
 
 await run("friends search excludes existing friend", async () => {
-  const friend = await findLiveFriend(authClient);
-
-  if (!friend) {
-    return liveFriendFixtureSkip("no existing friend fixture available");
-  }
+  const friend = await requireLiveFriend(authClient, createPromiseClient);
 
   const users = await authClient.friends.search(friend.name);
   assert(Array.isArray(users), "expected search array");
@@ -88,8 +89,8 @@ await run("friends search excludes existing friend", async () => {
 });
 
 await run("friends search requires restricted scope for oauth token", async () => {
-  const friend = await findLiveFriend(authClient);
-  const query = friend?.name ?? "codex-scope-probe";
+  const friend = await requireLiveFriend(authClient, createPromiseClient);
+  const query = friend.name;
 
   try {
     await oauthClient.friends.search(query);
@@ -105,11 +106,7 @@ await run("friends search requires restricted scope for oauth token", async () =
 });
 
 await run("friends shared folder shape", async () => {
-  const friend = await findLiveFriend(authClient, (candidate) => candidate.has_shared_files);
-
-  if (!friend) {
-    return liveFriendFixtureSkip("no friend with shared files available");
-  }
+  const friend = await requireLiveFriendWithSharedFiles(authClient, createPromiseClient);
 
   const file = assertPresent(
     await authClient.friends.sharedFolder(friend.name),
@@ -139,11 +136,7 @@ await run("friends missing shared folder yields typed not found", async () => {
 });
 
 await run("friends shared folder is readable with oauth token", async () => {
-  const friend = await findLiveFriend(authClient, (candidate) => candidate.has_shared_files);
-
-  if (!friend) {
-    return liveFriendFixtureSkip("no friend with shared files available");
-  }
+  const friend = await requireLiveFriendWithSharedFiles(authClient, createPromiseClient);
 
   const file = assertPresent(
     await oauthClient.friends.sharedFolder(friend.name),

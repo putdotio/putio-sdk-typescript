@@ -938,6 +938,22 @@ describe("operational domain boundaries", () => {
       ),
     ).toMatchObject({ zip_status: "DONE" });
 
+    expect(
+      await runSdkEffect(
+        zips.getZip(9),
+        () =>
+          jsonResponse({
+            id: 9,
+            missing_files: [{ id: 10, missing: true, name: "missing.zip" }],
+            size: 100,
+            status: "OK",
+            url: "https://download.put.io/zip",
+            zip_status: "DONE",
+          }),
+        { accessToken: "token-123" },
+      ),
+    ).toMatchObject({ missing_files: [{ missing: true }] });
+
     await runSdkEffect(zips.cancelZip(9), () => jsonResponse({ status: "OK" }), {
       accessToken: "token-123",
     });

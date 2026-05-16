@@ -1,6 +1,6 @@
-import { Headers, HttpClient, HttpClientResponse } from "@effect/platform";
-import type * as HttpClientRequest from "@effect/platform/HttpClientRequest";
 import { Cause, Effect, Exit, Option } from "effect";
+import { Headers, HttpClient, HttpClientResponse } from "effect/unstable/http";
+import type * as HttpClientRequest from "effect/unstable/http/HttpClientRequest";
 
 import {
   makePutioSdkLayer,
@@ -15,13 +15,13 @@ export const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
     throw new Error("Expected the effect to fail.");
   }
 
-  const failure = Cause.failureOption(exit.cause);
+  const failure = exit.cause.reasons.find(Cause.isFailReason);
 
-  if (Option.isNone(failure)) {
+  if (!failure) {
     throw Cause.squash(exit.cause);
   }
 
-  return failure.value;
+  return failure.error;
 };
 
 export const jsonResponse = (
@@ -48,7 +48,7 @@ const makeMockHttpClient = (handler: MockRequestHandler) =>
     Effect.succeed(HttpClientResponse.fromWeb(request, handler(request))),
   );
 
-export const provideSdkTest = <A, E>(
+const provideSdkTest = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
   handler: MockRequestHandler,
   config: PutioSdkConfigShape = {},
@@ -83,7 +83,7 @@ export const runConfigExit = <A, E>(
 export const getAuthorizationHeader = (request: HttpClientRequest.HttpClientRequest) =>
   Option.getOrUndefined(Headers.get(request.headers, "authorization"));
 
-export const getBodyText = (request: HttpClientRequest.HttpClientRequest): string | null => {
+const getBodyText = (request: HttpClientRequest.HttpClientRequest): string | null => {
   if (request.body._tag === "Empty") {
     return null;
   }

@@ -2,9 +2,10 @@ import {
   PutioApiError,
   PutioAuthError,
   type PutioErrorEnvelope,
+  isPutioErrorEnvelope,
   PutioOperationError,
   PutioRateLimitError,
-  type PutioKnownErrorContract,
+  type PutioKnownOperationErrorContract,
 } from "../core/errors.js";
 
 export type LocalizedErrorRecoverySuggestionTypeInstruction = {
@@ -58,7 +59,7 @@ type StatusAndBodyError =
   | PutioApiError
   | PutioAuthError
   | PutioRateLimitError
-  | PutioOperationError<string, string, PutioKnownErrorContract>;
+  | PutioOperationError<string, string, PutioKnownOperationErrorContract>;
 
 export type PutioLocalizableError = {
   readonly _tag?: string;
@@ -68,11 +69,13 @@ export type PutioLocalizableError = {
 
 export type PutioErrorWithBody = StatusAndBodyError;
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
+const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null;
 
-const isPutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelope =>
-  isObject(value) && ("status_code" in value || "error_type" in value || "error_message" in value);
+const isLocalizablePutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelope =>
+  isObject(value) &&
+  ("status_code" in value || "error_type" in value || "error_message" in value) &&
+  isPutioErrorEnvelope(value);
 
 const isPutioErrorWithBody = (value: unknown): value is PutioLocalizableError =>
   isObject(value) && "body" in value && isPutioErrorEnvelope(value.body);
@@ -80,7 +83,7 @@ const isPutioErrorWithBody = (value: unknown): value is PutioLocalizableError =>
 const normalizePutioError = (
   error: PutioErrorEnvelope | PutioLocalizableError,
 ): PutioLocalizableError => {
-  if (isPutioErrorEnvelope(error)) {
+  if (isLocalizablePutioErrorEnvelope(error)) {
     return {
       _tag: "PutioErrorEnvelope",
       body: error,
@@ -142,7 +145,7 @@ export const createLocalizeError =
   ): LocalizedError => {
     const localizers = [...scopedLocalizers, ...globalLocalizers];
 
-    if (isPutioErrorWithBody(error) || isPutioErrorEnvelope(error)) {
+    if (isPutioErrorWithBody(error) || isLocalizablePutioErrorEnvelope(error)) {
       const apiError = normalizePutioError(error);
 
       const byErrorType = localizers.find(

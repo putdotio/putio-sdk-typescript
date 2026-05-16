@@ -4,6 +4,7 @@ import {
   createLiveHarness,
   isFileUploadFileResult,
 } from "../support/harness.js";
+import { requireOwnedVideoFixture } from "../support/media.ts";
 
 const { authClient, client } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -15,17 +16,6 @@ const { assert, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
 void sleep;
-
-const getOwnedVideoCandidate = async () => {
-  const search = await client.files.search({
-    per_page: 10,
-    query: "mp4",
-  });
-
-  return (
-    search.files.find((file) => file.file_type === "VIDEO" && file.is_shared === false) ?? null
-  );
-};
 
 const getArchiveCandidate = async () => {
   const search = await client.files.search({
@@ -55,23 +45,23 @@ await run("files list extractions shape", async () => {
 });
 
 await run("files setWatchStatus roundtrip", async () => {
-  const video = await getOwnedVideoCandidate();
+  const video = await requireOwnedVideoFixture(client);
 
-  if (!video) {
-    return {
-      checked: false,
-      reason: "no owned video candidate found",
-    };
+  try {
+    await client.files.setWatchStatus({
+      ids: [video.id],
+      watched: true,
+    });
+    await client.files.setWatchStatus({
+      ids: [video.id],
+      watched: false,
+    });
+  } finally {
+    await client.files.setWatchStatus({
+      ids: [video.id],
+      watched: false,
+    });
   }
-
-  await client.files.setWatchStatus({
-    ids: [video.id],
-    watched: true,
-  });
-  await client.files.setWatchStatus({
-    ids: [video.id],
-    watched: false,
-  });
 
   return {
     checked: true,
@@ -80,36 +70,39 @@ await run("files setWatchStatus roundtrip", async () => {
 });
 
 await run("files start_from roundtrip semantics", async () => {
-  const video = await getOwnedVideoCandidate();
-
-  if (!video) {
-    return {
-      checked: false,
-      reason: "no owned video candidate found",
-    };
-  }
+  const video = await requireOwnedVideoFixture(client);
 
   const before = await client.files.getStartFrom(video.id);
 
-  await client.files.setStartFrom({
-    file_id: video.id,
-    time: 37,
-  });
+  try {
+    await client.files.setStartFrom({
+      file_id: video.id,
+      time: 37,
+    });
 
-  const updated = await client.files.getStartFrom(video.id);
-  assert(updated === 37, "expected updated start_from to roundtrip");
+    const updated = await client.files.getStartFrom(video.id);
+    assert(updated === 37, "expected updated start_from to roundtrip");
 
-  await client.files.resetStartFrom(video.id);
+    await client.files.setStartFrom({
+      file_id: video.id,
+      time: before,
+    });
 
-  const reset = await client.files.getStartFrom(video.id);
-  assert(reset === 0, "expected reset start_from to be 0");
+    const restored = await client.files.getStartFrom(video.id);
+    assert(restored === before, "expected start_from to be restored");
 
-  return {
-    before,
-    reset,
-    updated,
-    video_id: video.id,
-  };
+    return {
+      before,
+      restored,
+      updated,
+      video_id: video.id,
+    };
+  } finally {
+    await client.files.setStartFrom({
+      file_id: video.id,
+      time: before,
+    });
+  }
 });
 
 await run("files next-file natural ordering with disposable fixtures", async () => {
@@ -168,10 +161,7 @@ await run("files extract and cleanup", async () => {
   const archive = await getArchiveCandidate();
 
   if (!archive) {
-    return {
-      checked: false,
-      reason: "no owned archive candidate found",
-    };
+    throw new Error("expected owned archive candidate");
   }
 
   const created = await client.files.extract({

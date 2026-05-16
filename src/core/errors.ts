@@ -1,10 +1,10 @@
-import { Headers } from "@effect/platform";
 import { Data, Effect, Option, Schema } from "effect";
+import { Headers } from "effect/unstable/http";
 
 export const PutioErrorEnvelopeSchema = Schema.Struct({
   error_message: Schema.optional(Schema.String),
   error_type: Schema.optional(Schema.String),
-  status_code: Schema.optional(Schema.Number.pipe(Schema.int())),
+  status_code: Schema.optional(Schema.Int),
   details: Schema.optional(Schema.Unknown),
 });
 
@@ -48,7 +48,16 @@ export interface PutioOperationErrorSpec<
   readonly knownErrors: TContracts;
 }
 
-type OperationContractOf<TSpec extends PutioOperationErrorSpec> = TSpec["knownErrors"][number];
+type OperationContractOf<TSpec extends PutioOperationErrorSpec> = Extract<
+  TSpec["knownErrors"][number],
+  PutioKnownOperationErrorContract
+>;
+
+type OperationContractOfParts<
+  TDomain extends string,
+  TOperation extends string,
+  TContracts extends ReadonlyArray<PutioKnownErrorContract>,
+> = OperationContractOf<PutioOperationErrorSpec<TDomain, TOperation, TContracts>>;
 
 type PutioOperationErrorReason<TContract extends PutioKnownErrorContract> = TContract extends {
   readonly errorType: infer TType extends string;
@@ -64,7 +73,7 @@ type PutioOperationErrorReason<TContract extends PutioKnownErrorContract> = TCon
       }
     : never;
 
-type PutioMatchableKnownErrorContract =
+export type PutioKnownOperationErrorContract =
   | {
       readonly errorType: string;
       readonly statusCode?: number;
@@ -77,7 +86,7 @@ type PutioMatchableKnownErrorContract =
 const isKnownContractMatch = <TContract extends PutioKnownErrorContract>(
   contract: TContract,
   error: PutioApiError | PutioAuthError,
-): contract is Extract<TContract, PutioMatchableKnownErrorContract> => {
+): contract is Extract<TContract, PutioKnownOperationErrorContract> => {
   if (contract.errorType !== undefined) {
     if (error.body.error_type !== contract.errorType) {
       return false;
@@ -96,32 +105,55 @@ const isKnownContractMatch = <TContract extends PutioKnownErrorContract>(
 const isMatchableApiError = (error: PutioSdkError): error is PutioApiError | PutioAuthError =>
   error._tag === "PutioApiError" || error._tag === "PutioAuthError";
 
-function toOperationReason<TType extends string>(contract: {
-  readonly errorType: TType;
-  readonly statusCode?: number;
-}): {
-  readonly kind: "error_type";
-  readonly errorType: TType;
+const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null;
+
+const hasOptionalString = (record: Readonly<Record<string, unknown>>, key: string): boolean =>
+  !(key in record) || record[key] === undefined || typeof record[key] === "string";
+
+const hasOptionalInteger = (record: Readonly<Record<string, unknown>>, key: string): boolean =>
+  !(key in record) ||
+  record[key] === undefined ||
+  (typeof record[key] === "number" && Number.isInteger(record[key]));
+
+const isKnownOperationErrorContract = (value: unknown): value is PutioKnownOperationErrorContract =>
+  isRecord(value) &&
+  (typeof value.errorType === "string" || typeof value.statusCode === "number") &&
+  hasOptionalString(value, "errorType") &&
+  hasOptionalInteger(value, "statusCode");
+
+const isOperationReason = (
+  value: unknown,
+): value is PutioOperationErrorReason<PutioKnownOperationErrorContract> => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (value.kind === "error_type") {
+    return typeof value.errorType === "string";
+  }
+
+  if (value.kind === "status_code") {
+    return typeof value.statusCode === "number";
+  }
+
+  return false;
 };
-function toOperationReason<TStatus extends number>(contract: {
-  readonly errorType?: undefined;
-  readonly statusCode: TStatus;
-}): {
-  readonly kind: "status_code";
-  readonly statusCode: TStatus;
-};
-function toOperationReason(contract: PutioMatchableKnownErrorContract) {
+
+function toOperationReason<TContract extends PutioKnownOperationErrorContract>(
+  contract: TContract,
+): PutioOperationErrorReason<TContract> {
   if (contract.errorType !== undefined) {
     return {
       kind: "error_type",
       errorType: contract.errorType,
-    };
+    } as PutioOperationErrorReason<TContract>;
   }
 
   return {
     kind: "status_code",
     statusCode: contract.statusCode,
-  };
+  } as PutioOperationErrorReason<TContract>;
 }
 
 export class PutioTransportError extends Data.TaggedError("PutioTransportError")<{
@@ -136,31 +168,36 @@ export class PutioValidationError extends Data.TaggedError("PutioValidationError
   readonly cause: unknown;
 }> {}
 
-export class PutioApiError extends Data.TaggedError("PutioApiError")<{
-  readonly status: number;
-  readonly body: PutioErrorEnvelope;
-}> {}
+const PutioResponseErrorFields = {
+  status: Schema.Int,
+  body: PutioErrorEnvelopeSchema,
+};
 
-export class PutioAuthError extends Data.TaggedError("PutioAuthError")<{
-  readonly status: number;
-  readonly body: PutioErrorEnvelope;
-}> {}
+export class PutioApiError extends Schema.TaggedErrorClass<PutioApiError>()("PutioApiError", {
+  ...PutioResponseErrorFields,
+}) {}
 
-export class PutioRateLimitError extends Data.TaggedError("PutioRateLimitError")<{
-  readonly status: number;
-  readonly body: PutioErrorEnvelope;
-  readonly action?: string;
-  readonly id?: string;
-  readonly limit?: string;
-  readonly remaining?: string;
-  readonly retryAfter?: string;
-  readonly reset?: string;
-}> {}
+export class PutioAuthError extends Schema.TaggedErrorClass<PutioAuthError>()("PutioAuthError", {
+  ...PutioResponseErrorFields,
+}) {}
+
+export class PutioRateLimitError extends Schema.TaggedErrorClass<PutioRateLimitError>()(
+  "PutioRateLimitError",
+  {
+    ...PutioResponseErrorFields,
+    action: Schema.optional(Schema.String),
+    id: Schema.optional(Schema.String),
+    limit: Schema.optional(Schema.String),
+    remaining: Schema.optional(Schema.String),
+    retryAfter: Schema.optional(Schema.String),
+    reset: Schema.optional(Schema.String),
+  },
+) {}
 
 export class PutioOperationError<
   TDomain extends string,
   TOperation extends string,
-  TContract extends PutioKnownErrorContract,
+  TContract extends PutioKnownOperationErrorContract,
 > extends Data.TaggedError("PutioOperationError")<{
   readonly body: PutioTypedErrorEnvelope<TContract>;
   readonly contract: TContract;
@@ -193,6 +230,12 @@ export type PutioOperationFailure<TSpec extends PutioOperationErrorSpec> =
   | PutioUnhandledSdkError
   | PutioOperationErrorFromSpec<TSpec>;
 
+export type AnyPutioOperationError = PutioOperationError<
+  string,
+  string,
+  PutioKnownOperationErrorContract
+>;
+
 export const definePutioOperationErrorSpec = <
   const TDomain extends string,
   const TOperation extends string,
@@ -201,7 +244,52 @@ export const definePutioOperationErrorSpec = <
   spec: PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
 ) => spec;
 
-export const decodePutioErrorEnvelope = Schema.decodeUnknown(PutioErrorEnvelopeSchema);
+export const decodePutioErrorEnvelope = Schema.decodeUnknownEffect(PutioErrorEnvelopeSchema);
+
+export const isPutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelope =>
+  isRecord(value) &&
+  hasOptionalString(value, "error_message") &&
+  hasOptionalString(value, "error_type") &&
+  hasOptionalInteger(value, "status_code");
+
+const hasStatusAndBody = <TTag extends string>(
+  value: unknown,
+  tag: TTag,
+): value is {
+  readonly _tag: TTag;
+  readonly body: PutioErrorEnvelope;
+  readonly status: number;
+} =>
+  isRecord(value) &&
+  value._tag === tag &&
+  typeof value.status === "number" &&
+  isPutioErrorEnvelope(value.body);
+
+export const isPutioApiError = (value: unknown): value is PutioApiError =>
+  hasStatusAndBody(value, "PutioApiError");
+
+export const isPutioAuthError = (value: unknown): value is PutioAuthError =>
+  hasStatusAndBody(value, "PutioAuthError");
+
+export const isPutioRateLimitError = (value: unknown): value is PutioRateLimitError =>
+  hasStatusAndBody(value, "PutioRateLimitError") &&
+  isRecord(value) &&
+  hasOptionalString(value, "action") &&
+  hasOptionalString(value, "id") &&
+  hasOptionalString(value, "limit") &&
+  hasOptionalString(value, "remaining") &&
+  hasOptionalString(value, "retryAfter") &&
+  hasOptionalString(value, "reset");
+
+export const isPutioOperationError = (value: unknown): value is AnyPutioOperationError =>
+  isRecord(value) &&
+  value._tag === "PutioOperationError" &&
+  isPutioErrorEnvelope(value.body) &&
+  isKnownOperationErrorContract(value.contract) &&
+  typeof value.domain === "string" &&
+  typeof value.operation === "string" &&
+  isOperationReason(value.reason) &&
+  typeof value.status === "number";
 
 export const fallbackPutioErrorEnvelope = (status: number): PutioErrorEnvelope => ({
   error_message: `put.io API request failed with status ${status}`,
@@ -259,7 +347,16 @@ export function withOperationErrors<
 >(
   effect: Effect.Effect<A, E, R>,
   spec: PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
-): Effect.Effect<A, E | PutioOperationError<TDomain, TOperation, TContracts[number]>, R>;
+): Effect.Effect<
+  A,
+  | E
+  | PutioOperationError<
+      TDomain,
+      TOperation,
+      OperationContractOfParts<TDomain, TOperation, TContracts>
+    >,
+  R
+>;
 export function withOperationErrors<
   const TDomain extends string,
   const TOperation extends string,
@@ -268,7 +365,16 @@ export function withOperationErrors<
   spec: PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
 ): <A, E extends PutioSdkError, R>(
   effect: Effect.Effect<A, E, R>,
-) => Effect.Effect<A, E | PutioOperationError<TDomain, TOperation, TContracts[number]>, R>;
+) => Effect.Effect<
+  A,
+  | E
+  | PutioOperationError<
+      TDomain,
+      TOperation,
+      OperationContractOfParts<TDomain, TOperation, TContracts>
+    >,
+  R
+>;
 export function withOperationErrors<
   A,
   E extends PutioSdkError,
@@ -280,10 +386,28 @@ export function withOperationErrors<
   effectOrSpec: Effect.Effect<A, E, R> | PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
   maybeSpec?: PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
 ):
-  | Effect.Effect<A, E | PutioOperationError<TDomain, TOperation, TContracts[number]>, R>
+  | Effect.Effect<
+      A,
+      | E
+      | PutioOperationError<
+          TDomain,
+          TOperation,
+          OperationContractOfParts<TDomain, TOperation, TContracts>
+        >,
+      R
+    >
   | (<A2, E2 extends PutioSdkError, R2>(
       effect: Effect.Effect<A2, E2, R2>,
-    ) => Effect.Effect<A2, E2 | PutioOperationError<TDomain, TOperation, TContracts[number]>, R2>) {
+    ) => Effect.Effect<
+      A2,
+      | E2
+      | PutioOperationError<
+          TDomain,
+          TOperation,
+          OperationContractOfParts<TDomain, TOperation, TContracts>
+        >,
+      R2
+    >) {
   if (maybeSpec === undefined) {
     const spec = effectOrSpec as PutioOperationErrorSpec<TDomain, TOperation, TContracts>;
 
@@ -307,7 +431,9 @@ export function withOperationErrors<
       }
 
       return new PutioOperationError({
-        body: error.body as PutioTypedErrorEnvelope<TContracts[number]>,
+        body: error.body as PutioTypedErrorEnvelope<
+          OperationContractOfParts<TDomain, TOperation, TContracts>
+        >,
         contract,
         domain: spec.domain,
         operation: spec.operation,

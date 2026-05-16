@@ -28,7 +28,7 @@ That command runs formatting, linting, package build, unit tests, and coverage u
 
 The coverage guardrail is unit-only and counts all production files under `src/**`.
 Live tests are separate confidence checks outside the coverage threshold.
-The low-risk `consumer` publication-surface target is the exception and runs in CI on every push and pull request.
+Package-surface verification runs in CI through `vp run lint:package`.
 
 ## Live Verification
 
@@ -46,13 +46,13 @@ Run the full live suite:
 vp run test:live
 ```
 
-Run just the publication-surface target:
+Run the package-surface checks:
 
 ```bash
-vp run test:live:consumer
+vp run lint:package
 ```
 
-This is optional for normal contributions and requires real credentials. Use it when you need backend sanity checks, release confidence, or verification for stateful flows that unit tests cannot prove.
+The package-surface checks do not require live credentials. Use live tests when you need backend sanity checks, release confidence, or verification for stateful flows that unit tests cannot prove.
 
 Bootstrap runtime tokens with 1Password:
 

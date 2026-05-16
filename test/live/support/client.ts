@@ -1,9 +1,4 @@
-import {
-  createPutioSdkPromiseClient,
-  type createPutioSdkPromiseClient as CreatePutioSdkPromiseClient,
-} from "../../../dist/index.js";
-
-type PutioSdkPromiseClient = ReturnType<typeof CreatePutioSdkPromiseClient>;
+import { createPutioSdkPromiseClient, type PutioSdkPromiseClient } from "../../../dist/index.js";
 
 export const createPromiseClient = async (
   config: Record<string, unknown> = {},

@@ -59,18 +59,18 @@ jobs:
       matrix:
         include:
           - target: node
-            command: pnpm run test:compat:node
+            command: node ./scripts/test-compat-node.mts
           - target: browser-chromium
             browser: chromium
-            command: pnpm run test:compat:browser
+            command: node ./scripts/test-compat-browser.mts
           - target: browser-firefox
             browser: firefox
-            command: pnpm run test:compat:browser
+            command: node ./scripts/test-compat-browser.mts
           - target: browser-webkit
             browser: webkit
-            command: pnpm run test:compat:browser
+            command: node ./scripts/test-compat-browser.mts
           - target: bun
-            command: pnpm run test:compat:bun
+            command: node ./scripts/test-compat-bun.mts
 
     steps:
       - name: Check out repository
@@ -96,7 +96,7 @@ jobs:
 
       - name: Install browser runtime
         if: startsWith(matrix.target, 'browser-')
-        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+        run: vp exec playwright install --with-deps ${{ matrix.browser }}
 
       - name: Verify compatibility
         run: ${{ matrix.command }}

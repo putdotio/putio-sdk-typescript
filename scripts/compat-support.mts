@@ -106,7 +106,7 @@ export const createCompatWorkspace = async (name: string): Promise<CompatWorkspa
 
   await mkdir(packDirectory, { recursive: true });
   await mkdir(workspace, { recursive: true });
-  await run("pnpm", ["pack", "--pack-destination", packDirectory], { cwd: repoRoot });
+  await run("npm", ["pack", "--pack-destination", packDirectory], { cwd: repoRoot });
 
   const tarballs = (await readdir(packDirectory)).filter((entry) => entry.endsWith(".tgz"));
 

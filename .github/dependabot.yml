@@ -12,3 +12,15 @@ updates:
         update-types: ["major"]
     commit-message:
       prefix: "ci"
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      npm-patch-minor:
+        update-types: ["patch", "minor"]
+      npm-major:
+        update-types: ["major"]
+    commit-message:
+      prefix: "chore"

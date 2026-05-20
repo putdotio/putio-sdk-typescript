@@ -64,13 +64,13 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
-    "@types/node": "^24.0.0",
+    "@types/node": "^25.9.1",
     "@vitest/coverage-v8": "4.1.7",
     "is-ci": "^4.1.0",
     "knip": "^6.14.0",
     "playwright": "^1.60.0",
     "publint": "^0.3.21",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vite": "npm:@voidzero-dev/vite-plus-core@0.1.20",
     "vite-plus": "^0.1.20"
   },

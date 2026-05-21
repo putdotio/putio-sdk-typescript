@@ -127,8 +127,6 @@ Credential-fixture variables:
 - `PUTIO_TEST_SECONDARY_TOTP_REFERENCE`
 - `PUTIO_TEST_SECONDARY_TOTP`
 - `PUTIO_CLIENT_ID_THIRD_PARTY`
-- `PUTIO_1PASSWORD_RUNTIME_ITEM_ID`
-- `PUTIO_1PASSWORD_RUNTIME_VAULT`
 
 The secondary-account variables are required for live targets that need durable
 friendship or invite fixtures, including `friends`, `sharing`,
@@ -165,12 +163,9 @@ safe owned MP4 fixture for media flag, URL, HLS, watch status, and start-from
 coverage. The shared-friend clone fixture is seeded from the configured
 secondary account.
 
-If direct token vars are missing, the live harness can still hydrate them from:
-
-1. a runtime-token 1Password item when `OP_SERVICE_ACCOUNT_TOKEN`, `PUTIO_1PASSWORD_RUNTIME_ITEM_ID`, and `PUTIO_1PASSWORD_RUNTIME_VAULT` are set
-2. legacy local aliases
-
-See `.env.example` for the current bootstrap-oriented layout and supported optional aliases.
+Use `pnpm secrets:setup` to render the shared live variables from Infisical into
+`.env.local`. The live harness also accepts legacy local aliases when they are
+already exported in the shell.
 
 Keep token values out of command output, docs, comments, and commits.
 
@@ -188,7 +183,10 @@ Single target:
 vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
 ```
 
-Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from a gitignored `.env.1password` file via `op inject`. The materialized file is `0600` and gitignored. Live commands auto-load `.env.local` first and then `.env`; already-exported environment variables keep highest priority.
+Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from the
+Infisical `/sdk-typescript` path. The materialized file is `0600` and
+gitignored. Live commands auto-load `.env.local` first and then `.env`;
+already-exported environment variables keep highest priority.
 
 ```bash
 pnpm secrets:setup        # one-time per worktree
@@ -198,7 +196,9 @@ pnpm test:live            # runs the broader live suite against pre-existing tok
 pnpm secrets:clean        # before `git worktree remove`
 ```
 
-`secrets:setup` requires private maintainer `op://` references in `.env.1password`, plus an unlocked 1Password CLI session locally or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. External contributors can copy `.env.example` manually for their own live credentials, and unit tests do not require live credentials.
+`secrets:setup` requires the Infisical CLI and access to the put.io frontend
+Development environment. External contributors can copy `.env.example` manually
+for their own live credentials, and unit tests do not require live credentials.
 
 `bootstrap:live-fixtures` validates and seeds the live fixtures that are safe to
 prepare through the public SDK. It establishes the secondary friendship/shared

@@ -3,15 +3,22 @@
 set -euo pipefail
 umask 077
 
-input=".env.1password"
-output=".env.local"
-op_account="${OP_ACCOUNT:-putdotio.1password.com}"
+output="${SECRETS_OUTPUT:-.env.local}"
+infisical_domain="${INFISICAL_API_URL:-https://eu.infisical.com/api}"
+infisical_project_id="${INFISICAL_PROJECT_ID:-b2fcfbd7-19e0-4b87-a797-93d125c432ce}"
+infisical_env="${INFISICAL_ENV:-dev}"
+infisical_path="${INFISICAL_PATH:-/sdk-typescript}"
 
-if [ ! -f "$input" ]; then
-  echo "Missing $input. Create it from private maintainer docs before running secrets:setup." >&2
+if ! command -v infisical >/dev/null 2>&1; then
+  echo "Infisical CLI is required. Install it with: brew install infisical" >&2
   exit 1
 fi
 
-OP_ACCOUNT="$op_account" op whoami >/dev/null
-OP_ACCOUNT="$op_account" op inject -f -i "$input" -o "$output"
+infisical export \
+  --domain "$infisical_domain" \
+  --projectId "$infisical_project_id" \
+  --env "$infisical_env" \
+  --path "$infisical_path" \
+  --format dotenv \
+  --output-file "$output"
 chmod 600 "$output"

@@ -54,14 +54,16 @@ vp run lint:package
 
 The package-surface checks do not require live credentials. Use live tests when you need backend sanity checks, release confidence, or verification for stateful flows that unit tests cannot prove.
 
-Bootstrap runtime tokens with 1Password:
+Bootstrap runtime tokens from the rendered live credentials:
 
 ```bash
-pnpm secrets:setup        # materializes .env.local from a private .env.1password file
+pnpm secrets:setup        # materializes .env.local from the Infisical /sdk-typescript path
 pnpm bootstrap:tokens     # mints fresh first/third-party tokens against the live API
 ```
 
-`secrets:setup` requires a gitignored `.env.1password` file with private `op://` references, plus an unlocked 1Password CLI session locally or `OP_SERVICE_ACCOUNT_TOKEN` exported on shared devboxes / CI. Run `pnpm secrets:clean` before tearing down the worktree.
+`secrets:setup` requires the Infisical CLI and access to the put.io frontend
+Development environment. Run `pnpm secrets:clean` before tearing down the
+worktree.
 
 For single-target commands, safety rules, and fixture expectations, see [Testing](./docs/TESTING.md).
 

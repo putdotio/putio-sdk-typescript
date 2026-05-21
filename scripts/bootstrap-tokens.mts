@@ -24,7 +24,6 @@ const bootstrapped = await bootstrapRuntimeTokens(secrets, async (config = {}) =
 console.log(
   JSON.stringify(
     {
-      persisted: bootstrapped.persisted,
       first_party: {
         scope: bootstrapped.firstParty.scope,
         token_id: bootstrapped.firstParty.tokenId,

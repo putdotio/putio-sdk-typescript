@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { createHmac } from "node:crypto";
 
 import type {
@@ -45,7 +44,6 @@ export type OAuthAppIdentity = {
 
 export type BootstrappedTokens = {
   readonly firstParty: BootstrappedToken;
-  readonly persisted: boolean;
   readonly thirdParty: BootstrappedToken & {
     readonly app: OAuthAppIdentity;
   };
@@ -54,32 +52,9 @@ export type BootstrappedTokens = {
 const THIRD_PARTY_BOOTSTRAP_APP_NAME = "Codex SDK Live App";
 const THIRD_PARTY_BOOTSTRAP_CALLBACK = "https://example.com/codex-sdk-live/callback";
 const THIRD_PARTY_BOOTSTRAP_WEBSITE = "https://example.com/codex-sdk-live";
-const RUNTIME_ITEM_TITLE = "putio-sdk-testing";
 const TOTP_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-const parseOpReference = (
-  reference: string,
-): {
-  readonly item: string;
-  readonly vault: string;
-} | null => {
-  if (!reference.startsWith("op://")) {
-    return null;
-  }
-
-  const [vault, item] = reference.slice("op://".length).split("/", 3);
-
-  if (!vault || !item) {
-    return null;
-  }
-
-  return {
-    item,
-    vault,
-  };
-};
 
 const decodeBase32 = (value: string): Buffer => {
   const normalized = value.replace(/[\s-]/g, "").replace(/=+$/g, "").toUpperCase();
@@ -126,37 +101,6 @@ const generateTotpCode = (secret: string, now = Date.now()): string => {
 
 const readFreshTotp = (secrets: PutioBootstrapSecrets): string => {
   const reference = secrets.credentials.totpReference;
-
-  if (reference?.startsWith("op://")) {
-    const parsedReference = parseOpReference(reference);
-    const result = parsedReference
-      ? spawnSync(
-          "op",
-          ["item", "get", parsedReference.item, "--vault", parsedReference.vault, "--otp"],
-          {
-            env: process.env,
-            stdio: "pipe",
-            encoding: "utf8",
-          },
-        )
-      : spawnSync("op", ["read", reference], {
-          env: process.env,
-          stdio: "pipe",
-          encoding: "utf8",
-        });
-
-    if (result.status !== 0) {
-      throw new Error(`Failed to refresh TOTP code: ${result.stderr || result.stdout}`);
-    }
-
-    const code = result.stdout.trim();
-
-    if (!code) {
-      throw new Error("Refreshed TOTP code was empty");
-    }
-
-    return code;
-  }
 
   if (reference) {
     return generateTotpCode(reference);
@@ -316,62 +260,6 @@ export const bootstrapThirdPartyToken = async (
   };
 };
 
-export const persistRuntimeTokens = (
-  secrets: PutioBootstrapSecrets,
-  payload: {
-    readonly firstParty: BootstrappedToken;
-    readonly thirdParty: BootstrappedToken & {
-      readonly app: OAuthAppIdentity;
-    };
-  },
-): boolean => {
-  if (!process.env.OP_SERVICE_ACCOUNT_TOKEN || !secrets.runtimeItemId) {
-    return false;
-  }
-
-  const editResult = spawnSync(
-    "op",
-    [
-      "item",
-      "edit",
-      secrets.runtimeItemId,
-      "--vault",
-      secrets.runtimeItemVault ??
-        (() => {
-          throw new Error(
-            "Missing PUTIO_1PASSWORD_RUNTIME_VAULT. Set it explicitly when persisting runtime tokens to 1Password.",
-          );
-        })(),
-      "--title",
-      RUNTIME_ITEM_TITLE,
-      `meta.updated_at=${new Date().toISOString()}`,
-      `first_party.access_token[concealed]=${payload.firstParty.accessToken}`,
-      `first_party.scope=${payload.firstParty.scope ?? ""}`,
-      `first_party.token_id=${payload.firstParty.tokenId ?? ""}`,
-      `first_party.user_id=${payload.firstParty.userId ?? ""}`,
-      `third_party.access_token[concealed]=${payload.thirdParty.accessToken}`,
-      `third_party.scope=${payload.thirdParty.scope ?? ""}`,
-      `third_party.token_id=${payload.thirdParty.tokenId ?? ""}`,
-      `third_party.user_id=${payload.thirdParty.userId ?? ""}`,
-      `third_party.app_id=${payload.thirdParty.app.id}`,
-      `third_party.app_name=${payload.thirdParty.app.name}`,
-      "third_party_app_id[delete]",
-      "notesPlain=",
-    ],
-    {
-      env: process.env,
-      stdio: "pipe",
-      encoding: "utf8",
-    },
-  );
-
-  if (editResult.status !== 0) {
-    throw new Error(`Failed to persist runtime tokens: ${editResult.stderr || editResult.stdout}`);
-  }
-
-  return true;
-};
-
 export const bootstrapRuntimeTokens = async (
   secrets: PutioBootstrapSecrets,
   createClient: CreatePromiseClient = createSourcePromiseClient,
@@ -382,14 +270,9 @@ export const bootstrapRuntimeTokens = async (
     secrets.thirdPartyClientId,
     createClient,
   );
-  const persisted = persistRuntimeTokens(secrets, {
-    firstParty,
-    thirdParty,
-  });
 
   return {
     firstParty,
-    persisted,
     thirdParty,
   };
 };

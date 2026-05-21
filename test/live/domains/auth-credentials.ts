@@ -39,7 +39,6 @@ await run(
     );
 
     return {
-      persisted: bootstrapped.persisted,
       first_party_scope: bootstrapped.firstParty.scope,
       third_party_app_id: bootstrapped.thirdParty.app.id,
       third_party_scope: bootstrapped.thirdParty.scope,

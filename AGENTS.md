@@ -41,6 +41,7 @@
 
 - Default tests exclude `test/live/**`.
 - Use `vp run test:live` or the single-target live commands in [Testing](./docs/TESTING.md) when verifying against the real API.
+- Live tests expect maintainer-supplied `PUTIO_SDK_TYPESCRIPT_INFISICAL_*`; `pnpm secrets:setup` writes ignored `.env.local`, and `pnpm secrets:clean` removes it.
 - Keep package-surface verification healthy; `lint:package` is the publication safety net for tarball metadata, public types, and ESM entrypoints.
 
 ## Skills

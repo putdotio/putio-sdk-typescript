@@ -57,12 +57,14 @@ The package-surface checks do not require live credentials. Use live tests when 
 Bootstrap runtime tokens from the rendered live credentials:
 
 ```bash
-pnpm secrets:setup        # materializes .env.local from the Infisical /sdk-typescript path
+pnpm secrets:setup        # materializes .env.local from the repo-owned Infisical path
 pnpm bootstrap:tokens     # mints fresh first/third-party tokens against the live API
 ```
 
 `secrets:setup` requires the Infisical CLI and access to the put.io frontend
-Development environment. Run `pnpm secrets:clean` before tearing down the
+Development environment. Set the onboarding-provided
+`PUTIO_SDK_TYPESCRIPT_INFISICAL_*` variables in this repo or worktree shell
+before running the command. Run `pnpm secrets:clean` before tearing down the
 worktree.
 
 For single-target commands, safety rules, and fixture expectations, see [Testing](./docs/TESTING.md).

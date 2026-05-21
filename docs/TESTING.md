@@ -197,8 +197,8 @@ pnpm secrets:clean        # before `git worktree remove`
 ```
 
 `secrets:setup` requires the Infisical CLI and access to the put.io frontend
-Development environment. External contributors can copy `.env.example` manually
-for their own live credentials, and unit tests do not require live credentials.
+Development environment. You can copy `.env.example` manually when using your
+own live credentials, and unit tests do not require live credentials.
 
 `bootstrap:live-fixtures` validates and seeds the live fixtures that are safe to
 prepare through the public SDK. It establishes the secondary friendship/shared

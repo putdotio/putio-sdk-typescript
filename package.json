@@ -71,11 +71,11 @@
     "playwright": "^1.60.0",
     "publint": "^0.3.21",
     "typescript": "^6.0.3",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.1.20",
-    "vite-plus": "^0.1.20"
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.1.22",
+    "vite-plus": "^0.1.22"
   },
   "engines": {
     "node": ">=24.14.0"
   },
-  "packageManager": "pnpm@11.0.0"
+  "packageManager": "pnpm@11.2.2"
 }

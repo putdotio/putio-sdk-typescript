@@ -13,8 +13,8 @@ importers:
   .:
     dependencies:
       effect:
-        specifier: 4.0.0-beta.69
-        version: 4.0.0-beta.69
+        specifier: 4.0.0-beta.70
+        version: 4.0.0-beta.70
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: ^0.18.2
@@ -30,7 +30,7 @@ importers:
         version: 4.1.0
       knip:
         specifier: ^6.14.0
-        version: 6.14.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
+        version: 6.14.2(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
       playwright:
         specifier: ^1.60.0
         version: 1.60.0
@@ -111,33 +111,33 @@ packages:
   '@loaderkit/resolve@1.0.5':
     resolution: {integrity: sha512-fhkdGM57xhJ7CO91MUgbQlb0ClP0AJ9vB3yoVnBTslYJqrJOCVEbOprZcxZlexdMbmTBPQqVcQYr+j4oRRtIZA==}
 
-  '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
-    resolution: {integrity: sha512-QZHtlVgbAdy2zAqNA9Gu1UpIuI8Xvsd1v8ic6B2pZmeFnFcMWiPLfWXh7TVw4eGEZ/C9TH281KwhVoeQUKbyjw==}
+  '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
+    resolution: {integrity: sha512-LCkGo6JDfaBhgST7UpPWgNgLINpcpabaHfyz5OBx75nUYxBsaEPxjnyNjWpeb/xBup/682QnBfRBy2/LvPutZQ==}
     cpu: [arm64]
     os: [darwin]
 
-  '@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.3':
-    resolution: {integrity: sha512-mdzd3AVzYKuUmiWOQ8GNhl64/IoFGol569zNRdkLReh6LRLHOXxU4U8eq0JwaD8iFHdVGqSy4IjFL4reoWCDFw==}
+  '@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.4':
+    resolution: {integrity: sha512-zExlW9zUJKZH/tOtVMttwjKa4Xm/3KcNjnE3dPN92uCktwavMxpgCA3MoJK/DOnTWsQgo224OaST27/mPNAf+w==}
     cpu: [x64]
     os: [darwin]
 
-  '@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.3':
-    resolution: {integrity: sha512-YxQL+ax0XqBJDZiKimS2XQaf+2wDGVa1enVRGzEvLLVFeqa5kx2bWbtcSXgsxjQB7nRqqIGFIcLteF/sHeVtQg==}
+  '@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.4':
+    resolution: {integrity: sha512-dgX0P/9wGPJeHFBG+ZmhgE6bmtMt7NP5CRBGyyktpopdk/mW4POnrpQsSLtKI1dwpc+pPLuXHDh6vvskyQE/sw==}
     cpu: [arm64]
     os: [linux]
 
-  '@msgpackr-extract/msgpackr-extract-linux-arm@3.0.3':
-    resolution: {integrity: sha512-fg0uy/dG/nZEXfYilKoRe7yALaNmHoYeIoJuJ7KJ+YyU2bvY8vPv27f7UKhGRpY6euFYqEVhxCFZgAUNQBM3nw==}
+  '@msgpackr-extract/msgpackr-extract-linux-arm@3.0.4':
+    resolution: {integrity: sha512-Tg3yX65f5GbtXLkrYEHE5oibZG9epyYWas7FogTTEJeDEF9JlXJzKgXaNhT3UXlTOeA+AfZpYZYZ0uPj7Cfquw==}
     cpu: [arm]
     os: [linux]
 
-  '@msgpackr-extract/msgpackr-extract-linux-x64@3.0.3':
-    resolution: {integrity: sha512-cvwNfbP07pKUfq1uH+S6KJ7dT9K8WOE4ZiAcsrSes+UY55E/0jLYc+vq+DO7jlmqRb5zAggExKm0H7O/CBaesg==}
+  '@msgpackr-extract/msgpackr-extract-linux-x64@3.0.4':
+    resolution: {integrity: sha512-8TNXMEjJc3QEy7R/x1INhgiU+XakDAFUzBhaz7+Rbrs8NH5UQeHQxxmzsSBJGyV6I1jW79undiQm8tOI+D+8FQ==}
     cpu: [x64]
     os: [linux]
 
-  '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.3':
-    resolution: {integrity: sha512-x0fWaQtYp4E6sktbsdAqnehxDgEc/VwM7uLsRCYWaiGu0ykYdZPiS8zCWdnjHwyiumousxfBm4SO31eXqwEZhQ==}
+  '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.4':
+    resolution: {integrity: sha512-CmCXPQrkbwExx3j946/PtHWHbYJiCRBRDl4BlkRQcJB/YOwQxJRTpoo7aTsortjgoJ1x7opzTSxn7C+ASSLVjQ==}
     cpu: [x64]
     os: [win32]
 
@@ -962,8 +962,8 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
-  effect@4.0.0-beta.69:
-    resolution: {integrity: sha512-o6og4Dkh0/esTnCJq7UwQ5PZhuQQYCxNCrEYPVk5Z2Fo7oPTHj0/AAVi5kF2Dln53+jEVxA7quXMC/+jPnATuw==}
+  effect@4.0.0-beta.70:
+    resolution: {integrity: sha512-8AwGTRiNriirHGEYHrOS0E9fzdhIqCdZjiHP1YXmNo2UyPGS43ILsymsSHT7V0DJS+8dvlKq2RxnrDBUhDNZHg==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -1077,8 +1077,8 @@ packages:
   js-tokens@10.0.0:
     resolution: {integrity: sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q==}
 
-  knip@6.14.1:
-    resolution: {integrity: sha512-SN3Ly0ixzj5CQkY/rc4OPHpWrCC0XRIIjgdP76G9Cni5k72ur5jBYOyvJuF5oPTM14v8eHcMUgPbElHa+lnR0g==}
+  knip@6.14.2:
+    resolution: {integrity: sha512-Vg3JhIINjZew1I7qAFI4UHemW1mc4azP/BxJvsq9eGDfxpGO7oVCuD/bsWkog9TO/ZwwJeAeOMFZ1kd9jnY9+Q==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
@@ -1195,12 +1195,12 @@ packages:
     resolution: {integrity: sha512-Y3wQdFg2Va6etvQ5I82yUhGdsKrcYox6p7FfL1LbK2J4V01F9TGlepTIhnK24t7koZibmg82KGglhA1XK5IsLQ==}
     engines: {node: '>=10'}
 
-  msgpackr-extract@3.0.3:
-    resolution: {integrity: sha512-P0efT1C9jIdVRefqjzOQ9Xml57zpOXnIuS+csaB4MdZbTdmGDLo8XhzBG1N7aO11gKDDkJvBLULeFTo46wwreA==}
+  msgpackr-extract@3.0.4:
+    resolution: {integrity: sha512-4kmO/MdyUIkLIvTPr8VHLil4AtoKIoniWPIEk5+CDy0xnWC84azhSFmuJ7PxZdsYtiP5kEeQsORAVIeMgxT+Hw==}
     hasBin: true
 
-  msgpackr@2.0.1:
-    resolution: {integrity: sha512-9J+tqTEsbHqY8YohazYgty7LgerFIWxvMLpUjqETSmjHojtJm2WnX2kK/2a1fLI7CO7ERP1YSEUXMucz4j+yBA==}
+  msgpackr@2.0.2:
+    resolution: {integrity: sha512-c5hYOXFbP79Slh6Dzd2wzk+jnV7mX1UxfMYtilnY1NmalXPqG8DGb5cYCMBrW4AsH3zekBBZd4QrKz9NhtvYLQ==}
 
   multipasta@0.2.7:
     resolution: {integrity: sha512-KPA58d68KgGil15oDqXjkUBEBYc00XvbPj5/X+dyzeo/lWm9Nc25pQRlf1D+gv4OpK7NM0J1odrbu9JNNGvynA==}
@@ -1384,6 +1384,10 @@ packages:
 
   tinyexec@1.1.2:
     resolution: {integrity: sha512-dAqSqE/RabpBKI8+h26GfLq6Vb3JVXs30XYQjdMjaj/c2tS8IYYMbIzP599KtRj7c57/wYApb3QjgRgXmrCukA==}
+    engines: {node: '>=18'}
+
+  tinyexec@1.2.2:
+    resolution: {integrity: sha512-M/Q0B2cp4K7kynaT/vnED1j8TlLY+Pp7C6Wl2bl/7u/F0mUVwdyOpwomQb8JpYLitHUssAJRmLZdMCGsrx7i+g==}
     engines: {node: '>=18'}
 
   tinyglobby@0.2.16:
@@ -1603,22 +1607,22 @@ snapshots:
     dependencies:
       '@braidai/lang': 1.1.2
 
-  '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.3':
+  '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     optional: true
 
-  '@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.3':
+  '@msgpackr-extract/msgpackr-extract-darwin-x64@3.0.4':
     optional: true
 
-  '@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.3':
+  '@msgpackr-extract/msgpackr-extract-linux-arm64@3.0.4':
     optional: true
 
-  '@msgpackr-extract/msgpackr-extract-linux-arm@3.0.3':
+  '@msgpackr-extract/msgpackr-extract-linux-arm@3.0.4':
     optional: true
 
-  '@msgpackr-extract/msgpackr-extract-linux-x64@3.0.3':
+  '@msgpackr-extract/msgpackr-extract-linux-x64@3.0.4':
     optional: true
 
-  '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.3':
+  '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.4':
     optional: true
 
   '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
@@ -2128,14 +2132,14 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
-  effect@4.0.0-beta.69:
+  effect@4.0.0-beta.70:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 4.8.0
       find-my-way-ts: 0.1.6
       ini: 7.0.0
       kubernetes-types: 1.30.0
-      msgpackr: 2.0.1
+      msgpackr: 2.0.2
       multipasta: 0.2.7
       toml: 4.1.1
       uuid: 14.0.0
@@ -2222,7 +2226,7 @@ snapshots:
 
   js-tokens@10.0.0: {}
 
-  knip@6.14.1(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0):
+  knip@6.14.2(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0):
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
       formatly: 0.3.0
@@ -2328,21 +2332,21 @@ snapshots:
 
   mrmime@2.0.1: {}
 
-  msgpackr-extract@3.0.3:
+  msgpackr-extract@3.0.4:
     dependencies:
       node-gyp-build-optional-packages: 5.2.2
     optionalDependencies:
-      '@msgpackr-extract/msgpackr-extract-darwin-arm64': 3.0.3
-      '@msgpackr-extract/msgpackr-extract-darwin-x64': 3.0.3
-      '@msgpackr-extract/msgpackr-extract-linux-arm': 3.0.3
-      '@msgpackr-extract/msgpackr-extract-linux-arm64': 3.0.3
-      '@msgpackr-extract/msgpackr-extract-linux-x64': 3.0.3
-      '@msgpackr-extract/msgpackr-extract-win32-x64': 3.0.3
+      '@msgpackr-extract/msgpackr-extract-darwin-arm64': 3.0.4
+      '@msgpackr-extract/msgpackr-extract-darwin-x64': 3.0.4
+      '@msgpackr-extract/msgpackr-extract-linux-arm': 3.0.4
+      '@msgpackr-extract/msgpackr-extract-linux-arm64': 3.0.4
+      '@msgpackr-extract/msgpackr-extract-linux-x64': 3.0.4
+      '@msgpackr-extract/msgpackr-extract-win32-x64': 3.0.4
     optional: true
 
-  msgpackr@2.0.1:
+  msgpackr@2.0.2:
     optionalDependencies:
-      msgpackr-extract: 3.0.3
+      msgpackr-extract: 3.0.4
 
   multipasta@0.2.7: {}
 
@@ -2587,6 +2591,8 @@ snapshots:
 
   tinyexec@1.1.2: {}
 
+  tinyexec@1.2.2: {}
+
   tinyglobby@0.2.16:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.4)
@@ -2683,7 +2689,7 @@ snapshots:
       picomatch: 4.0.4
       std-env: 4.1.0
       tinybench: 2.9.0
-      tinyexec: 1.1.2
+      tinyexec: 1.2.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
       vite: '@voidzero-dev/vite-plus-core@0.1.22(@arethetypeswrong/core@0.18.2)(@types/node@25.9.1)(jiti@2.7.0)(publint@0.3.21)(typescript@6.0.3)(yaml@2.9.0)'

@@ -60,7 +60,7 @@
     "verify": "vp check . && vp pack && vp test --passWithNoTests && vp test --coverage --passWithNoTests"
   },
   "dependencies": {
-    "effect": "4.0.0-beta.78"
+    "effect": "4.0.0-beta.83"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",

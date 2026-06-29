@@ -301,6 +301,15 @@ export type RecoveryCodesError = PutioOperationFailure<typeof RecoveryCodesError
 export type RegenerateRecoveryCodesError = PutioOperationFailure<
   typeof RegenerateRecoveryCodesErrorSpec
 >;
+export type LoginInput = {
+  readonly clientId: string | number;
+  readonly clientSecret: string;
+  readonly password: string;
+  readonly username: string;
+  readonly callbackUrl?: string;
+  readonly clientName?: string;
+  readonly fingerprint?: string;
+};
 export const buildAuthLoginUrl = (options: {
   readonly clientId: string | number;
   readonly redirectUri: string;
@@ -317,14 +326,9 @@ export const buildAuthLoginUrl = (options: {
     response_type: options.responseType ?? "token",
     state: options.state,
   });
-export const login = (input: {
-  readonly clientId: string | number;
-  readonly clientSecret: string;
-  readonly password: string;
-  readonly username: string;
-  readonly clientName?: string;
-  readonly fingerprint?: string;
-}): Effect.Effect<LoginResponse, LoginError, PutioSdkContext> =>
+export const login = (
+  input: LoginInput,
+): Effect.Effect<LoginResponse, LoginError, PutioSdkContext> =>
   requestJson(LoginResponseSchema, {
     auth: {
       type: "basic",
@@ -336,6 +340,7 @@ export const login = (input: {
       ? `/v2/oauth2/authorizations/clients/${encodePathSegment(input.clientId)}/${encodePathSegment(input.fingerprint)}`
       : `/v2/oauth2/authorizations/clients/${encodePathSegment(input.clientId)}`,
     query: {
+      callback_url: input.callbackUrl,
       client_name: input.clientName,
       client_secret: input.clientSecret,
     },

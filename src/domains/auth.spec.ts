@@ -67,6 +67,7 @@ describe("auth domain", () => {
 
     const loginResult = await runSdkEffect(
       login({
+        callbackUrl: "https://example.com/callback",
         clientId: 42,
         clientName: "Codex",
         clientSecret: "secret",
@@ -76,7 +77,7 @@ describe("auth domain", () => {
       }),
       (request) => {
         expect(request.url).toBe(
-          "https://api.put.io/v2/oauth2/authorizations/clients/42/fingerprint-1?client_name=Codex&client_secret=secret",
+          "https://api.put.io/v2/oauth2/authorizations/clients/42/fingerprint-1?callback_url=https%3A%2F%2Fexample.com%2Fcallback&client_name=Codex&client_secret=secret",
         );
         expect(getAuthorizationHeader(request)).toBe("Basic c2RrOnBhc3M=");
 

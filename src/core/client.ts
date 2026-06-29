@@ -42,6 +42,7 @@ import {
   validateToken,
   verifyTOTP,
   type GenerateTOTPResponse,
+  type LoginInput,
   type LoginResponse,
   type RegisterInput,
   type TwoFactorRecoveryCodes,
@@ -664,14 +665,7 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
       getVoucher: (code: string) => provideSdk(config, getVoucher(code)),
       grants: (): Promise<ReadonlyArray<OAuthApp>> => provideSdk(config, grants()),
       linkDevice: (code: string) => provideSdk(config, linkDevice(code)),
-      login: (input: {
-        readonly clientId: string | number;
-        readonly clientSecret: string;
-        readonly password: string;
-        readonly username: string;
-        readonly clientName?: string;
-        readonly fingerprint?: string;
-      }): Promise<LoginResponse> => provideSdk(config, login(input)),
+      login: (input: LoginInput): Promise<LoginResponse> => provideSdk(config, login(input)),
       logout: () => provideSdk(config, logout()),
       register: (input: RegisterInput) => provideSdk(config, register(input)),
       resetPassword: (key: string, password: string) =>

@@ -51,6 +51,7 @@ const sdk = createPutioSdkPromiseClient();
 
 const validation = await sdk.auth.validateToken(tokenToCheck);
 const login = await sdk.auth.login({
+  callbackUrl,
   clientId,
   clientSecret,
   password,

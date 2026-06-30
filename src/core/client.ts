@@ -690,10 +690,10 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
     config: {
       deleteKey: (key: string) => provideSdk(config, deleteConfigKey(key)),
       getKey: (key: string): Promise<PutioJsonValue> => provideSdk(config, getConfigKey(key)),
-      getKeyWith: <A>(key: string, schema: Schema.Decoder<A, never>): Promise<A> =>
+      getKeyWith: <A>(key: string, schema: Schema.ConstraintDecoder<A, never>): Promise<A> =>
         provideSdk(config, getConfigKeyWith(key, schema)),
       read: (): Promise<PutioJsonObject> => provideSdk(config, readConfig()),
-      readWith: <A>(schema: Schema.Decoder<A, never>): Promise<A> =>
+      readWith: <A>(schema: Schema.ConstraintDecoder<A, never>): Promise<A> =>
         provideSdk(config, readConfigWith(schema)),
       setKey: (key: string, value: PutioJsonValue) => provideSdk(config, setConfigKey(key, value)),
       write: (value: PutioJsonObject) => provideSdk(config, writeConfig(value)),

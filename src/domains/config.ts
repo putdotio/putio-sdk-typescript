@@ -60,7 +60,7 @@ export const readConfig = (): Effect.Effect<PutioJsonObject, PutioSdkError, Puti
     path: "/v2/config",
   }).pipe(selectJsonField("config"));
 export const readConfigWith = <A>(
-  schema: Schema.Decoder<A, never>,
+  schema: Schema.ConstraintDecoder<A, never>,
 ): Effect.Effect<A, PutioSdkError, PutioSdkContext> =>
   requestJson(
     Schema.Struct({
@@ -94,7 +94,7 @@ export const getConfigKey = (
   }).pipe(selectJsonField("value"));
 export const getConfigKeyWith = <A>(
   key: string,
-  schema: Schema.Decoder<A, never>,
+  schema: Schema.ConstraintDecoder<A, never>,
 ): Effect.Effect<A, PutioSdkError, PutioSdkContext> =>
   requestJson(
     Schema.Struct({

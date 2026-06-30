@@ -211,6 +211,9 @@ describe("payment domain", () => {
               currency: "USD",
               next_billing_date: "2026-04-17",
             },
+            "Paddle Billing": {
+              next_billing_date: "2026-04-17",
+            },
             amount: "7.99",
             charge_amount: true,
             credit: null,
@@ -265,6 +268,11 @@ describe("payment domain", () => {
               provider: "Fastspring",
               type: "credit-card",
               url: "https://checkout.put.io",
+            },
+            {
+              price_id: "pri_123",
+              provider: "Paddle Billing",
+              type: "credit-card",
             },
           ],
         });
@@ -349,6 +357,32 @@ describe("payment domain", () => {
 
     expect(
       await runSdkEffect(
+        payment.getPaddleBillingInvoiceUrl(123),
+        (request) => {
+          expect(request.url).toBe(
+            "https://api.put.io/v2/payment/methods/paddle_billing/invoice/123",
+          );
+          return jsonResponse({ url: "https://paddle.test/invoice.pdf" });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).toBe("https://paddle.test/invoice.pdf");
+
+    expect(
+      await runSdkEffect(
+        payment.createPaddleBillingUpdatePaymentMethodTransaction(456),
+        (request) => {
+          expect(request.url).toBe(
+            "https://api.put.io/v2/payment/methods/paddle_billing/update_payment_method/456",
+          );
+          return jsonResponse({ transaction_id: "txn_123" });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).toBe("txn_123");
+
+    expect(
+      await runSdkEffect(
         payment.createCoinbaseCharge("plan/path"),
         (request) => {
           expect(getFormBody(request).get("plan_fs_path")).toBe("plan/path");
@@ -371,17 +405,6 @@ describe("payment domain", () => {
         { accessToken: "token-123" },
       ),
     ).toBe("https://checkout.opennode.com");
-
-    expect(
-      await runSdkEffect(
-        payment.createNanoPaymentRequest("nano-plan"),
-        (request) => {
-          expect(getFormBody(request).get("plan_code")).toBe("nano-plan");
-          return jsonResponse({ nano: { token: "nano-token" }, status: "OK" });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toBe("nano-token");
   });
 
   it("maps payment operation failures", async () => {
@@ -408,6 +431,82 @@ describe("payment domain", () => {
       domain: "payment",
       operation: "submitChangePlan",
       status: 410,
+    });
+
+    const paddleBillingSubmitFailure = await runSdkExit(
+      payment.submitPaymentChangePlan({
+        coupon_code: "BAD",
+        plan_path: "pro/monthly",
+      }),
+      () =>
+        jsonResponse(
+          {
+            error_message: "Coupon is invalid.",
+            error_type: "PADDLE_BILLING_INVALID_COUPON",
+            status_code: 400,
+          },
+          { status: 400 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    const paddleBillingSubmitError = expectFailure(paddleBillingSubmitFailure);
+    expect(paddleBillingSubmitError).toBeInstanceOf(PutioOperationError);
+    expect(paddleBillingSubmitError).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "payment",
+      operation: "submitChangePlan",
+      reason: {
+        errorType: "PADDLE_BILLING_INVALID_COUPON",
+        kind: "error_type",
+      },
+      status: 400,
+    });
+
+    const invoiceFailure = await runSdkExit(
+      payment.getPaddleBillingInvoiceUrl(123),
+      () =>
+        jsonResponse(
+          {
+            error_message: "Cannot find Paddle Billing payment.",
+            error_type: "PADDLE_BILLING_PAYMENT_NOT_FOUND",
+            status_code: 404,
+          },
+          { status: 404 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    const invoiceError = expectFailure(invoiceFailure);
+    expect(invoiceError).toBeInstanceOf(PutioOperationError);
+    expect(invoiceError).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "payment",
+      operation: "getPaddleBillingInvoiceUrl",
+      status: 404,
+    });
+
+    const updateFailure = await runSdkExit(
+      payment.createPaddleBillingUpdatePaymentMethodTransaction(456),
+      () =>
+        jsonResponse(
+          {
+            error_message: "Paddle Billing subscription is canceled.",
+            error_type: "PADDLE_BILLING_SUBSCRIPTION_CANCELED",
+            status_code: 404,
+          },
+          { status: 404 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    const updateError = expectFailure(updateFailure);
+    expect(updateError).toBeInstanceOf(PutioOperationError);
+    expect(updateError).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "payment",
+      operation: "createPaddleBillingUpdatePaymentMethodTransaction",
+      status: 404,
     });
   });
 });

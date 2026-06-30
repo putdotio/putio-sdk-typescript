@@ -178,10 +178,11 @@ import {
   classifyPaymentChangePlanResponse,
   confirmFastspringOrder,
   createCoinbaseCharge,
-  createNanoPaymentRequest,
   createOpenNodeCharge,
+  createPaddleBillingUpdatePaymentMethodTransaction,
   createPaddleWaitingPayment,
   getPaymentInfo,
+  getPaddleBillingInvoiceUrl,
   getPaymentVoucherInfo,
   listPaymentHistory,
   listPaymentInvites,
@@ -488,8 +489,9 @@ export const createPutioSdkEffectClient = () => ({
     methods: {
       addPaddleWaitingPayment: createPaddleWaitingPayment,
       createCoinbaseCharge,
-      createNanoPaymentRequest,
       createOpenNodeCharge,
+      createPaddleBillingUpdatePaymentMethodTransaction,
+      getPaddleBillingInvoiceUrl,
     },
     report: reportPayments,
     stopSubscription: stopPaymentSubscription,
@@ -943,10 +945,14 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
           provideSdk(config, createPaddleWaitingPayment(input)),
         createCoinbaseCharge: (planPath: string): Promise<string> =>
           provideSdk(config, createCoinbaseCharge(planPath)),
-        createNanoPaymentRequest: (planCode: string): Promise<string> =>
-          provideSdk(config, createNanoPaymentRequest(planCode)),
         createOpenNodeCharge: (planPath: string): Promise<string> =>
           provideSdk(config, createOpenNodeCharge(planPath)),
+        createPaddleBillingUpdatePaymentMethodTransaction: (
+          userSubscriptionId: number,
+        ): Promise<string> =>
+          provideSdk(config, createPaddleBillingUpdatePaymentMethodTransaction(userSubscriptionId)),
+        getPaddleBillingInvoiceUrl: (paymentId: number): Promise<string> =>
+          provideSdk(config, getPaddleBillingInvoiceUrl(paymentId)),
       },
       report: (paymentIds: ReadonlyArray<number>) => provideSdk(config, reportPayments(paymentIds)),
       stopSubscription: () => provideSdk(config, stopPaymentSubscription()),

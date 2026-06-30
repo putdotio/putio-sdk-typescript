@@ -399,22 +399,6 @@ await run("payment opennode invalid plan yields typed 400", async () => {
   }
 });
 
-await run("payment nano invalid plan yields typed 400", async () => {
-  await getOwnerPaymentInfo();
-
-  try {
-    await ownerClient.payment.methods.createNanoPaymentRequest("");
-    throw new Error("expected createNanoPaymentRequest to fail");
-  } catch (error) {
-    return assertOperationError(error, {
-      domain: "payment",
-      operation: "createNanoPaymentRequest",
-      errorType: "PAYMENT_UNKNOWN_PLAN",
-      statusCode: 400,
-    });
-  }
-});
-
 await run("payment sub-account preview is rejected", async () => {
   const subAccountClient = await getSubAccountClient();
 

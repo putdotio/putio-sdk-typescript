@@ -309,10 +309,13 @@ vi.mock("../domains/payment.js", async () => {
     classifyPaymentChangePlanResponse: vi.fn((input) => ({ classified: input })),
     confirmFastspringOrder: vi.fn((reference) => Effect.succeed(reference === "ok")),
     createCoinbaseCharge: vi.fn((planPath) => Effect.succeed(`coinbase:${planPath}`)),
-    createNanoPaymentRequest: vi.fn((planCode) => Effect.succeed(`nano:${planCode}`)),
     createOpenNodeCharge: vi.fn((planPath) => Effect.succeed(`opennode:${planPath}`)),
+    createPaddleBillingUpdatePaymentMethodTransaction: vi.fn((id) =>
+      Effect.succeed(`paddle-billing-update:${id}`),
+    ),
     createPaddleWaitingPayment: vi.fn((input) => Effect.succeed({ waiting: input })),
     getPaymentInfo: vi.fn(() => Effect.succeed({ active: true })),
+    getPaddleBillingInvoiceUrl: vi.fn((id) => Effect.succeed(`paddle-billing-invoice:${id}`)),
     getPaymentVoucherInfo: vi.fn((code) => Effect.succeed({ code, valid: true })),
     listPaymentHistory: vi.fn((query) => Effect.succeed([{ id: 1, query }])),
     listPaymentInvites: vi.fn(() => Effect.succeed([{ code: "invite" }])),
@@ -711,8 +714,13 @@ describe("sdk promise client adapters", () => {
       waiting: { plan: "pro" },
     });
     expect(await client.payment.methods.createCoinbaseCharge("pro")).toBe("coinbase:pro");
-    expect(await client.payment.methods.createNanoPaymentRequest("nano")).toBe("nano:nano");
     expect(await client.payment.methods.createOpenNodeCharge("pro")).toBe("opennode:pro");
+    expect(
+      await client.payment.methods.createPaddleBillingUpdatePaymentMethodTransaction(456),
+    ).toBe("paddle-billing-update:456");
+    expect(await client.payment.methods.getPaddleBillingInvoiceUrl(123)).toBe(
+      "paddle-billing-invoice:123",
+    );
     expect(await client.payment.report([1, 2])).toEqual({ reported: [1, 2] });
     expect(await client.payment.stopSubscription()).toEqual({ stopped: true });
     expect(await client.payment.voucher.getInfo("voucher")).toEqual({

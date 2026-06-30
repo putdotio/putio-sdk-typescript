@@ -15,11 +15,11 @@ export const PaymentPlanTypeSchema = Schema.Literals(["onetime", "subscription"]
 export const PaymentOptionPlanTypeSchema = Schema.Literals(["onetime", "subscription", "trial"]);
 export const PaymentProviderNameSchema = Schema.Literals([
   "Paddle",
+  "Paddle Billing",
   "Fastspring",
   "OpenNode",
-  "AcceptNano",
 ]);
-export const PaymentTypeSchema = Schema.Literals(["credit-card", "cryptocurrency", "nano"]);
+export const PaymentTypeSchema = Schema.Literals(["credit-card", "cryptocurrency"]);
 export const UserSubscriptionStatusSchema = Schema.Literals([
   "ACTIVE",
   "CANCELED",
@@ -149,6 +149,9 @@ const PaymentChangePlanProviderPaddlePreviewSchema = Schema.Struct({
   currency: Schema.String,
   next_billing_date: Schema.NullOr(Schema.String),
 });
+const PaymentChangePlanProviderPaddleBillingPreviewSchema = Schema.Struct({
+  next_billing_date: Schema.NullOr(Schema.String),
+});
 const PaymentChangePlanProviderFastspringPreviewSchema = Schema.Struct({
   charge_amount: Schema.NullOr(Schema.String),
   currency: Schema.String,
@@ -162,6 +165,7 @@ const PaymentChangePlanDiscountSchema = Schema.Struct({
 export const PaymentChangePlanPreviewSchema = Schema.Struct({
   Fastspring: PaymentChangePlanProviderFastspringPreviewSchema,
   Paddle: PaymentChangePlanProviderPaddlePreviewSchema,
+  "Paddle Billing": PaymentChangePlanProviderPaddleBillingPreviewSchema,
   amount: Schema.NullOr(Schema.String),
   charge_amount: Schema.Boolean,
   credit: Schema.NullOr(Schema.String),
@@ -180,6 +184,11 @@ const PaddlePaymentProviderSchema = Schema.Struct({
   type: Schema.Literal("credit-card"),
   vendor_id: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+const PaddleBillingPaymentProviderSchema = Schema.Struct({
+  price_id: Schema.NullOr(Schema.String),
+  provider: Schema.Literal("Paddle Billing"),
+  type: Schema.Literal("credit-card"),
+});
 const FastspringPaymentProviderSchema = Schema.Struct({
   provider: Schema.Literal("Fastspring"),
   type: Schema.Literal("credit-card"),
@@ -190,19 +199,10 @@ const OpenNodePaymentProviderSchema = Schema.Struct({
   provider: Schema.Literal("OpenNode"),
   type: Schema.Literal("cryptocurrency"),
 });
-const AcceptNanoPaymentProviderSchema = Schema.Struct({
-  amount: Schema.String,
-  api_host: Schema.String,
-  currency: Schema.Literal("USD"),
-  discount_percent: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-  provider: Schema.Literal("AcceptNano"),
-  state: Schema.String,
-  type: Schema.Literal("nano"),
-});
 export const PaymentProviderSchema = Schema.Union([
-  AcceptNanoPaymentProviderSchema,
   FastspringPaymentProviderSchema,
   OpenNodePaymentProviderSchema,
+  PaddleBillingPaymentProviderSchema,
   PaddlePaymentProviderSchema,
 ]);
 const PaymentChangePlanCheckoutSchema = Schema.Struct({
@@ -235,6 +235,14 @@ const PaymentFastspringConfirmEnvelopeSchema = Schema.Struct({
   confirmed: Schema.Boolean,
   status: Schema.Literal("OK"),
 });
+const PaymentPaddleBillingInvoiceEnvelopeSchema = Schema.Struct({
+  status: Schema.optional(Schema.Literal("OK")),
+  url: Schema.String,
+});
+const PaymentPaddleBillingUpdatePaymentMethodEnvelopeSchema = Schema.Struct({
+  status: Schema.optional(Schema.Literal("OK")),
+  transaction_id: Schema.String,
+});
 const PaymentVoucherPlanSchema = Schema.Struct({
   expiration_date: Schema.NullOr(Schema.String),
   type: Schema.NullOr(PaymentPlanTypeSchema),
@@ -252,12 +260,6 @@ export const PaymentVoucherInfoSchema = Schema.Struct({
   new_remaining_days: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   status: Schema.Literal("OK"),
   target_plan: PaymentVoucherTargetPlanSchema,
-});
-const PaymentNanoRequestEnvelopeSchema = Schema.Struct({
-  nano: Schema.Struct({
-    token: Schema.String,
-  }),
-  status: Schema.Literal("OK"),
 });
 const PaymentOpenNodeChargeEnvelopeSchema = Schema.Struct({
   opennode: Schema.Struct({
@@ -352,6 +354,8 @@ export const SubmitPaymentChangePlanErrorSpec = definePutioOperationErrorSpec({
   operation: "submitChangePlan",
   knownErrors: [
     { errorType: "PADDLE_ERROR", statusCode: 400 as const },
+    { errorType: "PADDLE_BILLING_INVALID_COUPON", statusCode: 400 as const },
+    { errorType: "PADDLE_BILLING_SUBSCRIPTION_CANNOT_CHANGE_PLAN", statusCode: 400 as const },
     { errorType: "CONFIRMATION_NOT_FOUND", statusCode: 404 as const },
     { errorType: "INVALID_CONFIRMATION", statusCode: 400 as const },
     { errorType: "PAYMENT_COUPON_CODE_NO_LONGER_AVAILABLE", statusCode: 410 as const },
@@ -430,6 +434,27 @@ export const CreatePaddleWaitingPaymentErrorSpec = definePutioOperationErrorSpec
     { statusCode: 404 as const },
   ],
 });
+export const GetPaddleBillingInvoiceUrlErrorSpec = definePutioOperationErrorSpec({
+  domain: "payment",
+  operation: "getPaddleBillingInvoiceUrl",
+  knownErrors: [
+    { errorType: "PADDLE_BILLING_PAYMENT_NOT_FOUND", statusCode: 404 as const },
+    { errorType: "PADDLE_BILLING_INVOICE_NOT_AVAILABLE", statusCode: 404 as const },
+    ...CommonPaymentActionErrors,
+    { statusCode: 404 as const },
+  ],
+});
+export const CreatePaddleBillingUpdatePaymentMethodTransactionErrorSpec =
+  definePutioOperationErrorSpec({
+    domain: "payment",
+    operation: "createPaddleBillingUpdatePaymentMethodTransaction",
+    knownErrors: [
+      { errorType: "PADDLE_BILLING_SUBSCRIPTION_NOT_FOUND", statusCode: 404 as const },
+      { errorType: "PADDLE_BILLING_SUBSCRIPTION_CANCELED", statusCode: 404 as const },
+      ...CommonPaymentActionErrors,
+      { statusCode: 404 as const },
+    ],
+  });
 export const CreateCoinbaseChargeErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "createCoinbaseCharge",
@@ -442,15 +467,6 @@ export const CreateCoinbaseChargeErrorSpec = definePutioOperationErrorSpec({
 export const CreateOpenNodeChargeErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "createOpenNodeCharge",
-  knownErrors: [
-    { errorType: "PAYMENT_UNKNOWN_PLAN", statusCode: 400 as const },
-    ...CommonPaymentActionErrors,
-    { statusCode: 400 as const },
-  ],
-});
-export const CreateNanoPaymentRequestErrorSpec = definePutioOperationErrorSpec({
-  domain: "payment",
-  operation: "createNanoPaymentRequest",
   knownErrors: [
     { errorType: "PAYMENT_UNKNOWN_PLAN", statusCode: 400 as const },
     ...CommonPaymentActionErrors,
@@ -480,11 +496,14 @@ export type ReportPaymentsError = PutioOperationFailure<typeof ReportPaymentsErr
 export type CreatePaddleWaitingPaymentError = PutioOperationFailure<
   typeof CreatePaddleWaitingPaymentErrorSpec
 >;
+export type GetPaddleBillingInvoiceUrlError = PutioOperationFailure<
+  typeof GetPaddleBillingInvoiceUrlErrorSpec
+>;
+export type CreatePaddleBillingUpdatePaymentMethodTransactionError = PutioOperationFailure<
+  typeof CreatePaddleBillingUpdatePaymentMethodTransactionErrorSpec
+>;
 export type CreateCoinbaseChargeError = PutioOperationFailure<typeof CreateCoinbaseChargeErrorSpec>;
 export type CreateOpenNodeChargeError = PutioOperationFailure<typeof CreateOpenNodeChargeErrorSpec>;
-export type CreateNanoPaymentRequestError = PutioOperationFailure<
-  typeof CreateNanoPaymentRequestErrorSpec
->;
 export type ClassifiedPaymentChangePlanSubmitResponse =
   | {
       readonly data: Schema.Schema.Type<typeof PaymentChangePlanCheckoutSchema>;
@@ -655,6 +674,25 @@ export const createPaddleWaitingPayment = (
     method: "POST",
     path: "/v2/payment/paddle_waiting_payment",
   }).pipe(Effect.asVoid, withOperationErrors(CreatePaddleWaitingPaymentErrorSpec));
+export const getPaddleBillingInvoiceUrl = (
+  paymentId: number,
+): Effect.Effect<string, GetPaddleBillingInvoiceUrlError, PutioSdkContext> =>
+  requestJson(PaymentPaddleBillingInvoiceEnvelopeSchema, {
+    method: "GET",
+    path: `/v2/payment/methods/paddle_billing/invoice/${encodeURIComponent(paymentId)}`,
+  }).pipe(selectJsonField("url"), withOperationErrors(GetPaddleBillingInvoiceUrlErrorSpec));
+export const createPaddleBillingUpdatePaymentMethodTransaction = (
+  userSubscriptionId: number,
+): Effect.Effect<string, CreatePaddleBillingUpdatePaymentMethodTransactionError, PutioSdkContext> =>
+  requestJson(PaymentPaddleBillingUpdatePaymentMethodEnvelopeSchema, {
+    method: "GET",
+    path: `/v2/payment/methods/paddle_billing/update_payment_method/${encodeURIComponent(
+      userSubscriptionId,
+    )}`,
+  }).pipe(
+    selectJsonField("transaction_id"),
+    withOperationErrors(CreatePaddleBillingUpdatePaymentMethodTransactionErrorSpec),
+  );
 export const createCoinbaseCharge = (
   planPath: string,
 ): Effect.Effect<string, CreateCoinbaseChargeError, PutioSdkContext> =>
@@ -688,21 +726,4 @@ export const createOpenNodeCharge = (
     selectJsonField("opennode"),
     Effect.map(({ checkout_url }) => checkout_url),
     withOperationErrors(CreateOpenNodeChargeErrorSpec),
-  );
-export const createNanoPaymentRequest = (
-  planCode: string,
-): Effect.Effect<string, CreateNanoPaymentRequestError, PutioSdkContext> =>
-  requestJson(PaymentNanoRequestEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        plan_code: planCode,
-      },
-    },
-    method: "POST",
-    path: "/v2/payment/methods/nano/request",
-  }).pipe(
-    selectJsonField("nano"),
-    Effect.map(({ token }) => token),
-    withOperationErrors(CreateNanoPaymentRequestErrorSpec),
   );

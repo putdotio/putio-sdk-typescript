@@ -15,7 +15,7 @@ export const PaymentPlanTypeSchema = Schema.Literals(["onetime", "subscription"]
 export const PaymentOptionPlanTypeSchema = Schema.Literals(["onetime", "subscription", "trial"]);
 export const PaymentProviderNameSchema = Schema.Literals([
   "Paddle",
-  "Paddle Billing",
+  "PaddleBilling",
   "Fastspring",
   "OpenNode",
 ]);
@@ -165,7 +165,7 @@ const PaymentChangePlanDiscountSchema = Schema.Struct({
 export const PaymentChangePlanPreviewSchema = Schema.Struct({
   Fastspring: PaymentChangePlanProviderFastspringPreviewSchema,
   Paddle: PaymentChangePlanProviderPaddlePreviewSchema,
-  "Paddle Billing": PaymentChangePlanProviderPaddleBillingPreviewSchema,
+  PaddleBilling: PaymentChangePlanProviderPaddleBillingPreviewSchema,
   amount: Schema.NullOr(Schema.String),
   charge_amount: Schema.Boolean,
   credit: Schema.NullOr(Schema.String),
@@ -186,7 +186,7 @@ const PaddlePaymentProviderSchema = Schema.Struct({
 });
 const PaddleBillingPaymentProviderSchema = Schema.Struct({
   price_id: Schema.NullOr(Schema.String),
-  provider: Schema.Literal("Paddle Billing"),
+  provider: Schema.Literal("PaddleBilling"),
   type: Schema.Literal("credit-card"),
 });
 const FastspringPaymentProviderSchema = Schema.Struct({

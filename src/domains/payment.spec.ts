@@ -211,7 +211,7 @@ describe("payment domain", () => {
               currency: "USD",
               next_billing_date: "2026-04-17",
             },
-            "Paddle Billing": {
+            PaddleBilling: {
               next_billing_date: "2026-04-17",
             },
             amount: "7.99",
@@ -271,7 +271,7 @@ describe("payment domain", () => {
             },
             {
               price_id: "pri_123",
-              provider: "Paddle Billing",
+              provider: "PaddleBilling",
               type: "credit-card",
             },
           ],

@@ -64,15 +64,15 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
-    "@types/node": "^26.0.0",
+    "@types/node": "^26.1.0",
     "@vitest/coverage-v8": "4.1.9",
     "is-ci": "^4.1.0",
-    "knip": "^6.14.0",
+    "knip": "^6.24.0",
     "playwright": "^1.60.0",
     "publint": "^0.3.21",
     "typescript": "^6.0.3",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.1",
-    "vite-plus": "^0.2.1"
+    "vite": "npm:@voidzero-dev/vite-plus-core@0.2.2",
+    "vite-plus": "0.2.2"
   },
   "engines": {
     "node": ">=24.14.0"

@@ -9,9 +9,6 @@ catalogs:
     '@vitest/coverage-v8':
       specifier: 4.1.9
       version: 4.1.9
-    vite-plus:
-      specifier: 0.2.2
-      version: 0.2.2
 
 overrides:
   vite: npm:@voidzero-dev/vite-plus-core@0.2.2
@@ -53,7 +50,7 @@ importers:
         specifier: npm:@voidzero-dev/vite-plus-core@0.2.2
         version: '@voidzero-dev/vite-plus-core@0.2.2(@arethetypeswrong/core@0.18.4)(@types/node@26.1.0)(jiti@2.7.0)(publint@0.3.21)(typescript@6.0.3)(yaml@2.9.0)'
       vite-plus:
-        specifier: 'catalog:'
+        specifier: 0.2.2
         version: 0.2.2(@arethetypeswrong/core@0.18.4)(@types/node@26.1.0)(@vitest/coverage-v8@4.1.9(@vitest/browser@4.1.9)(vitest@4.1.9))(@voidzero-dev/vite-plus-core@0.2.2(@arethetypeswrong/core@0.18.4)(@types/node@26.1.0)(jiti@2.7.0)(publint@0.3.21)(typescript@6.0.3)(yaml@2.9.0))(jiti@2.7.0)(publint@0.3.21)(typescript@6.0.3)(yaml@2.9.0)
       vitest:
         specifier: 4.1.9

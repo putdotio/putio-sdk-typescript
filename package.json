@@ -72,7 +72,7 @@
     "publint": "^0.3.21",
     "typescript": "^6.0.3",
     "vite": "catalog:",
-    "vite-plus": "catalog:",
+    "vite-plus": "0.2.2",
     "vitest": "catalog:"
   },
   "engines": {

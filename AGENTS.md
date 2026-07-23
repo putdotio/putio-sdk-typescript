@@ -25,6 +25,12 @@
 - `vp run verify`
 - `vp run bootstrap:tokens`
 
+## Worktrees
+
+`.worktreeinclude` carries `.env` and `.repos` into managed worktrees; Claude
+symlinks `.repos`. Run `vp install`, `vp config`, then `vp run verify`. Use
+`pnpm secrets:setup` if live-test env is missing or stale.
+
 ## Repo-Specific Guidance
 
 - Treat `@putdotio/sdk` as a new public package, not a compatibility wrapper around `putio-js`.

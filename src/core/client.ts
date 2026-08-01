@@ -372,6 +372,9 @@ const provideSdk = async <A, E>(
   return rejectWithSdkFailure(await getPromiseClientRuntime(state).runPromiseExit(operation));
 };
 
+const snapshotUrl = (value: string | URL | undefined): string | URL | undefined =>
+  value instanceof URL ? new URL(value.href) : value;
+
 export const createPutioSdkEffectClient = () => ({
   account: {
     appSpecificPasswords: {
@@ -612,7 +615,12 @@ export const makePutioSdkLiveClientLayer = (config: PutioSdkConfigShape) =>
   Layer.mergeAll(makePutioSdkEffectClientLayer(), makePutioSdkLiveLayer(config));
 
 export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape = {}) => {
-  const runtimeConfig = makePutioSdkConfig(initialConfig);
+  const runtimeConfig = makePutioSdkConfig({
+    ...initialConfig,
+    baseUrl: snapshotUrl(initialConfig.baseUrl),
+    uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
+    webAppUrl: snapshotUrl(initialConfig.webAppUrl),
+  });
   const config: PutioSdkPromiseState = {
     accessToken: runtimeConfig.accessToken,
     runtimeConfig,

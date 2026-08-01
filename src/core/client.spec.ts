@@ -286,6 +286,46 @@ describe("sdk client factories", () => {
     await beforeFirstRequestClient.dispose();
   });
 
+  it("snapshots caller-owned Promise client URLs", async () => {
+    const requestedUrls: Array<string> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      requestedUrls.push(
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      );
+      return new Response(JSON.stringify({ status: "OK" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const baseUrl = new URL("https://api.snapshot.test");
+    const uploadBaseUrl = new URL("https://upload.snapshot.test");
+    const webAppUrl = new URL("https://app.snapshot.test");
+    const client = createPutioSdkPromiseClient({
+      accessToken: "token-123",
+      baseUrl,
+      uploadBaseUrl,
+      webAppUrl,
+    });
+
+    baseUrl.hostname = "api.mutated.test";
+    uploadBaseUrl.hostname = "upload.mutated.test";
+    webAppUrl.hostname = "app.mutated.test";
+
+    await expect(client.config.deleteKey("snapshot")).resolves.toEqual({ status: "OK" });
+    const uploadRequest = await client.files.createUploadRequest({
+      file: new Blob(["snapshot"]),
+    });
+
+    expect(requestedUrls).toEqual(["https://api.snapshot.test/v2/config/snapshot"]);
+    expect(uploadRequest.url).toBe(
+      "https://upload.snapshot.test/v2/files/upload?oauth_token=token-123",
+    );
+
+    await client.dispose();
+  });
+
   it("snapshots the Promise access token when an operation is invoked", async () => {
     const authorizations = new Map<string, string | null>();
     let markFirstStarted: (() => void) | undefined;

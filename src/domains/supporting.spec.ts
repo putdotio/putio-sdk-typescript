@@ -95,6 +95,11 @@ describe("supporting domain boundaries", () => {
     const customPrototypeConfig: Record<string, unknown> = Object.create(customPrototype);
     customPrototypeConfig.locale = "en";
     expect(() => decodeJsonObject(customPrototypeConfig)).toThrow("Expected a JSON object");
+    const forgedPrototype: Record<string, unknown> = Object.create(null);
+    Object.defineProperty(forgedPrototype, "constructor", { value: Object });
+    const forgedPrototypeConfig: Record<string, unknown> = Object.create(forgedPrototype);
+    forgedPrototypeConfig.locale = "en";
+    expect(() => decodeJsonObject(forgedPrototypeConfig)).toThrow("Expected a JSON object");
     expect(() => decodeJsonObject(["nope"])).toThrow("Expected a JSON object");
 
     const responseConfig = {
@@ -336,6 +341,10 @@ describe("supporting domain boundaries", () => {
       enumerable: true,
       get: () => 1,
     });
+    const forgedPrototype: Record<string, unknown> = Object.create(null);
+    Object.defineProperty(forgedPrototype, "constructor", { value: Object });
+    const forgedValue: Record<string, unknown> = Object.create(forgedPrototype);
+    forgedValue.enabled = true;
     const invalidValues = [
       Number.NaN,
       Number.POSITIVE_INFINITY,
@@ -343,6 +352,7 @@ describe("supporting domain boundaries", () => {
       cyclicValue,
       sparseValue,
       accessorValue,
+      forgedValue,
       new Date(),
     ];
     const failures = await Promise.all(
@@ -373,6 +383,56 @@ describe("supporting domain boundaries", () => {
 
     expect(fullConfigFailure).toBeInstanceOf(PutioValidationError);
     expect(fullConfigRequestCount).toBe(1);
+
+    let envelopeGetterCalls = 0;
+    const valueEnvelope = { status: "OK" };
+    Object.defineProperty(valueEnvelope, "value", {
+      enumerable: true,
+      get: () => {
+        envelopeGetterCalls += 1;
+        return "unsafe";
+      },
+    });
+    const configEnvelope = { status: "OK" };
+    Object.defineProperty(configEnvelope, "config", {
+      enumerable: true,
+      get: () => {
+        envelopeGetterCalls += 1;
+        return {};
+      },
+    });
+    const valueEnvelopeFailure = expectFailure(
+      await runSdkExit(
+        configDomain.getConfigKey("accessor"),
+        () => inMemoryJsonResponse(valueEnvelope),
+        { accessToken: "token-123" },
+      ),
+    );
+    const configEnvelopeFailure = expectFailure(
+      await runSdkExit(configDomain.readConfig(), () => inMemoryJsonResponse(configEnvelope), {
+        accessToken: "token-123",
+      }),
+    );
+    const typedValueFailure = expectFailure(
+      await runSdkExit(
+        configDomain.getConfigKeyWith("typed-invalid", Schema.Unknown),
+        () => inMemoryJsonResponse({ status: "OK", value: new Date() }),
+        { accessToken: "token-123" },
+      ),
+    );
+    const typedConfigFailure = expectFailure(
+      await runSdkExit(
+        configDomain.readConfigWith(Schema.Unknown),
+        () => inMemoryJsonResponse({ config: new Date(), status: "OK" }),
+        { accessToken: "token-123" },
+      ),
+    );
+
+    expect(valueEnvelopeFailure).toBeInstanceOf(PutioValidationError);
+    expect(configEnvelopeFailure).toBeInstanceOf(PutioValidationError);
+    expect(typedValueFailure).toBeInstanceOf(PutioValidationError);
+    expect(typedConfigFailure).toBeInstanceOf(PutioValidationError);
+    expect(envelopeGetterCalls).toBe(0);
   });
 
   it("covers download links and events", async () => {

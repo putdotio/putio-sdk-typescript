@@ -1,4 +1,4 @@
-import { Effect, Option, Schema, SchemaIssue } from "effect";
+import { Effect, Option, Schema, SchemaIssue, SchemaParser } from "effect";
 import { mapDecodeErrorToValidationError, type PutioSdkError } from "../core/errors.js";
 import {
   OkResponseSchema,
@@ -28,8 +28,13 @@ const isPlainRecord = (value: object): value is Record<string, unknown> => {
       return false;
     }
     const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor")?.value;
+    const constructorPrototype =
+      typeof constructor === "function"
+        ? Object.getOwnPropertyDescriptor(constructor, "prototype")?.value
+        : undefined;
     return (
       typeof constructor === "function" &&
+      constructorPrototype === prototype &&
       Function.prototype.toString.call(constructor) === nativeObjectConstructorSource
     );
   } catch {
@@ -194,14 +199,60 @@ const ConfigSetKeyInputSchema = Schema.Struct({
   key: ConfigKeySchema,
   value: JsonValueSchema,
 });
-const ConfigEnvelopeSchema = Schema.Struct({
-  config: JsonObjectResponseSchema,
-  status: Schema.Literal("OK"),
-});
-const ConfigValueEnvelopeSchema = Schema.Struct({
-  status: Schema.Literal("OK"),
-  value: JsonValueResponseSchema,
-});
+const getResponseEnvelopeFields = (
+  input: unknown,
+  valueField: "config" | "value",
+): { readonly status: unknown; readonly value: unknown } | undefined => {
+  if (typeof input !== "object" || input === null || !isPlainRecord(input)) {
+    return undefined;
+  }
+  try {
+    const statusDescriptor = Object.getOwnPropertyDescriptor(input, "status");
+    const valueDescriptor = Object.getOwnPropertyDescriptor(input, valueField);
+    if (
+      statusDescriptor === undefined ||
+      !("value" in statusDescriptor) ||
+      valueDescriptor === undefined ||
+      !("value" in valueDescriptor)
+    ) {
+      return undefined;
+    }
+    return {
+      status: statusDescriptor.value,
+      value: valueDescriptor.value,
+    };
+  } catch {
+    return undefined;
+  }
+};
+const makeConfigEnvelopeSchema = <A>(schema: Schema.ConstraintDecoder<A, never>) =>
+  Schema.declareConstructor<{
+    readonly config: A;
+    readonly status: "OK";
+  }>()([schema], ([configSchema]) => (input, ast, options) => {
+    const fields = getResponseEnvelopeFields(input, "config");
+    if (fields === undefined || fields.status !== "OK") {
+      return Effect.fail(new SchemaIssue.InvalidType(ast, Option.none()));
+    }
+    return SchemaParser.decodeUnknownEffect(configSchema)(fields.value, options).pipe(
+      Effect.map((config) => ({ config, status: "OK" })),
+    );
+  });
+const makeConfigValueEnvelopeSchema = <A>(schema: Schema.ConstraintDecoder<A, never>) =>
+  Schema.declareConstructor<{
+    readonly status: "OK";
+    readonly value: A;
+  }>()([schema], ([valueSchema]) => (input, ast, options) => {
+    const fields = getResponseEnvelopeFields(input, "value");
+    if (fields === undefined || fields.status !== "OK") {
+      return Effect.fail(new SchemaIssue.InvalidType(ast, Option.none()));
+    }
+    return SchemaParser.decodeUnknownEffect(valueSchema)(fields.value, options).pipe(
+      Effect.map((value) => ({ status: "OK", value })),
+    );
+  });
+const ConfigEnvelopeSchema = makeConfigEnvelopeSchema(JsonObjectResponseSchema);
+const ConfigValueEnvelopeSchema = makeConfigValueEnvelopeSchema(JsonValueResponseSchema);
 export const readConfig = (): Effect.Effect<PutioJsonObject, PutioSdkError, PutioSdkContext> =>
   requestJson(ConfigEnvelopeSchema, {
     method: "GET",
@@ -210,16 +261,10 @@ export const readConfig = (): Effect.Effect<PutioJsonObject, PutioSdkError, Puti
 export const readConfigWith = <A>(
   schema: Schema.ConstraintDecoder<A, never>,
 ): Effect.Effect<A, PutioSdkError, PutioSdkContext> =>
-  requestJson(
-    Schema.Struct({
-      config: schema,
-      status: Schema.Literal("OK"),
-    }),
-    {
-      method: "GET",
-      path: "/v2/config",
-    },
-  ).pipe(Effect.map((envelope) => envelope["config"]));
+  requestJson(makeConfigEnvelopeSchema(JsonObjectResponseSchema.pipe(Schema.decodeTo(schema))), {
+    method: "GET",
+    path: "/v2/config",
+  }).pipe(Effect.map((envelope) => envelope["config"]));
 export const writeConfig = (
   config: PutioJsonObject,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
@@ -259,10 +304,7 @@ export const getConfigKeyWith = <A>(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedKey) =>
       requestJson(
-        Schema.Struct({
-          status: Schema.Literal("OK"),
-          value: schema,
-        }),
+        makeConfigValueEnvelopeSchema(JsonValueResponseSchema.pipe(Schema.decodeTo(schema))),
         {
           method: "GET",
           path: `/v2/config/${encodePathSegment(decodedKey)}`,

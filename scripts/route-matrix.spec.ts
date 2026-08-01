@@ -98,6 +98,13 @@ describe("route matrix validation", () => {
           rationale: "A bare API prefix is not a public operation.",
           source: "putio/app.py:1",
         },
+        {
+          classification: "excluded",
+          method: "GET",
+          path: "/v2/files/../admin/users",
+          rationale: "Dot navigation cannot turn a public-looking path into an internal route.",
+          source: "putio/api2/files.py:1",
+        },
       ],
       version: 1,
     };

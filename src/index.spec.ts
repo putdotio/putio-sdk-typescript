@@ -37,13 +37,6 @@ describe("sdk root entry", () => {
       writeConfig: expect.any(Function),
     });
 
-    expect(Object.keys(sdk)).toEqual(
-      expect.arrayContaining([
-        "getAccountInfo",
-        "getFile",
-        "listAccountSubtitleLanguages",
-        "uploadFile",
-      ]),
-    );
+    expect(Object.keys(sdk).sort()).toMatchSnapshot();
   });
 });

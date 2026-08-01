@@ -11,7 +11,7 @@ const { authClient, oauthClient } = await createClients({
 });
 
 const live = createLiveHarness("zips live");
-const { assert, assertOperationError, finish, run, sleep } = live;
+const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
 void sleep;
@@ -129,18 +129,14 @@ await run("zips list shape", async () => {
   };
 });
 
-await run("zips create empty payload yields 400", async () => {
+await run("zips create empty payload fails validation", async () => {
   try {
     await authClient.zips.create({
       file_ids: [],
     });
     throw new Error("expected empty zip payload to fail");
   } catch (error) {
-    return assertOperationError(error, {
-      domain: "zips",
-      operation: "create",
-      statusCode: 400,
-    });
+    return assertErrorTag(error, { tag: "PutioValidationError" });
   }
 });
 

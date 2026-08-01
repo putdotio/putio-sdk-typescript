@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect";
 import {
   definePutioOperationErrorSpec,
+  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
@@ -12,6 +13,8 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
+const PositiveIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
+const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
 export const RssFeedSchema = Schema.Struct({
   created_at: Schema.String,
   delete_old_files: Schema.Boolean,
@@ -38,9 +41,17 @@ export const RssFeedParamsSchema = Schema.Struct({
   parent_dir_id: Schema.optional(
     Schema.Union([Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), Schema.Literal("newf")]),
   ),
-  rss_source_url: Schema.String,
-  title: Schema.String,
+  rss_source_url: NonEmptyStringSchema,
+  title: NonEmptyStringSchema,
   unwanted_keywords: Schema.optional(Schema.String),
+});
+const RssFeedUpdateInputSchema = Schema.Struct({
+  id: PositiveIdSchema,
+  params: RssFeedParamsSchema,
+});
+const RssFeedItemRetryInputSchema = Schema.Struct({
+  feedId: PositiveIdSchema,
+  itemId: PositiveIdSchema,
 });
 const RssFeedItemBaseSchema = Schema.Struct({
   detected_date: Schema.String,
@@ -231,21 +242,35 @@ export const listRssFeeds = (): Effect.Effect<
     path: "/v2/rss/list",
   }).pipe(selectJsonField("feeds"), withOperationErrors(ListRssFeedsErrorSpec));
 export const getRssFeed = (id: number): Effect.Effect<RssFeed, GetRssFeedError, PutioSdkContext> =>
-  requestJson(RssFeedEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/rss/${encodePathSegment(id)}`,
-  }).pipe(selectJsonField("feed"), withOperationErrors(GetRssFeedErrorSpec));
+  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedId) =>
+      requestJson(RssFeedEnvelopeSchema, {
+        method: "GET",
+        path: `/v2/rss/${encodePathSegment(decodedId)}`,
+      }),
+    ),
+    selectJsonField("feed"),
+    withOperationErrors(GetRssFeedErrorSpec),
+  );
 export const createRssFeed = (
   params: RssFeedParams,
 ): Effect.Effect<RssFeed, CreateRssFeedError, PutioSdkContext> =>
-  requestJson(RssFeedEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: toCreateBody(params),
-    },
-    method: "POST",
-    path: "/v2/rss/create",
-  }).pipe(selectJsonField("feed"), withOperationErrors(CreateRssFeedErrorSpec));
+  Schema.decodeUnknownEffect(RssFeedParamsSchema)(params).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedParams) =>
+      requestJson(RssFeedEnvelopeSchema, {
+        body: {
+          type: "form",
+          value: toCreateBody(decodedParams),
+        },
+        method: "POST",
+        path: "/v2/rss/create",
+      }),
+    ),
+    selectJsonField("feed"),
+    withOperationErrors(CreateRssFeedErrorSpec),
+  );
 export const updateRssFeed = (
   id: number,
   params: RssFeedParams,
@@ -254,21 +279,33 @@ export const updateRssFeed = (
   UpdateRssFeedError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: toUpdateBody(params),
-    },
-    method: "POST",
-    path: `/v2/rss/${encodePathSegment(id)}`,
-  }).pipe(withOperationErrors(UpdateRssFeedErrorSpec));
+  Schema.decodeUnknownEffect(RssFeedUpdateInputSchema)({ id, params }).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "form",
+          value: toUpdateBody(decodedInput.params),
+        },
+        method: "POST",
+        path: `/v2/rss/${encodePathSegment(decodedInput.id)}`,
+      }),
+    ),
+    withOperationErrors(UpdateRssFeedErrorSpec),
+  );
 export const pauseRssFeed = (
   id: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PauseRssFeedError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/rss/${encodePathSegment(id)}/pause`,
-  }).pipe(withOperationErrors(PauseRssFeedErrorSpec));
+  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedId) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/rss/${encodePathSegment(decodedId)}/pause`,
+      }),
+    ),
+    withOperationErrors(PauseRssFeedErrorSpec),
+  );
 export const resumeRssFeed = (
   id: number,
 ): Effect.Effect<
@@ -276,10 +313,16 @@ export const resumeRssFeed = (
   ResumeRssFeedError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/rss/${encodePathSegment(id)}/resume`,
-  }).pipe(withOperationErrors(ResumeRssFeedErrorSpec));
+  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedId) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/rss/${encodePathSegment(decodedId)}/resume`,
+      }),
+    ),
+    withOperationErrors(ResumeRssFeedErrorSpec),
+  );
 export const deleteRssFeed = (
   id: number,
 ): Effect.Effect<
@@ -287,10 +330,16 @@ export const deleteRssFeed = (
   DeleteRssFeedError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/rss/${encodePathSegment(id)}/delete`,
-  }).pipe(withOperationErrors(DeleteRssFeedErrorSpec));
+  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedId) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/rss/${encodePathSegment(decodedId)}/delete`,
+      }),
+    ),
+    withOperationErrors(DeleteRssFeedErrorSpec),
+  );
 export const listRssFeedItems = (
   id: number,
 ): Effect.Effect<
@@ -301,10 +350,17 @@ export const listRssFeedItems = (
   ListRssFeedItemsError,
   PutioSdkContext
 > =>
-  requestJson(RssFeedItemsEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/rss/${encodePathSegment(id)}/items`,
-  }).pipe(selectJsonFields("feed", "items"), withOperationErrors(ListRssFeedItemsErrorSpec));
+  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedId) =>
+      requestJson(RssFeedItemsEnvelopeSchema, {
+        method: "GET",
+        path: `/v2/rss/${encodePathSegment(decodedId)}/items`,
+      }),
+    ),
+    selectJsonFields("feed", "items"),
+    withOperationErrors(ListRssFeedItemsErrorSpec),
+  );
 export const clearRssFeedLogs = (
   id: number,
 ): Effect.Effect<
@@ -312,10 +368,16 @@ export const clearRssFeedLogs = (
   ClearRssFeedLogsError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/rss/${encodePathSegment(id)}/clear-log`,
-  }).pipe(withOperationErrors(ClearRssFeedLogsErrorSpec));
+  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedId) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/rss/${encodePathSegment(decodedId)}/clear-log`,
+      }),
+    ),
+    withOperationErrors(ClearRssFeedLogsErrorSpec),
+  );
 export const retryRssFeedItem = (
   feedId: number,
   itemId: number,
@@ -324,10 +386,16 @@ export const retryRssFeedItem = (
   RetryRssFeedItemError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/rss/${encodePathSegment(feedId)}/items/${encodePathSegment(itemId)}/retry`,
-  }).pipe(withOperationErrors(RetryRssFeedItemErrorSpec));
+  Schema.decodeUnknownEffect(RssFeedItemRetryInputSchema)({ feedId, itemId }).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/rss/${encodePathSegment(decodedInput.feedId)}/items/${encodePathSegment(decodedInput.itemId)}/retry`,
+      }),
+    ),
+    withOperationErrors(RetryRssFeedItemErrorSpec),
+  );
 export const retryAllRssFeedItems = (
   feedId: number,
 ): Effect.Effect<
@@ -335,7 +403,13 @@ export const retryAllRssFeedItems = (
   RetryAllRssFeedItemsError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/rss/${encodePathSegment(feedId)}/retry-all`,
-  }).pipe(withOperationErrors(RetryAllRssFeedItemsErrorSpec));
+  Schema.decodeUnknownEffect(PositiveIdSchema)(feedId).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedFeedId) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/rss/${encodePathSegment(decodedFeedId)}/retry-all`,
+      }),
+    ),
+    withOperationErrors(RetryAllRssFeedItemsErrorSpec),
+  );

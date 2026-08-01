@@ -15,9 +15,8 @@ await run("podcast default links shape", async () => {
 
   assert(typeof result.token === "string", "expected podcast token");
   assert(result.token.length > 0, "expected non-empty podcast token");
-  Object.entries(result.links).forEach(([type, url]) => {
-    assert(["all", "audio", "video", "mp4"].includes(type), "expected known feed type");
-    assert(typeof url === "string", "expected podcast link URL");
+  (["all", "audio", "video", "mp4"] as const).forEach((type) => {
+    assert(typeof result.links[type] === "string", `expected ${type} podcast link`);
   });
 
   return {

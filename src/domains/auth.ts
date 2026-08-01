@@ -1,5 +1,7 @@
 import { Effect, Schema } from "effect";
 import {
+  PutioApiError,
+  PutioValidationError,
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
@@ -19,6 +21,21 @@ export const LoginResponseSchema = Schema.Struct({
   access_token: Schema.String,
   user_id: Schema.Int,
 });
+const OAuthAuthorizationCodeResponseSchema = Schema.Struct({
+  access_token: Schema.String,
+});
+export const OAuthAuthorizationCodeExchangeErrorCodeSchema = Schema.Literals([
+  "access_denied",
+  "invalid_request",
+  "unauthorized_client",
+]);
+export class OAuthAuthorizationCodeExchangeError extends Schema.TaggedErrorClass<OAuthAuthorizationCodeExchangeError>()(
+  "OAuthAuthorizationCodeExchangeError",
+  {
+    code: OAuthAuthorizationCodeExchangeErrorCodeSchema,
+    status: Schema.Literal(400),
+  },
+) {}
 const TokenScopeSchema = Schema.NullOr(
   Schema.Literals([
     "default",
@@ -142,12 +159,24 @@ export const RegisterInputSchema = Schema.Struct({
   username: Schema.String,
   voucher_code: Schema.optional(Schema.String),
 });
+export const OAuthAuthorizationCodeExchangeInputSchema = Schema.Struct({
+  clientId: Schema.Union([
+    Schema.String.check(Schema.isMinLength(1)),
+    Schema.Int.check(Schema.isGreaterThan(0)),
+  ]),
+  clientSecret: Schema.String.check(Schema.isMinLength(1)),
+  code: Schema.String.check(Schema.isMinLength(1)),
+  redirectUri: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
+});
 export type LoginResponse = Schema.Schema.Type<typeof LoginResponseSchema>;
 export type ValidateTokenResponse = Schema.Schema.Type<typeof ValidateTokenResponseSchema>;
 export type TwoFactorRecoveryCodes = Schema.Schema.Type<typeof TwoFactorRecoveryCodesSchema>;
 export type GenerateTOTPResponse = Schema.Schema.Type<typeof GenerateTOTPResponseSchema>;
 export type VerifyTOTPResponse = Schema.Schema.Type<typeof VerifyTOTPResponseSchema>;
 export type RegisterInput = Schema.Schema.Type<typeof RegisterInputSchema>;
+export type OAuthAuthorizationCodeExchangeInput = Schema.Schema.Type<
+  typeof OAuthAuthorizationCodeExchangeInputSchema
+>;
 export const LoginErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "login",
@@ -326,6 +355,55 @@ export const buildAuthLoginUrl = (options: {
     response_type: options.responseType ?? "token",
     state: options.state,
   });
+const isOAuthAuthorizationCodeExchangeErrorCode = Schema.is(
+  OAuthAuthorizationCodeExchangeErrorCodeSchema,
+);
+const mapOAuthAuthorizationCodeExchangeError = (
+  error: PutioSdkError,
+): PutioSdkError | OAuthAuthorizationCodeExchangeError =>
+  error instanceof PutioApiError &&
+  error.status === 400 &&
+  isOAuthAuthorizationCodeExchangeErrorCode(error.body.error)
+    ? new OAuthAuthorizationCodeExchangeError({
+        code: error.body.error,
+        status: 400,
+      })
+    : error;
+export const exchangeOAuthAuthorizationCode = (
+  input: OAuthAuthorizationCodeExchangeInput,
+): Effect.Effect<string, PutioSdkError | OAuthAuthorizationCodeExchangeError, PutioSdkContext> =>
+  Schema.decodeUnknownEffect(OAuthAuthorizationCodeExchangeInputSchema)(input).pipe(
+    Effect.mapError(
+      () =>
+        new PutioValidationError({
+          cause: {
+            domain: "auth",
+            operation: "exchangeAuthorizationCode",
+            reason: "Invalid request input",
+          },
+        }),
+    ),
+    Effect.flatMap((decodedInput) =>
+      requestJson(OAuthAuthorizationCodeResponseSchema, {
+        auth: { type: "none" },
+        body: {
+          type: "form",
+          value: {
+            client_id: decodedInput.clientId,
+            client_secret: decodedInput.clientSecret,
+            code: decodedInput.code,
+            grant_type: "authorization_code",
+            redirect_uri: decodedInput.redirectUri,
+          },
+        },
+        method: "POST",
+        path: "/v2/oauth2/access_token",
+      }).pipe(
+        selectJsonField("access_token"),
+        Effect.mapError(mapOAuthAuthorizationCodeExchangeError),
+      ),
+    ),
+  );
 export const login = (
   input: LoginInput,
 ): Effect.Effect<LoginResponse, LoginError, PutioSdkContext> =>

@@ -40,6 +40,7 @@ describe("sdk client factories", () => {
     expect(client.account.getInfo).toBeTypeOf("function");
     expect(client.account.listSubtitleLanguages).toBeTypeOf("function");
     expect(client.auth.getCode).toBeTypeOf("function");
+    expect(client.auth.exchangeAuthorizationCode).toBeTypeOf("function");
     expect(client.downloadLinks.create).toBeTypeOf("function");
     expect(client.events.list).toBeTypeOf("function");
     expect(client.files.canWrite).toBeTypeOf("function");
@@ -100,6 +101,7 @@ describe("sdk client factories", () => {
     expect(client.account.getInfo).toBeTypeOf("function");
     expect(client.account.listSubtitleLanguages).toBeTypeOf("function");
     expect(client.auth.getCode).toBeTypeOf("function");
+    expect(client.auth.exchangeAuthorizationCode).toBeTypeOf("function");
     expect(client.files.copy).toBeTypeOf("function");
     expect(client.files.createUploadFormData).toBeTypeOf("function");
     expect(client.files.getApiDownloadUrl).toBeTypeOf("function");

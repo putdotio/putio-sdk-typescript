@@ -21,6 +21,7 @@ vi.mock("../domains/auth.js", async () => {
     buildAuthLoginUrl: vi.fn(({ state }) => `https://app.put.io/authenticate?state=${state}`),
     checkCodeMatch: vi.fn((code) => Effect.succeed(code === "MATCH")),
     clients: vi.fn(() => Effect.succeed([{ id: 1, name: "cli" }])),
+    exchangeOAuthAuthorizationCode: vi.fn((input) => Effect.succeed(`exchange:${input.code}`)),
     exists: vi.fn((key, value) => Effect.succeed(key === "username" && value === "sdk-user")),
     forgotPassword: vi.fn((mail) => Effect.succeed({ mail, status: "OK" })),
     generateTOTP: vi.fn(() =>
@@ -532,6 +533,13 @@ describe("sdk promise client adapters", () => {
     ).toContain("state=abc");
     expect(await client.auth.checkCodeMatch("MATCH")).toBe(true);
     expect(await client.auth.clients()).toEqual([{ id: 1, name: "cli" }]);
+    expect(
+      await client.auth.exchangeAuthorizationCode({
+        clientId: 1,
+        clientSecret: "secret",
+        code: "authorization-code",
+      }),
+    ).toBe("exchange:authorization-code");
     expect(await client.auth.exists("username", "sdk-user")).toBe(true);
     expect(await client.auth.forgotPassword("a@put.io")).toEqual({
       mail: "a@put.io",

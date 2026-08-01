@@ -31,6 +31,7 @@ import {
   buildAuthLoginUrl,
   checkCodeMatch,
   clients,
+  exchangeOAuthAuthorizationCode,
   exists,
   forgotPassword,
   generateTOTP,
@@ -55,6 +56,7 @@ import {
   type GenerateTOTPResponse,
   type LoginInput,
   type LoginResponse,
+  type OAuthAuthorizationCodeExchangeInput,
   type RegisterInput,
   type TwoFactorRecoveryCodes,
   type ValidateTokenResponse,
@@ -417,6 +419,7 @@ export const createPutioSdkEffectClient = () => ({
     buildLoginUrl: buildAuthLoginUrl,
     checkCodeMatch,
     clients,
+    exchangeAuthorizationCode: exchangeOAuthAuthorizationCode,
     exists,
     forgotPassword,
     getCode,
@@ -780,6 +783,8 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
         }),
       checkCodeMatch: (code: string) => provideSdk(config, checkCodeMatch(code)),
       clients: (): Promise<ReadonlyArray<OAuthAppSession>> => provideSdk(config, clients()),
+      exchangeAuthorizationCode: (input: OAuthAuthorizationCodeExchangeInput): Promise<string> =>
+        provideSdk(config, exchangeOAuthAuthorizationCode(input)),
       exists: (key: "mail" | "username", value: string) => provideSdk(config, exists(key, value)),
       forgotPassword: (mail: string) => provideSdk(config, forgotPassword(mail)),
       getCode: (input: { readonly appId: number | string; readonly clientName?: string }) =>

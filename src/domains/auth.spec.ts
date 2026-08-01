@@ -1,8 +1,10 @@
-import { PutioOperationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError } from "../core/errors.js";
 import {
+  OAuthAuthorizationCodeExchangeError,
   buildAuthLoginUrl,
   checkCodeMatch,
   clients,
+  exchangeOAuthAuthorizationCode,
   exists,
   forgotPassword,
   generateTOTP,
@@ -48,6 +50,74 @@ describe("auth domain", () => {
     ).toBe(
       "https://app.put.io/authenticate?client_id=42&client_name=Codex&isolated=1&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&response_type=token&state=state-123",
     );
+  });
+
+  it("exchanges OAuth authorization codes without sending configured credentials", async () => {
+    await expect(
+      runSdkEffect(
+        exchangeOAuthAuthorizationCode({
+          clientId: 123,
+          clientSecret: "client-secret",
+          code: "authorization-code",
+          redirectUri: "myapp://callback",
+        }),
+        (request) => {
+          const body = getFormBody(request);
+
+          expect(request.method).toBe("POST");
+          expect(request.url).toBe("https://api.put.io/v2/oauth2/access_token");
+          expect(getAuthorizationHeader(request)).toBeUndefined();
+          expect(body.get("client_id")).toBe("123");
+          expect(body.get("client_secret")).toBe("client-secret");
+          expect(body.get("code")).toBe("authorization-code");
+          expect(body.get("grant_type")).toBe("authorization_code");
+          expect(body.get("redirect_uri")).toBe("myapp://callback");
+
+          return jsonResponse({ access_token: "exchanged-token" });
+        },
+        { accessToken: "configured-token" },
+      ),
+    ).resolves.toBe("exchanged-token");
+  });
+
+  it("maps OAuth authorization-code failures and redacts invalid inputs", async () => {
+    const denied = expectFailure(
+      await runSdkExit(
+        exchangeOAuthAuthorizationCode({
+          clientId: 123,
+          clientSecret: "client-secret",
+          code: "denied-code",
+        }),
+        () => jsonResponse({ error: "access_denied" }, { status: 400 }),
+      ),
+    );
+
+    expect(denied).toBeInstanceOf(OAuthAuthorizationCodeExchangeError);
+    expect(denied).toMatchObject({
+      _tag: "OAuthAuthorizationCodeExchangeError",
+      code: "access_denied",
+      status: 400,
+    });
+
+    let requestCount = 0;
+    const sensitiveSecret = "highly-sensitive-client-secret";
+    const invalid = expectFailure(
+      await runSdkExit(
+        exchangeOAuthAuthorizationCode({
+          clientId: 123,
+          clientSecret: sensitiveSecret,
+          code: "",
+        }),
+        () => {
+          requestCount += 1;
+          return jsonResponse({ access_token: "unexpected" });
+        },
+      ),
+    );
+
+    expect(invalid).toBeInstanceOf(PutioValidationError);
+    expect(JSON.stringify(invalid)).not.toContain(sensitiveSecret);
+    expect(requestCount).toBe(0);
   });
 
   it("covers the main auth flows", async () => {

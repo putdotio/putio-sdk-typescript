@@ -1044,6 +1044,15 @@ describe("operational domain boundaries", () => {
         accessToken: "token-123",
       }),
       runSdkExit(
+        // @ts-expect-error JavaScript callers can omit both required selectors.
+        transfers.removeTransfers({}),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(transfers.removeTransfers({ ids: [-1] }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(
         // @ts-expect-error JavaScript callers can provide both mutually exclusive selectors.
         transfers.removeTransfers({ filter: "all", ids: [1] }),
         handler,

@@ -166,7 +166,13 @@ import {
   type FriendBase,
   type UserSearchResult,
 } from "../domains/friends.js";
-import { makePutioSdkLiveLayer, type PutioSdkConfigShape, type PutioSdkContext } from "./http.js";
+import {
+  makePutioSdkConfig,
+  makePutioSdkLiveLayer,
+  PutioSdkConfig,
+  type PutioSdkConfigShape,
+  type PutioSdkContext,
+} from "./http.js";
 import {
   buildOAuthAppIconUrl,
   buildOAuthAuthorizeUrl,
@@ -300,32 +306,37 @@ import { mapConfigurationError } from "./errors.js";
 
 type PutioSdkPromiseRuntime = ManagedRuntime.ManagedRuntime<PutioSdkContext, never>;
 
-const promiseClientRuntimeCache = new WeakMap<PutioSdkConfigShape, PutioSdkPromiseRuntime>();
-const disposedPromiseClientConfigs = new WeakSet<PutioSdkConfigShape>();
+interface PutioSdkPromiseState {
+  accessToken: string | undefined;
+  readonly runtimeConfig: PutioSdkConfigShape;
+}
 
-const getPromiseClientRuntime = (config: PutioSdkConfigShape): PutioSdkPromiseRuntime => {
-  if (disposedPromiseClientConfigs.has(config)) {
+const promiseClientRuntimeCache = new WeakMap<PutioSdkPromiseState, PutioSdkPromiseRuntime>();
+const disposedPromiseClientStates = new WeakSet<PutioSdkPromiseState>();
+
+const getPromiseClientRuntime = (state: PutioSdkPromiseState): PutioSdkPromiseRuntime => {
+  if (disposedPromiseClientStates.has(state)) {
     throw mapConfigurationError(
       "This Promise client has been disposed and can no longer execute SDK effects",
     );
   }
 
-  const cachedRuntime = promiseClientRuntimeCache.get(config);
+  const cachedRuntime = promiseClientRuntimeCache.get(state);
 
   if (cachedRuntime) {
     return cachedRuntime;
   }
 
-  const runtime = ManagedRuntime.make(makePutioSdkLiveLayer(config));
-  promiseClientRuntimeCache.set(config, runtime);
+  const runtime = ManagedRuntime.make(makePutioSdkLiveLayer(state.runtimeConfig));
+  promiseClientRuntimeCache.set(state, runtime);
   return runtime;
 };
 
-const disposePromiseClientRuntime = async (config: PutioSdkConfigShape): Promise<void> => {
-  disposedPromiseClientConfigs.add(config);
+const disposePromiseClientRuntime = async (state: PutioSdkPromiseState): Promise<void> => {
+  disposedPromiseClientStates.add(state);
 
-  const runtime = promiseClientRuntimeCache.get(config);
-  promiseClientRuntimeCache.delete(config);
+  const runtime = promiseClientRuntimeCache.get(state);
+  promiseClientRuntimeCache.delete(state);
 
   if (!runtime) {
     return;
@@ -349,9 +360,17 @@ const rejectWithSdkFailure = <A, E>(exit: Exit.Exit<A, E>): Promise<A> =>
   });
 
 const provideSdk = async <A, E>(
-  config: PutioSdkConfigShape,
+  state: PutioSdkPromiseState,
   effect: Effect.Effect<A, E, PutioSdkContext>,
-) => rejectWithSdkFailure(await getPromiseClientRuntime(config).runPromiseExit(effect));
+) => {
+  const operationConfig = {
+    ...state.runtimeConfig,
+    accessToken: state.accessToken,
+  };
+  const operation = Effect.provideService(effect, PutioSdkConfig, operationConfig);
+
+  return rejectWithSdkFailure(await getPromiseClientRuntime(state).runPromiseExit(operation));
+};
 
 export const createPutioSdkEffectClient = () => ({
   account: {
@@ -593,7 +612,11 @@ export const makePutioSdkLiveClientLayer = (config: PutioSdkConfigShape) =>
   Layer.mergeAll(makePutioSdkEffectClientLayer(), makePutioSdkLiveLayer(config));
 
 export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape = {}) => {
-  const config = { ...initialConfig };
+  const runtimeConfig = makePutioSdkConfig(initialConfig);
+  const config: PutioSdkPromiseState = {
+    accessToken: runtimeConfig.accessToken,
+    runtimeConfig,
+  };
 
   function getInfo(query: {
     readonly download_token: 1;
@@ -662,6 +685,9 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
 
   return {
     dispose: () => disposePromiseClientRuntime(config),
+    setAccessToken: (accessToken: string | undefined): void => {
+      config.accessToken = accessToken;
+    },
     account: {
       appSpecificPasswords: {
         create: (input: CreateAppSpecificPasswordInput): Promise<CreateAppSpecificPasswordResult> =>

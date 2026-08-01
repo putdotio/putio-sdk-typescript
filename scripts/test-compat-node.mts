@@ -189,10 +189,13 @@ const promiseAuthUrl = promiseClient.auth.buildLoginUrl({
   state: "node-smoke",
 });
 const promiseAuthHost = new URL(promiseAuthUrl).host;
+promiseClient.setAccessToken("rotated-compat-token");
 const uploadRequest = await promiseClient.files.createUploadRequest({
   file: new Blob(["hello from node"]),
   fileName: "node.txt",
 });
+const uploadToken = new URL(uploadRequest.url).searchParams.get("oauth_token");
+promiseClient.setAccessToken(undefined);
 await promiseClient.dispose();
 
 const effectClient = createPutioSdkEffectClient();
@@ -217,6 +220,7 @@ console.log(
     subtitleLanguage: subtitleLanguage.code,
     uploadMethod: uploadRequest.method,
     uploadBody: uploadRequest.body.constructor.name,
+    uploadToken,
     utility: toHumanFileSize(1_572_864),
     unknownAppSpecificPasswordError,
   }),

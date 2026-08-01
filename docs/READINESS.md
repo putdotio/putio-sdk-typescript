@@ -53,6 +53,7 @@ The last recorded full live sweep confirmed:
 | `zips`           | `zips`                               | `high`    | larger-input and rarer terminal/error-state coverage would still help, but cursor-based bulk creation is now live-covered                     |
 | `family`         | `family`                             | `good`    | positive invite lookup now requires a pre-seeded unused secondary invite; positive member lifecycle still needs a dedicated second account    |
 | `ifttt`          | `ifttt`                              | `high`    | payment-disabled and rate-limit behavior still need broader controlled verification                                                           |
+| `podcast`        | `podcast`                            | `high`    | read-only surface is live-covered; more nested-folder fixtures would deepen path-specific confidence                                          |
 | `tunnel`         | `tunnel`                             | `high`    | simple surface; main remaining risk is future backend drift, not current contract uncertainty                                                 |
 
 ## Priority Gaps

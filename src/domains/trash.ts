@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect";
 import { joinCsv } from "../core/forms.js";
 import {
   definePutioOperationErrorSpec,
+  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
@@ -43,22 +44,28 @@ const TrashContinueEnvelopeSchema = Schema.Struct({
 export type TrashFile = Schema.Schema.Type<typeof TrashFileSchema>;
 export type TrashListResponse = Schema.Schema.Type<typeof TrashListEnvelopeSchema>;
 export type TrashContinueResponse = Schema.Schema.Type<typeof TrashContinueEnvelopeSchema>;
-
-export type TrashListQuery = {
-  readonly per_page?: number;
-};
-
-export type TrashBulkInput =
-  | {
-      readonly cursor: string;
-      readonly file_ids?: ReadonlyArray<number>;
-      readonly useCursor?: true;
-    }
-  | {
-      readonly cursor?: string;
-      readonly file_ids: ReadonlyArray<number>;
-      readonly useCursor?: false;
-    };
+const PositiveIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
+const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
+const TrashListQuerySchema = Schema.Struct({
+  per_page: Schema.optional(PositiveIdSchema),
+});
+const TrashCursorBulkInputSchema = Schema.Struct({
+  cursor: NonEmptyStringSchema,
+  file_ids: Schema.optional(Schema.Array(PositiveIdSchema)),
+  useCursor: Schema.Literal(true),
+});
+const TrashIdsBulkInputSchema = Schema.Struct({
+  cursor: Schema.optional(NonEmptyStringSchema),
+  file_ids: Schema.Array(PositiveIdSchema).check(Schema.isMinLength(1)),
+  useCursor: Schema.optional(Schema.Literal(false)),
+});
+const TrashBulkInputSchema = Schema.Union([TrashCursorBulkInputSchema, TrashIdsBulkInputSchema]);
+const TrashContinueInputSchema = Schema.Struct({
+  cursor: NonEmptyStringSchema,
+  query: TrashListQuerySchema,
+});
+export type TrashListQuery = Schema.Schema.Type<typeof TrashListQuerySchema>;
+export type TrashBulkInput = Schema.Schema.Type<typeof TrashBulkInputSchema>;
 
 const RestrictedReadError = { errorType: "invalid_scope", statusCode: 401 as const };
 const RestrictedWriteError = { errorType: "invalid_scope", statusCode: 401 as const };
@@ -117,17 +124,12 @@ export type DeleteTrashError = PutioOperationFailure<typeof DeleteTrashErrorSpec
 export type EmptyTrashError = PutioOperationFailure<typeof EmptyTrashErrorSpec>;
 
 const toBulkTrashBody = (input: TrashBulkInput) => {
-  if (input.useCursor) {
+  if (input.useCursor === true) {
     return {
       cursor: input.cursor,
       file_ids: undefined,
     };
   }
-
-  if (!input.file_ids) {
-    throw new Error("trash bulk file_ids are required when useCursor is not set");
-  }
-
   return {
     cursor: undefined,
     file_ids: joinCsv(input.file_ids),
@@ -135,53 +137,79 @@ const toBulkTrashBody = (input: TrashBulkInput) => {
 };
 
 export const listTrash = (
-  query?: TrashListQuery,
+  query: TrashListQuery = {},
 ): Effect.Effect<TrashListResponse, ListTrashError, PutioSdkContext> =>
-  requestJson(TrashListEnvelopeSchema, {
-    method: "GET",
-    path: "/v2/trash/list",
-    query,
-  }).pipe(withOperationErrors(ListTrashErrorSpec));
+  Schema.decodeUnknownEffect(TrashListQuerySchema)(query).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedQuery) =>
+      requestJson(TrashListEnvelopeSchema, {
+        method: "GET",
+        path: "/v2/trash/list",
+        query: decodedQuery,
+      }),
+    ),
+    withOperationErrors(ListTrashErrorSpec),
+  );
 
 export const continueTrash = (
   cursor: string,
-  query?: TrashListQuery,
+  query: TrashListQuery = {},
 ): Effect.Effect<TrashContinueResponse, ContinueTrashError, PutioSdkContext> =>
-  requestJson(TrashContinueEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        cursor,
-      },
-    },
-    method: "POST",
-    path: "/v2/trash/list/continue",
-    query,
-  }).pipe(withOperationErrors(ContinueTrashErrorSpec));
+  Schema.decodeUnknownEffect(TrashContinueInputSchema)({ cursor, query }).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(TrashContinueEnvelopeSchema, {
+        body: {
+          type: "form",
+          value: {
+            cursor: decodedInput.cursor,
+          },
+        },
+        method: "POST",
+        path: "/v2/trash/list/continue",
+        query: decodedInput.query,
+      }),
+    ),
+    withOperationErrors(ContinueTrashErrorSpec),
+  );
 
 export const restoreTrash = (
   input: TrashBulkInput,
 ): Effect.Effect<void, RestoreTrashError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: toBulkTrashBody(input),
-    },
-    method: "POST",
-    path: "/v2/trash/restore",
-  }).pipe(Effect.asVoid, withOperationErrors(RestoreTrashErrorSpec));
+  Schema.decodeUnknownEffect(TrashBulkInputSchema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "form",
+          value: toBulkTrashBody(decodedInput),
+        },
+        method: "POST",
+        path: "/v2/trash/restore",
+      }),
+    ),
+    Effect.asVoid,
+    withOperationErrors(RestoreTrashErrorSpec),
+  );
 
 export const deleteTrash = (
   input: TrashBulkInput,
 ): Effect.Effect<void, DeleteTrashError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: toBulkTrashBody(input),
-    },
-    method: "POST",
-    path: "/v2/trash/delete",
-  }).pipe(Effect.asVoid, withOperationErrors(DeleteTrashErrorSpec));
+  Schema.decodeUnknownEffect(TrashBulkInputSchema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "form",
+          value: toBulkTrashBody(decodedInput),
+        },
+        method: "POST",
+        path: "/v2/trash/delete",
+      }),
+    ),
+    Effect.asVoid,
+    withOperationErrors(DeleteTrashErrorSpec),
+  );
 
 export const emptyTrash = (): Effect.Effect<void, EmptyTrashError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {

@@ -1,4 +1,4 @@
-import { PutioOperationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError } from "../core/errors.js";
 import { Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -52,6 +52,14 @@ describe("supporting domain boundaries", () => {
       nested: { enabled: true },
     });
     expect(() => decodeJsonValue(() => "nope")).toThrow("Expected a JSON-compatible value");
+    expect(() => decodeJsonValue(Number.NaN)).toThrow("Expected a JSON-compatible value");
+    expect(() => decodeJsonValue(Number.POSITIVE_INFINITY)).toThrow(
+      "Expected a JSON-compatible value",
+    );
+    expect(() => decodeJsonObject(new Date())).toThrow("Expected a JSON object");
+    const cyclicValue: { self?: unknown } = {};
+    cyclicValue.self = cyclicValue;
+    expect(() => decodeJsonValue(cyclicValue)).toThrow("Expected a JSON-compatible value");
     expect(() => decodeJsonObject(["nope"])).toThrow("Expected a JSON object");
 
     expect(
@@ -168,6 +176,49 @@ describe("supporting domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toEqual({ status: "OK" });
+
+    let requestCount = 0;
+    const invalidHandler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const invalidConfig = expectFailure(
+      await runSdkExit(configDomain.writeConfig({ count: Number.NaN }), invalidHandler),
+    );
+    const cyclicConfig = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply cyclic objects.
+        configDomain.writeConfig(cyclicValue),
+        invalidHandler,
+      ),
+    );
+    const emptyGetKey = expectFailure(
+      await runSdkExit(configDomain.getConfigKey(""), invalidHandler),
+    );
+    const emptyTypedGetKey = expectFailure(
+      await runSdkExit(
+        configDomain.getConfigKeyWith("", configDomain.JsonValueSchema),
+        invalidHandler,
+      ),
+    );
+    const invalidSetValue = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply non-JSON values.
+        configDomain.setConfigKey("theme", undefined),
+        invalidHandler,
+      ),
+    );
+    const emptyDeleteKey = expectFailure(
+      await runSdkExit(configDomain.deleteConfigKey(""), invalidHandler),
+    );
+
+    expect(invalidConfig).toBeInstanceOf(PutioValidationError);
+    expect(cyclicConfig).toBeInstanceOf(PutioValidationError);
+    expect(emptyGetKey).toBeInstanceOf(PutioValidationError);
+    expect(emptyTypedGetKey).toBeInstanceOf(PutioValidationError);
+    expect(invalidSetValue).toBeInstanceOf(PutioValidationError);
+    expect(emptyDeleteKey).toBeInstanceOf(PutioValidationError);
+    expect(requestCount).toBe(0);
   });
 
   it("covers download links and events", async () => {

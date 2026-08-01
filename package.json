@@ -57,7 +57,8 @@
     "test:compat:bun": "node ./scripts/test-compat-bun.mts",
     "test:compat:node": "node ./scripts/test-compat-node.mts",
     "test:live": "vp pack && vp test run --config vitest.live.config.ts",
-    "verify": "vp check . && vp pack && knip && knip --production --no-gitignore && vp test run --coverage --passWithNoTests"
+    "validate:routes": "node ./scripts/validate-route-matrix.mts",
+    "verify": "vp check . && vp pack && knip && knip --production --no-gitignore && vp run validate:routes && vp test run --coverage --passWithNoTests"
   },
   "dependencies": {
     "effect": "4.0.0-beta.101"

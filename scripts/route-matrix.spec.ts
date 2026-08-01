@@ -146,6 +146,31 @@ describe("route matrix validation", () => {
     );
   });
 
+  it("does not validate forbidden operations against client surfaces", () => {
+    const invalid = {
+      routes: [
+        {
+          ...validMatrix.routes[2],
+          operation: "files.missing",
+        },
+      ],
+      version: 1,
+    };
+
+    try {
+      validateRouteMatrix(invalid, clients);
+      throw new Error("Expected route matrix validation to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(RouteMatrixValidationError);
+      if (!(error instanceof RouteMatrixValidationError)) {
+        throw error;
+      }
+      expect(error.issues).toEqual([
+        "routes[0] GET /v2/docs: excluded routes cannot declare an operation",
+      ]);
+    }
+  });
+
   it("rejects unknown fields instead of silently dropping typos", () => {
     const invalid = {
       ...validMatrix,

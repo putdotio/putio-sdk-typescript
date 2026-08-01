@@ -133,7 +133,10 @@ export const validateRouteMatrix = (
 
     issues.push(...validateClassification(route, index));
 
-    if (route.operation !== undefined) {
+    if (
+      route.operation !== undefined &&
+      (route.classification === "sdk" || route.classification === "equivalent")
+    ) {
       if (!operationPattern.test(route.operation)) {
         issues.push(`${location}: operation must be a dotted client method path`);
       } else {

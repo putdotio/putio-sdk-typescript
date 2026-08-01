@@ -116,7 +116,7 @@ export const AccountTwoFactorSettingsSchema = Schema.Struct({
   code: Schema.String,
   enable: Schema.Boolean,
 });
-const AccountSettingsPatchSchema = Schema.Struct({
+const AccountSettingsPatchFields = {
   beta_user: Schema.optional(AccountSettingsFields.beta_user),
   callback_url: Schema.optional(AccountSettingsFields.callback_url),
   dark_theme: Schema.optional(AccountSettingsFields.dark_theme),
@@ -143,22 +143,25 @@ const AccountSettingsPatchSchema = Schema.Struct({
   use_private_download_ip: Schema.optional(AccountSettingsFields.use_private_download_ip),
   use_start_from: Schema.optional(AccountSettingsFields.use_start_from),
   video_player: Schema.optional(AccountSettingsFields.video_player),
-});
+};
+const SaveAccountSettingsCommonFields = {
+  ...AccountSettingsPatchFields,
+  two_factor_enabled: Schema.optional(AccountTwoFactorSettingsSchema),
+  username: Schema.optional(Schema.String),
+};
 export const SaveAccountSettingsPayloadSchema = Schema.Union([
-  AccountSettingsPatchSchema,
+  Schema.Struct(SaveAccountSettingsCommonFields),
   Schema.Struct({
-    username: Schema.String,
-  }),
-  Schema.Struct({
+    ...SaveAccountSettingsCommonFields,
     current_password: Schema.String,
     mail: Schema.String,
+    password: Schema.optional(Schema.String),
   }),
   Schema.Struct({
+    ...SaveAccountSettingsCommonFields,
     current_password: Schema.String,
+    mail: Schema.optional(Schema.String),
     password: Schema.String,
-  }),
-  Schema.Struct({
-    two_factor_enabled: AccountTwoFactorSettingsSchema,
   }),
 ]);
 export const AccountClearOptionsSchema = Schema.Struct({
@@ -237,6 +240,14 @@ const failMissingField = (field: string): Effect.Effect<never, PutioValidationEr
 const widenValidationError = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E | PutioValidationError, R> => effect;
+const mapSensitiveAccountDecodeError = (operation: "destroy" | "saveSettings") => () =>
+  new PutioValidationError({
+    cause: {
+      domain: "account",
+      operation,
+      reason: "Invalid request input",
+    },
+  });
 const hasDownloadToken = (
   value: AccountInfoBroad,
 ): value is AccountInfoBroad & {
@@ -424,7 +435,7 @@ export const saveAccountSettings = (
   Schema.decodeUnknownEffect(SaveAccountSettingsPayloadSchema, {
     onExcessProperty: "error",
   })(payload).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.mapError(mapSensitiveAccountDecodeError("saveSettings")),
     Effect.flatMap((decodedPayload) =>
       requestJson(OkResponseSchema, {
         body: {
@@ -459,7 +470,7 @@ export const destroyAccount = (
   currentPassword: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
   Schema.decodeUnknownEffect(Schema.String.check(Schema.isMinLength(1)))(currentPassword).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.mapError(mapSensitiveAccountDecodeError("destroy")),
     Effect.flatMap((decodedPassword) =>
       requestJson(OkResponseSchema, {
         body: {

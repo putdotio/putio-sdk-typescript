@@ -54,9 +54,12 @@ export type CreateAppSpecificPasswordResult = AppSpecificPassword & {
   readonly password: string;
 };
 
-const RestrictedAppSpecificPasswordError = {
+const RestrictedAppSpecificPasswordError: {
+  readonly errorType: "invalid_scope";
+  readonly statusCode: 401;
+} = {
   errorType: "invalid_scope",
-  statusCode: 401 as const,
+  statusCode: 401,
 };
 
 export const CreateAppSpecificPasswordErrorSpec = definePutioOperationErrorSpec({

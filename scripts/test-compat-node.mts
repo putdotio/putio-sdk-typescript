@@ -58,6 +58,7 @@ const main = async () => {
 import {
   createPutioSdkEffectClient,
   createPutioSdkPromiseClient,
+  type CreateAppSpecificPasswordError,
   type PutioSdkPromiseClient,
 } from "@putdotio/sdk";
 import { toHumanFileSize } from "@putdotio/sdk/utilities";
@@ -82,6 +83,16 @@ const appSpecificPassword: AppSpecificPasswords[number] = {
   last_used_at: null,
   note: "Laptop",
 };
+type CreateAppSpecificPasswordOperationError = Extract<
+  CreateAppSpecificPasswordError,
+  { readonly _tag: "PutioOperationError" }
+>;
+type CreateAppSpecificPasswordErrorType =
+  CreateAppSpecificPasswordOperationError["contract"]["errorType"];
+const knownAppSpecificPasswordError: CreateAppSpecificPasswordErrorType =
+  "TOO_MANY_APP_SPECIFIC_PASSWORDS";
+// @ts-expect-error unknown app-specific-password error literals are not part of the public contract
+const unknownAppSpecificPasswordError: CreateAppSpecificPasswordErrorType = "UNKNOWN_ERROR";
 const promiseAuthUrl = promiseClient.auth.buildLoginUrl({
   clientId: "external-node",
   redirectUri: "https://example.com/callback",
@@ -110,12 +121,14 @@ const effectAuthHost = await Effect.runPromise(
 console.log(
   JSON.stringify({
     effectAuthHost,
+    knownAppSpecificPasswordError,
     appSpecificPasswordNote: appSpecificPassword.note,
     promiseAuthHost,
     subtitleLanguage: subtitleLanguage.code,
     uploadMethod: uploadRequest.method,
     uploadBody: uploadRequest.body.constructor.name,
     utility: toHumanFileSize(1_572_864),
+    unknownAppSpecificPasswordError,
   }),
 );
 `,

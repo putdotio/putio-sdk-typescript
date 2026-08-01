@@ -125,6 +125,9 @@ export const JsonObjectSchema = Schema.declareConstructor<PutioJsonObject>()(
 const ConfigKeySchema = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isPattern(/^(?!\.{1,2}$)/),
+  Schema.makeFilter((key: string) => key.isWellFormed(), {
+    expected: "a well-formed Unicode config key",
+  }),
 );
 const ConfigSetKeyInputSchema = Schema.Struct({
   key: ConfigKeySchema,

@@ -226,6 +226,9 @@ describe("supporting domain boundaries", () => {
     const dotGetKey = expectFailure(
       await runSdkExit(configDomain.getConfigKey(".."), invalidHandler),
     );
+    const malformedGetKey = expectFailure(
+      await runSdkExit(configDomain.getConfigKey("\uD800"), invalidHandler),
+    );
     const emptyTypedGetKey = expectFailure(
       await runSdkExit(
         configDomain.getConfigKeyWith("", configDomain.JsonValueSchema),
@@ -262,6 +265,7 @@ describe("supporting domain boundaries", () => {
     expect(cyclicConfig).toBeInstanceOf(PutioValidationError);
     expect(emptyGetKey).toBeInstanceOf(PutioValidationError);
     expect(dotGetKey).toBeInstanceOf(PutioValidationError);
+    expect(malformedGetKey).toBeInstanceOf(PutioValidationError);
     expect(emptyTypedGetKey).toBeInstanceOf(PutioValidationError);
     expect(invalidSetValue).toBeInstanceOf(PutioValidationError);
     expect(sparseSetValue).toBeInstanceOf(PutioValidationError);

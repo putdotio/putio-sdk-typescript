@@ -576,6 +576,8 @@ describe("files domain", () => {
           time: 12.5,
         }),
         (request) => {
+          expect(request.method).toBe("POST");
+          expect(request.url).toBe("https://api.put.io/v2/files/9/start-from");
           expect(getFormBody(request).get("time")).toBe("12.5");
           return jsonResponse({ status: "OK" });
         },
@@ -584,9 +586,17 @@ describe("files domain", () => {
     ).toEqual({ status: "OK" });
 
     expect(
-      await runSdkEffect(files.resetStartFrom(9), () => jsonResponse({ status: "OK" }), {
-        accessToken: "token-123",
-      }),
+      await runSdkEffect(
+        files.resetStartFrom(9),
+        (request) => {
+          expect(request.method).toBe("POST");
+          expect(request.url).toBe("https://api.put.io/v2/files/9/start-from/delete");
+          return jsonResponse({ status: "OK" });
+        },
+        {
+          accessToken: "token-123",
+        },
+      ),
     ).toEqual({ status: "OK" });
 
     expect(

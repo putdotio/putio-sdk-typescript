@@ -1,9 +1,11 @@
 import { Effect, Schema } from "effect";
 import {
   definePutioOperationErrorSpec,
+  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
+import { NonEmptyStringSchema } from "../core/validation.js";
 import {
   OkResponseSchema,
   encodePathSegment,
@@ -133,14 +135,28 @@ export const createFamilyInvite = (): Effect.Effect<
 export const removeFamilyMember = (
   username: string,
 ): Effect.Effect<void, RemoveFamilyMemberError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    method: "DELETE",
-    path: `/v2/family/sub_account/${encodePathSegment(username)}`,
-  }).pipe(Effect.asVoid, withOperationErrors(RemoveFamilyMemberErrorSpec));
+  Schema.decodeUnknownEffect(NonEmptyStringSchema)(username).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedUsername) =>
+      requestJson(OkResponseSchema, {
+        method: "DELETE",
+        path: `/v2/family/sub_account/${encodePathSegment(decodedUsername)}`,
+      }),
+    ),
+    Effect.asVoid,
+    withOperationErrors(RemoveFamilyMemberErrorSpec),
+  );
 export const joinFamily = (
   inviteCode: string,
 ): Effect.Effect<void, JoinFamilyError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/family/join/${encodePathSegment(inviteCode)}`,
-  }).pipe(Effect.asVoid, withOperationErrors(JoinFamilyErrorSpec));
+  Schema.decodeUnknownEffect(NonEmptyStringSchema)(inviteCode).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInviteCode) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/family/join/${encodePathSegment(decodedInviteCode)}`,
+      }),
+    ),
+    Effect.asVoid,
+    withOperationErrors(JoinFamilyErrorSpec),
+  );

@@ -1,9 +1,11 @@
 import { Effect, Schema } from "effect";
 import {
   definePutioOperationErrorSpec,
+  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
+import { NonEmptyStringSchema } from "../core/validation.js";
 import { FileBroadSchema, type FileBroad } from "./files.js";
 import {
   OkResponseSchema,
@@ -133,6 +135,10 @@ export type RemoveFriendError = PutioOperationFailure<typeof RemoveFriendErrorSp
 export type ApproveFriendRequestError = PutioOperationFailure<typeof ApproveFriendRequestErrorSpec>;
 export type DenyFriendRequestError = PutioOperationFailure<typeof DenyFriendRequestErrorSpec>;
 export type FriendSharedFolderError = PutioOperationFailure<typeof FriendSharedFolderErrorSpec>;
+const decodeUsername = (username: string) =>
+  Schema.decodeUnknownEffect(NonEmptyStringSchema)(username).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+  );
 export const listFriends = (): Effect.Effect<
   {
     readonly friends: ReadonlyArray<Friend>;
@@ -148,10 +154,16 @@ export const listFriends = (): Effect.Effect<
 export const searchFriends = (
   username: string,
 ): Effect.Effect<ReadonlyArray<UserSearchResult>, SearchFriendsError, PutioSdkContext> =>
-  requestJson(FriendSearchEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/friends/user-search/${encodePathSegment(username)}`,
-  }).pipe(selectJsonField("users"), withOperationErrors(SearchFriendsErrorSpec));
+  decodeUsername(username).pipe(
+    Effect.flatMap((decodedUsername) =>
+      requestJson(FriendSearchEnvelopeSchema, {
+        method: "GET",
+        path: `/v2/friends/user-search/${encodePathSegment(decodedUsername)}`,
+      }),
+    ),
+    selectJsonField("users"),
+    withOperationErrors(SearchFriendsErrorSpec),
+  );
 export const listWaitingRequests = (): Effect.Effect<
   ReadonlyArray<FriendBase>,
   ListWaitingRequestsError,
@@ -186,17 +198,27 @@ export const sendFriendRequest = (
   SendFriendRequestError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/friends/${encodePathSegment(username)}/request`,
-  }).pipe(withOperationErrors(SendFriendRequestErrorSpec));
+  decodeUsername(username).pipe(
+    Effect.flatMap((decodedUsername) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/friends/${encodePathSegment(decodedUsername)}/request`,
+      }),
+    ),
+    withOperationErrors(SendFriendRequestErrorSpec),
+  );
 export const removeFriend = (
   username: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, RemoveFriendError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/friends/${encodePathSegment(username)}/unfriend`,
-  }).pipe(withOperationErrors(RemoveFriendErrorSpec));
+  decodeUsername(username).pipe(
+    Effect.flatMap((decodedUsername) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/friends/${encodePathSegment(decodedUsername)}/unfriend`,
+      }),
+    ),
+    withOperationErrors(RemoveFriendErrorSpec),
+  );
 export const approveFriendRequest = (
   username: string,
 ): Effect.Effect<
@@ -204,10 +226,15 @@ export const approveFriendRequest = (
   ApproveFriendRequestError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/friends/${encodePathSegment(username)}/approve`,
-  }).pipe(withOperationErrors(ApproveFriendRequestErrorSpec));
+  decodeUsername(username).pipe(
+    Effect.flatMap((decodedUsername) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/friends/${encodePathSegment(decodedUsername)}/approve`,
+      }),
+    ),
+    withOperationErrors(ApproveFriendRequestErrorSpec),
+  );
 export const denyFriendRequest = (
   username: string,
 ): Effect.Effect<
@@ -215,14 +242,25 @@ export const denyFriendRequest = (
   DenyFriendRequestError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/friends/${encodePathSegment(username)}/deny`,
-  }).pipe(withOperationErrors(DenyFriendRequestErrorSpec));
+  decodeUsername(username).pipe(
+    Effect.flatMap((decodedUsername) =>
+      requestJson(OkResponseSchema, {
+        method: "POST",
+        path: `/v2/friends/${encodePathSegment(decodedUsername)}/deny`,
+      }),
+    ),
+    withOperationErrors(DenyFriendRequestErrorSpec),
+  );
 export const getFriendSharedFolder = (
   username: string,
 ): Effect.Effect<FileBroad | null, FriendSharedFolderError, PutioSdkContext> =>
-  requestJson(FriendSharedFolderEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/friends/${encodePathSegment(username)}/files`,
-  }).pipe(selectJsonField("file"), withOperationErrors(FriendSharedFolderErrorSpec));
+  decodeUsername(username).pipe(
+    Effect.flatMap((decodedUsername) =>
+      requestJson(FriendSharedFolderEnvelopeSchema, {
+        method: "GET",
+        path: `/v2/friends/${encodePathSegment(decodedUsername)}/files`,
+      }),
+    ),
+    selectJsonField("file"),
+    withOperationErrors(FriendSharedFolderErrorSpec),
+  );

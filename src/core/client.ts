@@ -133,13 +133,16 @@ import {
   putMp4ToMyFiles,
   queryFiles,
   renameFile,
+  resetFileSortSettings,
   resetStartFrom,
   searchFiles,
+  setFileSort,
   setFilesWatchStatus,
   setStartFrom,
   uploadFile,
   type FileListResponse,
   type FileQuery,
+  type FileSetSortInput,
   type FilesMoveError,
   type FilesSearchQuery,
   type FileSearchResponse,
@@ -481,8 +484,10 @@ export const createPutioSdkEffectClient = () => ({
     moveSelection: moveFileSelection,
     putMp4ToMyFiles,
     rename: renameFile,
+    resetSortSettings: resetFileSortSettings,
     resetStartFrom,
     search: searchFiles,
+    setSort: setFileSort,
     setWatchStatus: setFilesWatchStatus,
     setStartFrom,
     upload: uploadFile,
@@ -936,9 +941,11 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
       putMp4ToMyFiles: (fileId: number) => provideSdk(config, putMp4ToMyFiles(fileId)),
       rename: (input: { readonly file_id: number; readonly name: string }) =>
         provideSdk(config, renameFile(input)),
+      resetSortSettings: (): Promise<void> => provideSdk(config, resetFileSortSettings()),
       resetStartFrom: (fileId: number) => provideSdk(config, resetStartFrom(fileId)),
       search: (query: FilesSearchQuery): Promise<FileSearchResponse> =>
         provideSdk(config, searchFiles(query)),
+      setSort: (input: FileSetSortInput): Promise<void> => provideSdk(config, setFileSort(input)),
       setWatchStatus: (selection: {
         readonly cursor?: string;
         readonly excludeIds?: ReadonlyArray<number>;

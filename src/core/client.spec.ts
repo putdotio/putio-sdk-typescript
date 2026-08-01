@@ -43,6 +43,7 @@ describe("sdk client factories", () => {
     expect(client.downloadLinks.create).toBeTypeOf("function");
     expect(client.events.list).toBeTypeOf("function");
     expect(client.files.list).toBeTypeOf("function");
+    expect(client.files.setSort).toBeTypeOf("function");
     expect(client.oauth.buildAuthorizeUrl).toBeTypeOf("function");
     expect(client.transfers.list).toBeTypeOf("function");
   });
@@ -97,6 +98,7 @@ describe("sdk client factories", () => {
     expect(client.auth.getCode).toBeTypeOf("function");
     expect(client.files.createUploadFormData).toBeTypeOf("function");
     expect(client.files.getApiDownloadUrl).toBeTypeOf("function");
+    expect(client.files.setSort).toBeTypeOf("function");
     expect(client.payment.changePlan.preview).toBeTypeOf("function");
     expect(client.sharing.publicShares.list).toBeTypeOf("function");
     expect(client.zips.list).toBeTypeOf("function");

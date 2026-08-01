@@ -72,6 +72,16 @@ const subtitleLanguage: SubtitleLanguages[number] = {
   code: "eng",
   name: "English",
 };
+type AppSpecificPasswords = Awaited<
+  ReturnType<PutioSdkPromiseClient["account"]["appSpecificPasswords"]["list"]>
+>;
+const appSpecificPassword: AppSpecificPasswords[number] = {
+  created_at: "2026-08-01T10:00:00Z",
+  id: 42,
+  ip_address: "203.0.113.XXX",
+  last_used_at: null,
+  note: "Laptop",
+};
 const promiseAuthUrl = promiseClient.auth.buildLoginUrl({
   clientId: "external-node",
   redirectUri: "https://example.com/callback",
@@ -100,6 +110,7 @@ const effectAuthHost = await Effect.runPromise(
 console.log(
   JSON.stringify({
     effectAuthHost,
+    appSpecificPasswordNote: appSpecificPassword.note,
     promiseAuthHost,
     subtitleLanguage: subtitleLanguage.code,
     uploadMethod: uploadRequest.method,

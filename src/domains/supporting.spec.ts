@@ -80,6 +80,11 @@ describe("supporting domain boundaries", () => {
     expect(getterCalls).toBe(0);
     const crossRealmConfig: unknown = runInNewContext(`({ locale: "en" })`);
     expect(decodeJsonObject(crossRealmConfig)).toEqual({ locale: "en" });
+    const customPrototype: Record<string, unknown> = Object.create(null);
+    customPrototype.inherited = true;
+    const customPrototypeConfig: Record<string, unknown> = Object.create(customPrototype);
+    customPrototypeConfig.locale = "en";
+    expect(() => decodeJsonObject(customPrototypeConfig)).toThrow("Expected a JSON object");
     expect(() => decodeJsonObject(["nope"])).toThrow("Expected a JSON object");
 
     expect(

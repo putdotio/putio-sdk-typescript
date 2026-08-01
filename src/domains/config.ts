@@ -17,10 +17,21 @@ export type PutioJsonValue =
 export type PutioJsonObject = {
   readonly [key: string]: PutioJsonValue;
 };
+const nativeObjectConstructorSource = Function.prototype.toString.call(Object);
 const isPlainRecord = (value: object): value is Record<string, unknown> => {
   try {
     const prototype = Object.getPrototypeOf(value);
-    return prototype === null || Object.getPrototypeOf(prototype) === null;
+    if (prototype === null) {
+      return true;
+    }
+    if (Object.getPrototypeOf(prototype) !== null) {
+      return false;
+    }
+    const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor")?.value;
+    return (
+      typeof constructor === "function" &&
+      Function.prototype.toString.call(constructor) === nativeObjectConstructorSource
+    );
   } catch {
     return false;
   }

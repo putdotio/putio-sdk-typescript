@@ -305,10 +305,11 @@ import {
 import { mapConfigurationError } from "./errors.js";
 
 type PutioSdkPromiseRuntime = ManagedRuntime.ManagedRuntime<PutioSdkContext, never>;
+type PutioSdkPromiseRuntimeConfig = Omit<PutioSdkConfigShape, "accessToken">;
 
 interface PutioSdkPromiseState {
   accessToken: string | undefined;
-  readonly runtimeConfig: PutioSdkConfigShape;
+  readonly runtimeConfig: PutioSdkPromiseRuntimeConfig;
 }
 
 const promiseClientRuntimeCache = new WeakMap<PutioSdkPromiseState, PutioSdkPromiseRuntime>();
@@ -373,7 +374,7 @@ const provideSdk = async <A, E>(
 };
 
 const snapshotUrl = (value: string | URL | undefined): string | URL | undefined =>
-  value instanceof URL ? new URL(value.href) : value;
+  typeof value === "string" || value === undefined ? value : new URL(value.href);
 
 export const createPutioSdkEffectClient = () => ({
   account: {
@@ -615,14 +616,19 @@ export const makePutioSdkLiveClientLayer = (config: PutioSdkConfigShape) =>
   Layer.mergeAll(makePutioSdkEffectClientLayer(), makePutioSdkLiveLayer(config));
 
 export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape = {}) => {
-  const runtimeConfig = makePutioSdkConfig({
+  const normalizedConfig = makePutioSdkConfig({
     ...initialConfig,
     baseUrl: snapshotUrl(initialConfig.baseUrl),
     uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
     webAppUrl: snapshotUrl(initialConfig.webAppUrl),
   });
+  const runtimeConfig: PutioSdkPromiseRuntimeConfig = {
+    baseUrl: normalizedConfig.baseUrl,
+    uploadBaseUrl: normalizedConfig.uploadBaseUrl,
+    webAppUrl: normalizedConfig.webAppUrl,
+  };
   const config: PutioSdkPromiseState = {
-    accessToken: runtimeConfig.accessToken,
+    accessToken: initialConfig.accessToken,
     runtimeConfig,
   };
 
@@ -717,7 +723,11 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
         provideSdk(config, saveAccountSettings(payload)),
     },
     auth: {
-      buildLoginUrl: buildAuthLoginUrl,
+      buildLoginUrl: (options: Parameters<typeof buildAuthLoginUrl>[0]) =>
+        buildAuthLoginUrl({
+          ...options,
+          webAppUrl: options.webAppUrl ?? config.runtimeConfig.webAppUrl,
+        }),
       checkCodeMatch: (code: string) => provideSdk(config, checkCodeMatch(code)),
       clients: (): Promise<ReadonlyArray<OAuthAppSession>> => provideSdk(config, clients()),
       exists: (key: "mail" | "username", value: string) => provideSdk(config, exists(key, value)),

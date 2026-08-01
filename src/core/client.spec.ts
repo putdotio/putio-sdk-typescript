@@ -299,9 +299,14 @@ describe("sdk client factories", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const baseUrl = new URL("https://api.snapshot.test");
+    const baseUrl = new Proxy(new URL("https://api.snapshot.test"), {
+      get: (target, key) => Reflect.get(target, key, target),
+      getPrototypeOf: () => null,
+      set: (target, key, value) => Reflect.set(target, key, value, target),
+    });
     const uploadBaseUrl = new URL("https://upload.snapshot.test");
     const webAppUrl = new URL("https://app.snapshot.test");
+    expect(baseUrl).not.toBeInstanceOf(URL);
     const client = createPutioSdkPromiseClient({
       accessToken: "token-123",
       baseUrl,
@@ -317,11 +322,17 @@ describe("sdk client factories", () => {
     const uploadRequest = await client.files.createUploadRequest({
       file: new Blob(["snapshot"]),
     });
+    const loginUrl = client.auth.buildLoginUrl({
+      clientId: 1,
+      redirectUri: "https://consumer.test/callback",
+      state: "snapshot",
+    });
 
     expect(requestedUrls).toEqual(["https://api.snapshot.test/v2/config/snapshot"]);
     expect(uploadRequest.url).toBe(
       "https://upload.snapshot.test/v2/files/upload?oauth_token=token-123",
     );
+    expect(new URL(loginUrl).origin).toBe("https://app.snapshot.test");
 
     await client.dispose();
   });

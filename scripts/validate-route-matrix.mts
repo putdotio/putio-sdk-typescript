@@ -8,6 +8,8 @@ const { createPutioSdkEffectClient, createPutioSdkPromiseClient } =
   await import("../dist/index.js");
 
 const promiseClient = createPutioSdkPromiseClient();
+let failed = false;
+let failure: unknown;
 
 try {
   const matrix = validateRouteMatrix(input, {
@@ -20,6 +22,20 @@ try {
   console.log(
     `Validated ${matrix.routes.length} public route decisions (${investigateCount} awaiting disposition).`,
   );
-} finally {
+} catch (error) {
+  failed = true;
+  failure = error;
+}
+
+try {
   await promiseClient.dispose();
+} catch (error) {
+  if (!failed) {
+    failed = true;
+    failure = error;
+  }
+}
+
+if (failed) {
+  throw failure;
 }

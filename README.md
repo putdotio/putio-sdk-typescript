@@ -305,6 +305,27 @@ const upload = await sdk.files.upload({
 
 Upload targets `upload.put.io` internally because `api.put.io/v2/files/upload` is only a redirect shim.
 
+## File Lookup and Mutations
+
+Named-child lookup avoids listing an entire folder and preserves the same query-conditioned fields as
+`files.get`:
+
+```ts
+const child = await sdk.files.getChild({
+  parentId: folderId,
+  name: "movie.mp4",
+  query: { stream_url: 1 },
+});
+
+await sdk.files.touch({ fileIds: [child.id], updatedAt: new Date() });
+const copy = await sdk.files.copy({ fileId: child.id, parentId: 0, name: "movie copy.mp4" });
+const writableUserId = await sdk.files.canWrite(copy.id);
+```
+
+`canWrite` resolves the user ID returned by the backend when the file is writable. A non-writable,
+missing, or payment-gated file rejects with the corresponding typed SDK error rather than returning
+`false`.
+
 ## Folder Sort and Podcast Feeds
 
 Folder sort settings persist per folder and apply to subsequent file listings:

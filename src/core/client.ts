@@ -96,6 +96,8 @@ import {
 } from "../domains/family.js";
 import { getIftttStatus, sendIftttEvent, type IftttEventInput } from "../domains/ifttt.js";
 import {
+  canWriteFile,
+  copyFile,
   createFileUploadFormData,
   createFileUploadRequest,
   continueFiles,
@@ -115,6 +117,7 @@ import {
   getApiDownloadUrl,
   getApiMp4DownloadUrl,
   getDownloadUrl,
+  getFileChild,
   getHlsStreamUrl,
   type FileConversionStatus,
   type FileCore,
@@ -139,9 +142,14 @@ import {
   setFileSort,
   setFilesWatchStatus,
   setStartFrom,
+  touchFiles,
   uploadFile,
+  type FileBroad,
+  type FileCopyInput,
   type FileListResponse,
   type FileQuery,
+  type FileResponseFor,
+  type FileTouchInput,
   type FileSetSortInput,
   type FilesMoveError,
   type FilesSearchQuery,
@@ -462,8 +470,10 @@ export const createPutioSdkEffectClient = () => ({
     getLinks: getPodcastLinks,
   },
   files: {
+    canWrite: canWriteFile,
     continue: continueFiles,
     continueSearch,
+    copy: copyFile,
     convertToMp4: convertFileToMp4,
     convertManyToMp4: convertFilesToMp4,
     convertSelectionToMp4: convertFileSelectionToMp4,
@@ -480,6 +490,7 @@ export const createPutioSdkEffectClient = () => ({
     getApiDownloadUrl,
     getApiMp4DownloadUrl,
     get: getFile,
+    getChild: getFileChild,
     getDownloadUrl,
     getHlsStreamUrl,
     getMp4Status,
@@ -498,6 +509,7 @@ export const createPutioSdkEffectClient = () => ({
     setSort: setFileSort,
     setWatchStatus: setFilesWatchStatus,
     setStartFrom,
+    touch: touchFiles,
     upload: uploadFile,
   },
   friendInvites: {
@@ -710,6 +722,23 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
     return provideSdk(config, getFile(input));
   }
 
+  function getChildByName(input: {
+    readonly name: string;
+    readonly parentId: number;
+  }): Promise<FileCore>;
+  function getChildByName<TQuery extends FileQuery>(input: {
+    readonly name: string;
+    readonly parentId: number;
+    readonly query: TQuery;
+  }): Promise<FileResponseFor<TQuery>>;
+  function getChildByName(input: {
+    readonly name: string;
+    readonly parentId: number;
+    readonly query?: FileQuery;
+  }) {
+    return provideSdk(config, getFileChild(input));
+  }
+
   return {
     dispose: () => disposePromiseClientRuntime(config),
     setAccessToken: (accessToken: string | undefined): void => {
@@ -814,6 +843,7 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
         provideSdk(config, getPodcastLinks(input)),
     },
     files: {
+      canWrite: (fileId: number): Promise<number> => provideSdk(config, canWriteFile(fileId)),
       continue: (
         cursor: string,
         query?: { readonly per_page?: number },
@@ -822,6 +852,7 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
         cursor: string,
         query?: { readonly per_page?: number },
       ): Promise<FileSearchResponse> => provideSdk(config, continueSearch(cursor, query)),
+      copy: (input: FileCopyInput): Promise<FileBroad> => provideSdk(config, copyFile(input)),
       convertManyToMp4: (ids: ReadonlyArray<number>): Promise<number> =>
         provideSdk(config, convertFilesToMp4(ids)),
       convertSelectionToMp4: (selection: {
@@ -910,6 +941,7 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
         },
       ): Promise<string> => provideSdk(config, getApiMp4DownloadUrl(fileId, options)),
       get: getFileById,
+      getChild: getChildByName,
       getDownloadUrl: (fileId: number): Promise<string> =>
         provideSdk(config, getDownloadUrl(fileId)),
       getHlsStreamUrl: (
@@ -966,6 +998,7 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
       }) => provideSdk(config, setFilesWatchStatus(selection)),
       setStartFrom: (input: { readonly file_id: number; readonly time: number }) =>
         provideSdk(config, setStartFrom(input)),
+      touch: (input: FileTouchInput): Promise<void> => provideSdk(config, touchFiles(input)),
       upload: (input: {
         readonly file: Blob;
         readonly fileName?: string;

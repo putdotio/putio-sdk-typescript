@@ -305,6 +305,32 @@ const upload = await sdk.files.upload({
 
 Upload targets `upload.put.io` internally because `api.put.io/v2/files/upload` is only a redirect shim.
 
+## Folder Sort and Podcast Feeds
+
+Folder sort settings apply to subsequent file listings:
+
+```ts
+await sdk.files.setSort({
+  fileId: folderId,
+  sortBy: "MODIFIED_DESC",
+});
+
+await sdk.files.resetSortSettings();
+```
+
+Podcast links can target a folder and an explicit non-empty selection of feed types. Omit
+`types` to request the API defaults:
+
+```ts
+const { links, token } = await sdk.podcast.getLinks({
+  parentId: folderId,
+  types: ["audio", "mp4"],
+});
+```
+
+`links` is a partial map keyed by `all`, `audio`, `video`, and `mp4`, so consumers should
+check whether a requested link is present.
+
 ## TanStack Query
 
 The Promise client plugs into TanStack Query directly:

@@ -292,6 +292,7 @@ describe("account domain", () => {
         handler,
       ),
     );
+    const emptyPassword = expectFailure(await runSdkExit(destroyAccount(""), handler));
     const invalidConfirmationSubject = expectFailure(
       await runSdkExit(
         // @ts-expect-error JavaScript callers can supply unknown confirmation subjects.
@@ -306,6 +307,7 @@ describe("account domain", () => {
     expect(unknownSetting).toBeInstanceOf(PutioValidationError);
     expect(incompleteClearOptions).toBeInstanceOf(PutioValidationError);
     expect(invalidPassword).toBeInstanceOf(PutioValidationError);
+    expect(emptyPassword).toBeInstanceOf(PutioValidationError);
     expect(invalidConfirmationSubject).toBeInstanceOf(PutioValidationError);
     expect(requestCount).toBe(0);
   });

@@ -251,6 +251,11 @@ describe("supporting domain boundaries", () => {
         invalidHandler,
       ),
     );
+    const revokedConfig = Proxy.revocable<configDomain.PutioJsonObject>({}, {});
+    revokedConfig.revoke();
+    const revokedConfigFailure = expectFailure(
+      await runSdkExit(configDomain.writeConfig(revokedConfig.proxy), invalidHandler),
+    );
     const emptyGetKey = expectFailure(
       await runSdkExit(configDomain.getConfigKey(""), invalidHandler),
     );
@@ -270,6 +275,15 @@ describe("supporting domain boundaries", () => {
       await runSdkExit(
         // @ts-expect-error JavaScript callers can supply non-JSON values.
         configDomain.setConfigKey("theme", undefined),
+        invalidHandler,
+      ),
+    );
+    const fakeSecret = "sdk-fake-secret-for-redaction";
+    const sensitiveInvalidValue = { invalid: undefined, token: fakeSecret };
+    const sensitiveInvalidError = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply objects containing non-JSON values.
+        configDomain.setConfigKey("credentials", sensitiveInvalidValue),
         invalidHandler,
       ),
     );
@@ -294,11 +308,14 @@ describe("supporting domain boundaries", () => {
 
     expect(invalidConfig).toBeInstanceOf(PutioValidationError);
     expect(cyclicConfig).toBeInstanceOf(PutioValidationError);
+    expect(revokedConfigFailure).toBeInstanceOf(PutioValidationError);
     expect(emptyGetKey).toBeInstanceOf(PutioValidationError);
     expect(dotGetKey).toBeInstanceOf(PutioValidationError);
     expect(malformedGetKey).toBeInstanceOf(PutioValidationError);
     expect(emptyTypedGetKey).toBeInstanceOf(PutioValidationError);
     expect(invalidSetValue).toBeInstanceOf(PutioValidationError);
+    expect(sensitiveInvalidError).toBeInstanceOf(PutioValidationError);
+    expect(String(sensitiveInvalidError.cause)).not.toContain(fakeSecret);
     expect(sparseSetValue).toBeInstanceOf(PutioValidationError);
     expect(accessorConfig).toBeInstanceOf(PutioValidationError);
     expect(emptySetKey).toBeInstanceOf(PutioValidationError);
@@ -341,6 +358,21 @@ describe("supporting domain boundaries", () => {
     expect(
       failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
     ).toBe(true);
+
+    let fullConfigRequestCount = 0;
+    const fullConfigFailure = expectFailure(
+      await runSdkExit(
+        configDomain.readConfig(),
+        () => {
+          fullConfigRequestCount += 1;
+          return inMemoryJsonResponse({ config: new Date(), status: "OK" });
+        },
+        { accessToken: "token-123" },
+      ),
+    );
+
+    expect(fullConfigFailure).toBeInstanceOf(PutioValidationError);
+    expect(fullConfigRequestCount).toBe(1);
   });
 
   it("covers download links and events", async () => {

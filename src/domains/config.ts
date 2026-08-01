@@ -96,14 +96,6 @@ const snapshotJsonValue = (
   }
 };
 const snapshotJsonObject = (value: unknown): PutioJsonObject | undefined => {
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    Array.isArray(value) ||
-    !isPlainRecord(value)
-  ) {
-    return undefined;
-  }
   const snapshot = snapshotJsonValue(value);
   return typeof snapshot === "object" && snapshot !== null && !Array.isArray(snapshot)
     ? snapshot
@@ -158,15 +150,15 @@ const isJsonValue = (
 const isJsonObject = (value: unknown): value is PutioJsonObject =>
   typeof value === "object" &&
   value !== null &&
+  isJsonValue(value) &&
   !Array.isArray(value) &&
-  isPlainRecord(value) &&
-  isJsonValue(value);
+  isPlainRecord(value);
 export const JsonValueSchema = Schema.declareConstructor<PutioJsonValue>()(
   [],
   () => (input, ast) => {
     const snapshot = snapshotJsonValue(input);
     return snapshot === undefined
-      ? Effect.fail(new SchemaIssue.InvalidType(ast, Option.some(input)))
+      ? Effect.fail(new SchemaIssue.InvalidType(ast, Option.none()))
       : Effect.succeed(snapshot);
   },
   {
@@ -178,7 +170,7 @@ const JsonValueResponseSchema = Schema.declareConstructor<PutioJsonValue>()(
   () => (input, ast) =>
     isJsonValue(input)
       ? Effect.succeed(input)
-      : Effect.fail(new SchemaIssue.InvalidType(ast, Option.some(input))),
+      : Effect.fail(new SchemaIssue.InvalidType(ast, Option.none())),
   {
     expected: "a JSON-compatible value",
   },
@@ -188,7 +180,7 @@ const JsonObjectResponseSchema = Schema.declareConstructor<PutioJsonObject>()(
   () => (input, ast) =>
     isJsonObject(input)
       ? Effect.succeed(input)
-      : Effect.fail(new SchemaIssue.InvalidType(ast, Option.some(input))),
+      : Effect.fail(new SchemaIssue.InvalidType(ast, Option.none())),
   {
     expected: "a JSON object",
   },
@@ -198,7 +190,7 @@ export const JsonObjectSchema = Schema.declareConstructor<PutioJsonObject>()(
   () => (input, ast) => {
     const snapshot = snapshotJsonObject(input);
     return snapshot === undefined
-      ? Effect.fail(new SchemaIssue.InvalidType(ast, Option.some(input)))
+      ? Effect.fail(new SchemaIssue.InvalidType(ast, Option.none()))
       : Effect.succeed(snapshot);
   },
   {

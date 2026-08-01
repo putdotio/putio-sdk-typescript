@@ -1040,6 +1040,11 @@ describe("operational domain boundaries", () => {
       runSdkExit(transfers.addTransferTrackers({ trackers: ["one,two"], transferId: 1 }), handler, {
         accessToken: "token-123",
       }),
+      runSdkExit(
+        transfers.addTransferTrackers({ trackers: ["udp://tracker example"], transferId: 1 }),
+        handler,
+        { accessToken: "token-123" },
+      ),
       runSdkExit(transfers.removeTransfers({ ids: [] }), handler, {
         accessToken: "token-123",
       }),
@@ -1111,6 +1116,54 @@ describe("operational domain boundaries", () => {
         errorType: "IS_MAGNET",
         kind: "error_type",
       },
+      status: 400,
+    });
+
+    const addTrackersFailure = await runSdkExit(
+      transfers.addTransferTrackers({
+        trackers: ["udp://tracker.example:80"],
+        transferId: 11,
+      }),
+      () =>
+        jsonResponse(
+          {
+            error_message: "No trackers were accepted",
+            error_type: "NO_TRACKERS",
+            status_code: 400,
+          },
+          { status: 400 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(addTrackersFailure)).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "transfers",
+      operation: "addTrackers",
+      reason: {
+        errorType: "NO_TRACKERS",
+        kind: "error_type",
+      },
+      status: 400,
+    });
+
+    const removeFailure = await runSdkExit(
+      transfers.removeTransfers({ ids: [11] }),
+      () =>
+        jsonResponse(
+          {
+            error_message: "Transfer cannot be removed",
+            status_code: 400,
+          },
+          { status: 400 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(removeFailure)).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "transfers",
+      operation: "remove",
       status: 400,
     });
   });

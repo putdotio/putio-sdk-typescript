@@ -37,6 +37,6 @@ export default defineConfig({
   test: {
     coverage: coverageConfig,
     exclude: [".repos/**", "test/live/**"],
-    include: ["src/**/*.spec.ts", "src/**/*.test.ts"],
+    include: ["scripts/**/*.spec.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
   },
 });

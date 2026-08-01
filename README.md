@@ -307,7 +307,7 @@ Upload targets `upload.put.io` internally because `api.put.io/v2/files/upload` i
 
 ## Folder Sort and Podcast Feeds
 
-Folder sort settings apply to subsequent file listings:
+Folder sort settings persist per folder and apply to subsequent file listings:
 
 ```ts
 await sdk.files.setSort({
@@ -317,6 +317,8 @@ await sdk.files.setSort({
 
 await sdk.files.resetSortSettings();
 ```
+
+`resetSortSettings()` clears the saved sort setting for every folder, including the root folder.
 
 Podcast links can target a folder and an explicit non-empty selection of feed types. Omit
 `types` to request the API defaults:

@@ -65,6 +65,8 @@ import {
   type FileCopyInput,
   type FileTouchInput,
   type PutioSdkPromiseClient,
+  type TransferAddTrackersInput,
+  type TransferRemoveInput,
 } from "@putdotio/sdk";
 import { toHumanFileSize } from "@putdotio/sdk/utilities";
 
@@ -200,6 +202,18 @@ const compilePromiseFileUtilities = async () => {
   return { streamUrl: child.stream_url, writableUserId };
 };
 void compilePromiseFileUtilities;
+const trackersInput: TransferAddTrackersInput = {
+  trackers: ["udp://tracker.example:80"],
+  transferId: 7,
+};
+const removalInput: TransferRemoveInput = { filter: "completed" };
+const compilePromiseTransferUtilities = async () => {
+  const torrent: Uint8Array = await promiseClient.transfers.getTorrent(7);
+  await promiseClient.transfers.addTrackers(trackersInput);
+  await promiseClient.transfers.remove(removalInput);
+  return torrent.byteLength;
+};
+void compilePromiseTransferUtilities;
 const promiseAuthUrl = promiseClient.auth.buildLoginUrl({
   clientId: "external-node",
   redirectUri: "https://example.com/callback",
@@ -223,6 +237,9 @@ void effectClient.files.getChild({ name: "source.txt", parentId: 0 });
 void effectClient.files.copy(copyInput);
 void effectClient.files.canWrite(7);
 void effectClient.files.touch(touchInput);
+void effectClient.transfers.getTorrent(7);
+void effectClient.transfers.addTrackers(trackersInput);
+void effectClient.transfers.remove(removalInput);
 const effectAuthHost = await Effect.runPromise(
   Effect.succeed(
     new URL(

@@ -435,6 +435,7 @@ vi.mock("../domains/transfers.js", async () => {
       }),
     ),
     addTransfer: vi.fn((input) => Effect.succeed({ ...transfer, source: input.url })),
+    addTransferTrackers: vi.fn(() => Effect.void),
     cancelTransfers: vi.fn((ids) => Effect.succeed({ cancelled: ids })),
     cleanTransfers: vi.fn((ids = []) => Effect.succeed({ deleted_ids: ids })),
     continueTransfers: vi.fn((cursor, query) =>
@@ -442,6 +443,7 @@ vi.mock("../domains/transfers.js", async () => {
     ),
     countTransfers: vi.fn(() => Effect.succeed(1)),
     getTransfer: vi.fn((id) => Effect.succeed({ ...transfer, id })),
+    getTransferTorrent: vi.fn((id) => Effect.succeed(Uint8Array.from([id]))),
     getTransferInfo: vi.fn((urls: ReadonlyArray<string>) =>
       Effect.succeed({
         disk_avail: 1000,
@@ -458,6 +460,7 @@ vi.mock("../domains/transfers.js", async () => {
       Effect.succeed({ cursor: null, total: 1, transfers: [transfer], query }),
     ),
     reannounceTransfer: vi.fn((id) => Effect.succeed({ reannounced: id })),
+    removeTransfers: vi.fn(() => Effect.void),
     retryTransfer: vi.fn((id) => Effect.succeed({ ...transfer, id })),
     stopTransferRecording: vi.fn((id) => Effect.succeed({ stoppedRecording: id })),
   };
@@ -812,16 +815,21 @@ describe("sdk promise client adapters", () => {
     expect(await client.transfers.addMany([{ url: "https://example.com/a" }])).toMatchObject({
       errors: [],
     });
+    await expect(
+      client.transfers.addTrackers({ trackers: ["udp://tracker.example:80"], transferId: 1 }),
+    ).resolves.toBeUndefined();
     expect(await client.transfers.cancel([1, 2])).toEqual({ cancelled: [1, 2] });
     expect(await client.transfers.clean([1])).toEqual({ deleted_ids: [1] });
     expect(await client.transfers.continue("cursor")).toMatchObject({ cursor: "cursor" });
     expect(await client.transfers.count()).toBe(1);
     expect(await client.transfers.get(1)).toMatchObject({ id: 1 });
+    expect(Array.from(await client.transfers.getTorrent(1))).toEqual([1]);
     expect(await client.transfers.info(["https://example.com/a"])).toMatchObject({
       disk_avail: 1000,
     });
     expect(await client.transfers.list({ per_page: 10 })).toMatchObject({ total: 1 });
     expect(await client.transfers.reannounce(1)).toEqual({ reannounced: 1 });
+    await expect(client.transfers.remove({ filter: "completed" })).resolves.toBeUndefined();
     expect(await client.transfers.retry(1)).toMatchObject({ id: 1 });
     expect(await client.transfers.stopRecording(1)).toEqual({ stoppedRecording: 1 });
 

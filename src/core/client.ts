@@ -290,23 +290,28 @@ import {
 import {
   addManyTransfers,
   addTransfer,
+  addTransferTrackers,
   cancelTransfers,
   cleanTransfers,
   continueTransfers,
   countTransfers,
   getTransfer,
   getTransferInfo,
+  getTransferTorrent,
   listTransfers,
   reannounceTransfer,
+  removeTransfers,
   retryTransfer,
   stopTransferRecording,
   type Transfer,
   type TransferAddInput,
+  type TransferAddTrackersInput,
   type TransferInfoItem,
   type TransfersAddMultiError,
   type TransfersContinueResponse,
   type TransfersListQuery,
   type TransfersListResponse,
+  type TransferRemoveInput,
 } from "../domains/transfers.js";
 import { listTunnelRoutes, type TunnelRoute } from "../domains/tunnel.js";
 import {
@@ -611,14 +616,17 @@ export const createPutioSdkEffectClient = () => ({
   transfers: {
     add: addTransfer,
     addMany: addManyTransfers,
+    addTrackers: addTransferTrackers,
     cancel: cancelTransfers,
     clean: cleanTransfers,
     continue: continueTransfers,
     count: countTransfers,
     get: getTransfer,
+    getTorrent: getTransferTorrent,
     info: getTransferInfo,
     list: listTransfers,
     reannounce: reannounceTransfer,
+    remove: removeTransfers,
     retry: retryTransfer,
     stopRecording: stopTransferRecording,
   },
@@ -1159,6 +1167,8 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
         readonly errors: ReadonlyArray<TransfersAddMultiError>;
         readonly transfers: ReadonlyArray<Transfer>;
       }> => provideSdk(config, addManyTransfers(inputs)),
+      addTrackers: (input: TransferAddTrackersInput): Promise<void> =>
+        provideSdk(config, addTransferTrackers(input)),
       cancel: (ids: ReadonlyArray<number>) => provideSdk(config, cancelTransfers(ids)),
       clean: (ids?: ReadonlyArray<number>) => provideSdk(config, cleanTransfers(ids)),
       continue: (
@@ -1167,6 +1177,7 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
       ): Promise<TransfersContinueResponse> => provideSdk(config, continueTransfers(cursor, query)),
       count: (): Promise<number> => provideSdk(config, countTransfers()),
       get: (id: number): Promise<Transfer> => provideSdk(config, getTransfer(id)),
+      getTorrent: (id: number): Promise<Uint8Array> => provideSdk(config, getTransferTorrent(id)),
       info: (
         urls: ReadonlyArray<string>,
       ): Promise<{ readonly disk_avail: number; readonly ret: ReadonlyArray<TransferInfoItem> }> =>
@@ -1174,6 +1185,8 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
       list: (query?: TransfersListQuery): Promise<TransfersListResponse> =>
         provideSdk(config, listTransfers(query)),
       reannounce: (id: number) => provideSdk(config, reannounceTransfer(id)),
+      remove: (input: TransferRemoveInput): Promise<void> =>
+        provideSdk(config, removeTransfers(input)),
       retry: (id: number): Promise<Transfer> => provideSdk(config, retryTransfer(id)),
       stopRecording: (id: number) => provideSdk(config, stopTransferRecording(id)),
     },

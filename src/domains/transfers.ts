@@ -491,7 +491,7 @@ export const removeTransfers = (
         body: {
           type: "form",
           value:
-            "ids" in decodedInput
+            decodedInput.ids !== undefined
               ? { transfer_ids: joinCsv(decodedInput.ids) }
               : { remove_filter: decodedInput.filter },
         },

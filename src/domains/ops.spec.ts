@@ -816,6 +816,18 @@ describe("operational domain boundaries", () => {
     );
 
     await runSdkEffect(
+      // @ts-expect-error JavaScript callers can provide explicit undefined optional fields.
+      transfers.removeTransfers({ filter: "all", ids: undefined }),
+      (request) => {
+        const body = getFormBody(request);
+        expect(body.get("remove_filter")).toBe("all");
+        expect(body.has("transfer_ids")).toBe(false);
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+
+    await runSdkEffect(
       transfers.cancelTransfers([11, 12]),
       (request) => {
         expect(getFormBody(request).get("transfer_ids")).toBe("11,12");

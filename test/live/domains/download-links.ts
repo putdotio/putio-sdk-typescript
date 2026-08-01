@@ -10,7 +10,7 @@ const { client } = await createClients({
 });
 
 const live = createLiveHarness("download-links live");
-const { assert, assertOperationError, finish, run, sleep } = live;
+const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
 void sleep;
@@ -232,14 +232,7 @@ await run("download links empty request fails before transport", async () => {
     await retryOnRateLimit(() => client.downloadLinks.create());
     throw new Error("expected empty create request to fail");
   } catch (error) {
-    assert(
-      typeof error === "object" &&
-        error !== null &&
-        "_tag" in error &&
-        error._tag === "PutioValidationError",
-      "expected empty selection to produce PutioValidationError",
-    );
-    return { tag: error._tag };
+    return assertErrorTag(error, { tag: "PutioValidationError" });
   }
 });
 

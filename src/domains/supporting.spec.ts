@@ -21,6 +21,16 @@ import {
   runSdkExit,
 } from "../../test/support/sdk-test.js";
 
+const inMemoryJsonResponse = (body: unknown): Response => {
+  const response = new Response(null, {
+    headers: { "content-type": "application/json" },
+  });
+  Object.defineProperty(response, "json", {
+    value: async () => body,
+  });
+  return response;
+};
+
 const sharedFile = {
   content_type: null,
   created_at: "2026-03-17T00:00:00Z",
@@ -93,12 +103,7 @@ describe("supporting domain boundaries", () => {
       },
       theme: "dark",
     };
-    const configResponse = new Response(null, {
-      headers: { "content-type": "application/json" },
-    });
-    Object.defineProperty(configResponse, "json", {
-      value: async () => ({ config: responseConfig, status: "OK" }),
-    });
+    const configResponse = inMemoryJsonResponse({ config: responseConfig, status: "OK" });
     const decodedConfig = await runSdkEffect(configDomain.readConfig(), () => configResponse, {
       accessToken: "token-123",
     });
@@ -162,12 +167,7 @@ describe("supporting domain boundaries", () => {
     ).toBe("dark");
 
     const responseValue = { enabled: true };
-    const valueResponse = new Response(null, {
-      headers: { "content-type": "application/json" },
-    });
-    Object.defineProperty(valueResponse, "json", {
-      value: async () => ({ status: "OK", value: responseValue }),
-    });
+    const valueResponse = inMemoryJsonResponse({ status: "OK", value: responseValue });
     const decodedValue = await runSdkEffect(
       configDomain.getConfigKey("feature"),
       () => valueResponse,
@@ -175,6 +175,15 @@ describe("supporting domain boundaries", () => {
     );
 
     expect(decodedValue).toBe(responseValue);
+
+    const responseArray = ["sdk", 1, false, null];
+    const decodedArray = await runSdkEffect(
+      configDomain.getConfigKey("array"),
+      () => inMemoryJsonResponse({ status: "OK", value: responseArray }),
+      { accessToken: "token-123" },
+    );
+
+    expect(decodedArray).toBe(responseArray);
 
     expect(
       await runSdkEffect(
@@ -298,6 +307,40 @@ describe("supporting domain boundaries", () => {
     expect(dotDeleteKey).toBeInstanceOf(PutioValidationError);
     expect(getterCalls).toBe(0);
     expect(requestCount).toBe(0);
+  });
+
+  it("rejects invalid config response values", async () => {
+    const cyclicValue: { self?: unknown } = {};
+    cyclicValue.self = cyclicValue;
+    const sparseValue: Array<unknown> = [];
+    sparseValue.length = 1;
+    const accessorValue = {};
+    Object.defineProperty(accessorValue, "value", {
+      enumerable: true,
+      get: () => 1,
+    });
+    const invalidValues = [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      () => "nope",
+      cyclicValue,
+      sparseValue,
+      accessorValue,
+      new Date(),
+    ];
+    const failures = await Promise.all(
+      invalidValues.map((value) =>
+        runSdkExit(
+          configDomain.getConfigKey("invalid"),
+          () => inMemoryJsonResponse({ status: "OK", value }),
+          { accessToken: "token-123" },
+        ),
+      ),
+    );
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
   });
 
   it("covers download links and events", async () => {

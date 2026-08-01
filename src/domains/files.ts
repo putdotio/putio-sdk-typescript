@@ -212,7 +212,7 @@ const FileConversionNotAvailableSchema = Schema.Struct({
 });
 const FileConversionInQueueSchema = Schema.Struct({
   id: Schema.Int,
-  percent_done: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  percent_done: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
   status: Schema.Literal("IN_QUEUE"),
 });
 const FileConversionConvertingSchema = Schema.Struct({

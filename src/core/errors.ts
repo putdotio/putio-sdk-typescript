@@ -1,8 +1,12 @@
 import { Data, Effect, Schema } from "effect";
 
 export const PutioErrorEnvelopeSchema = Schema.Struct({
+  status: Schema.optional(Schema.String),
   error_message: Schema.optional(Schema.String),
   error_type: Schema.optional(Schema.String),
+  error_uri: Schema.optional(Schema.String),
+  error_id: Schema.optional(Schema.NullOr(Schema.String)),
+  extra: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   status_code: Schema.optional(Schema.Int),
   details: Schema.optional(Schema.Unknown),
 });
@@ -114,6 +118,20 @@ const hasOptionalInteger = (record: Readonly<Record<string, unknown>>, key: stri
   !(key in record) ||
   record[key] === undefined ||
   (typeof record[key] === "number" && Number.isInteger(record[key]));
+
+const hasOptionalNullableString = (
+  record: Readonly<Record<string, unknown>>,
+  key: string,
+): boolean =>
+  !(key in record) ||
+  record[key] === undefined ||
+  record[key] === null ||
+  typeof record[key] === "string";
+
+const hasOptionalRecord = (record: Readonly<Record<string, unknown>>, key: string): boolean =>
+  !(key in record) ||
+  record[key] === undefined ||
+  (isRecord(record[key]) && !Array.isArray(record[key]));
 
 const isKnownOperationErrorContract = (value: unknown): value is PutioKnownOperationErrorContract =>
   isRecord(value) &&
@@ -253,8 +271,12 @@ export const decodePutioErrorEnvelope = Schema.decodeUnknownEffect(PutioErrorEnv
 
 export const isPutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelope =>
   isRecord(value) &&
+  hasOptionalString(value, "status") &&
   hasOptionalString(value, "error_message") &&
   hasOptionalString(value, "error_type") &&
+  hasOptionalString(value, "error_uri") &&
+  hasOptionalNullableString(value, "error_id") &&
+  hasOptionalRecord(value, "extra") &&
   hasOptionalInteger(value, "status_code");
 
 const hasStatusAndBody = <TTag extends string>(

@@ -81,7 +81,7 @@ export const AccountInfoQuerySchema = Schema.Struct({
   features: Schema.optional(RequestedFlag),
   intercom: Schema.optional(RequestedFlag),
   pas: Schema.optional(RequestedFlag),
-  platform: Schema.optional(Schema.String),
+  platform: Schema.optional(Schema.Literals(["web", "ios"])),
   profitwell: Schema.optional(RequestedFlag),
   push_token: Schema.optional(RequestedFlag),
 });
@@ -89,7 +89,7 @@ export const AccountInfoBroadSchema = AccountInfoBaseSchema.pipe(
   Schema.fieldsAssign({
     download_token: Schema.optional(Schema.String),
     features: Schema.optional(AccountFeaturesSchema),
-    paddle_user_id: Schema.optional(Schema.NullOr(Schema.Int)),
+    paddle_user_id: Schema.optional(Schema.NullOr(Schema.Union([Schema.Int, Schema.String]))),
     pas: Schema.optional(PasInfoSchema),
     push_token: Schema.optional(Schema.String),
     user_hash: Schema.optional(Schema.String),
@@ -204,7 +204,7 @@ export type AccountInfoResponseFor<TQuery extends AccountInfoQuery> = AccountInf
     : {}) &
   (TQuery["intercom"] extends 1
     ? {
-        readonly user_hash: string;
+        readonly user_hash?: string;
       }
     : {}) &
   (TQuery["pas"] extends 1
@@ -214,7 +214,7 @@ export type AccountInfoResponseFor<TQuery extends AccountInfoQuery> = AccountInf
     : {}) &
   (TQuery["profitwell"] extends 1
     ? {
-        readonly paddle_user_id: number | null;
+        readonly paddle_user_id: number | string | null;
       }
     : {}) &
   (TQuery["push_token"] extends 1
@@ -241,11 +241,6 @@ const hasFeatures = (
 ): value is AccountInfoBroad & {
   readonly features: Record<string, boolean>;
 } => typeof value.features === "object" && value.features !== null;
-const hasIntercomUserHash = (
-  value: AccountInfoBroad,
-): value is AccountInfoBroad & {
-  readonly user_hash: string;
-} => typeof value.user_hash === "string";
 const hasPas = (
   value: AccountInfoBroad,
 ): value is AccountInfoBroad & {
@@ -254,7 +249,7 @@ const hasPas = (
 const hasPaddleUserId = (
   value: AccountInfoBroad,
 ): value is AccountInfoBroad & {
-  readonly paddle_user_id: number | null;
+  readonly paddle_user_id: number | string | null;
 } => "paddle_user_id" in value;
 const hasPushToken = (
   value: AccountInfoBroad,
@@ -276,9 +271,6 @@ const ensureAccountInfoFields = <TQuery extends AccountInfoQuery>(
     }
     if (query.features === 1 && !hasFeatures(info)) {
       return yield* failMissingField("features");
-    }
-    if (query.intercom === 1 && !hasIntercomUserHash(info)) {
-      return yield* failMissingField("user_hash");
     }
     if (query.pas === 1 && !hasPas(info)) {
       return yield* failMissingField("pas");
@@ -350,10 +342,10 @@ export function getAccountInfo(query: { readonly features: 1 }): Effect.Effect<
 >;
 export function getAccountInfo(query: {
   readonly intercom: 1;
-  readonly platform?: string;
+  readonly platform?: "web" | "ios";
 }): Effect.Effect<
   AccountInfoBase & {
-    readonly user_hash: string;
+    readonly user_hash?: string;
   },
   PutioSdkError,
   PutioSdkContext
@@ -367,7 +359,7 @@ export function getAccountInfo(query: { readonly pas: 1 }): Effect.Effect<
 >;
 export function getAccountInfo(query: { readonly profitwell: 1 }): Effect.Effect<
   AccountInfoBase & {
-    readonly paddle_user_id: number | null;
+    readonly paddle_user_id: number | string | null;
   },
   PutioSdkError,
   PutioSdkContext

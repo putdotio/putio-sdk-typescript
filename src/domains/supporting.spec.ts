@@ -87,22 +87,24 @@ describe("supporting domain boundaries", () => {
     expect(() => decodeJsonObject(customPrototypeConfig)).toThrow("Expected a JSON object");
     expect(() => decodeJsonObject(["nope"])).toThrow("Expected a JSON object");
 
-    expect(
-      await runSdkEffect(
-        configDomain.readConfig(),
-        () =>
-          jsonResponse({
-            config: {
-              nested: {
-                enabled: true,
-              },
-              theme: "dark",
-            },
-            status: "OK",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toEqual({
+    const responseConfig = {
+      nested: {
+        enabled: true,
+      },
+      theme: "dark",
+    };
+    const configResponse = new Response(null, {
+      headers: { "content-type": "application/json" },
+    });
+    Object.defineProperty(configResponse, "json", {
+      value: async () => ({ config: responseConfig, status: "OK" }),
+    });
+    const decodedConfig = await runSdkEffect(configDomain.readConfig(), () => configResponse, {
+      accessToken: "token-123",
+    });
+
+    expect(decodedConfig).toBe(responseConfig);
+    expect(decodedConfig).toEqual({
       nested: {
         enabled: true,
       },
@@ -158,6 +160,21 @@ describe("supporting domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toBe("dark");
+
+    const responseValue = { enabled: true };
+    const valueResponse = new Response(null, {
+      headers: { "content-type": "application/json" },
+    });
+    Object.defineProperty(valueResponse, "json", {
+      value: async () => ({ status: "OK", value: responseValue }),
+    });
+    const decodedValue = await runSdkEffect(
+      configDomain.getConfigKey("feature"),
+      () => valueResponse,
+      { accessToken: "token-123" },
+    );
+
+    expect(decodedValue).toBe(responseValue);
 
     expect(
       await runSdkEffect(

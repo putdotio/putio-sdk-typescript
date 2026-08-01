@@ -109,6 +109,58 @@ const snapshotJsonObject = (value: unknown): PutioJsonObject | undefined => {
     ? snapshot
     : undefined;
 };
+const isJsonValue = (
+  value: unknown,
+  ancestors: Set<object> = new Set(),
+): value is PutioJsonValue => {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return true;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+  if (typeof value !== "object" || ancestors.has(value)) {
+    return false;
+  }
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (
+          descriptor === undefined ||
+          !("value" in descriptor) ||
+          !isJsonValue(descriptor.value, ancestors)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (!isPlainRecord(value)) {
+      return false;
+    }
+    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
+      if (
+        descriptor.enumerable &&
+        (!("value" in descriptor) || !isJsonValue(descriptor.value, ancestors))
+      ) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  } finally {
+    ancestors.delete(value);
+  }
+};
+const isJsonObject = (value: unknown): value is PutioJsonObject =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  isPlainRecord(value) &&
+  isJsonValue(value);
 export const JsonValueSchema = Schema.declareConstructor<PutioJsonValue>()(
   [],
   () => (input, ast) => {
@@ -119,6 +171,26 @@ export const JsonValueSchema = Schema.declareConstructor<PutioJsonValue>()(
   },
   {
     expected: "a JSON-compatible value",
+  },
+);
+const JsonValueResponseSchema = Schema.declareConstructor<PutioJsonValue>()(
+  [],
+  () => (input, ast) =>
+    isJsonValue(input)
+      ? Effect.succeed(input)
+      : Effect.fail(new SchemaIssue.InvalidType(ast, Option.some(input))),
+  {
+    expected: "a JSON-compatible value",
+  },
+);
+const JsonObjectResponseSchema = Schema.declareConstructor<PutioJsonObject>()(
+  [],
+  () => (input, ast) =>
+    isJsonObject(input)
+      ? Effect.succeed(input)
+      : Effect.fail(new SchemaIssue.InvalidType(ast, Option.some(input))),
+  {
+    expected: "a JSON object",
   },
 );
 export const JsonObjectSchema = Schema.declareConstructor<PutioJsonObject>()(
@@ -145,12 +217,12 @@ const ConfigSetKeyInputSchema = Schema.Struct({
   value: JsonValueSchema,
 });
 const ConfigEnvelopeSchema = Schema.Struct({
-  config: JsonObjectSchema,
+  config: JsonObjectResponseSchema,
   status: Schema.Literal("OK"),
 });
 const ConfigValueEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
-  value: JsonValueSchema,
+  value: JsonValueResponseSchema,
 });
 export const readConfig = (): Effect.Effect<PutioJsonObject, PutioSdkError, PutioSdkContext> =>
   requestJson(ConfigEnvelopeSchema, {

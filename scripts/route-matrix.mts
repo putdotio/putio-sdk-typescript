@@ -35,7 +35,7 @@ export class RouteMatrixValidationError extends Error {
   }
 }
 
-const canonicalPathPattern = /^\/v2(?:\/(?:[a-z0-9._~-]+|:[A-Za-z][A-Za-z0-9]*))*$/;
+const canonicalPathPattern = /^\/v2(?:\/(?:[a-z0-9._~-]+|:[A-Za-z][A-Za-z0-9]*))+(?:\/)?$/;
 const operationPattern = /^[a-z][A-Za-z0-9]*(?:\.[a-z][A-Za-z0-9]*)+$/;
 const sourcePattern = /^[A-Za-z0-9._/-]+\.py:[1-9][0-9]*$/;
 const followUpPattern =

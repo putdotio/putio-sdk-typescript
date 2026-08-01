@@ -7,6 +7,9 @@ const clients = {
     account: {
       getInfo: () => undefined,
     },
+    auth: {
+      grants: () => undefined,
+    },
     files: {
       copy: () => undefined,
       get: () => undefined,
@@ -15,6 +18,9 @@ const clients = {
   promise: {
     account: {
       getInfo: () => undefined,
+    },
+    auth: {
+      grants: () => undefined,
     },
     files: {
       copy: () => undefined,
@@ -49,6 +55,14 @@ const validMatrix = {
       source: "putio/api2/documentation.py:6",
     },
     {
+      classification: "sdk",
+      method: "GET",
+      operation: "auth.grants",
+      path: "/v2/oauth/grants/",
+      rationale: "The trailing slash is part of the registered blueprint-root route.",
+      source: "putio/api2/oauth_grants.py:28",
+    },
+    {
       classification: "investigate",
       followUp: "https://github.com/putdotio/putio-sdk-typescript/issues/108",
       method: "POST",
@@ -77,6 +91,13 @@ describe("route matrix validation", () => {
           rationale: " ",
           source: "/Users/maintainer/putio/api2/admin.py:1",
         },
+        {
+          classification: "excluded",
+          method: "GET",
+          path: "/v2/",
+          rationale: "A bare API prefix is not a public operation.",
+          source: "putio/app.py:1",
+        },
       ],
       version: 1,
     };
@@ -101,7 +122,7 @@ describe("route matrix validation", () => {
           operation: "files.get",
         },
         {
-          ...validMatrix.routes[3],
+          ...validMatrix.routes[4],
           followUp: "https://github.com/putdotio/other/issues/1",
         },
       ],

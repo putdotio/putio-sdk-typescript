@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect";
 
 import { joinCsv } from "../core/forms.js";
+import { NonEmptyStringSchema, PositiveIntegerSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   mapDecodeErrorToValidationError,
@@ -44,10 +45,8 @@ const TrashContinueEnvelopeSchema = Schema.Struct({
 export type TrashFile = Schema.Schema.Type<typeof TrashFileSchema>;
 export type TrashListResponse = Schema.Schema.Type<typeof TrashListEnvelopeSchema>;
 export type TrashContinueResponse = Schema.Schema.Type<typeof TrashContinueEnvelopeSchema>;
-const PositiveIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
-const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
 const TrashListQuerySchema = Schema.Struct({
-  per_page: Schema.optional(PositiveIdSchema),
+  per_page: Schema.optional(PositiveIntegerSchema),
 });
 const TrashCursorBulkInputSchema = Schema.Struct({
   cursor: NonEmptyStringSchema,
@@ -56,7 +55,7 @@ const TrashCursorBulkInputSchema = Schema.Struct({
 });
 const TrashIdsBulkInputSchema = Schema.Struct({
   cursor: Schema.optional(Schema.Never),
-  file_ids: Schema.Array(PositiveIdSchema).check(Schema.isMinLength(1)),
+  file_ids: Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1)),
   useCursor: Schema.optional(Schema.Literal(false)),
 });
 const TrashBulkInputSchema = Schema.Union([TrashCursorBulkInputSchema, TrashIdsBulkInputSchema]);

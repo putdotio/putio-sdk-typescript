@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
+import { NonEmptyStringSchema, PositiveIntegerSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   mapDecodeErrorToValidationError,
@@ -16,12 +17,10 @@ import {
   type PutioSdkContext,
 } from "../core/http.js";
 export const SharingCloneStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
-const PositiveIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
-const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
 export const SharingCloneInputSchema = Schema.Struct({
   cursor: Schema.optional(NonEmptyStringSchema),
-  excludeIds: Schema.optional(Schema.Array(PositiveIdSchema)),
-  ids: Schema.optional(Schema.Array(PositiveIdSchema)),
+  excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
+  ids: Schema.optional(Schema.Array(PositiveIntegerSchema)),
   parentId: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
 const SharingCloneEnvelopeSchema = Schema.Struct({
@@ -49,8 +48,8 @@ export const SharedFileSchema = FileBroadSchema.pipe(
 );
 export const SharingShareInputSchema = Schema.Struct({
   cursor: Schema.optional(NonEmptyStringSchema),
-  excludeIds: Schema.optional(Schema.Array(PositiveIdSchema)),
-  ids: Schema.optional(Schema.Array(PositiveIdSchema)),
+  excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
+  ids: Schema.optional(Schema.Array(PositiveIntegerSchema)),
   target: Schema.Union([
     Schema.Struct({
       type: Schema.Literal("everyone"),
@@ -82,8 +81,10 @@ export const SharedFileSharedWithSchema = Schema.Union([
   }),
 ]);
 export const SharingUnshareInputSchema = Schema.Struct({
-  fileId: PositiveIdSchema,
-  shares: Schema.optional(Schema.Array(Schema.Union([PositiveIdSchema, NonEmptyStringSchema]))),
+  fileId: PositiveIntegerSchema,
+  shares: Schema.optional(
+    Schema.Array(Schema.Union([PositiveIntegerSchema, NonEmptyStringSchema])),
+  ),
 });
 export const PublicShareSchema = Schema.Struct({
   created_at: Schema.String,
@@ -325,7 +326,7 @@ export const cloneSharedFiles = (
 export const getSharingCloneInfo = (
   id: number,
 ): Effect.Effect<SharingCloneInfo, GetSharingCloneInfoError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(SharingCloneInfoSchema, {
@@ -367,7 +368,7 @@ export const listSharedFiles = (): Effect.Effect<
 export const getSharedWith = (
   fileId: number,
 ): Effect.Effect<SharedFileSharedWith, GetSharedWithError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(fileId).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(fileId).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedFileId) =>
       requestJson(SharedFileSharedWithSchema, {
@@ -399,7 +400,7 @@ export const unshareFile = (
 export const createPublicShare = (
   fileId: number,
 ): Effect.Effect<PublicShare, CreatePublicShareError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(fileId).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(fileId).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedFileId) =>
       requestJson(PublicShareEnvelopeSchema, {
@@ -426,7 +427,7 @@ export const deletePublicShare = (
   DeletePublicShareError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -491,7 +492,7 @@ export const continuePublicShareFiles = (
 export const getPublicShareFileUrl = (
   fileId: number,
 ): Effect.Effect<string, GetPublicShareFileUrlError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(fileId).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(fileId).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedFileId) =>
       requestJson(PublicShareFileUrlEnvelopeSchema, {

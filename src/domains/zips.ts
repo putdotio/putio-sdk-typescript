@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
+import { NonEmptyStringSchema, PositiveIntegerSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   mapDecodeErrorToValidationError,
@@ -13,8 +14,6 @@ import {
   selectJsonField,
   type PutioSdkContext,
 } from "../core/http.js";
-const PositiveIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
-const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
 export const ZipStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
 const ZipSummarySchema = Schema.Struct({
   created_at: Schema.String,
@@ -58,8 +57,8 @@ export type ZipCreateResponse = Schema.Schema.Type<typeof ZipCreateEnvelopeSchem
 export type ZipInfo = Schema.Schema.Type<typeof ZipInfoSchema>;
 const CreateZipInputSchema = Schema.Struct({
   cursor: Schema.optional(NonEmptyStringSchema),
-  exclude_ids: Schema.optional(Schema.Array(PositiveIdSchema)),
-  file_ids: Schema.optional(Schema.Array(PositiveIdSchema).check(Schema.isMinLength(1))),
+  exclude_ids: Schema.optional(Schema.Array(PositiveIntegerSchema)),
+  file_ids: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
 }).check(
   Schema.makeFilter((input) => input.cursor !== undefined || input.file_ids !== undefined, {
     expected: "a non-empty cursor or file ID selection",
@@ -143,7 +142,7 @@ export const createZip = (
     withOperationErrors(CreateZipErrorSpec),
   );
 export const getZip = (id: number): Effect.Effect<ZipInfo, GetZipError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(ZipInfoSchema, {
@@ -154,7 +153,7 @@ export const getZip = (id: number): Effect.Effect<ZipInfo, GetZipError, PutioSdk
     withOperationErrors(GetZipErrorSpec),
   );
 export const cancelZip = (id: number): Effect.Effect<void, CancelZipError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {

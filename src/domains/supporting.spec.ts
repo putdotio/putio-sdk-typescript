@@ -115,12 +115,19 @@ describe("supporting domain boundaries", () => {
       ),
     ).toEqual({ locale: "en" });
 
+    const configInput: configDomain.PutioJsonObject = { locale: "en" };
+    let descriptorWalks = 0;
+    const trackedConfig = new Proxy(configInput, {
+      ownKeys: (target) => {
+        descriptorWalks += 1;
+        return Reflect.ownKeys(target);
+      },
+    });
     expect(
       await runSdkEffect(
-        configDomain.writeConfig({
-          locale: "en",
-        }),
+        configDomain.writeConfig(trackedConfig),
         (request) => {
+          Object.defineProperty(configInput, "locale", { value: "tr" });
           expect(getJsonBody(request)).toEqual({
             config: {
               locale: "en",
@@ -131,6 +138,7 @@ describe("supporting domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toEqual({ status: "OK" });
+    expect(descriptorWalks).toBe(1);
 
     expect(
       await runSdkEffect(

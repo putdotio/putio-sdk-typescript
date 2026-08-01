@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema, SchemaIssue } from "effect";
 import { mapDecodeErrorToValidationError, type PutioSdkError } from "../core/errors.js";
 import {
   OkResponseSchema,
@@ -82,14 +82,6 @@ const snapshotJsonValue = (
     return undefined;
   }
 };
-const isJsonValue = (value: unknown): value is PutioJsonValue =>
-  snapshotJsonValue(value) !== undefined;
-const isJsonObject = (value: unknown): value is PutioJsonObject =>
-  typeof value === "object" &&
-  value !== null &&
-  !Array.isArray(value) &&
-  isPlainRecord(value) &&
-  isJsonValue(value);
 const snapshotJsonObject = (value: unknown): PutioJsonObject | undefined => {
   if (
     typeof value !== "object" ||
@@ -104,22 +96,29 @@ const snapshotJsonObject = (value: unknown): PutioJsonObject | undefined => {
     ? snapshot
     : undefined;
 };
-const requireJsonSnapshot = <A extends PutioJsonValue>(
-  snapshot: A | undefined,
-  expected: string,
-): Effect.Effect<A, PutioSdkError> =>
-  snapshot === undefined
-    ? Effect.fail(mapDecodeErrorToValidationError(`Expected ${expected}`))
-    : Effect.succeed(snapshot);
-export const JsonValueSchema = Schema.Unknown.pipe(
-  Schema.refine(isJsonValue, {
+export const JsonValueSchema = Schema.declareConstructor<PutioJsonValue>()(
+  [],
+  () => (input, ast) => {
+    const snapshot = snapshotJsonValue(input);
+    return snapshot === undefined
+      ? Effect.fail(new SchemaIssue.InvalidType(ast, Option.some(input)))
+      : Effect.succeed(snapshot);
+  },
+  {
     expected: "a JSON-compatible value",
-  }),
+  },
 );
-export const JsonObjectSchema = Schema.Unknown.pipe(
-  Schema.refine(isJsonObject, {
+export const JsonObjectSchema = Schema.declareConstructor<PutioJsonObject>()(
+  [],
+  () => (input, ast) => {
+    const snapshot = snapshotJsonObject(input);
+    return snapshot === undefined
+      ? Effect.fail(new SchemaIssue.InvalidType(ast, Option.some(input)))
+      : Effect.succeed(snapshot);
+  },
+  {
     expected: "a JSON object",
-  }),
+  },
 );
 const ConfigKeySchema = Schema.String.check(Schema.isMinLength(1));
 const ConfigSetKeyInputSchema = Schema.Struct({
@@ -158,20 +157,16 @@ export const writeConfig = (
   Schema.decodeUnknownEffect(JsonObjectSchema)(config).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedConfig) =>
-      requireJsonSnapshot(snapshotJsonObject(decodedConfig), "a JSON object").pipe(
-        Effect.flatMap((configSnapshot) =>
-          requestJson(OkResponseSchema, {
-            body: {
-              type: "json",
-              value: {
-                config: configSnapshot,
-              },
-            },
-            method: "PUT",
-            path: "/v2/config",
-          }),
-        ),
-      ),
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "json",
+          value: {
+            config: decodedConfig,
+          },
+        },
+        method: "PUT",
+        path: "/v2/config",
+      }),
     ),
   );
 export const getConfigKey = (
@@ -214,20 +209,16 @@ export const setConfigKey = (
   Schema.decodeUnknownEffect(ConfigSetKeyInputSchema)({ key, value }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
-      requireJsonSnapshot(snapshotJsonValue(decodedInput.value), "a JSON-compatible value").pipe(
-        Effect.flatMap((valueSnapshot) =>
-          requestJson(OkResponseSchema, {
-            body: {
-              type: "json",
-              value: {
-                value: valueSnapshot,
-              },
-            },
-            method: "PUT",
-            path: `/v2/config/${encodePathSegment(decodedInput.key)}`,
-          }),
-        ),
-      ),
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "json",
+          value: {
+            value: decodedInput.value,
+          },
+        },
+        method: "PUT",
+        path: `/v2/config/${encodePathSegment(decodedInput.key)}`,
+      }),
     ),
   );
 export const deleteConfigKey = (

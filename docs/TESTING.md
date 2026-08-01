@@ -59,21 +59,21 @@ Compatibility checks are package-consumer smoke tests, not live API tests. They 
 Run all compatibility checks:
 
 ```bash
-pnpm test:compat
+vp run test:compat
 ```
 
 Target one runtime:
 
 ```bash
-pnpm test:compat:node
-PUTIO_COMPAT_BROWSERS=chromium pnpm test:compat:browser
-pnpm test:compat:bun
+vp run test:compat:node
+PUTIO_COMPAT_BROWSERS=chromium vp run test:compat:browser
+vp run test:compat:bun
 ```
 
 The browser check uses Playwright. Install local browser engines once when needed:
 
 ```bash
-pnpm test:compat:browser:install
+vp run test:compat:browser:install
 ```
 
 The compatibility layer proves:

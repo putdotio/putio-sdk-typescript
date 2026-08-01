@@ -51,11 +51,11 @@ const TrashListQuerySchema = Schema.Struct({
 });
 const TrashCursorBulkInputSchema = Schema.Struct({
   cursor: NonEmptyStringSchema,
-  file_ids: Schema.optional(Schema.Array(PositiveIdSchema)),
+  file_ids: Schema.optional(Schema.Never),
   useCursor: Schema.Literal(true),
 });
 const TrashIdsBulkInputSchema = Schema.Struct({
-  cursor: Schema.optional(NonEmptyStringSchema),
+  cursor: Schema.optional(Schema.Never),
   file_ids: Schema.Array(PositiveIdSchema).check(Schema.isMinLength(1)),
   useCursor: Schema.optional(Schema.Literal(false)),
 });

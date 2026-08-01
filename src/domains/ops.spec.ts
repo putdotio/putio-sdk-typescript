@@ -1226,7 +1226,17 @@ describe("operational domain boundaries", () => {
       runSdkExit(trash.restoreTrash({}), handler),
       runSdkExit(trash.restoreTrash({ cursor: "", useCursor: true }), handler),
       runSdkExit(trash.restoreTrash({ file_ids: [] }), handler),
+      runSdkExit(
+        // @ts-expect-error Cursor mode cannot also carry explicit file IDs.
+        trash.restoreTrash({ cursor: "cursor", file_ids: [1], useCursor: true }),
+        handler,
+      ),
       runSdkExit(trash.deleteTrash({ file_ids: [0] }), handler),
+      runSdkExit(
+        // @ts-expect-error File-ID mode cannot also carry a cursor.
+        trash.deleteTrash({ cursor: "cursor", file_ids: [1], useCursor: false }),
+        handler,
+      ),
       // @ts-expect-error Cursor selection must opt into cursor serialization.
       runSdkExit(trash.deleteTrash({ cursor: "cursor" }), handler),
       // @ts-expect-error JavaScript callers can provide null instead of a request object.

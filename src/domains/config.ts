@@ -18,6 +18,19 @@ export type PutioJsonObject = {
   readonly [key: string]: PutioJsonValue;
 };
 const nativeObjectConstructorSource = Function.prototype.toString.call(Object);
+const nativeArrayConstructorSource = Function.prototype.toString.call(Array);
+const hasMatchingNativeConstructor = (prototype: object, constructorSource: string): boolean => {
+  const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor")?.value;
+  const constructorPrototype =
+    typeof constructor === "function"
+      ? Object.getOwnPropertyDescriptor(constructor, "prototype")?.value
+      : undefined;
+  return (
+    typeof constructor === "function" &&
+    constructorPrototype === prototype &&
+    Function.prototype.toString.call(constructor) === constructorSource
+  );
+};
 const isPlainRecord = (value: object): value is Record<string, unknown> => {
   try {
     const prototype = Object.getPrototypeOf(value);
@@ -27,15 +40,18 @@ const isPlainRecord = (value: object): value is Record<string, unknown> => {
     if (Object.getPrototypeOf(prototype) !== null) {
       return false;
     }
-    const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor")?.value;
-    const constructorPrototype =
-      typeof constructor === "function"
-        ? Object.getOwnPropertyDescriptor(constructor, "prototype")?.value
-        : undefined;
+    return hasMatchingNativeConstructor(prototype, nativeObjectConstructorSource);
+  } catch {
+    return false;
+  }
+};
+const isPlainArray = (value: ReadonlyArray<unknown>): boolean => {
+  try {
+    const prototype = Object.getPrototypeOf(value);
     return (
-      typeof constructor === "function" &&
-      constructorPrototype === prototype &&
-      Function.prototype.toString.call(constructor) === nativeObjectConstructorSource
+      prototype !== null &&
+      Object.getPrototypeOf(prototype) !== null &&
+      hasMatchingNativeConstructor(prototype, nativeArrayConstructorSource)
     );
   } catch {
     return false;
@@ -69,9 +85,22 @@ const walkJsonValue = (
   ancestors.add(value);
   try {
     if (Array.isArray(value)) {
+      if (!isPlainArray(value)) {
+        return invalidJsonWalk;
+      }
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      const lengthDescriptor = descriptors["length"];
+      if (
+        lengthDescriptor === undefined ||
+        !("value" in lengthDescriptor) ||
+        !Number.isSafeInteger(lengthDescriptor.value) ||
+        lengthDescriptor.value < 0
+      ) {
+        return invalidJsonWalk;
+      }
       const output: Array<PutioJsonValue> | undefined = mode === "snapshot" ? [] : undefined;
-      for (let index = 0; index < value.length; index += 1) {
-        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      for (let index = 0; index < lengthDescriptor.value; index += 1) {
+        const descriptor = descriptors[String(index)];
         if (descriptor === undefined || !("value" in descriptor)) {
           return invalidJsonWalk;
         }

@@ -74,6 +74,29 @@ describe("supporting domain boundaries", () => {
     const sparseValue: Array<configDomain.PutioJsonValue> = [];
     sparseValue.length = 1;
     expect(() => decodeJsonValue(sparseValue)).toThrow("Expected a JSON-compatible value");
+    let lengthReads = 0;
+    const lengthSpoof = new Proxy([Number.NaN], {
+      get: (target, key, receiver) => {
+        if (key === "length") {
+          lengthReads += 1;
+          return 0;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    expect(() => decodeJsonValue(lengthSpoof)).toThrow("Expected a JSON-compatible value");
+    expect(lengthReads).toBe(0);
+    const customArrayPrototype = Object.create(Array.prototype);
+    const customPrototypeArray = ["sdk"];
+    Object.setPrototypeOf(customPrototypeArray, customArrayPrototype);
+    expect(() => decodeJsonValue(customPrototypeArray)).toThrow("Expected a JSON-compatible value");
+    const forgedArrayPrototype: Record<string, unknown> = Object.create(null);
+    Object.defineProperty(forgedArrayPrototype, "constructor", { value: Array });
+    const forgedPrototypeArray = ["sdk"];
+    Object.setPrototypeOf(forgedPrototypeArray, forgedArrayPrototype);
+    expect(() => decodeJsonValue(forgedPrototypeArray)).toThrow("Expected a JSON-compatible value");
+    const crossRealmArray: unknown = runInNewContext(`["sdk", 1, false]`);
+    expect(decodeJsonValue(crossRealmArray)).toEqual(["sdk", 1, false]);
     let getterCalls = 0;
     const accessorValue: configDomain.PutioJsonObject = {};
     Object.defineProperty(accessorValue, "count", {
@@ -345,6 +368,11 @@ describe("supporting domain boundaries", () => {
     Object.defineProperty(forgedPrototype, "constructor", { value: Object });
     const forgedValue: Record<string, unknown> = Object.create(forgedPrototype);
     forgedValue.enabled = true;
+    const lengthSpoof = new Proxy([Number.NaN], {
+      get: (target, key, receiver) => (key === "length" ? 0 : Reflect.get(target, key, receiver)),
+    });
+    const customPrototypeArray = ["sdk"];
+    Object.setPrototypeOf(customPrototypeArray, Object.create(Array.prototype));
     const invalidValues = [
       Number.NaN,
       Number.POSITIVE_INFINITY,
@@ -353,6 +381,8 @@ describe("supporting domain boundaries", () => {
       sparseValue,
       accessorValue,
       forgedValue,
+      lengthSpoof,
+      customPrototypeArray,
       new Date(),
     ];
     const failures = await Promise.all(

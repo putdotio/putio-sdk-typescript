@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { createCompatWorkspace, getRootPackageVersion, run, writeJson } from "./compat-support.mts";
+import { createCompatWorkspace, getRootPackageVersion, run, writeJson } from "./compat-support.ts";
 
 const main = async () => {
   const context = await createCompatWorkspace("putio-sdk-compat-node");

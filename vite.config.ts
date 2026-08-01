@@ -32,7 +32,7 @@ export default defineConfig({
     sourcemap: true,
   },
   staged: {
-    "*.{js,ts,tsx,mjs,cjs,mts,cts}": "vp check --fix",
+    "*.{js,ts,tsx,mjs,cjs,cts}": "vp check --fix",
   },
   test: {
     coverage: coverageConfig,

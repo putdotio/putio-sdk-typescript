@@ -122,7 +122,10 @@ export const JsonObjectSchema = Schema.declareConstructor<PutioJsonObject>()(
     expected: "a JSON object",
   },
 );
-const ConfigKeySchema = Schema.String.check(Schema.isMinLength(1));
+const ConfigKeySchema = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isPattern(/^(?!\.{1,2}$)/),
+);
 const ConfigSetKeyInputSchema = Schema.Struct({
   key: ConfigKeySchema,
   value: JsonValueSchema,

@@ -223,6 +223,9 @@ describe("supporting domain boundaries", () => {
     const emptyGetKey = expectFailure(
       await runSdkExit(configDomain.getConfigKey(""), invalidHandler),
     );
+    const dotGetKey = expectFailure(
+      await runSdkExit(configDomain.getConfigKey(".."), invalidHandler),
+    );
     const emptyTypedGetKey = expectFailure(
       await runSdkExit(
         configDomain.getConfigKeyWith("", configDomain.JsonValueSchema),
@@ -245,19 +248,28 @@ describe("supporting domain boundaries", () => {
     const emptySetKey = expectFailure(
       await runSdkExit(configDomain.setConfigKey("", "light"), invalidHandler),
     );
+    const dotSetKey = expectFailure(
+      await runSdkExit(configDomain.setConfigKey(".", "light"), invalidHandler),
+    );
     const emptyDeleteKey = expectFailure(
       await runSdkExit(configDomain.deleteConfigKey(""), invalidHandler),
+    );
+    const dotDeleteKey = expectFailure(
+      await runSdkExit(configDomain.deleteConfigKey(".."), invalidHandler),
     );
 
     expect(invalidConfig).toBeInstanceOf(PutioValidationError);
     expect(cyclicConfig).toBeInstanceOf(PutioValidationError);
     expect(emptyGetKey).toBeInstanceOf(PutioValidationError);
+    expect(dotGetKey).toBeInstanceOf(PutioValidationError);
     expect(emptyTypedGetKey).toBeInstanceOf(PutioValidationError);
     expect(invalidSetValue).toBeInstanceOf(PutioValidationError);
     expect(sparseSetValue).toBeInstanceOf(PutioValidationError);
     expect(accessorConfig).toBeInstanceOf(PutioValidationError);
     expect(emptySetKey).toBeInstanceOf(PutioValidationError);
+    expect(dotSetKey).toBeInstanceOf(PutioValidationError);
     expect(emptyDeleteKey).toBeInstanceOf(PutioValidationError);
+    expect(dotDeleteKey).toBeInstanceOf(PutioValidationError);
     expect(getterCalls).toBe(0);
     expect(requestCount).toBe(0);
   });

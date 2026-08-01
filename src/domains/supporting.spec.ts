@@ -208,6 +208,9 @@ describe("supporting domain boundaries", () => {
         invalidHandler,
       ),
     );
+    const emptySetKey = expectFailure(
+      await runSdkExit(configDomain.setConfigKey("", "light"), invalidHandler),
+    );
     const emptyDeleteKey = expectFailure(
       await runSdkExit(configDomain.deleteConfigKey(""), invalidHandler),
     );
@@ -217,6 +220,7 @@ describe("supporting domain boundaries", () => {
     expect(emptyGetKey).toBeInstanceOf(PutioValidationError);
     expect(emptyTypedGetKey).toBeInstanceOf(PutioValidationError);
     expect(invalidSetValue).toBeInstanceOf(PutioValidationError);
+    expect(emptySetKey).toBeInstanceOf(PutioValidationError);
     expect(emptyDeleteKey).toBeInstanceOf(PutioValidationError);
     expect(requestCount).toBe(0);
   });

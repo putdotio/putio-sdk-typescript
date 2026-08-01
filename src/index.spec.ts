@@ -14,6 +14,7 @@ describe("sdk root entry", () => {
       createPutioSdkEffectClient: expect.any(Function),
       createPutioSdkPromiseClient: expect.any(Function),
       getAccountInfo: expect.any(Function),
+      listAccountSubtitleLanguages: expect.any(Function),
       getCode: expect.any(Function),
       getConfigKey: expect.any(Function),
       getFile: expect.any(Function),
@@ -37,7 +38,12 @@ describe("sdk root entry", () => {
     });
 
     expect(Object.keys(sdk)).toEqual(
-      expect.arrayContaining(["getAccountInfo", "getFile", "uploadFile"]),
+      expect.arrayContaining([
+        "getAccountInfo",
+        "getFile",
+        "listAccountSubtitleLanguages",
+        "uploadFile",
+      ]),
     );
   });
 });

@@ -65,6 +65,13 @@ import { toHumanFileSize } from "@putdotio/sdk/utilities";
 const promiseClient: PutioSdkPromiseClient = createPutioSdkPromiseClient({
   accessToken: "compat-token",
 });
+type SubtitleLanguages = Awaited<
+  ReturnType<PutioSdkPromiseClient["account"]["listSubtitleLanguages"]>
+>;
+const subtitleLanguage: SubtitleLanguages[number] = {
+  code: "eng",
+  name: "English",
+};
 const promiseAuthUrl = promiseClient.auth.buildLoginUrl({
   clientId: "external-node",
   redirectUri: "https://example.com/callback",
@@ -94,6 +101,7 @@ console.log(
   JSON.stringify({
     effectAuthHost,
     promiseAuthHost,
+    subtitleLanguage: subtitleLanguage.code,
     uploadMethod: uploadRequest.method,
     uploadBody: uploadRequest.body.constructor.name,
     utility: toHumanFileSize(1_572_864),

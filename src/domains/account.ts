@@ -103,6 +103,14 @@ const AccountSettingsEnvelopeSchema = Schema.Struct({
   settings: AccountSettingsSchema,
   status: Schema.Literal("OK"),
 });
+export const AccountSubtitleLanguageSchema = Schema.Struct({
+  code: Schema.String,
+  name: Schema.String,
+});
+const AccountSubtitleLanguagesEnvelopeSchema = Schema.Struct({
+  languages: Schema.Array(AccountSubtitleLanguageSchema),
+  status: Schema.Literal("OK"),
+});
 export const AccountTwoFactorSettingsSchema = Schema.Struct({
   code: Schema.String,
   enable: Schema.Boolean,
@@ -182,6 +190,7 @@ export type SaveAccountSettingsPayload = Schema.Schema.Type<
 >;
 export type AccountClearOptions = Schema.Schema.Type<typeof AccountClearOptionsSchema>;
 export type AccountConfirmation = Schema.Schema.Type<typeof AccountConfirmationSchema>;
+export type AccountSubtitleLanguage = Schema.Schema.Type<typeof AccountSubtitleLanguageSchema>;
 export type AccountInfoResponseFor<TQuery extends AccountInfoQuery> = AccountInfoBase &
   (TQuery["download_token"] extends 1
     ? {
@@ -391,6 +400,15 @@ export const getAccountSettings = (): Effect.Effect<
     method: "GET",
     path: "/v2/account/settings",
   }).pipe(selectJsonField("settings"));
+export const listAccountSubtitleLanguages = (): Effect.Effect<
+  ReadonlyArray<AccountSubtitleLanguage>,
+  PutioSdkError,
+  PutioSdkContext
+> =>
+  requestJson(AccountSubtitleLanguagesEnvelopeSchema, {
+    method: "GET",
+    path: "/v2/account/subtitle_languages",
+  }).pipe(selectJsonField("languages"));
 export const saveAccountSettings = (
   payload: SaveAccountSettingsPayload,
 ): Effect.Effect<

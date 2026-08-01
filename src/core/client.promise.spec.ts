@@ -8,6 +8,7 @@ vi.mock("../domains/account.js", async () => {
     destroyAccount: vi.fn((password) => Effect.succeed({ destroyed: password })),
     getAccountInfo: vi.fn((query) => Effect.succeed({ id: 1, query, username: "sdk-user" })),
     getAccountSettings: vi.fn(() => Effect.succeed({ locale: "en" })),
+    listAccountSubtitleLanguages: vi.fn(() => Effect.succeed([{ code: "eng", name: "English" }])),
     listAccountConfirmations: vi.fn((subject) => Effect.succeed([{ subject }])),
     saveAccountSettings: vi.fn((payload) => Effect.succeed({ saved: payload })),
   };
@@ -501,6 +502,9 @@ describe("sdk promise client adapters", () => {
     expect(await client.account.destroy("secret")).toEqual({ destroyed: "secret" });
     expect(await client.account.getInfo({ download_token: 1 })).toMatchObject({ id: 1 });
     expect(await client.account.getSettings()).toEqual({ locale: "en" });
+    expect(await client.account.listSubtitleLanguages()).toEqual([
+      { code: "eng", name: "English" },
+    ]);
     expect(await client.account.listConfirmations("mail_change")).toEqual([
       { subject: "mail_change" },
     ]);

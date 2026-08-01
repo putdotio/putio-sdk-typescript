@@ -4,6 +4,7 @@ import {
   destroyAccount,
   getAccountInfo,
   getAccountSettings,
+  listAccountSubtitleLanguages,
   listAccountConfirmations,
   saveAccountSettings,
 } from "./account.js";
@@ -200,6 +201,41 @@ describe("account domain", () => {
     );
 
     expect(result).toEqual({ status: "OK" });
+  });
+
+  it("lists supported subtitle languages", async () => {
+    const languages = await runSdkEffect(
+      listAccountSubtitleLanguages(),
+      (request) => {
+        expect(request.url).toBe("https://api.put.io/v2/account/subtitle_languages");
+
+        return jsonResponse({
+          languages: [
+            { code: "eng", name: "English" },
+            { code: "tur", name: "Turkish" },
+          ],
+          status: "OK",
+        });
+      },
+      { accessToken: "token-123" },
+    );
+
+    expect(languages).toEqual([
+      { code: "eng", name: "English" },
+      { code: "tur", name: "Turkish" },
+    ]);
+
+    const invalidExit = await runSdkExit(
+      listAccountSubtitleLanguages(),
+      () =>
+        jsonResponse({
+          languages: [{ code: "eng" }],
+          status: "OK",
+        }),
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(invalidExit)).toBeInstanceOf(PutioValidationError);
   });
 
   it("maps account operation failures and form mutations", async () => {

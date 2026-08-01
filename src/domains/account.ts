@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import {
   PutioValidationError,
   definePutioOperationErrorSpec,
+  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
   type PutioSdkError,
@@ -170,9 +171,14 @@ export const AccountClearOptionsSchema = Schema.Struct({
   rss_logs: Schema.Boolean,
   trash: Schema.Boolean,
 });
+const AccountConfirmationSubjectSchema = Schema.Literals([
+  "mail_change",
+  "password_change",
+  "subscription_upgrade",
+]);
 export const AccountConfirmationSchema = Schema.Struct({
   created_at: Schema.String,
-  subject: Schema.Literals(["mail_change", "password_change", "subscription_upgrade"]),
+  subject: AccountConfirmationSubjectSchema,
 });
 const AccountConfirmationsEnvelopeSchema = Schema.Struct({
   confirmations: Schema.Array(AccountConfirmationSchema),
@@ -376,12 +382,19 @@ export function getAccountInfo(
   query: AccountInfoQuery,
 ): Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext>;
 export function getAccountInfo(query: AccountInfoQuery = {}) {
-  const effect = requestJson(AccountInfoEnvelopeSchema, {
-    method: "GET",
-    path: "/v2/account/info",
-    query,
-  }).pipe(selectJsonField("info"));
-  return ensureAccountInfoFields(effect, query);
+  return Schema.decodeUnknownEffect(AccountInfoQuerySchema, {
+    onExcessProperty: "error",
+  })(query).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedQuery) => {
+      const effect = requestJson(AccountInfoEnvelopeSchema, {
+        method: "GET",
+        path: "/v2/account/info",
+        query: decodedQuery,
+      }).pipe(selectJsonField("info"));
+      return ensureAccountInfoFields(effect, decodedQuery);
+    }),
+  );
 }
 export const getAccountSettings = (): Effect.Effect<
   AccountSettings,
@@ -408,47 +421,74 @@ export const saveAccountSettings = (
   SaveAccountSettingsError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "json",
-      value: payload,
-    },
-    method: "POST",
-    path: "/v2/account/settings",
-  }).pipe(withOperationErrors(SaveAccountSettingsErrorSpec));
+  Schema.decodeUnknownEffect(SaveAccountSettingsPayloadSchema, {
+    onExcessProperty: "error",
+  })(payload).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedPayload) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "json",
+          value: decodedPayload,
+        },
+        method: "POST",
+        path: "/v2/account/settings",
+      }),
+    ),
+    withOperationErrors(SaveAccountSettingsErrorSpec),
+  );
 export const clearAccount = (
   options: AccountClearOptions,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: options,
-    },
-    method: "POST",
-    path: "/v2/account/clear",
-  });
+  Schema.decodeUnknownEffect(AccountClearOptionsSchema, {
+    onExcessProperty: "error",
+  })(options).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedOptions) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "form",
+          value: decodedOptions,
+        },
+        method: "POST",
+        path: "/v2/account/clear",
+      }),
+    ),
+  );
 export const destroyAccount = (
   currentPassword: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: {
-        current_password: currentPassword,
-      },
-    },
-    method: "POST",
-    path: "/v2/account/destroy",
-  });
+  Schema.decodeUnknownEffect(Schema.String)(currentPassword).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedPassword) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "form",
+          value: {
+            current_password: decodedPassword,
+          },
+        },
+        method: "POST",
+        path: "/v2/account/destroy",
+      }),
+    ),
+  );
 export const listAccountConfirmations = (
   subject?: AccountConfirmation["subject"],
 ): Effect.Effect<ReadonlyArray<AccountConfirmation>, AccountConfirmationsError, PutioSdkContext> =>
-  requestJson(AccountConfirmationsEnvelopeSchema, {
-    method: "GET",
-    path: "/v2/account/confirmation/list",
-    query: subject
-      ? {
-          type: subject,
-        }
-      : undefined,
-  }).pipe(selectJsonField("confirmations"), withOperationErrors(AccountConfirmationsErrorSpec));
+  Schema.decodeUnknownEffect(Schema.UndefinedOr(AccountConfirmationSubjectSchema))(subject).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedSubject) =>
+      requestJson(AccountConfirmationsEnvelopeSchema, {
+        method: "GET",
+        path: "/v2/account/confirmation/list",
+        query: decodedSubject
+          ? {
+              type: decodedSubject,
+            }
+          : undefined,
+      }),
+    ),
+    selectJsonField("confirmations"),
+    withOperationErrors(AccountConfirmationsErrorSpec),
+  );

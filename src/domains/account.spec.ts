@@ -214,6 +214,100 @@ describe("account domain", () => {
     );
 
     expect(result).toEqual({ status: "OK" });
+
+    const twoFactorResult = await runSdkEffect(
+      saveAccountSettings({
+        two_factor_enabled: {
+          code: "123456",
+          enable: true,
+        },
+      }),
+      (request) => {
+        expect(getJsonBody(request)).toEqual({
+          two_factor_enabled: {
+            code: "123456",
+            enable: true,
+          },
+        });
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+
+    expect(twoFactorResult).toEqual({ status: "OK" });
+  });
+
+  it("rejects invalid account request inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+
+    const invalidQuery = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can still supply invalid query flags.
+        getAccountInfo({ download_token: 2 }),
+        handler,
+      ),
+    );
+    const invalidNestedSettings = expectFailure(
+      await runSdkExit(
+        saveAccountSettings({
+          two_factor_enabled: {
+            code: "123456",
+            // @ts-expect-error JavaScript callers can still supply invalid nested values.
+            enable: "yes",
+          },
+        }),
+        handler,
+      ),
+    );
+    const invalidSubtitleCount = expectFailure(
+      await runSdkExit(
+        saveAccountSettings({
+          subtitle_languages: ["en", "tr", "de"],
+        }),
+        handler,
+      ),
+    );
+    const unknownSetting = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply unknown settings.
+        saveAccountSettings({ unknown_setting: true }),
+        handler,
+      ),
+    );
+    const incompleteClearOptions = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can omit required clear flags.
+        clearAccount({ files: true }),
+        handler,
+      ),
+    );
+    const invalidPassword = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply non-string passwords.
+        destroyAccount(123),
+        handler,
+      ),
+    );
+    const invalidConfirmationSubject = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply unknown confirmation subjects.
+        listAccountConfirmations("username_change"),
+        handler,
+      ),
+    );
+
+    expect(invalidQuery).toBeInstanceOf(PutioValidationError);
+    expect(invalidNestedSettings).toBeInstanceOf(PutioValidationError);
+    expect(invalidSubtitleCount).toBeInstanceOf(PutioValidationError);
+    expect(unknownSetting).toBeInstanceOf(PutioValidationError);
+    expect(incompleteClearOptions).toBeInstanceOf(PutioValidationError);
+    expect(invalidPassword).toBeInstanceOf(PutioValidationError);
+    expect(invalidConfirmationSubject).toBeInstanceOf(PutioValidationError);
+    expect(requestCount).toBe(0);
   });
 
   it("lists supported subtitle languages", async () => {

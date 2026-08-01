@@ -20,14 +20,14 @@ export type PutioJsonObject = {
 const isPlainRecord = (value: object): value is Record<string, unknown> => {
   try {
     const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
+    return prototype === null || Object.getPrototypeOf(prototype) === null;
   } catch {
     return false;
   }
 };
 const snapshotJsonValue = (
   value: unknown,
-  ancestors: ReadonlySet<object> = new Set(),
+  ancestors: Set<object> = new Set(),
 ): PutioJsonValue | undefined => {
   if (value === null || typeof value === "string" || typeof value === "boolean") {
     return value;
@@ -38,7 +38,7 @@ const snapshotJsonValue = (
   if (typeof value !== "object" || ancestors.has(value)) {
     return undefined;
   }
-  const descendants = new Set(ancestors).add(value);
+  ancestors.add(value);
   try {
     if (Array.isArray(value)) {
       const output: Array<PutioJsonValue> = [];
@@ -47,7 +47,7 @@ const snapshotJsonValue = (
         if (descriptor === undefined || !("value" in descriptor)) {
           return undefined;
         }
-        const item = snapshotJsonValue(descriptor.value, descendants);
+        const item = snapshotJsonValue(descriptor.value, ancestors);
         if (item === undefined) {
           return undefined;
         }
@@ -66,7 +66,7 @@ const snapshotJsonValue = (
       if (!("value" in descriptor)) {
         return undefined;
       }
-      const item = snapshotJsonValue(descriptor.value, descendants);
+      const item = snapshotJsonValue(descriptor.value, ancestors);
       if (item === undefined) {
         return undefined;
       }
@@ -80,6 +80,8 @@ const snapshotJsonValue = (
     return output;
   } catch {
     return undefined;
+  } finally {
+    ancestors.delete(value);
   }
 };
 const snapshotJsonObject = (value: unknown): PutioJsonObject | undefined => {

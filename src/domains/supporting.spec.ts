@@ -1,5 +1,6 @@
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
 import { Effect, Schema } from "effect";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vite-plus/test";
 
 import * as configDomain from "./config.js";
@@ -77,6 +78,8 @@ describe("supporting domain boundaries", () => {
     );
     expect(accessorExit._tag).toBe("Failure");
     expect(getterCalls).toBe(0);
+    const crossRealmConfig: unknown = runInNewContext(`({ locale: "en" })`);
+    expect(decodeJsonObject(crossRealmConfig)).toEqual({ locale: "en" });
     expect(() => decodeJsonObject(["nope"])).toThrow("Expected a JSON object");
 
     expect(

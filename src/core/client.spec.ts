@@ -37,6 +37,7 @@ describe("sdk client factories", () => {
     const client = createPutioSdkEffectClient();
 
     expect(client.account.getInfo).toBeTypeOf("function");
+    expect(client.account.listSubtitleLanguages).toBeTypeOf("function");
     expect(client.auth.getCode).toBeTypeOf("function");
     expect(client.downloadLinks.create).toBeTypeOf("function");
     expect(client.events.list).toBeTypeOf("function");
@@ -89,6 +90,7 @@ describe("sdk client factories", () => {
 
     expect(client.dispose).toBeTypeOf("function");
     expect(client.account.getInfo).toBeTypeOf("function");
+    expect(client.account.listSubtitleLanguages).toBeTypeOf("function");
     expect(client.auth.getCode).toBeTypeOf("function");
     expect(client.files.createUploadFormData).toBeTypeOf("function");
     expect(client.files.getApiDownloadUrl).toBeTypeOf("function");

@@ -5,11 +5,13 @@ import {
   destroyAccount,
   getAccountInfo,
   getAccountSettings,
+  listAccountSubtitleLanguages,
   listAccountConfirmations,
   saveAccountSettings,
   type AccountInfoBase,
   type AccountInfoQuery,
   type AccountSettings,
+  type AccountSubtitleLanguage,
   type AccountConfirmation,
   type AccountInfoBroad,
   type PasInfo,
@@ -348,6 +350,7 @@ export const createPutioSdkEffectClient = () => ({
     destroy: destroyAccount,
     getInfo: getAccountInfo,
     getSettings: getAccountSettings,
+    listSubtitleLanguages: listAccountSubtitleLanguages,
     listConfirmations: listAccountConfirmations,
     saveSettings: saveAccountSettings,
   },
@@ -648,6 +651,8 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
       destroy: (currentPassword: string) => provideSdk(config, destroyAccount(currentPassword)),
       getInfo,
       getSettings: (): Promise<AccountSettings> => provideSdk(config, getAccountSettings()),
+      listSubtitleLanguages: (): Promise<ReadonlyArray<AccountSubtitleLanguage>> =>
+        provideSdk(config, listAccountSubtitleLanguages()),
       listConfirmations: (subject?: AccountConfirmation["subject"]) =>
         provideSdk(config, listAccountConfirmations(subject)),
       saveSettings: (payload: SaveAccountSettingsPayload) =>

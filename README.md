@@ -147,7 +147,7 @@ If you create a long-lived Promise client in a script, test harness, or server i
 
 | Namespace       | Purpose                                                                    |
 | --------------- | -------------------------------------------------------------------------- |
-| `account`       | account info, settings, confirmations, destructive account actions         |
+| `account`       | account info, settings, subtitle languages, confirmations, clear/destroy   |
 | `auth`          | token validation, login flows, device/OOB helpers, two-factor flows        |
 | `config`        | app-owned JSON config storage                                              |
 | `downloadLinks` | download-link bundles                                                      |

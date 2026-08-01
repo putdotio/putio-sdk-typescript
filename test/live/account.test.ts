@@ -34,6 +34,16 @@ describe.sequential("account live", () => {
     ).toBe(true);
   });
 
+  test("supported subtitle languages expose stable code and name fields", async () => {
+    const languages = await clients.oauthClient.account.listSubtitleLanguages();
+
+    expect(languages.length).toBeGreaterThan(0);
+    expect(languages).toContainEqual({ code: "eng", name: "English" });
+    expect(
+      languages.every((language) => language.code.length > 0 && language.name.length > 0),
+    ).toBe(true);
+  });
+
   test("account settings theme mutation is reversible", async () => {
     const before = await clients.authClient.account.getSettings();
     const nextTheme = before.theme === "dark" ? "auto" : "dark";

@@ -227,6 +227,11 @@ import {
   type PaymentVoucherInfo,
 } from "../domains/payment.js";
 import {
+  getPodcastLinks,
+  type PodcastGetLinksInput,
+  type PodcastLinksResponse,
+} from "../domains/podcast.js";
+import {
   clearRssFeedLogs,
   createRssFeed,
   deleteRssFeed,
@@ -452,6 +457,9 @@ export const createPutioSdkEffectClient = () => ({
   ifttt: {
     getStatus: getIftttStatus,
     sendEvent: sendIftttEvent,
+  },
+  podcast: {
+    getLinks: getPodcastLinks,
   },
   files: {
     continue: continueFiles,
@@ -800,6 +808,10 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
     ifttt: {
       getStatus: (): Promise<{ readonly enabled: boolean }> => provideSdk(config, getIftttStatus()),
       sendEvent: (input: IftttEventInput) => provideSdk(config, sendIftttEvent(input)),
+    },
+    podcast: {
+      getLinks: (input: PodcastGetLinksInput): Promise<PodcastLinksResponse> =>
+        provideSdk(config, getPodcastLinks(input)),
     },
     files: {
       continue: (

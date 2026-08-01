@@ -59,6 +59,24 @@ const login = await sdk.auth.login({
 });
 ```
 
+## App-Specific Passwords
+
+Create and manage passwords for apps that use put.io basic authentication:
+
+```ts
+const created = await sdk.account.appSpecificPasswords.create({
+  note: "Media server",
+});
+
+savePasswordSecurely(created.password);
+
+const passwords = await sdk.account.appSpecificPasswords.list();
+await sdk.account.appSpecificPasswords.delete(created.id);
+await sdk.account.appSpecificPasswords.deleteAll();
+```
+
+The plaintext `password` is returned only by `create`. List results contain metadata instead, including a nullable `last_used_at` timestamp and a null or masked `ip_address`. The Effect client exposes the same namespace with typed errors in its Effect channel.
+
 ## Utilities
 
 Shared formatting, URL, and error-localization helpers are available from the utilities subpath:
@@ -145,27 +163,27 @@ If you create a long-lived Promise client in a script, test harness, or server i
 
 ## Namespace Surface
 
-| Namespace       | Purpose                                                                    |
-| --------------- | -------------------------------------------------------------------------- |
-| `account`       | account info, settings, subtitle languages, confirmations, clear/destroy   |
-| `auth`          | token validation, login flows, device/OOB helpers, two-factor flows        |
-| `config`        | app-owned JSON config storage                                              |
-| `downloadLinks` | download-link bundles                                                      |
-| `events`        | history events and event torrent payloads                                  |
-| `family`        | family members and invites                                                 |
-| `files`         | file listing, search, move/delete/extract, MP4, direct access URLs, upload |
-| `friendInvites` | friend invitation management                                               |
-| `friends`       | friend graph and requests                                                  |
-| `ifttt`         | IFTTT integration endpoints                                                |
-| `oauth`         | OAuth app management                                                       |
-| `payment`       | plans, vouchers, payment flows, payment history                            |
-| `rss`           | RSS feed management                                                        |
-| `sharing`       | friend shares, public shares, clone flows                                  |
-| `transfers`     | transfer list, add/retry/cancel/clean flows                                |
-| `trash`         | trash listing, restore, delete, empty                                      |
-| `tunnel`        | route listing                                                              |
-| `utilities`     | file URLs, localized errors, and shared formatting helpers                 |
-| `zips`          | zip creation and lookup                                                    |
+| Namespace       | Purpose                                                                      |
+| --------------- | ---------------------------------------------------------------------------- |
+| `account`       | account info, settings, app-specific passwords, confirmations, clear/destroy |
+| `auth`          | token validation, login flows, device/OOB helpers, two-factor flows          |
+| `config`        | app-owned JSON config storage                                                |
+| `downloadLinks` | download-link bundles                                                        |
+| `events`        | history events and event torrent payloads                                    |
+| `family`        | family members and invites                                                   |
+| `files`         | file listing, search, move/delete/extract, MP4, direct access URLs, upload   |
+| `friendInvites` | friend invitation management                                                 |
+| `friends`       | friend graph and requests                                                    |
+| `ifttt`         | IFTTT integration endpoints                                                  |
+| `oauth`         | OAuth app management                                                         |
+| `payment`       | plans, vouchers, payment flows, payment history                              |
+| `rss`           | RSS feed management                                                          |
+| `sharing`       | friend shares, public shares, clone flows                                    |
+| `transfers`     | transfer list, add/retry/cancel/clean flows                                  |
+| `trash`         | trash listing, restore, delete, empty                                        |
+| `tunnel`        | route listing                                                                |
+| `utilities`     | file URLs, localized errors, and shared formatting helpers                   |
+| `zips`          | zip creation and lookup                                                      |
 
 ## Design Rules
 

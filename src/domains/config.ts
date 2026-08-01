@@ -36,64 +36,98 @@ const isPlainRecord = (value: object): value is Record<string, unknown> => {
     return false;
   }
 };
-const snapshotJsonValue = (
+type JsonWalkMode = "snapshot" | "validate";
+type JsonWalkResult =
+  | { readonly _tag: "Invalid" }
+  | { readonly _tag: "Validated" }
+  | { readonly _tag: "Snapshot"; readonly value: PutioJsonValue };
+const invalidJsonWalk: JsonWalkResult = { _tag: "Invalid" };
+const validatedJsonWalk: JsonWalkResult = { _tag: "Validated" };
+const walkJsonValue = (
   value: unknown,
+  mode: JsonWalkMode,
   ancestors: Set<object> = new Set(),
-): PutioJsonValue | undefined => {
+): JsonWalkResult => {
   if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return value;
+    return mode === "snapshot" ? { _tag: "Snapshot", value } : validatedJsonWalk;
   }
   if (typeof value === "number") {
-    return Number.isFinite(value) ? value : undefined;
+    return Number.isFinite(value)
+      ? mode === "snapshot"
+        ? { _tag: "Snapshot", value }
+        : validatedJsonWalk
+      : invalidJsonWalk;
   }
   if (typeof value !== "object" || ancestors.has(value)) {
-    return undefined;
+    return invalidJsonWalk;
   }
   ancestors.add(value);
   try {
     if (Array.isArray(value)) {
-      const output: Array<PutioJsonValue> = [];
+      const output: Array<PutioJsonValue> | undefined = mode === "snapshot" ? [] : undefined;
       for (let index = 0; index < value.length; index += 1) {
         const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
         if (descriptor === undefined || !("value" in descriptor)) {
-          return undefined;
+          return invalidJsonWalk;
         }
-        const item = snapshotJsonValue(descriptor.value, ancestors);
-        if (item === undefined) {
-          return undefined;
+        const item = walkJsonValue(descriptor.value, mode, ancestors);
+        if (item._tag === "Invalid") {
+          return item;
         }
-        output.push(item);
+        if (output === undefined) {
+          if (item._tag !== "Validated") {
+            return invalidJsonWalk;
+          }
+        } else {
+          if (item._tag !== "Snapshot") {
+            return invalidJsonWalk;
+          }
+          output.push(item.value);
+        }
       }
-      return output;
+      return output === undefined ? validatedJsonWalk : { _tag: "Snapshot", value: output };
     }
     if (!isPlainRecord(value)) {
-      return undefined;
+      return invalidJsonWalk;
     }
-    const output: Record<string, PutioJsonValue> = {};
+    const output: Record<string, PutioJsonValue> | undefined = mode === "snapshot" ? {} : undefined;
     for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
       if (!descriptor.enumerable) {
         continue;
       }
       if (!("value" in descriptor)) {
-        return undefined;
+        return invalidJsonWalk;
       }
-      const item = snapshotJsonValue(descriptor.value, ancestors);
-      if (item === undefined) {
-        return undefined;
+      const item = walkJsonValue(descriptor.value, mode, ancestors);
+      if (item._tag === "Invalid") {
+        return item;
+      }
+      if (output === undefined) {
+        if (item._tag !== "Validated") {
+          return invalidJsonWalk;
+        }
+        continue;
+      }
+      if (item._tag !== "Snapshot") {
+        return invalidJsonWalk;
       }
       Object.defineProperty(output, key, {
         configurable: true,
         enumerable: true,
-        value: item,
+        value: item.value,
         writable: true,
       });
     }
-    return output;
+    return output === undefined ? validatedJsonWalk : { _tag: "Snapshot", value: output };
   } catch {
-    return undefined;
+    return invalidJsonWalk;
   } finally {
     ancestors.delete(value);
   }
+};
+const snapshotJsonValue = (value: unknown): PutioJsonValue | undefined => {
+  const result = walkJsonValue(value, "snapshot");
+  return result._tag === "Snapshot" ? result.value : undefined;
 };
 const snapshotJsonObject = (value: unknown): PutioJsonObject | undefined => {
   const snapshot = snapshotJsonValue(value);
@@ -101,58 +135,10 @@ const snapshotJsonObject = (value: unknown): PutioJsonObject | undefined => {
     ? snapshot
     : undefined;
 };
-const isJsonValue = (
-  value: unknown,
-  ancestors: Set<object> = new Set(),
-): value is PutioJsonValue => {
-  if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return true;
-  }
-  if (typeof value === "number") {
-    return Number.isFinite(value);
-  }
-  if (typeof value !== "object" || ancestors.has(value)) {
-    return false;
-  }
-  ancestors.add(value);
-  try {
-    if (Array.isArray(value)) {
-      for (let index = 0; index < value.length; index += 1) {
-        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-        if (
-          descriptor === undefined ||
-          !("value" in descriptor) ||
-          !isJsonValue(descriptor.value, ancestors)
-        ) {
-          return false;
-        }
-      }
-      return true;
-    }
-    if (!isPlainRecord(value)) {
-      return false;
-    }
-    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
-      if (
-        descriptor.enumerable &&
-        (!("value" in descriptor) || !isJsonValue(descriptor.value, ancestors))
-      ) {
-        return false;
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  } finally {
-    ancestors.delete(value);
-  }
-};
+const isJsonValue = (value: unknown): value is PutioJsonValue =>
+  walkJsonValue(value, "validate")._tag === "Validated";
 const isJsonObject = (value: unknown): value is PutioJsonObject =>
-  typeof value === "object" &&
-  value !== null &&
-  isJsonValue(value) &&
-  !Array.isArray(value) &&
-  isPlainRecord(value);
+  typeof value === "object" && value !== null && isJsonValue(value) && !Array.isArray(value);
 export const JsonValueSchema = Schema.declareConstructor<PutioJsonValue>()(
   [],
   () => (input, ast) => {

@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema } from "../core/validation.js";
+import { PositiveIntegerSchema, makeCursorSelectionSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   mapDecodeErrorToValidationError,
@@ -14,15 +14,7 @@ import {
   type PutioSdkContext,
 } from "../core/http.js";
 export const DownloadLinksStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
-export const DownloadLinksCreateInputSchema = Schema.Struct({
-  cursor: Schema.optional(NonEmptyStringSchema),
-  excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
-  ids: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
-}).check(
-  Schema.makeFilter((input) => input.cursor !== undefined || input.ids !== undefined, {
-    expected: "a non-empty cursor or file ID selection",
-  }),
-);
+export const DownloadLinksCreateInputSchema = makeCursorSelectionSchema("ids", "excludeIds");
 export const DownloadLinksPayloadSchema = Schema.Struct({
   download_links: Schema.Array(Schema.String),
   media_links: Schema.Array(Schema.String),

@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema } from "../core/validation.js";
+import { PositiveIntegerSchema, makeCursorSelectionSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   mapDecodeErrorToValidationError,
@@ -55,15 +55,7 @@ const ZipInfoSchema = Schema.Union([ZipInfoPendingSchema, ZipInfoErrorSchema, Zi
 export type ZipSummary = Schema.Schema.Type<typeof ZipSummarySchema>;
 export type ZipCreateResponse = Schema.Schema.Type<typeof ZipCreateEnvelopeSchema>;
 export type ZipInfo = Schema.Schema.Type<typeof ZipInfoSchema>;
-const CreateZipInputSchema = Schema.Struct({
-  cursor: Schema.optional(NonEmptyStringSchema),
-  exclude_ids: Schema.optional(Schema.Array(PositiveIntegerSchema)),
-  file_ids: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
-}).check(
-  Schema.makeFilter((input) => input.cursor !== undefined || input.file_ids !== undefined, {
-    expected: "a non-empty cursor or file ID selection",
-  }),
-);
+const CreateZipInputSchema = makeCursorSelectionSchema("file_ids", "exclude_ids");
 export type CreateZipInput = Schema.Schema.Type<typeof CreateZipInputSchema>;
 const FilesReadScopeError = { errorType: "invalid_scope", statusCode: 401 as const };
 const FilesWriteScopeError = { errorType: "invalid_scope", statusCode: 401 as const };

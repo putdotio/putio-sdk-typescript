@@ -1,5 +1,5 @@
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import * as configDomain from "./config.js";
@@ -60,6 +60,23 @@ describe("supporting domain boundaries", () => {
     const cyclicValue: { self?: unknown } = {};
     cyclicValue.self = cyclicValue;
     expect(() => decodeJsonValue(cyclicValue)).toThrow("Expected a JSON-compatible value");
+    const sparseValue: Array<configDomain.PutioJsonValue> = [];
+    sparseValue.length = 1;
+    expect(() => decodeJsonValue(sparseValue)).toThrow("Expected a JSON-compatible value");
+    let getterCalls = 0;
+    const accessorValue: configDomain.PutioJsonObject = {};
+    Object.defineProperty(accessorValue, "count", {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        return 1;
+      },
+    });
+    const accessorExit = Effect.runSyncExit(
+      Schema.decodeUnknownEffect(configDomain.JsonObjectSchema)(accessorValue),
+    );
+    expect(accessorExit._tag).toBe("Failure");
+    expect(getterCalls).toBe(0);
     expect(() => decodeJsonObject(["nope"])).toThrow("Expected a JSON object");
 
     expect(
@@ -208,6 +225,12 @@ describe("supporting domain boundaries", () => {
         invalidHandler,
       ),
     );
+    const sparseSetValue = expectFailure(
+      await runSdkExit(configDomain.setConfigKey("sparse", sparseValue), invalidHandler),
+    );
+    const accessorConfig = expectFailure(
+      await runSdkExit(configDomain.writeConfig(accessorValue), invalidHandler),
+    );
     const emptySetKey = expectFailure(
       await runSdkExit(configDomain.setConfigKey("", "light"), invalidHandler),
     );
@@ -220,8 +243,11 @@ describe("supporting domain boundaries", () => {
     expect(emptyGetKey).toBeInstanceOf(PutioValidationError);
     expect(emptyTypedGetKey).toBeInstanceOf(PutioValidationError);
     expect(invalidSetValue).toBeInstanceOf(PutioValidationError);
+    expect(sparseSetValue).toBeInstanceOf(PutioValidationError);
+    expect(accessorConfig).toBeInstanceOf(PutioValidationError);
     expect(emptySetKey).toBeInstanceOf(PutioValidationError);
     expect(emptyDeleteKey).toBeInstanceOf(PutioValidationError);
+    expect(getterCalls).toBe(0);
     expect(requestCount).toBe(0);
   });
 

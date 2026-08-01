@@ -25,37 +25,92 @@ const isPlainRecord = (value: object): value is Record<string, unknown> => {
     return false;
   }
 };
-const isJsonValue = (
+const snapshotJsonValue = (
   value: unknown,
   ancestors: ReadonlySet<object> = new Set(),
-): value is PutioJsonValue => {
+): PutioJsonValue | undefined => {
   if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return true;
+    return value;
   }
   if (typeof value === "number") {
-    return Number.isFinite(value);
+    return Number.isFinite(value) ? value : undefined;
   }
   if (typeof value !== "object" || ancestors.has(value)) {
-    return false;
+    return undefined;
   }
   const descendants = new Set(ancestors).add(value);
   try {
     if (Array.isArray(value)) {
-      return value.every((item) => isJsonValue(item, descendants));
+      const output: Array<PutioJsonValue> = [];
+      for (let index = 0; index < value.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (descriptor === undefined || !("value" in descriptor)) {
+          return undefined;
+        }
+        const item = snapshotJsonValue(descriptor.value, descendants);
+        if (item === undefined) {
+          return undefined;
+        }
+        output.push(item);
+      }
+      return output;
     }
-    return (
-      isPlainRecord(value) && Object.values(value).every((item) => isJsonValue(item, descendants))
-    );
+    if (!isPlainRecord(value)) {
+      return undefined;
+    }
+    const output: Record<string, PutioJsonValue> = {};
+    for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
+      if (!descriptor.enumerable) {
+        continue;
+      }
+      if (!("value" in descriptor)) {
+        return undefined;
+      }
+      const item = snapshotJsonValue(descriptor.value, descendants);
+      if (item === undefined) {
+        return undefined;
+      }
+      Object.defineProperty(output, key, {
+        configurable: true,
+        enumerable: true,
+        value: item,
+        writable: true,
+      });
+    }
+    return output;
   } catch {
-    return false;
+    return undefined;
   }
 };
+const isJsonValue = (value: unknown): value is PutioJsonValue =>
+  snapshotJsonValue(value) !== undefined;
 const isJsonObject = (value: unknown): value is PutioJsonObject =>
   typeof value === "object" &&
   value !== null &&
   !Array.isArray(value) &&
   isPlainRecord(value) &&
   isJsonValue(value);
+const snapshotJsonObject = (value: unknown): PutioJsonObject | undefined => {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value) ||
+    !isPlainRecord(value)
+  ) {
+    return undefined;
+  }
+  const snapshot = snapshotJsonValue(value);
+  return typeof snapshot === "object" && snapshot !== null && !Array.isArray(snapshot)
+    ? snapshot
+    : undefined;
+};
+const requireJsonSnapshot = <A extends PutioJsonValue>(
+  snapshot: A | undefined,
+  expected: string,
+): Effect.Effect<A, PutioSdkError> =>
+  snapshot === undefined
+    ? Effect.fail(mapDecodeErrorToValidationError(`Expected ${expected}`))
+    : Effect.succeed(snapshot);
 export const JsonValueSchema = Schema.Unknown.pipe(
   Schema.refine(isJsonValue, {
     expected: "a JSON-compatible value",
@@ -103,16 +158,20 @@ export const writeConfig = (
   Schema.decodeUnknownEffect(JsonObjectSchema)(config).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedConfig) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "json",
-          value: {
-            config: decodedConfig,
-          },
-        },
-        method: "PUT",
-        path: "/v2/config",
-      }),
+      requireJsonSnapshot(snapshotJsonObject(decodedConfig), "a JSON object").pipe(
+        Effect.flatMap((configSnapshot) =>
+          requestJson(OkResponseSchema, {
+            body: {
+              type: "json",
+              value: {
+                config: configSnapshot,
+              },
+            },
+            method: "PUT",
+            path: "/v2/config",
+          }),
+        ),
+      ),
     ),
   );
 export const getConfigKey = (
@@ -155,16 +214,20 @@ export const setConfigKey = (
   Schema.decodeUnknownEffect(ConfigSetKeyInputSchema)({ key, value }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "json",
-          value: {
-            value: decodedInput.value,
-          },
-        },
-        method: "PUT",
-        path: `/v2/config/${encodePathSegment(decodedInput.key)}`,
-      }),
+      requireJsonSnapshot(snapshotJsonValue(decodedInput.value), "a JSON-compatible value").pipe(
+        Effect.flatMap((valueSnapshot) =>
+          requestJson(OkResponseSchema, {
+            body: {
+              type: "json",
+              value: {
+                value: valueSnapshot,
+              },
+            },
+            method: "PUT",
+            path: `/v2/config/${encodePathSegment(decodedInput.key)}`,
+          }),
+        ),
+      ),
     ),
   );
 export const deleteConfigKey = (

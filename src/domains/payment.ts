@@ -267,12 +267,6 @@ const PaymentOpenNodeChargeEnvelopeSchema = Schema.Struct({
   }),
   status: Schema.Literal("OK"),
 });
-const PaymentCoinbaseChargeEnvelopeSchema = Schema.Struct({
-  coinbase: Schema.Struct({
-    code: Schema.String,
-  }),
-  status: Schema.Literal("OK"),
-});
 export type PaymentInfo = Schema.Schema.Type<typeof PaymentInfoSchema>;
 export type PaymentPlanGroup = Schema.Schema.Type<typeof PaymentPlanGroupSchema>;
 export type PaymentOption = Schema.Schema.Type<typeof PaymentOptionSchema>;
@@ -455,15 +449,6 @@ export const CreatePaddleBillingUpdatePaymentMethodTransactionErrorSpec =
       { statusCode: 404 as const },
     ],
   });
-export const CreateCoinbaseChargeErrorSpec = definePutioOperationErrorSpec({
-  domain: "payment",
-  operation: "createCoinbaseCharge",
-  knownErrors: [
-    { errorType: "PAYMENT_UNKNOWN_PLAN", statusCode: 400 as const },
-    ...CommonPaymentActionErrors,
-    { statusCode: 400 as const },
-  ],
-});
 export const CreateOpenNodeChargeErrorSpec = definePutioOperationErrorSpec({
   domain: "payment",
   operation: "createOpenNodeCharge",
@@ -502,7 +487,6 @@ export type GetPaddleBillingInvoiceUrlError = PutioOperationFailure<
 export type CreatePaddleBillingUpdatePaymentMethodTransactionError = PutioOperationFailure<
   typeof CreatePaddleBillingUpdatePaymentMethodTransactionErrorSpec
 >;
-export type CreateCoinbaseChargeError = PutioOperationFailure<typeof CreateCoinbaseChargeErrorSpec>;
 export type CreateOpenNodeChargeError = PutioOperationFailure<typeof CreateOpenNodeChargeErrorSpec>;
 export type ClassifiedPaymentChangePlanSubmitResponse =
   | {
@@ -692,23 +676,6 @@ export const createPaddleBillingUpdatePaymentMethodTransaction = (
   }).pipe(
     selectJsonField("transaction_id"),
     withOperationErrors(CreatePaddleBillingUpdatePaymentMethodTransactionErrorSpec),
-  );
-export const createCoinbaseCharge = (
-  planPath: string,
-): Effect.Effect<string, CreateCoinbaseChargeError, PutioSdkContext> =>
-  requestJson(PaymentCoinbaseChargeEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        plan_fs_path: planPath,
-      },
-    },
-    method: "POST",
-    path: "/v2/payment/methods/coinbase/charge",
-  }).pipe(
-    selectJsonField("coinbase"),
-    Effect.map(({ code }) => code),
-    withOperationErrors(CreateCoinbaseChargeErrorSpec),
   );
 export const createOpenNodeCharge = (
   planPath: string,

@@ -383,17 +383,6 @@ describe("payment domain", () => {
 
     expect(
       await runSdkEffect(
-        payment.createCoinbaseCharge("plan/path"),
-        (request) => {
-          expect(getFormBody(request).get("plan_fs_path")).toBe("plan/path");
-          return jsonResponse({ coinbase: { code: "cb-code" }, status: "OK" });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toBe("cb-code");
-
-    expect(
-      await runSdkEffect(
         payment.createOpenNodeCharge("plan/path"),
         (request) => {
           expect(getFormBody(request).get("plan_fs_path")).toBe("plan/path");

@@ -207,7 +207,6 @@ import {
 import {
   classifyPaymentChangePlanResponse,
   confirmFastspringOrder,
-  createCoinbaseCharge,
   createOpenNodeCharge,
   createPaddleBillingUpdatePaymentMethodTransaction,
   createPaddleWaitingPayment,
@@ -562,7 +561,6 @@ export const createPutioSdkEffectClient = () => ({
     listPlans: listPaymentPlans,
     methods: {
       addPaddleWaitingPayment: createPaddleWaitingPayment,
-      createCoinbaseCharge,
       createOpenNodeCharge,
       createPaddleBillingUpdatePaymentMethodTransaction,
       getPaddleBillingInvoiceUrl,
@@ -1081,8 +1079,6 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
       methods: {
         addPaddleWaitingPayment: (input: PaymentPaddleWaitingPaymentInput) =>
           provideSdk(config, createPaddleWaitingPayment(input)),
-        createCoinbaseCharge: (planPath: string): Promise<string> =>
-          provideSdk(config, createCoinbaseCharge(planPath)),
         createOpenNodeCharge: (planPath: string): Promise<string> =>
           provideSdk(config, createOpenNodeCharge(planPath)),
         createPaddleBillingUpdatePaymentMethodTransaction: (

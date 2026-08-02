@@ -1093,13 +1093,13 @@ export const setStartFrom = (
       },
     },
     method: "POST",
-    path: `/v2/files/${encodePathSegment(input.file_id)}/start-from/set`,
+    path: `/v2/files/${encodePathSegment(input.file_id)}/start-from`,
   }).pipe(withOperationErrors(StartFromErrorSpec));
 export const resetStartFrom = (
   fileId: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, StartFromError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
-    method: "GET",
+    method: "POST",
     path: `/v2/files/${encodePathSegment(fileId)}/start-from/delete`,
   }).pipe(withOperationErrors(StartFromErrorSpec));
 export const getMp4Status = (

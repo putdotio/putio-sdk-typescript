@@ -402,6 +402,27 @@ const FileUploadInputSchema = Schema.Struct({
 const FileUploadOptionsSchema = Schema.Struct({
   oauthToken: Schema.optional(NonEmptyStringSchema),
 });
+const FileDirectAccessOptionsSchema = Schema.Struct({
+  oauthToken: Schema.optional(NonEmptyStringSchema),
+  useTunnel: Schema.optional(Schema.Boolean),
+});
+const FileApiDownloadUrlOptionsSchema = FileDirectAccessOptionsSchema.pipe(
+  Schema.fieldsAssign({ name: Schema.optional(NonEmptyStringSchema) }),
+);
+const FileApiMp4DownloadUrlOptionsSchema = FileDirectAccessOptionsSchema.pipe(
+  Schema.fieldsAssign({
+    convert: Schema.optional(Schema.Boolean),
+    name: Schema.optional(NonEmptyStringSchema),
+  }),
+);
+const FileHlsStreamUrlOptionsSchema = Schema.Struct({
+  maxSubtitleCount: Schema.optional(PositiveIntegerSchema),
+  oauthToken: Schema.optional(NonEmptyStringSchema),
+  playOriginal: Schema.optional(Schema.Boolean),
+  subtitleLanguages: Schema.optional(
+    Schema.Array(NonEmptyStringSchema).check(Schema.isMinLength(1)),
+  ),
+});
 const FilesNextFileSchema = Schema.Struct({
   id: Schema.Int,
   name: Schema.String,
@@ -1292,49 +1313,69 @@ export const getApiDownloadUrl = (
   fileId: number,
   options: FileApiDownloadUrlOptions = {},
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
-  resolveRouteContext(options.oauthToken).pipe(
-    Effect.map(({ config, oauthToken }) =>
-      buildFileApiDownloadUrl(config.baseUrl ?? "https://api.put.io", fileId, {
-        ...options,
-        oauthToken,
-      }),
-    ),
+  decodeAndRun(
+    Schema.Struct({ fileId: PositiveFileIdSchema, options: FileApiDownloadUrlOptionsSchema }),
+    { fileId, options },
+    (decoded) =>
+      resolveRouteContext(decoded.options.oauthToken).pipe(
+        Effect.map(({ config, oauthToken }) =>
+          buildFileApiDownloadUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
+            ...decoded.options,
+            oauthToken,
+          }),
+        ),
+      ),
   );
 export const getApiContentUrl = (
   fileId: number,
   options: FileDirectAccessOptions = {},
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
-  resolveRouteContext(options.oauthToken).pipe(
-    Effect.map(({ config, oauthToken }) =>
-      buildFileApiContentUrl(config.baseUrl ?? "https://api.put.io", fileId, {
-        ...options,
-        oauthToken,
-      }),
-    ),
+  decodeAndRun(
+    Schema.Struct({ fileId: PositiveFileIdSchema, options: FileDirectAccessOptionsSchema }),
+    { fileId, options },
+    (decoded) =>
+      resolveRouteContext(decoded.options.oauthToken).pipe(
+        Effect.map(({ config, oauthToken }) =>
+          buildFileApiContentUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
+            ...decoded.options,
+            oauthToken,
+          }),
+        ),
+      ),
   );
 export const getApiMp4DownloadUrl = (
   fileId: number,
   options: FileApiMp4DownloadUrlOptions = {},
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
-  resolveRouteContext(options.oauthToken).pipe(
-    Effect.map(({ config, oauthToken }) =>
-      buildFileApiMp4DownloadUrl(config.baseUrl ?? "https://api.put.io", fileId, {
-        ...options,
-        oauthToken,
-      }),
-    ),
+  decodeAndRun(
+    Schema.Struct({ fileId: PositiveFileIdSchema, options: FileApiMp4DownloadUrlOptionsSchema }),
+    { fileId, options },
+    (decoded) =>
+      resolveRouteContext(decoded.options.oauthToken).pipe(
+        Effect.map(({ config, oauthToken }) =>
+          buildFileApiMp4DownloadUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
+            ...decoded.options,
+            oauthToken,
+          }),
+        ),
+      ),
   );
 export const getHlsStreamUrl = (
   fileId: number,
   options: FileHlsStreamUrlOptions = {},
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
-  resolveRouteContext(options.oauthToken).pipe(
-    Effect.map(({ config, oauthToken }) =>
-      buildFileHlsStreamUrl(config.baseUrl ?? "https://api.put.io", fileId, {
-        ...options,
-        oauthToken,
-      }),
-    ),
+  decodeAndRun(
+    Schema.Struct({ fileId: PositiveFileIdSchema, options: FileHlsStreamUrlOptionsSchema }),
+    { fileId, options },
+    (decoded) =>
+      resolveRouteContext(decoded.options.oauthToken).pipe(
+        Effect.map(({ config, oauthToken }) =>
+          buildFileHlsStreamUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
+            ...decoded.options,
+            oauthToken,
+          }),
+        ),
+      ),
   );
 export const listFileSubtitles = (
   fileId: number,

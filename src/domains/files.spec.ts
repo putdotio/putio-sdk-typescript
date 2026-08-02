@@ -295,6 +295,34 @@ describe("files domain", () => {
     const missingTokenExit = await runConfigExit(files.getApiDownloadUrl(42));
     const missingTokenError = expectFailure(missingTokenExit);
     expect(missingTokenError).toBeInstanceOf(PutioConfigurationError);
+
+    const invalidDirectAccess = await Promise.all([
+      runConfigExit(files.getApiDownloadUrl(0), { accessToken: "token-123" }),
+      runConfigExit(files.getApiDownloadUrl(42, { name: "" }), {
+        accessToken: "token-123",
+      }),
+      runConfigExit(files.getApiContentUrl(0), { accessToken: "token-123" }),
+      runConfigExit(
+        // @ts-expect-error JavaScript callers can supply excess option properties.
+        files.getApiContentUrl(42, { unexpected: true }),
+        { accessToken: "token-123" },
+      ),
+      runConfigExit(files.getApiMp4DownloadUrl(0), { accessToken: "token-123" }),
+      runConfigExit(files.getHlsStreamUrl(42, { maxSubtitleCount: 0 }), {
+        accessToken: "token-123",
+      }),
+      runConfigExit(files.getHlsStreamUrl(42, { subtitleLanguages: [] }), {
+        accessToken: "token-123",
+      }),
+      runConfigExit(files.getHlsStreamUrl(42, { oauthToken: "" }), {
+        accessToken: "token-123",
+      }),
+    ]);
+    expect(
+      invalidDirectAccess
+        .map(expectFailure)
+        .every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
   });
 
   it("covers file reads, searches, and requested-field validation", async () => {

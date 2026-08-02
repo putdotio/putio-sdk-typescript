@@ -53,7 +53,7 @@ sops decrypt --output-type json --output "$payload_json" "$ciphertext" \
   || fail "could not decrypt ciphertext input"
 chmod 600 "$payload_json"
 
-node ./scripts/secrets-render.mjs "$payload_json" "$rendered_env" \
+node ./scripts/secrets-render.ts "$payload_json" "$rendered_env" \
   || fail "decrypted payload failed validation or safe dotenv rendering"
 install -m 600 "$rendered_env" "$output"
 printf 'ok wrote %s\n' "$output"

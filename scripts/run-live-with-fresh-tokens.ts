@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { createPutioSdkPromiseClient } from "../dist/index.js";
 import { bootstrapRuntimeTokens } from "../test/live/support/bootstrap.ts";
@@ -14,9 +16,12 @@ const bootstrapped = await bootstrapRuntimeTokens(readBootstrapSecrets(), async 
   createPutioSdkPromiseClient(config),
 );
 
+const localVitePlus = resolve("node_modules/.bin/vp");
+const vitePlusCommand = existsSync(localVitePlus) ? localVitePlus : "vp";
+
 const result = spawnSync(
-  "pnpm",
-  ["exec", "vp", "test", "run", "--config", "vitest.live.config.ts", ...targets],
+  vitePlusCommand,
+  ["test", "run", "--config", "vitest.live.config.ts", ...targets],
   {
     encoding: "utf8",
     env: {

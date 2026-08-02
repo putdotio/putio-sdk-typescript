@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -38,6 +38,27 @@ const requireIdentifier = (value: string | undefined, name: string): string => {
 
 const commandOutput = (command: string, args: readonly string[]): string =>
   execFileSync(command, args, { encoding: "utf8" }).trim();
+
+const optionalCommandOutput = (command: string, args: readonly string[]): string | null => {
+  try {
+    return commandOutput(command, args);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return null;
+    }
+
+    throw error;
+  }
+};
+
+const vitePlusVersion = (): string | null => {
+  const localVitePlus = resolve("node_modules/.bin/vp");
+  const output = existsSync(localVitePlus)
+    ? commandOutput(localVitePlus, ["--version"])
+    : optionalCommandOutput("vp", ["--version"]);
+
+  return output?.split("\n", 1)[0] ?? null;
+};
 
 const getArtifactDirectory = (): string => {
   const taskId = requireIdentifier(process.env.AGENT_TASK_ID, "AGENT_TASK_ID");
@@ -79,7 +100,7 @@ const record = (args: readonly string[]): void => {
     human_interventions: 0,
     node_version: process.version,
     phase,
-    pnpm_version: commandOutput("pnpm", ["--version"]),
+    pnpm_version: optionalCommandOutput("pnpm", ["--version"]),
     result,
     retries: 0,
     runner: `${process.platform}-${process.arch}`,
@@ -88,6 +109,7 @@ const record = (args: readonly string[]): void => {
     status_code: statusCode,
     task_class: process.env.AGENT_TASK_CLASS ?? "implementation",
     task_id: requireIdentifier(process.env.AGENT_TASK_ID, "AGENT_TASK_ID"),
+    vite_plus_version: vitePlusVersion(),
     worktree_dirty: commandOutput("git", ["status", "--porcelain"]).length > 0,
   };
 

@@ -21,8 +21,8 @@ Readiness here is based on four things:
 The repository exposes one unattended lifecycle for implementation and package
 QA:
 
-1. `./scripts/agent-bootstrap.sh` validates task identity, runner versions, frozen
-   dependency setup, and the pinned Effect research checkout
+1. `./scripts/agent-bootstrap.sh` validates task identity, pinned Node/package-tool
+   versions, frozen dependency setup, and the pinned Effect research checkout
 2. `./scripts/agent-verify.sh` runs the canonical deterministic and package-surface gates
 3. `./scripts/agent-teardown.sh` records the terminal status on success or failure
 4. `./scripts/agent-run.sh` composes all three and guarantees teardown

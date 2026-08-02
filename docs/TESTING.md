@@ -55,8 +55,10 @@ pnpm exec vp run test:compat
 ## Unattended Agent Lifecycle
 
 The checked-in lifecycle requires stable task and attempt identifiers, validates
-the pinned Node.js and pnpm versions, installs from the frozen lockfile, runs the
-canonical repository and package gates, and always records teardown:
+the pinned Node.js and package-tool versions, installs from the frozen lockfile,
+runs the canonical repository and package gates, and always records teardown.
+It accepts the exact pnpm version used by contributors or the exact Vite+ version
+installed by the repository's CI setup action:
 
 ```bash
 export AGENT_TASK_ID="issue-123"

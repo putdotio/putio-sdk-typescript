@@ -39,11 +39,11 @@ for target in "$@"; do
 done
 
 live_test() {
-  pnpm exec vp pack
+  agent_vp pack
   if [[ "${AGENT_LIVE_REFRESH_TOKENS:-0}" == "1" ]]; then
     node ./scripts/run-live-with-fresh-tokens.ts "$@"
   else
-    pnpm exec vp test run --config vitest.live.config.ts "$@"
+    agent_vp test run --config vitest.live.config.ts "$@"
   fi
 }
 

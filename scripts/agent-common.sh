@@ -26,6 +26,21 @@ agent_record() {
   node ./scripts/agent-record.ts "$@"
 }
 
+agent_vp() {
+  if [[ -x node_modules/.bin/vp ]]; then
+    ./node_modules/.bin/vp "$@"
+    return
+  fi
+
+  if command -v vp >/dev/null 2>&1; then
+    vp "$@"
+    return
+  fi
+
+  echo "Vite+ is unavailable. Run the agent bootstrap or use the repository's setup action." >&2
+  return 2
+}
+
 agent_run_logged() {
   local phase="$1"
   local scenario="$2"

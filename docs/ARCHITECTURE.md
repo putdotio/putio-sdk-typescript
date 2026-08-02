@@ -88,6 +88,9 @@ The Effect client is available as both a factory value and a `PutioSdk` service 
 `makePutioSdkLiveClientLayer(...)` composes the SDK service, SDK config, and fetch-backed transport for the normal live boundary.
 Both clients are assembled from one typed operation tree. The Promise client adapts its Effect operations through one managed runtime per client instance, while keeping lifecycle methods, token replacement, overload-specific signatures, and pure helpers explicit. It exposes `dispose()` so host applications can tear the runtime down explicitly.
 
+Every canonical-tree operation is classified as validated, input-free, or pure. Module initialization rejects an unclassified leaf, so a new request operation must explicitly acknowledge the boundary rule before it can join either public client. Validation remains owned by the domain operation, before transport serialization.
+Overload-specific Promise signatures remain explicit adapters; mixed Effect/pure overloads are unsupported.
+
 ## What This Package Is Not
 
 - not a `putio-js` compatibility wrapper

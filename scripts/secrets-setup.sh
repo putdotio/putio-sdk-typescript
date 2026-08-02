@@ -18,6 +18,7 @@ command -v jq >/dev/null 2>&1 || fail "jq is required"
 command -v sops >/dev/null 2>&1 || fail "sops is required"
 
 [ -f "$ciphertext" ] || fail "ciphertext input must be one regular file"
+[ ! -L "$ciphertext" ] || fail "ciphertext input must not be a symlink"
 case "$output" in
   /*|..|../*|*/../*) fail "SECRETS_OUTPUT must be a repository-relative ignored path" ;;
 esac
@@ -27,7 +28,7 @@ git check-ignore -q -- "$output" || fail "output path is not gitignored: $output
 
 status="$(sops filestatus "$ciphertext" 2>/dev/null)" \
   || fail "SOPS could not inspect ciphertext input"
-printf '%s\n' "$status" | grep -Eq '"encrypted"[[:space:]]*:[[:space:]]*true' \
+printf '%s\n' "$status" | jq -e '.encrypted == true' >/dev/null 2>&1 \
   || fail "ciphertext input is not encrypted"
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/putio-sdk-secrets.XXXXXX")"

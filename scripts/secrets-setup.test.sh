@@ -148,4 +148,13 @@ expect_failure env \
   SECRETS_OUTPUT=README.md \
   bash ./scripts/secrets-setup.sh
 
+symlinked_ciphertext="$tmp_dir/symlinked.sops.env"
+ln -s "$ciphertext" "$symlinked_ciphertext"
+expect_failure env \
+  PATH="$tmp_dir/bin:$PATH" \
+  FAKE_SOPS_PAYLOAD="$payload" \
+  PUTIO_SDK_TYPESCRIPT_SOPS_FILE="$symlinked_ciphertext" \
+  SECRETS_OUTPUT="$output" \
+  bash ./scripts/secrets-setup.sh
+
 printf 'ok SOPS setup renders validated ignored output and fails closed\n'

@@ -45,7 +45,7 @@
     "dev": "vp pack --watch",
     "lint:package": "vp pack && publint --pack pnpm && attw --pack . --profile esm-only",
     "lint:unused": "knip",
-    "lint:unused:prod": "vp pack && knip --production",
+    "lint:unused:prod": "vp pack && knip --production --no-gitignore",
     "prepare": "./scripts/prepare-effect.sh",
     "prepack": "vp pack",
     "secrets:setup": "bash ./scripts/secrets-setup.sh",

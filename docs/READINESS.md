@@ -23,9 +23,9 @@ of four decisions for each audited public route: `sdk`, `equivalent`, `excluded`
 `investigate`. `vp run verify` validates its shape, rejects internal or duplicate routes, and
 checks every named operation on both Effect and Promise clients.
 
-The matrix is currently an audited seed, not a completeness claim. Its `investigate` entries are
-linked to the endpoint-parity epic and do not count as supported. Endpoint completeness requires a
-full backend comparison and zero unresolved `investigate` entries.
+The matrix is currently an audited seed, not a completeness claim. Every route in the seed has a
+final disposition, but endpoint completeness still requires a full backend comparison and zero
+unresolved `investigate` entries in the expanded matrix.
 
 ## Last Full Sweep
 

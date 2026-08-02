@@ -20,6 +20,7 @@ import {
   type PutioSdkConfigShape,
   type PutioSdkContext,
 } from "../core/http.js";
+import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
 const RequestedFlag = Schema.Literal(1);
 const NonNegativeFileIdSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 const PositiveFileIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
@@ -193,6 +194,36 @@ const FilesSearchEnvelopeSchema = Schema.Struct({
   files: Schema.Array(FileBroadSchema),
   status: Schema.Literal("OK"),
   total: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+});
+const FilesListInputSchema = Schema.Struct({
+  parent: Schema.Union([NonNegativeFileIdSchema, Schema.Literal("friends")]),
+  query: FilesListQuerySchema,
+});
+const FilesContinueInputSchema = Schema.Struct({
+  cursor: NonEmptyStringSchema,
+  query: Schema.Struct({
+    per_page: Schema.optional(PositiveIntegerSchema),
+  }),
+});
+const FileGetInputSchema = Schema.Struct({
+  id: NonNegativeFileIdSchema,
+  query: Schema.optional(FileQuerySchema),
+});
+const FilesSearchContinueInputSchema = Schema.Struct({
+  cursor: NonEmptyStringSchema,
+  query: Schema.Struct({
+    per_page: Schema.optional(PositiveIntegerSchema),
+  }),
+});
+const FileSubtitlesInputSchema = Schema.Struct({
+  fileId: PositiveFileIdSchema,
+  options: Schema.Struct({
+    languages: Schema.optional(Schema.Array(NonEmptyStringSchema).check(Schema.isMinLength(1))),
+  }),
+});
+const FileNextInputSchema = Schema.Struct({
+  fileId: PositiveFileIdSchema,
+  fileType: FileTypeSchema,
 });
 const FileCreateFolderInputSchema = Schema.Struct({
   name: Schema.optional(Schema.String),
@@ -877,34 +908,41 @@ export const queryFiles = (
   parent: number | "friends",
   query: FilesListQuery = {},
 ): Effect.Effect<FileListResponse, QueryFilesError, PutioSdkContext> =>
-  requestJson(FilesListEnvelopeSchema, {
-    method: "GET",
-    path: parent === "friends" ? "/v2/files/list/items-shared-with-you" : "/v2/files/list",
-    query:
-      parent === "friends"
-        ? query
-        : {
-            ...query,
-            parent_id: parent,
-          },
-  }).pipe(withOperationErrors(QueryFilesErrorSpec));
+  decodeAndRun(FilesListInputSchema, { parent, query }, (decodedInput) =>
+    requestJson(FilesListEnvelopeSchema, {
+      method: "GET",
+      path:
+        decodedInput.parent === "friends"
+          ? "/v2/files/list/items-shared-with-you"
+          : "/v2/files/list",
+      query:
+        decodedInput.parent === "friends"
+          ? decodedInput.query
+          : {
+              ...decodedInput.query,
+              parent_id: decodedInput.parent,
+            },
+    }),
+  ).pipe(withOperationErrors(QueryFilesErrorSpec));
 export const continueFiles = (
   cursor: string,
   query: {
     readonly per_page?: number;
   } = {},
 ): Effect.Effect<FileListContinuationResponse, ContinueFilesError, PutioSdkContext> =>
-  requestJson(FilesListContinueEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        cursor,
+  decodeAndRun(FilesContinueInputSchema, { cursor, query }, (decodedInput) =>
+    requestJson(FilesListContinueEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          cursor: decodedInput.cursor,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/files/list/continue",
-    query,
-  }).pipe(withOperationErrors(ContinueFilesErrorSpec));
+      method: "POST",
+      path: "/v2/files/list/continue",
+      query: decodedInput.query,
+    }),
+  ).pipe(withOperationErrors(ContinueFilesErrorSpec));
 export function getFile(input: {
   readonly id: number;
 }): Effect.Effect<FileCore, GetFileError | PutioValidationError, PutioSdkContext>;
@@ -913,22 +951,16 @@ export function getFile<TQuery extends FileQuery>(input: {
   readonly query: TQuery;
 }): Effect.Effect<FileResponseFor<TQuery>, GetFileError | PutioValidationError, PutioSdkContext>;
 export function getFile(input: { readonly id: number; readonly query?: FileQuery | null }) {
-  if (input.query === null) {
-    return Effect.fail(
-      new PutioValidationError({
-        cause: "getFile query must be an object when provided",
-      }),
-    );
-  }
-  const effect = requestJson(FileEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/files/${encodePathSegment(input.id)}`,
-    query: input.query,
-  }).pipe(selectJsonField("file"), withOperationErrors(GetFileErrorSpec));
-  if (input.query === undefined) {
-    return effect;
-  }
-  return ensureFileQueryFields(effect, input.query);
+  return decodeAndRun(FileGetInputSchema, input, (decodedInput) => {
+    const effect = requestJson(FileEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedInput.id)}`,
+      query: decodedInput.query,
+    }).pipe(selectJsonField("file"), withOperationErrors(GetFileErrorSpec));
+    return decodedInput.query === undefined
+      ? effect
+      : ensureFileQueryFields(effect, decodedInput.query);
+  });
 }
 export function getFileChild(input: {
   readonly name: string;
@@ -1038,17 +1070,19 @@ export const continueSearch = (
     readonly per_page?: number;
   } = {},
 ): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
-  requestJson(FilesSearchEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        cursor,
+  decodeAndRun(FilesSearchContinueInputSchema, { cursor, query }, (decodedInput) =>
+    requestJson(FilesSearchEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          cursor: decodedInput.cursor,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/files/search/continue",
-    query,
-  }).pipe(withOperationErrors(SearchFilesErrorSpec));
+      method: "POST",
+      path: "/v2/files/search/continue",
+      query: decodedInput.query,
+    }),
+  ).pipe(withOperationErrors(SearchFilesErrorSpec));
 export const setFileSort = (
   input: FileSetSortInput,
 ): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
@@ -1181,17 +1215,21 @@ export const moveFileSelection = (
 export const getStartFrom = (
   fileId: number,
 ): Effect.Effect<number, StartFromError, PutioSdkContext> =>
-  requestJson(FileStartFromEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/files/${encodePathSegment(fileId)}/start-from`,
-  }).pipe(selectJsonField("start_from"), withOperationErrors(StartFromErrorSpec));
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestJson(FileStartFromEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/start-from`,
+    }),
+  ).pipe(selectJsonField("start_from"), withOperationErrors(StartFromErrorSpec));
 export const getDownloadUrl = (
   fileId: number,
 ): Effect.Effect<string, DownloadUrlError, PutioSdkContext> =>
-  requestJson(FileDownloadUrlEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/files/${encodePathSegment(fileId)}/url`,
-  }).pipe(selectJsonField("url"), withOperationErrors(DownloadUrlErrorSpec));
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestJson(FileDownloadUrlEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/url`,
+    }),
+  ).pipe(selectJsonField("url"), withOperationErrors(DownloadUrlErrorSpec));
 export const getApiDownloadUrl = (
   fileId: number,
   options: FileApiDownloadUrlOptions = {},
@@ -1253,15 +1291,17 @@ export const listFileSubtitles = (
   FileSubtitlesError,
   PutioSdkContext
 > =>
-  requestJson(FileSubtitlesEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/files/${encodePathSegment(fileId)}/subtitles`,
-    query: options.languages
-      ? {
-          languages: joinCsv(options.languages),
-        }
-      : undefined,
-  }).pipe(withOperationErrors(FileSubtitlesErrorSpec));
+  decodeAndRun(FileSubtitlesInputSchema, { fileId, options }, (decodedInput) =>
+    requestJson(FileSubtitlesEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedInput.fileId)}/subtitles`,
+      query: decodedInput.options.languages
+        ? {
+            languages: joinCsv(decodedInput.options.languages),
+          }
+        : undefined,
+    }),
+  ).pipe(withOperationErrors(FileSubtitlesErrorSpec));
 export const setStartFrom = (
   input: FileStartFromSetInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, StartFromError, PutioSdkContext> =>
@@ -1285,10 +1325,12 @@ export const resetStartFrom = (
 export const getMp4Status = (
   fileId: number,
 ): Effect.Effect<FileConversionStatus, FileMp4Error, PutioSdkContext> =>
-  requestJson(FileConversionStatusEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/files/${encodePathSegment(fileId)}/mp4`,
-  }).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestJson(FileConversionStatusEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/mp4`,
+    }),
+  ).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
 export const convertFileToMp4 = (
   fileId: number,
 ): Effect.Effect<FileConversionStatus, FileMp4Error, PutioSdkContext> =>
@@ -1395,20 +1437,24 @@ export const findNextFile = (
   fileId: number,
   fileType: FileType,
 ): Effect.Effect<Schema.Schema.Type<typeof FilesNextFileSchema>, PutioSdkError, PutioSdkContext> =>
-  requestJson(FilesNextFileEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/files/${encodePathSegment(fileId)}/next-file`,
-    query: {
-      file_type: fileType,
-    },
-  }).pipe(selectJsonField("next_file"));
+  decodeAndRun(FileNextInputSchema, { fileId, fileType }, (decodedInput) =>
+    requestJson(FilesNextFileEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedInput.fileId)}/next-file`,
+      query: {
+        file_type: decodedInput.fileType,
+      },
+    }),
+  ).pipe(selectJsonField("next_file"));
 export const findNextVideo = (
   fileId: number,
 ): Effect.Effect<Schema.Schema.Type<typeof FilesNextFileSchema>, PutioSdkError, PutioSdkContext> =>
-  requestJson(FilesNextVideoEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/files/${encodePathSegment(fileId)}/next-video`,
-  }).pipe(selectJsonField("next_video"));
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestJson(FilesNextVideoEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/next-video`,
+    }),
+  ).pipe(selectJsonField("next_video"));
 export const createFileUploadRequest = (
   input: FileUploadInput,
   options: {

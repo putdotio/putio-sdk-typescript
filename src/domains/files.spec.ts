@@ -314,20 +314,17 @@ describe("files domain", () => {
 
     expect(
       await runSdkEffect(
-        // @ts-expect-error This covers untyped JavaScript callers.
-        files.getFile({
-          id: "1/../../account/info",
-        }),
+        files.getFile({ id: 0 }),
         (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/files/1%2F..%2F..%2Faccount%2Finfo");
+          expect(request.url).toBe("https://api.put.io/v2/files/0");
           return jsonResponse({
-            file: baseFile,
+            file: { ...baseFile, id: 0, name: "Root" },
             status: "OK",
           });
         },
         { accessToken: "token-123" },
       ),
-    ).toMatchObject({ id: 9 });
+    ).toMatchObject({ id: 0, name: "Root" });
 
     const file = await runSdkEffect(
       files.getFile({
@@ -381,20 +378,6 @@ describe("files domain", () => {
     expect(file.content_type_and_codecs).toContain("codecs");
     expect(file.media_info?.mime_type).toBe("video/mp4");
     expect(file.video_metadata?.width).toBe(1280);
-
-    const nullQueryExit = await runSdkExit(
-      // @ts-expect-error This covers untyped JavaScript callers.
-      files.getFile({
-        id: 9,
-        query: null,
-      }),
-      () => {
-        throw new Error("request should not execute");
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(expectFailure(nullQueryExit)).toBeInstanceOf(PutioValidationError);
 
     const validationExit = await runSdkExit(
       files.getFile({
@@ -695,6 +678,64 @@ describe("files domain", () => {
         { accessToken: "token-123" },
       ),
     ).toEqual([]);
+  });
+
+  it("rejects invalid file read inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+
+    const failures = await Promise.all([
+      runSdkExit(files.queryFiles(-1), handler, { accessToken: "token-123" }),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can supply excess query properties.
+        files.queryFiles(0, { unexpected: true }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(files.continueFiles(""), handler, { accessToken: "token-123" }),
+      runSdkExit(files.continueFiles("cursor", { per_page: 0 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can supply non-numeric file IDs.
+        files.getFile({ id: "1/../../account/info" }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can supply null query values.
+        files.getFile({ id: 9, query: null }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(files.continueSearch(""), handler, { accessToken: "token-123" }),
+      runSdkExit(files.continueSearch("cursor", { per_page: 0 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.getStartFrom(0), handler, { accessToken: "token-123" }),
+      runSdkExit(files.getDownloadUrl(0), handler, { accessToken: "token-123" }),
+      runSdkExit(files.listFileSubtitles(0), handler, { accessToken: "token-123" }),
+      runSdkExit(files.listFileSubtitles(9, { languages: [] }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.getMp4Status(0), handler, { accessToken: "token-123" }),
+      runSdkExit(files.findNextFile(0, "VIDEO"), handler, { accessToken: "token-123" }),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can supply unknown file types.
+        files.findNextFile(9, "MOVIE"),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(files.findNextVideo(0), handler, { accessToken: "token-123" }),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
   });
 
   it("covers playback, subtitle, conversion, extraction, and next-file helpers", async () => {

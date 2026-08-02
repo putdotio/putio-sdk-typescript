@@ -1,5 +1,6 @@
-import { PutioOperationError } from "../core/errors.js";
-import { Schema } from "effect";
+import { PutioOperationError, PutioValidationError } from "../core/errors.js";
+import { Effect, Schema } from "effect";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vite-plus/test";
 
 import * as configDomain from "./config.js";
@@ -19,6 +20,16 @@ import {
   runSdkEffect,
   runSdkExit,
 } from "../../test/support/sdk-test.js";
+
+const inMemoryJsonResponse = (body: unknown): Response => {
+  const response = new Response(null, {
+    headers: { "content-type": "application/json" },
+  });
+  Object.defineProperty(response, "json", {
+    value: async () => body,
+  });
+  return response;
+};
 
 const sharedFile = {
   content_type: null,
@@ -52,24 +63,81 @@ describe("supporting domain boundaries", () => {
       nested: { enabled: true },
     });
     expect(() => decodeJsonValue(() => "nope")).toThrow("Expected a JSON-compatible value");
+    expect(() => decodeJsonValue(Number.NaN)).toThrow("Expected a JSON-compatible value");
+    expect(() => decodeJsonValue(Number.POSITIVE_INFINITY)).toThrow(
+      "Expected a JSON-compatible value",
+    );
+    expect(() => decodeJsonObject(new Date())).toThrow("Expected a JSON object");
+    const cyclicValue: { self?: unknown } = {};
+    cyclicValue.self = cyclicValue;
+    expect(() => decodeJsonValue(cyclicValue)).toThrow("Expected a JSON-compatible value");
+    const sparseValue: Array<configDomain.PutioJsonValue> = [];
+    sparseValue.length = 1;
+    expect(() => decodeJsonValue(sparseValue)).toThrow("Expected a JSON-compatible value");
+    let lengthReads = 0;
+    const lengthSpoof = new Proxy([Number.NaN], {
+      get: (target, key, receiver) => {
+        if (key === "length") {
+          lengthReads += 1;
+          return 0;
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    expect(() => decodeJsonValue(lengthSpoof)).toThrow("Expected a JSON-compatible value");
+    expect(lengthReads).toBe(0);
+    const customArrayPrototype = Object.create(Array.prototype);
+    const customPrototypeArray = ["sdk"];
+    Object.setPrototypeOf(customPrototypeArray, customArrayPrototype);
+    expect(() => decodeJsonValue(customPrototypeArray)).toThrow("Expected a JSON-compatible value");
+    const forgedArrayPrototype: Record<string, unknown> = Object.create(null);
+    Object.defineProperty(forgedArrayPrototype, "constructor", { value: Array });
+    const forgedPrototypeArray = ["sdk"];
+    Object.setPrototypeOf(forgedPrototypeArray, forgedArrayPrototype);
+    expect(() => decodeJsonValue(forgedPrototypeArray)).toThrow("Expected a JSON-compatible value");
+    const crossRealmArray: unknown = runInNewContext(`["sdk", 1, false]`);
+    expect(decodeJsonValue(crossRealmArray)).toEqual(["sdk", 1, false]);
+    let getterCalls = 0;
+    const accessorValue: configDomain.PutioJsonObject = {};
+    Object.defineProperty(accessorValue, "count", {
+      enumerable: true,
+      get: () => {
+        getterCalls += 1;
+        return 1;
+      },
+    });
+    const accessorExit = Effect.runSyncExit(
+      Schema.decodeUnknownEffect(configDomain.JsonObjectSchema)(accessorValue),
+    );
+    expect(accessorExit._tag).toBe("Failure");
+    expect(getterCalls).toBe(0);
+    const crossRealmConfig: unknown = runInNewContext(`({ locale: "en" })`);
+    expect(decodeJsonObject(crossRealmConfig)).toEqual({ locale: "en" });
+    const customPrototype: Record<string, unknown> = Object.create(null);
+    customPrototype.inherited = true;
+    const customPrototypeConfig: Record<string, unknown> = Object.create(customPrototype);
+    customPrototypeConfig.locale = "en";
+    expect(() => decodeJsonObject(customPrototypeConfig)).toThrow("Expected a JSON object");
+    const forgedPrototype: Record<string, unknown> = Object.create(null);
+    Object.defineProperty(forgedPrototype, "constructor", { value: Object });
+    const forgedPrototypeConfig: Record<string, unknown> = Object.create(forgedPrototype);
+    forgedPrototypeConfig.locale = "en";
+    expect(() => decodeJsonObject(forgedPrototypeConfig)).toThrow("Expected a JSON object");
     expect(() => decodeJsonObject(["nope"])).toThrow("Expected a JSON object");
 
-    expect(
-      await runSdkEffect(
-        configDomain.readConfig(),
-        () =>
-          jsonResponse({
-            config: {
-              nested: {
-                enabled: true,
-              },
-              theme: "dark",
-            },
-            status: "OK",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toEqual({
+    const responseConfig = {
+      nested: {
+        enabled: true,
+      },
+      theme: "dark",
+    };
+    const configResponse = inMemoryJsonResponse({ config: responseConfig, status: "OK" });
+    const decodedConfig = await runSdkEffect(configDomain.readConfig(), () => configResponse, {
+      accessToken: "token-123",
+    });
+
+    expect(decodedConfig).toBe(responseConfig);
+    expect(decodedConfig).toEqual({
       nested: {
         enabled: true,
       },
@@ -90,12 +158,19 @@ describe("supporting domain boundaries", () => {
       ),
     ).toEqual({ locale: "en" });
 
+    const configInput: configDomain.PutioJsonObject = { locale: "en" };
+    let descriptorWalks = 0;
+    const trackedConfig = new Proxy(configInput, {
+      ownKeys: (target) => {
+        descriptorWalks += 1;
+        return Reflect.ownKeys(target);
+      },
+    });
     expect(
       await runSdkEffect(
-        configDomain.writeConfig({
-          locale: "en",
-        }),
+        configDomain.writeConfig(trackedConfig),
         (request) => {
+          Object.defineProperty(configInput, "locale", { value: "tr" });
           expect(getJsonBody(request)).toEqual({
             config: {
               locale: "en",
@@ -106,6 +181,7 @@ describe("supporting domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toEqual({ status: "OK" });
+    expect(descriptorWalks).toBe(1);
 
     expect(
       await runSdkEffect(
@@ -117,6 +193,25 @@ describe("supporting domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toBe("dark");
+
+    const responseValue = { enabled: true };
+    const valueResponse = inMemoryJsonResponse({ status: "OK", value: responseValue });
+    const decodedValue = await runSdkEffect(
+      configDomain.getConfigKey("feature"),
+      () => valueResponse,
+      { accessToken: "token-123" },
+    );
+
+    expect(decodedValue).toBe(responseValue);
+
+    const responseArray = ["sdk", 1, false, null];
+    const decodedArray = await runSdkEffect(
+      configDomain.getConfigKey("array"),
+      () => inMemoryJsonResponse({ status: "OK", value: responseArray }),
+      { accessToken: "token-123" },
+    );
+
+    expect(decodedArray).toBe(responseArray);
 
     expect(
       await runSdkEffect(
@@ -168,6 +263,206 @@ describe("supporting domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toEqual({ status: "OK" });
+
+    let requestCount = 0;
+    const invalidHandler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const invalidConfig = expectFailure(
+      await runSdkExit(configDomain.writeConfig({ count: Number.NaN }), invalidHandler),
+    );
+    const cyclicConfig = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply cyclic objects.
+        configDomain.writeConfig(cyclicValue),
+        invalidHandler,
+      ),
+    );
+    const revokedConfig = Proxy.revocable<configDomain.PutioJsonObject>({}, {});
+    revokedConfig.revoke();
+    const revokedConfigFailure = expectFailure(
+      await runSdkExit(configDomain.writeConfig(revokedConfig.proxy), invalidHandler),
+    );
+    const emptyGetKey = expectFailure(
+      await runSdkExit(configDomain.getConfigKey(""), invalidHandler),
+    );
+    const dotGetKey = expectFailure(
+      await runSdkExit(configDomain.getConfigKey(".."), invalidHandler),
+    );
+    const malformedGetKey = expectFailure(
+      await runSdkExit(configDomain.getConfigKey("\uD800"), invalidHandler),
+    );
+    const emptyTypedGetKey = expectFailure(
+      await runSdkExit(
+        configDomain.getConfigKeyWith("", configDomain.JsonValueSchema),
+        invalidHandler,
+      ),
+    );
+    const invalidSetValue = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply non-JSON values.
+        configDomain.setConfigKey("theme", undefined),
+        invalidHandler,
+      ),
+    );
+    const fakeSecret = "sdk-fake-secret-for-redaction";
+    const sensitiveInvalidValue = { invalid: undefined, token: fakeSecret };
+    const sensitiveInvalidError = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply objects containing non-JSON values.
+        configDomain.setConfigKey("credentials", sensitiveInvalidValue),
+        invalidHandler,
+      ),
+    );
+    const sparseSetValue = expectFailure(
+      await runSdkExit(configDomain.setConfigKey("sparse", sparseValue), invalidHandler),
+    );
+    const accessorConfig = expectFailure(
+      await runSdkExit(configDomain.writeConfig(accessorValue), invalidHandler),
+    );
+    const emptySetKey = expectFailure(
+      await runSdkExit(configDomain.setConfigKey("", "light"), invalidHandler),
+    );
+    const dotSetKey = expectFailure(
+      await runSdkExit(configDomain.setConfigKey(".", "light"), invalidHandler),
+    );
+    const emptyDeleteKey = expectFailure(
+      await runSdkExit(configDomain.deleteConfigKey(""), invalidHandler),
+    );
+    const dotDeleteKey = expectFailure(
+      await runSdkExit(configDomain.deleteConfigKey(".."), invalidHandler),
+    );
+
+    expect(invalidConfig).toBeInstanceOf(PutioValidationError);
+    expect(cyclicConfig).toBeInstanceOf(PutioValidationError);
+    expect(revokedConfigFailure).toBeInstanceOf(PutioValidationError);
+    expect(emptyGetKey).toBeInstanceOf(PutioValidationError);
+    expect(dotGetKey).toBeInstanceOf(PutioValidationError);
+    expect(malformedGetKey).toBeInstanceOf(PutioValidationError);
+    expect(emptyTypedGetKey).toBeInstanceOf(PutioValidationError);
+    expect(invalidSetValue).toBeInstanceOf(PutioValidationError);
+    expect(sensitiveInvalidError).toBeInstanceOf(PutioValidationError);
+    expect(String(sensitiveInvalidError.cause)).not.toContain(fakeSecret);
+    expect(sparseSetValue).toBeInstanceOf(PutioValidationError);
+    expect(accessorConfig).toBeInstanceOf(PutioValidationError);
+    expect(emptySetKey).toBeInstanceOf(PutioValidationError);
+    expect(dotSetKey).toBeInstanceOf(PutioValidationError);
+    expect(emptyDeleteKey).toBeInstanceOf(PutioValidationError);
+    expect(dotDeleteKey).toBeInstanceOf(PutioValidationError);
+    expect(getterCalls).toBe(0);
+    expect(requestCount).toBe(0);
+  });
+
+  it("rejects invalid config response values", async () => {
+    const cyclicValue: { self?: unknown } = {};
+    cyclicValue.self = cyclicValue;
+    const sparseValue: Array<unknown> = [];
+    sparseValue.length = 1;
+    const accessorValue = {};
+    Object.defineProperty(accessorValue, "value", {
+      enumerable: true,
+      get: () => 1,
+    });
+    const forgedPrototype: Record<string, unknown> = Object.create(null);
+    Object.defineProperty(forgedPrototype, "constructor", { value: Object });
+    const forgedValue: Record<string, unknown> = Object.create(forgedPrototype);
+    forgedValue.enabled = true;
+    const lengthSpoof = new Proxy([Number.NaN], {
+      get: (target, key, receiver) => (key === "length" ? 0 : Reflect.get(target, key, receiver)),
+    });
+    const customPrototypeArray = ["sdk"];
+    Object.setPrototypeOf(customPrototypeArray, Object.create(Array.prototype));
+    const invalidValues = [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      () => "nope",
+      cyclicValue,
+      sparseValue,
+      accessorValue,
+      forgedValue,
+      lengthSpoof,
+      customPrototypeArray,
+      new Date(),
+    ];
+    const failures = await Promise.all(
+      invalidValues.map((value) =>
+        runSdkExit(
+          configDomain.getConfigKey("invalid"),
+          () => inMemoryJsonResponse({ status: "OK", value }),
+          { accessToken: "token-123" },
+        ),
+      ),
+    );
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+
+    let fullConfigRequestCount = 0;
+    const fullConfigFailure = expectFailure(
+      await runSdkExit(
+        configDomain.readConfig(),
+        () => {
+          fullConfigRequestCount += 1;
+          return inMemoryJsonResponse({ config: new Date(), status: "OK" });
+        },
+        { accessToken: "token-123" },
+      ),
+    );
+
+    expect(fullConfigFailure).toBeInstanceOf(PutioValidationError);
+    expect(fullConfigRequestCount).toBe(1);
+
+    let envelopeGetterCalls = 0;
+    const valueEnvelope = { status: "OK" };
+    Object.defineProperty(valueEnvelope, "value", {
+      enumerable: true,
+      get: () => {
+        envelopeGetterCalls += 1;
+        return "unsafe";
+      },
+    });
+    const configEnvelope = { status: "OK" };
+    Object.defineProperty(configEnvelope, "config", {
+      enumerable: true,
+      get: () => {
+        envelopeGetterCalls += 1;
+        return {};
+      },
+    });
+    const valueEnvelopeFailure = expectFailure(
+      await runSdkExit(
+        configDomain.getConfigKey("accessor"),
+        () => inMemoryJsonResponse(valueEnvelope),
+        { accessToken: "token-123" },
+      ),
+    );
+    const configEnvelopeFailure = expectFailure(
+      await runSdkExit(configDomain.readConfig(), () => inMemoryJsonResponse(configEnvelope), {
+        accessToken: "token-123",
+      }),
+    );
+    const typedValueFailure = expectFailure(
+      await runSdkExit(
+        configDomain.getConfigKeyWith("typed-invalid", Schema.Unknown),
+        () => inMemoryJsonResponse({ status: "OK", value: new Date() }),
+        { accessToken: "token-123" },
+      ),
+    );
+    const typedConfigFailure = expectFailure(
+      await runSdkExit(
+        configDomain.readConfigWith(Schema.Unknown),
+        () => inMemoryJsonResponse({ config: new Date(), status: "OK" }),
+        { accessToken: "token-123" },
+      ),
+    );
+
+    expect(valueEnvelopeFailure).toBeInstanceOf(PutioValidationError);
+    expect(configEnvelopeFailure).toBeInstanceOf(PutioValidationError);
+    expect(typedValueFailure).toBeInstanceOf(PutioValidationError);
+    expect(typedConfigFailure).toBeInstanceOf(PutioValidationError);
+    expect(envelopeGetterCalls).toBe(0);
   });
 
   it("covers download links and events", async () => {

@@ -133,12 +133,15 @@ Use `makePutioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioH
 ## Side-By-Side Usage
 
 Both client styles expose the same domain surface. The Promise client also exposes
-`dispose()` for runtime teardown and `files.createUploadFormData(...)` for pure
-FormData construction.
+`setAccessToken(...)` for token rotation, `dispose()` for runtime teardown, and
+`files.createUploadFormData(...)` for pure FormData construction.
 
 ```ts
 promiseClient.files.list(0, { per_page: 20 });
 effectClient.files.list(0, { per_page: 20 });
+
+promiseClient.setAccessToken(refreshedAccessToken);
+promiseClient.setAccessToken(undefined);
 ```
 
 Choose the Promise client when you want standard async functions.
@@ -157,6 +160,7 @@ Effect is the canonical typed surface. The Promise client is an adapter for envi
 - Authenticated endpoints need a token through client config or the Effect layer config
 - Effect client: keeps errors in the Effect error channel with operation-specific typing
 - Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`
+- Promise client: rotates or clears credentials synchronously with `setAccessToken(...)`; each operation uses the token active when it is invoked
 - Promise client: owns a managed Effect runtime and exposes `dispose()` for explicit teardown
 
 If you create a long-lived Promise client in a script, test harness, or server integration, call `await sdk.dispose()` during teardown.

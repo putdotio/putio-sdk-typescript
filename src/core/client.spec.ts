@@ -91,6 +91,7 @@ describe("sdk client factories", () => {
 
     expect(client.dispose).toBeTypeOf("function");
     expect(client.account.appSpecificPasswords.create).toBeTypeOf("function");
+    expect(client.setAccessToken).toBeTypeOf("function");
     expect(client.account.getInfo).toBeTypeOf("function");
     expect(client.account.listSubtitleLanguages).toBeTypeOf("function");
     expect(client.auth.getCode).toBeTypeOf("function");
@@ -110,6 +111,7 @@ describe("sdk client factories", () => {
     expect(promisePaths.filter((path) => !effectPaths.includes(path)).sort()).toEqual([
       "dispose",
       "files.createUploadFormData",
+      "setAccessToken",
     ]);
   });
 
@@ -242,6 +244,150 @@ describe("sdk client factories", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(9);
+  });
+
+  it("updates the Promise access token before and after runtime creation", async () => {
+    const authorizations: Array<string | null> = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      authorizations.push(new Headers(init?.headers).get("authorization"));
+      return new Response(JSON.stringify({ status: "OK" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const initialConfig = { accessToken: "initial-token" };
+    const activeClient = createPutioSdkPromiseClient(initialConfig);
+
+    await expect(activeClient.config.deleteKey("initial")).resolves.toEqual({ status: "OK" });
+    activeClient.setAccessToken("replacement-token");
+    await expect(activeClient.config.deleteKey("replacement")).resolves.toEqual({ status: "OK" });
+    activeClient.setAccessToken(undefined);
+    await expect(activeClient.config.deleteKey("cleared")).rejects.toMatchObject({
+      _tag: "PutioConfigurationError",
+    });
+
+    const beforeFirstRequestClient = createPutioSdkPromiseClient(initialConfig);
+    beforeFirstRequestClient.setAccessToken("before-first-request-token");
+    await expect(beforeFirstRequestClient.config.deleteKey("before-first")).resolves.toEqual({
+      status: "OK",
+    });
+
+    expect(authorizations).toEqual([
+      "Token initial-token",
+      "Token replacement-token",
+      "Token before-first-request-token",
+    ]);
+    expect(initialConfig).toEqual({ accessToken: "initial-token" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await activeClient.dispose();
+    await beforeFirstRequestClient.dispose();
+  });
+
+  it("snapshots caller-owned Promise client URLs", async () => {
+    const requestedUrls: Array<string> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      requestedUrls.push(
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      );
+      return new Response(JSON.stringify({ status: "OK" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const baseUrl = new Proxy(new URL("https://api.snapshot.test"), {
+      get: (target, key) => Reflect.get(target, key, target),
+      getPrototypeOf: () => null,
+      set: (target, key, value) => Reflect.set(target, key, value, target),
+    });
+    const uploadBaseUrl = new URL("https://upload.snapshot.test");
+    const webAppUrl = new URL("https://app.snapshot.test");
+    expect(baseUrl).not.toBeInstanceOf(URL);
+    const client = createPutioSdkPromiseClient({
+      accessToken: "token-123",
+      baseUrl,
+      uploadBaseUrl,
+      webAppUrl,
+    });
+
+    baseUrl.hostname = "api.mutated.test";
+    uploadBaseUrl.hostname = "upload.mutated.test";
+    webAppUrl.hostname = "app.mutated.test";
+
+    await expect(client.config.deleteKey("snapshot")).resolves.toEqual({ status: "OK" });
+    const uploadRequest = await client.files.createUploadRequest({
+      file: new Blob(["snapshot"]),
+    });
+    const loginUrl = client.auth.buildLoginUrl({
+      clientId: 1,
+      redirectUri: "https://consumer.test/callback",
+      state: "snapshot",
+    });
+
+    expect(requestedUrls).toEqual(["https://api.snapshot.test/v2/config/snapshot"]);
+    expect(uploadRequest.url).toBe(
+      "https://upload.snapshot.test/v2/files/upload?oauth_token=token-123",
+    );
+    expect(new URL(loginUrl).origin).toBe("https://app.snapshot.test");
+
+    await client.dispose();
+  });
+
+  it("snapshots the Promise access token when an operation is invoked", async () => {
+    const authorizations = new Map<string, string | null>();
+    let markFirstStarted: (() => void) | undefined;
+    let releaseFirst: (() => void) | undefined;
+    const firstStarted = new Promise<void>((resolve) => {
+      markFirstStarted = resolve;
+    });
+    const firstReleased = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url =
+        typeof input === "string"
+          ? new URL(input)
+          : input instanceof URL
+            ? input
+            : new URL(input.url);
+      authorizations.set(url.pathname, new Headers(init?.headers).get("authorization"));
+
+      if (url.pathname === "/v2/config/first") {
+        markFirstStarted?.();
+        await firstReleased;
+      }
+
+      return new Response(JSON.stringify({ status: "OK" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createPutioSdkPromiseClient({ accessToken: "first-token" });
+    const firstRequest = client.config.deleteKey("first");
+    client.setAccessToken("second-token");
+
+    await firstStarted;
+    const secondRequest = client.config.deleteKey("second");
+    releaseFirst?.();
+
+    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([
+      { status: "OK" },
+      { status: "OK" },
+    ]);
+    expect(authorizations).toEqual(
+      new Map([
+        ["/v2/config/first", "Token first-token"],
+        ["/v2/config/second", "Token second-token"],
+      ]),
+    );
+
+    await client.dispose();
   });
 
   it("fails fast after the Promise client runtime is disposed", async () => {

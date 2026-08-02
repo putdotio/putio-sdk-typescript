@@ -189,10 +189,16 @@ const promiseAuthUrl = promiseClient.auth.buildLoginUrl({
   state: "node-smoke",
 });
 const promiseAuthHost = new URL(promiseAuthUrl).host;
+promiseClient.setAccessToken("rotated-compat-token");
 const uploadRequest = await promiseClient.files.createUploadRequest({
   file: new Blob(["hello from node"]),
   fileName: "node.txt",
 });
+const uploadToken = new URL(uploadRequest.url).searchParams.get("oauth_token");
+if (uploadToken !== "rotated-compat-token") {
+  throw new Error("Promise access-token replacement did not reach the upload request");
+}
+promiseClient.setAccessToken(undefined);
 await promiseClient.dispose();
 
 const effectClient = createPutioSdkEffectClient();
@@ -217,6 +223,7 @@ console.log(
     subtitleLanguage: subtitleLanguage.code,
     uploadMethod: uploadRequest.method,
     uploadBody: uploadRequest.body.constructor.name,
+    uploadTokenUpdated: true,
     utility: toHumanFileSize(1_572_864),
     unknownAppSpecificPasswordError,
   }),

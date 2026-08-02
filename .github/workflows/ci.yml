@@ -59,18 +59,18 @@ jobs:
       matrix:
         include:
           - target: node
-            command: node ./scripts/test-compat-node.mts
+            command: node ./scripts/test-compat-node.ts
           - target: browser-chromium
             browser: chromium
-            command: node ./scripts/test-compat-browser.mts
+            command: node ./scripts/test-compat-browser.ts
           - target: browser-firefox
             browser: firefox
-            command: node ./scripts/test-compat-browser.mts
+            command: node ./scripts/test-compat-browser.ts
           - target: browser-webkit
             browser: webkit
-            command: node ./scripts/test-compat-browser.mts
+            command: node ./scripts/test-compat-browser.ts
           - target: bun
-            command: node ./scripts/test-compat-bun.mts
+            command: node ./scripts/test-compat-bun.ts
 
     steps:
       - name: Check out repository

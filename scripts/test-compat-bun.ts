@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { createCompatWorkspace, getRootPackageVersion, run, writeJson } from "./compat-support.mts";
+import { createCompatWorkspace, getRootPackageVersion, run, writeJson } from "./compat-support.ts";
 
 const main = async () => {
   const context = await createCompatWorkspace("putio-sdk-compat-bun");
@@ -29,7 +29,7 @@ import { createPutioSdkEffectClient, createPutioSdkPromiseClient } from "@putdot
 import { toHumanFileSize } from "@putdotio/sdk/utilities";
 
 const promiseClient = createPutioSdkPromiseClient({
-  accessToken: "compat-token",
+  accessToken: "test-token",
 });
 const authUrl = promiseClient.auth.buildLoginUrl({
   clientId: "external-bun",

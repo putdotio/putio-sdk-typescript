@@ -5,7 +5,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { chromium, firefox, webkit } from "playwright";
 import { build } from "vite";
 
-import { createCompatWorkspace, getRootPackageVersion, run, writeJson } from "./compat-support.mts";
+import { createCompatWorkspace, getRootPackageVersion, run, writeJson } from "./compat-support.ts";
 
 type BrowserName = "chromium" | "firefox" | "webkit";
 
@@ -251,7 +251,7 @@ declare global {
 
 const run = async () => {
   const promiseClient = createPutioSdkPromiseClient({
-    accessToken: "compat-token",
+    accessToken: "test-token",
   });
   const authUrl = promiseClient.auth.buildLoginUrl({
     clientId: "external-browser",

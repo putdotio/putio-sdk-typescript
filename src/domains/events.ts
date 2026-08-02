@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { PositiveIntegerSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   mapDecodeErrorToValidationError,
@@ -12,7 +13,6 @@ import {
   requestJson,
   type PutioSdkContext,
 } from "../core/http.js";
-const PositiveIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
 const HistoryEventBaseSchema = Schema.Struct({
   created_at: Schema.String,
   id: Schema.Int,
@@ -223,7 +223,7 @@ export const listEvents = (
 export const deleteEvent = (
   id: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, DeleteEventError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -245,7 +245,7 @@ export const clearEvents = (): Effect.Effect<
 export const getEventTorrent = (
   id: number,
 ): Effect.Effect<Uint8Array, GetEventTorrentError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestArrayBuffer({

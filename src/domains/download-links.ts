@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
+import { PositiveIntegerSchema, makeCursorSelectionSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   mapDecodeErrorToValidationError,
@@ -13,16 +14,7 @@ import {
   type PutioSdkContext,
 } from "../core/http.js";
 export const DownloadLinksStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
-const PositiveIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
-export const DownloadLinksCreateInputSchema = Schema.Struct({
-  cursor: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
-  excludeIds: Schema.optional(Schema.Array(PositiveIdSchema)),
-  ids: Schema.optional(Schema.Array(PositiveIdSchema).check(Schema.isMinLength(1))),
-}).check(
-  Schema.makeFilter((input) => input.cursor !== undefined || input.ids !== undefined, {
-    expected: "a non-empty cursor or file ID selection",
-  }),
-);
+export const DownloadLinksCreateInputSchema = makeCursorSelectionSchema("ids", "excludeIds");
 export const DownloadLinksPayloadSchema = Schema.Struct({
   download_links: Schema.Array(Schema.String),
   media_links: Schema.Array(Schema.String),
@@ -109,7 +101,7 @@ export const createDownloadLinks = (
 export const getDownloadLinks = (
   id: number,
 ): Effect.Effect<DownloadLinksInfo, GetDownloadLinksError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(DownloadLinksInfoSchema, {

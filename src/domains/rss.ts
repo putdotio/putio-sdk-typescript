@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { NonEmptyStringSchema, PositiveIntegerSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   mapDecodeErrorToValidationError,
@@ -13,8 +14,6 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
-const PositiveIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
-const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
 export const RssFeedSchema = Schema.Struct({
   created_at: Schema.String,
   delete_old_files: Schema.Boolean,
@@ -46,12 +45,12 @@ export const RssFeedParamsSchema = Schema.Struct({
   unwanted_keywords: Schema.optional(Schema.String),
 });
 const RssFeedUpdateInputSchema = Schema.Struct({
-  id: PositiveIdSchema,
+  id: PositiveIntegerSchema,
   params: RssFeedParamsSchema,
 });
 const RssFeedItemRetryInputSchema = Schema.Struct({
-  feedId: PositiveIdSchema,
-  itemId: PositiveIdSchema,
+  feedId: PositiveIntegerSchema,
+  itemId: PositiveIntegerSchema,
 });
 const RssFeedItemBaseSchema = Schema.Struct({
   detected_date: Schema.String,
@@ -242,7 +241,7 @@ export const listRssFeeds = (): Effect.Effect<
     path: "/v2/rss/list",
   }).pipe(selectJsonField("feeds"), withOperationErrors(ListRssFeedsErrorSpec));
 export const getRssFeed = (id: number): Effect.Effect<RssFeed, GetRssFeedError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(RssFeedEnvelopeSchema, {
@@ -296,7 +295,7 @@ export const updateRssFeed = (
 export const pauseRssFeed = (
   id: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PauseRssFeedError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -313,7 +312,7 @@ export const resumeRssFeed = (
   ResumeRssFeedError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -330,7 +329,7 @@ export const deleteRssFeed = (
   DeleteRssFeedError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -350,7 +349,7 @@ export const listRssFeedItems = (
   ListRssFeedItemsError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(RssFeedItemsEnvelopeSchema, {
@@ -368,7 +367,7 @@ export const clearRssFeedLogs = (
   ClearRssFeedLogsError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -403,7 +402,7 @@ export const retryAllRssFeedItems = (
   RetryAllRssFeedItemsError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PositiveIdSchema)(feedId).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(feedId).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedFeedId) =>
       requestJson(OkResponseSchema, {

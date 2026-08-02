@@ -1096,10 +1096,6 @@ describe("operational domain boundaries", () => {
       accessToken: "token-123",
     });
 
-    expect(() => trash.restoreTrash({} as never)).toThrow(
-      "trash bulk file_ids are required when useCursor is not set",
-    );
-
     expect(
       await runSdkEffect(
         zips.listZips(),
@@ -1204,6 +1200,55 @@ describe("operational domain boundaries", () => {
         handler,
         { accessToken: "token-123" },
       ),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
+  });
+
+  it("rejects invalid trash and zip inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const failures = await Promise.all([
+      // @ts-expect-error JavaScript callers can provide null instead of a query object.
+      runSdkExit(trash.listTrash(null), handler),
+      runSdkExit(trash.listTrash({ per_page: 0 }), handler),
+      runSdkExit(trash.continueTrash(""), handler),
+      runSdkExit(trash.continueTrash("cursor", { per_page: 0 }), handler),
+      // @ts-expect-error JavaScript callers can provide null instead of a query object.
+      runSdkExit(trash.continueTrash("cursor", null), handler),
+      // @ts-expect-error JavaScript callers can omit both bulk selectors.
+      runSdkExit(trash.restoreTrash({}), handler),
+      runSdkExit(trash.restoreTrash({ cursor: "", useCursor: true }), handler),
+      runSdkExit(trash.restoreTrash({ file_ids: [] }), handler),
+      runSdkExit(
+        // @ts-expect-error Cursor mode cannot also carry explicit file IDs.
+        trash.restoreTrash({ cursor: "cursor", file_ids: [1], useCursor: true }),
+        handler,
+      ),
+      runSdkExit(trash.deleteTrash({ file_ids: [0] }), handler),
+      runSdkExit(
+        // @ts-expect-error File-ID mode cannot also carry a cursor.
+        trash.deleteTrash({ cursor: "cursor", file_ids: [1], useCursor: false }),
+        handler,
+      ),
+      // @ts-expect-error Cursor selection must opt into cursor serialization.
+      runSdkExit(trash.deleteTrash({ cursor: "cursor" }), handler),
+      // @ts-expect-error JavaScript callers can provide null instead of a request object.
+      runSdkExit(zips.createZip(null), handler),
+      // @ts-expect-error JavaScript callers can omit both zip selectors.
+      runSdkExit(zips.createZip({}), handler),
+      runSdkExit(zips.createZip({ cursor: "" }), handler),
+      runSdkExit(zips.createZip({ file_ids: [] }), handler),
+      runSdkExit(zips.createZip({ file_ids: [0] }), handler),
+      runSdkExit(zips.createZip({ cursor: "cursor", exclude_ids: [0] }), handler),
+      runSdkExit(zips.getZip(0), handler),
+      runSdkExit(zips.cancelZip(0), handler),
     ]);
 
     expect(

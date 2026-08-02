@@ -1,6 +1,10 @@
 import { Effect, Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
-import { PositiveIntegerSchema, makeCursorSelectionSchema } from "../core/validation.js";
+import {
+  PositiveIntegerSchema,
+  decodeAndRun,
+  makeCursorSelectionSchema,
+} from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
@@ -8,7 +12,6 @@ import {
 } from "../core/errors.js";
 import {
   OkResponseSchema,
-  decodeAndRun,
   encodePathSegment,
   requestJson,
   selectJsonField,

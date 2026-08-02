@@ -1,7 +1,19 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
+
+import { mapDecodeErrorToValidationError } from "./errors.js";
 
 export const PositiveIntegerSchema = Schema.Int.check(Schema.isGreaterThan(0));
 export const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
+
+export const decodeAndRun = <S extends Schema.Top, A, E, R>(
+  schema: S,
+  input: unknown,
+  run: (decoded: S["Type"]) => Effect.Effect<A, E, R>,
+) =>
+  Schema.decodeUnknownEffect(schema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap(run),
+  );
 
 export const makeCursorSelectionSchema = <
   const TIdsField extends string,

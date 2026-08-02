@@ -6,7 +6,7 @@ const { authClient, oauthClient } = await createClients({
 });
 
 const live = createLiveHarness("ifttt live");
-const { assert, assertOperationError, finish, run, sleep } = live;
+const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
 void sleep;
@@ -58,7 +58,7 @@ await run("ifttt sendEvent negative behavior", async () => {
   }
 });
 
-await run("ifttt sendEvent missing ingredients yields typed 400", async () => {
+await run("ifttt sendEvent rejects missing playback ingredients before transport", async () => {
   try {
     await authClient.ifttt.sendEvent({
       eventType: "playback_started",
@@ -69,12 +69,7 @@ await run("ifttt sendEvent missing ingredients yields typed 400", async () => {
     });
     throw new Error("expected missing ingredients to fail");
   } catch (error) {
-    return assertOperationError(error, {
-      domain: "ifttt",
-      errorType: "MISSING_INGREDIENTS",
-      operation: "sendEvent",
-      statusCode: 400,
-    });
+    return assertErrorTag(error, { tag: "PutioValidationError" });
   }
 });
 

@@ -858,6 +858,9 @@ describe("supporting domain boundaries", () => {
         clientName: "SDK",
         eventType: "playback_started",
         ingredients: {
+          client_id: "sdk",
+          client_name: "SDK",
+          created_at: "2026-08-02T00:00:00Z",
           file_id: 7,
           file_name: "SDK File",
           file_type: "VIDEO",
@@ -868,6 +871,21 @@ describe("supporting domain boundaries", () => {
         expect(body.get("client_name")).toBe("SDK");
         expect(body.get("event_type")).toBe("playback_started");
         expect(body.get("ingredients")).toContain("file_id");
+        expect(body.get("ingredients")).toContain("created_at");
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+
+    await runSdkEffect(
+      ifttt.sendIftttEvent({
+        eventType: "custom_event",
+        ingredients: { nested: { enabled: true } },
+      }),
+      (request) => {
+        const body = getFormBody(request);
+        expect(body.get("event_type")).toBe("custom_event");
+        expect(body.get("ingredients")).toContain('"nested"');
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -898,6 +916,54 @@ describe("supporting domain boundaries", () => {
     ]);
   });
 
+  it("rejects invalid ifttt inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const failures = await Promise.all([
+      // @ts-expect-error JavaScript callers can provide null instead of a request object.
+      runSdkExit(ifttt.sendIftttEvent(null), handler),
+      runSdkExit(ifttt.sendIftttEvent({ eventType: "", ingredients: {} }), handler),
+      runSdkExit(
+        ifttt.sendIftttEvent({
+          eventType: "playback_started",
+          ingredients: { file_id: 7, file_name: "SDK File" },
+        }),
+        handler,
+      ),
+      runSdkExit(
+        ifttt.sendIftttEvent({
+          eventType: "playback_stopped",
+          ingredients: { file_id: 0, file_name: "SDK File", file_type: "VIDEO" },
+        }),
+        handler,
+      ),
+      runSdkExit(
+        ifttt.sendIftttEvent({
+          eventType: "custom_event",
+          ingredients: { created_at: new Date() },
+        }),
+        handler,
+      ),
+      runSdkExit(
+        ifttt.sendIftttEvent({
+          eventType: "custom_event",
+          ingredients: {},
+          // @ts-expect-error JavaScript callers can provide unknown request properties.
+          unexpected: true,
+        }),
+        handler,
+      ),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
+  });
+
   it("maps representative operation failures in supporting domains", async () => {
     const failure = await runSdkExit(
       downloadLinks.getDownloadLinks(9),
@@ -920,6 +986,40 @@ describe("supporting domain boundaries", () => {
       domain: "downloadLinks",
       operation: "get",
       status: 404,
+    });
+
+    const iftttFailure = await runSdkExit(
+      ifttt.sendIftttEvent({
+        eventType: "playback_started",
+        ingredients: {
+          file_id: 7,
+          file_name: "SDK File",
+          file_type: "VIDEO",
+        },
+      }),
+      () =>
+        jsonResponse(
+          {
+            error_message: "Missing ingredients",
+            error_type: "MISSING_INGREDIENTS",
+            status_code: 400,
+          },
+          { status: 400 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    const iftttError = expectFailure(iftttFailure);
+    expect(iftttError).toBeInstanceOf(PutioOperationError);
+    expect(iftttError).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "ifttt",
+      operation: "sendEvent",
+      reason: {
+        errorType: "MISSING_INGREDIENTS",
+        kind: "error_type",
+      },
+      status: 400,
     });
   });
 });

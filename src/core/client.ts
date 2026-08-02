@@ -291,277 +291,406 @@ type PromiseOperation<T> = T extends (...args: infer Args) => infer Result
   ? Result extends Effect.Effect<infer Success, infer _Error, infer _Requirements>
     ? (...args: Args) => Promise<Success>
     : T
-  : T extends object
-    ? { [Key in keyof T]: PromiseOperation<T[Key]> }
-    : T;
+  : never;
 
-const cloneOperationTree = <T extends object>(tree: T): T =>
+type OperationBoundary = "input-free" | "pure" | "validated";
+type Operation = (...args: never[]) => unknown;
+const operationEntryMarker = Symbol("PutioSdkOperationEntry");
+interface OperationEntry<T extends Operation> {
+  readonly [operationEntryMarker]: true;
+  readonly boundary: OperationBoundary;
+  readonly run: T;
+}
+
+type EffectOperation<T extends Operation> =
+  ReturnType<T> extends Effect.Effect<infer _Success, infer _Error, infer _Requirements>
+    ? T
+    : never;
+
+type InputFreeEffectOperation<T extends Operation> =
+  Parameters<T> extends [] ? EffectOperation<T> : never;
+
+type ValidatedEffectOperation<T extends Operation> =
+  Parameters<T> extends [] ? never : EffectOperation<T>;
+
+type EffectReturnMember<T> =
+  T extends Effect.Effect<infer _Success, infer _Error, infer _Requirements> ? T : never;
+
+type PureOperation<T extends Operation> = [EffectReturnMember<ReturnType<T>>] extends [never]
+  ? T
+  : never;
+
+const operationAtBoundary = <T extends Operation>(
+  run: T,
+  boundary: OperationBoundary,
+): OperationEntry<T> => {
+  const entry = { boundary, run };
+  Object.defineProperty(entry, operationEntryMarker, { value: true });
+  return Object.freeze(entry) as OperationEntry<T>;
+};
+
+const inputFree = <T extends Operation>(
+  operation: InputFreeEffectOperation<T>,
+): OperationEntry<T> => operationAtBoundary(operation, "input-free");
+
+const pure = <T extends Operation>(operation: PureOperation<T>): OperationEntry<T> =>
+  operationAtBoundary(operation, "pure");
+
+const validated = <T extends Operation>(
+  operation: ValidatedEffectOperation<T>,
+): OperationEntry<T> => operationAtBoundary(operation, "validated");
+
+type EffectOperationTree<T> =
+  T extends OperationEntry<infer TOperation>
+    ? TOperation
+    : T extends object
+      ? { [Key in keyof T]: EffectOperationTree<T[Key]> }
+      : never;
+
+type PromiseOperationTree<T> =
+  T extends OperationEntry<infer TOperation>
+    ? PromiseOperation<TOperation>
+    : T extends object
+      ? { [Key in keyof T]: PromiseOperationTree<T[Key]> }
+      : never;
+
+const isOperationEntry = (value: unknown): value is OperationEntry<Operation> =>
+  typeof value === "object" &&
+  value !== null &&
+  Object.getPrototypeOf(value) === Object.prototype &&
+  Object.isFrozen(value) &&
+  Object.hasOwn(value, operationEntryMarker) &&
+  value[operationEntryMarker] === true &&
+  Object.hasOwn(value, "boundary") &&
+  Object.hasOwn(value, "run") &&
+  Reflect.ownKeys(value).length === 3 &&
+  (value.boundary === "input-free" ||
+    value.boundary === "pure" ||
+    value.boundary === "validated") &&
+  typeof value.run === "function";
+
+const runClassifiedOperation = (
+  entry: OperationEntry<Operation>,
+  args: ReadonlyArray<unknown>,
+): unknown => {
+  const result: unknown = Reflect.apply(entry.run, undefined, args);
+
+  if (entry.boundary === "pure") {
+    if (Effect.isEffect(result)) {
+      throw new TypeError("Pure SDK operation returned an Effect");
+    }
+
+    return result;
+  }
+
+  if (!Effect.isEffect(result)) {
+    throw new TypeError(`${entry.boundary} SDK operation did not return an Effect`);
+  }
+
+  return result;
+};
+
+const cloneOperationTree = <T extends object>(tree: T): EffectOperationTree<T> =>
   Object.fromEntries(
     Object.entries(tree).map(([key, value]) => [
       key,
-      typeof value === "function" ? value : cloneOperationTree(value as object),
+      isOperationEntry(value) ? value.run : cloneOperationTree(value as object),
     ]),
-  ) as T;
+  ) as EffectOperationTree<T>;
+
+const runPromiseOperation = (
+  entry: OperationEntry<Operation>,
+  state: PutioSdkPromiseState,
+  args: ReadonlyArray<unknown>,
+): unknown => {
+  const result = runClassifiedOperation(entry, args);
+
+  return entry.boundary === "pure"
+    ? result
+    : provideSdk(state, result as Effect.Effect<unknown, unknown, PutioSdkContext>);
+};
 
 const makePromiseOperationTree = <T extends object>(
   tree: T,
   state: PutioSdkPromiseState,
-): PromiseOperation<T> =>
+): PromiseOperationTree<T> =>
   Object.fromEntries(
     Object.entries(tree).map(([key, value]) => [
       key,
-      typeof value === "function"
-        ? (...args: ReadonlyArray<unknown>) => {
-            const result: unknown = Reflect.apply(value, undefined, args);
-
-            return Effect.isEffect(result)
-              ? provideSdk(state, result as Effect.Effect<unknown, unknown, PutioSdkContext>)
-              : result;
-          }
+      isOperationEntry(value)
+        ? (...args: ReadonlyArray<unknown>) => runPromiseOperation(value, state, args)
         : makePromiseOperationTree(value as object, state),
     ]),
-  ) as PromiseOperation<T>;
+  ) as PromiseOperationTree<T>;
+
+const assertClassifiedOperationTree = (tree: object, parentPath = ""): void => {
+  const entries = Object.entries(tree);
+
+  if (Object.getPrototypeOf(tree) !== Object.prototype || entries.length === 0) {
+    throw new TypeError(
+      `SDK operation namespace ${parentPath || "<root>"} is not a non-empty plain object`,
+    );
+  }
+
+  for (const [key, value] of entries) {
+    const path = parentPath ? `${parentPath}.${key}` : key;
+
+    if (isOperationEntry(value)) {
+      continue;
+    }
+
+    if (typeof value === "object" && value !== null) {
+      assertClassifiedOperationTree(value as object, path);
+    } else {
+      throw new TypeError(`SDK operation ${path} has no request-boundary classification`);
+    }
+  }
+};
 
 const sharedOperationTree = {
   account: {
     appSpecificPasswords: {
-      create: createAppSpecificPassword,
-      delete: deleteAppSpecificPassword,
-      deleteAll: deleteAllAppSpecificPasswords,
-      list: listAppSpecificPasswords,
+      create: validated(createAppSpecificPassword),
+      delete: validated(deleteAppSpecificPassword),
+      deleteAll: inputFree(deleteAllAppSpecificPasswords),
+      list: inputFree(listAppSpecificPasswords),
     },
-    clear: clearAccount,
-    destroy: destroyAccount,
-    getInfo: getAccountInfo,
-    getSettings: getAccountSettings,
-    listSubtitleLanguages: listAccountSubtitleLanguages,
-    listConfirmations: listAccountConfirmations,
-    saveSettings: saveAccountSettings,
+    clear: validated(clearAccount),
+    destroy: validated(destroyAccount),
+    getInfo: validated(getAccountInfo),
+    getSettings: inputFree(getAccountSettings),
+    listSubtitleLanguages: inputFree(listAccountSubtitleLanguages),
+    listConfirmations: validated(listAccountConfirmations),
+    saveSettings: validated(saveAccountSettings),
   },
   auth: {
-    buildLoginUrl: buildAuthLoginUrl,
-    checkCodeMatch,
-    clients,
-    exchangeAuthorizationCode: exchangeOAuthAuthorizationCode,
-    exists,
-    forgotPassword,
-    getCode,
-    getFamilyInvite,
-    getFriendInvite,
-    getGiftCard,
-    getVoucher,
-    grants,
-    linkDevice,
-    login,
-    logout,
-    register,
-    resetPassword,
-    revokeAllClients,
-    revokeApp,
-    revokeClient,
+    buildLoginUrl: pure(buildAuthLoginUrl),
+    checkCodeMatch: validated(checkCodeMatch),
+    clients: inputFree(clients),
+    exchangeAuthorizationCode: validated(exchangeOAuthAuthorizationCode),
+    exists: validated(exists),
+    forgotPassword: validated(forgotPassword),
+    getCode: validated(getCode),
+    getFamilyInvite: validated(getFamilyInvite),
+    getFriendInvite: validated(getFriendInvite),
+    getGiftCard: validated(getGiftCard),
+    getVoucher: validated(getVoucher),
+    grants: inputFree(grants),
+    linkDevice: validated(linkDevice),
+    login: validated(login),
+    logout: inputFree(logout),
+    register: validated(register),
+    resetPassword: validated(resetPassword),
+    revokeAllClients: inputFree(revokeAllClients),
+    revokeApp: validated(revokeApp),
+    revokeClient: validated(revokeClient),
     twoFactor: {
-      generateTOTP,
-      getRecoveryCodes,
-      regenerateRecoveryCodes,
-      verifyTOTP,
+      generateTOTP: inputFree(generateTOTP),
+      getRecoveryCodes: inputFree(getRecoveryCodes),
+      regenerateRecoveryCodes: inputFree(regenerateRecoveryCodes),
+      verifyTOTP: validated(verifyTOTP),
     },
-    validateToken,
+    validateToken: validated(validateToken),
   },
   config: {
-    deleteKey: deleteConfigKey,
-    getKey: getConfigKey,
-    getKeyWith: getConfigKeyWith,
-    read: readConfig,
-    readWith: readConfigWith,
-    setKey: setConfigKey,
-    write: writeConfig,
+    deleteKey: validated(deleteConfigKey),
+    getKey: validated(getConfigKey),
+    getKeyWith: validated(getConfigKeyWith),
+    read: inputFree(readConfig),
+    readWith: validated(readConfigWith),
+    setKey: validated(setConfigKey),
+    write: validated(writeConfig),
   },
   downloadLinks: {
-    create: createDownloadLinks,
-    get: getDownloadLinks,
+    create: validated(createDownloadLinks),
+    get: validated(getDownloadLinks),
   },
   events: {
-    clear: clearEvents,
-    delete: deleteEvent,
-    getTorrent: getEventTorrent,
-    list: listEvents,
+    clear: inputFree(clearEvents),
+    delete: validated(deleteEvent),
+    getTorrent: validated(getEventTorrent),
+    list: validated(listEvents),
   },
   family: {
-    createInvite: createFamilyInvite,
-    join: joinFamily,
-    listInvites: listFamilyInvites,
-    listMembers: listFamilyMembers,
-    removeMember: removeFamilyMember,
+    createInvite: inputFree(createFamilyInvite),
+    join: validated(joinFamily),
+    listInvites: inputFree(listFamilyInvites),
+    listMembers: inputFree(listFamilyMembers),
+    removeMember: validated(removeFamilyMember),
   },
   ifttt: {
-    getStatus: getIftttStatus,
-    sendEvent: sendIftttEvent,
+    getStatus: inputFree(getIftttStatus),
+    sendEvent: validated(sendIftttEvent),
   },
   podcast: {
-    getLinks: getPodcastLinks,
+    getLinks: validated(getPodcastLinks),
   },
   files: {
-    canWrite: canWriteFile,
-    continue: continueFiles,
-    continueSearch,
-    copy: copyFile,
-    convertToMp4: convertFileToMp4,
-    convertManyToMp4: convertFilesToMp4,
-    convertSelectionToMp4: convertFileSelectionToMp4,
-    createUploadRequest: createFileUploadRequest,
-    createFolder,
-    deleteExtraction: deleteFileExtraction,
-    deleteMp4: deleteFileMp4,
-    deleteSelection: deleteFileSelection,
-    delete: deleteFiles,
-    extract: extractFiles,
-    findNext: findNextFile,
-    findNextVideo,
-    getApiContentUrl,
-    getApiDownloadUrl,
-    getApiMp4DownloadUrl,
-    get: getFile,
-    getChild: getFileChild,
-    getDownloadUrl,
-    getHlsStreamUrl,
-    getMp4Status,
-    getStartFrom,
-    list: queryFiles,
-    listActiveConversions: listActiveMp4Conversions,
-    listExtractions: listFileExtractions,
-    listSubtitles: listFileSubtitles,
-    move: moveFiles,
-    moveSelection: moveFileSelection,
-    putMp4ToMyFiles,
-    rename: renameFile,
-    resetSortSettings: resetFileSortSettings,
-    resetStartFrom,
-    search: searchFiles,
-    setSort: setFileSort,
-    setWatchStatus: setFilesWatchStatus,
-    setStartFrom,
-    touch: touchFiles,
-    upload: uploadFile,
+    canWrite: validated(canWriteFile),
+    continue: validated(continueFiles),
+    continueSearch: validated(continueSearch),
+    copy: validated(copyFile),
+    convertToMp4: validated(convertFileToMp4),
+    convertManyToMp4: validated(convertFilesToMp4),
+    convertSelectionToMp4: validated(convertFileSelectionToMp4),
+    createUploadRequest: validated(createFileUploadRequest),
+    createFolder: validated(createFolder),
+    deleteExtraction: validated(deleteFileExtraction),
+    deleteMp4: validated(deleteFileMp4),
+    deleteSelection: validated(deleteFileSelection),
+    delete: validated(deleteFiles),
+    extract: validated(extractFiles),
+    findNext: validated(findNextFile),
+    findNextVideo: validated(findNextVideo),
+    getApiContentUrl: validated(getApiContentUrl),
+    getApiDownloadUrl: validated(getApiDownloadUrl),
+    getApiMp4DownloadUrl: validated(getApiMp4DownloadUrl),
+    get: validated(getFile),
+    getChild: validated(getFileChild),
+    getDownloadUrl: validated(getDownloadUrl),
+    getHlsStreamUrl: validated(getHlsStreamUrl),
+    getMp4Status: validated(getMp4Status),
+    getStartFrom: validated(getStartFrom),
+    list: validated(queryFiles),
+    listActiveConversions: inputFree(listActiveMp4Conversions),
+    listExtractions: inputFree(listFileExtractions),
+    listSubtitles: validated(listFileSubtitles),
+    move: validated(moveFiles),
+    moveSelection: validated(moveFileSelection),
+    putMp4ToMyFiles: validated(putMp4ToMyFiles),
+    rename: validated(renameFile),
+    resetSortSettings: inputFree(resetFileSortSettings),
+    resetStartFrom: validated(resetStartFrom),
+    search: validated(searchFiles),
+    setSort: validated(setFileSort),
+    setWatchStatus: validated(setFilesWatchStatus),
+    setStartFrom: validated(setStartFrom),
+    touch: validated(touchFiles),
+    upload: validated(uploadFile),
   },
   friendInvites: {
-    create: createFriendInvite,
-    list: listFriendInvites,
+    create: inputFree(createFriendInvite),
+    list: inputFree(listFriendInvites),
   },
   friends: {
-    approve: approveFriendRequest,
-    countWaitingRequests,
-    deny: denyFriendRequest,
-    list: listFriends,
-    listSentRequests,
-    listWaitingRequests,
-    remove: removeFriend,
-    search: searchFriends,
-    sendRequest: sendFriendRequest,
-    sharedFolder: getFriendSharedFolder,
+    approve: validated(approveFriendRequest),
+    countWaitingRequests: inputFree(countWaitingRequests),
+    deny: validated(denyFriendRequest),
+    list: inputFree(listFriends),
+    listSentRequests: inputFree(listSentRequests),
+    listWaitingRequests: inputFree(listWaitingRequests),
+    remove: validated(removeFriend),
+    search: validated(searchFriends),
+    sendRequest: validated(sendFriendRequest),
+    sharedFolder: validated(getFriendSharedFolder),
   },
   oauth: {
-    buildAuthorizeUrl: buildOAuthAuthorizeUrl,
-    buildIconUrl: buildOAuthAppIconUrl,
-    create: createOAuthApp,
-    delete: deleteOAuthApp,
-    get: getOAuthApp,
-    getPopularApps: getPopularOAuthApps,
-    query: queryOAuthApps,
-    regenerateToken: regenerateOAuthAppToken,
-    setIcon: setOAuthAppIcon,
-    update: updateOAuthApp,
+    buildAuthorizeUrl: pure(buildOAuthAuthorizeUrl),
+    buildIconUrl: pure(buildOAuthAppIconUrl),
+    create: validated(createOAuthApp),
+    delete: validated(deleteOAuthApp),
+    get: validated(getOAuthApp),
+    getPopularApps: inputFree(getPopularOAuthApps),
+    query: inputFree(queryOAuthApps),
+    regenerateToken: validated(regenerateOAuthAppToken),
+    setIcon: validated(setOAuthAppIcon),
+    update: validated(updateOAuthApp),
   },
   payment: {
     changePlan: {
-      classifyResponse: classifyPaymentChangePlanResponse,
-      preview: previewPaymentChangePlan,
-      submit: submitPaymentChangePlan,
+      classifyResponse: pure(classifyPaymentChangePlanResponse),
+      preview: validated(previewPaymentChangePlan),
+      submit: validated(submitPaymentChangePlan),
     },
-    confirmFastspringOrder,
-    getInfo: getPaymentInfo,
-    listHistory: listPaymentHistory,
-    listInvites: listPaymentInvites,
-    listOptions: listPaymentOptions,
-    listPlans: listPaymentPlans,
+    confirmFastspringOrder: validated(confirmFastspringOrder),
+    getInfo: inputFree(getPaymentInfo),
+    listHistory: validated(listPaymentHistory),
+    listInvites: inputFree(listPaymentInvites),
+    listOptions: inputFree(listPaymentOptions),
+    listPlans: inputFree(listPaymentPlans),
     methods: {
-      addPaddleWaitingPayment: createPaddleWaitingPayment,
-      createOpenNodeCharge,
-      createPaddleBillingUpdatePaymentMethodTransaction,
-      getPaddleBillingInvoiceUrl,
+      addPaddleWaitingPayment: validated(createPaddleWaitingPayment),
+      createOpenNodeCharge: validated(createOpenNodeCharge),
+      createPaddleBillingUpdatePaymentMethodTransaction: validated(
+        createPaddleBillingUpdatePaymentMethodTransaction,
+      ),
+      getPaddleBillingInvoiceUrl: validated(getPaddleBillingInvoiceUrl),
     },
-    report: reportPayments,
-    stopSubscription: stopPaymentSubscription,
+    report: validated(reportPayments),
+    stopSubscription: inputFree(stopPaymentSubscription),
     voucher: {
-      getInfo: getPaymentVoucherInfo,
-      redeem: redeemPaymentVoucher,
+      getInfo: validated(getPaymentVoucherInfo),
+      redeem: validated(redeemPaymentVoucher),
     },
   },
   rss: {
-    clearLogs: clearRssFeedLogs,
-    create: createRssFeed,
-    delete: deleteRssFeed,
-    get: getRssFeed,
-    list: listRssFeeds,
-    listItems: listRssFeedItems,
-    pause: pauseRssFeed,
-    resume: resumeRssFeed,
-    retryAll: retryAllRssFeedItems,
-    retryItem: retryRssFeedItem,
-    update: updateRssFeed,
+    clearLogs: validated(clearRssFeedLogs),
+    create: validated(createRssFeed),
+    delete: validated(deleteRssFeed),
+    get: validated(getRssFeed),
+    list: inputFree(listRssFeeds),
+    listItems: validated(listRssFeedItems),
+    pause: validated(pauseRssFeed),
+    resume: validated(resumeRssFeed),
+    retryAll: validated(retryAllRssFeedItems),
+    retryItem: validated(retryRssFeedItem),
+    update: validated(updateRssFeed),
   },
   sharing: {
-    clone: cloneSharedFiles,
-    getCloneInfo: getSharingCloneInfo,
-    getSharedWith,
-    listSharedFiles,
+    clone: validated(cloneSharedFiles),
+    getCloneInfo: validated(getSharingCloneInfo),
+    getSharedWith: validated(getSharedWith),
+    listSharedFiles: inputFree(listSharedFiles),
     publicAccess: {
-      continueFiles: continuePublicShareFiles,
-      get: getPublicShare,
-      getFileUrl: getPublicShareFileUrl,
-      listFiles: listPublicShareFiles,
+      continueFiles: validated(continuePublicShareFiles),
+      get: inputFree(getPublicShare),
+      getFileUrl: validated(getPublicShareFileUrl),
+      listFiles: validated(listPublicShareFiles),
     },
     publicShares: {
-      create: createPublicShare,
-      delete: deletePublicShare,
-      list: listPublicShares,
+      create: validated(createPublicShare),
+      delete: validated(deletePublicShare),
+      list: inputFree(listPublicShares),
     },
-    shareFiles,
-    unshare: unshareFile,
+    shareFiles: validated(shareFiles),
+    unshare: validated(unshareFile),
   },
   tunnel: {
-    listRoutes: listTunnelRoutes,
+    listRoutes: inputFree(listTunnelRoutes),
   },
   trash: {
-    continue: continueTrash,
-    delete: deleteTrash,
-    empty: emptyTrash,
-    list: listTrash,
-    restore: restoreTrash,
+    continue: validated(continueTrash),
+    delete: validated(deleteTrash),
+    empty: inputFree(emptyTrash),
+    list: validated(listTrash),
+    restore: validated(restoreTrash),
   },
   transfers: {
-    add: addTransfer,
-    addMany: addManyTransfers,
-    addTrackers: addTransferTrackers,
-    cancel: cancelTransfers,
-    clean: cleanTransfers,
-    continue: continueTransfers,
-    count: countTransfers,
-    get: getTransfer,
-    getTorrent: getTransferTorrent,
-    info: getTransferInfo,
-    list: listTransfers,
-    reannounce: reannounceTransfer,
-    remove: removeTransfers,
-    retry: retryTransfer,
-    stopRecording: stopTransferRecording,
+    add: validated(addTransfer),
+    addMany: validated(addManyTransfers),
+    addTrackers: validated(addTransferTrackers),
+    cancel: validated(cancelTransfers),
+    clean: validated(cleanTransfers),
+    continue: validated(continueTransfers),
+    count: inputFree(countTransfers),
+    get: validated(getTransfer),
+    getTorrent: validated(getTransferTorrent),
+    info: validated(getTransferInfo),
+    list: validated(listTransfers),
+    reannounce: validated(reannounceTransfer),
+    remove: validated(removeTransfers),
+    retry: validated(retryTransfer),
+    stopRecording: validated(stopTransferRecording),
   },
   zips: {
-    cancel: cancelZip,
-    create: createZip,
-    get: getZip,
-    list: listZips,
+    cancel: validated(cancelZip),
+    create: validated(createZip),
+    get: validated(getZip),
+    list: inputFree(listZips),
   },
 };
+
+assertClassifiedOperationTree(sharedOperationTree);
 
 export const createPutioSdkEffectClient = () => cloneOperationTree(sharedOperationTree);
 

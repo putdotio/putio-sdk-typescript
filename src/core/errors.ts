@@ -2,6 +2,7 @@ import { Data, Effect, Schema } from "effect";
 
 export const PutioErrorEnvelopeSchema = Schema.Struct({
   status: Schema.optional(Schema.String),
+  error: Schema.optional(Schema.String),
   error_message: Schema.optional(Schema.String),
   error_type: Schema.optional(Schema.String),
   error_uri: Schema.optional(Schema.String),
@@ -284,6 +285,7 @@ export const decodePutioErrorEnvelope = Schema.decodeUnknownEffect(PutioErrorEnv
 export const isPutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelope =>
   isRecord(value) &&
   hasOptionalString(value, "status") &&
+  hasOptionalString(value, "error") &&
   hasOptionalString(value, "error_message") &&
   hasOptionalString(value, "error_type") &&
   hasOptionalString(value, "error_uri") &&

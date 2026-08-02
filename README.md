@@ -88,6 +88,23 @@ sdk.setAccessToken(undefined);
 
 The token is snapshotted when each Promise-client operation is invoked. Token changes apply to subsequent operations; an operation already in flight keeps the snapshot it started with. Base, upload, and web app URLs remain fixed from client creation.
 
+Authorization-code clients can exchange a code without configuring a default access token:
+
+```ts
+const sdk = createPutioSdkPromiseClient();
+
+const accessToken = await sdk.auth.exchangeAuthorizationCode({
+  clientId,
+  clientSecret,
+  code,
+  redirectUri,
+});
+```
+
+The exchange uses a form-encoded `POST` and never sends a configured bearer token. Known OAuth
+failures are exposed as `OAuthAuthorizationCodeExchangeError`; client secrets and codes are not
+included in validation errors.
+
 ## Utilities
 
 Shared formatting, URL, and error-localization helpers are available from the utilities subpath:

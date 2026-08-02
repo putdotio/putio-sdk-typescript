@@ -64,6 +64,7 @@ import {
   type FileBroad,
   type FileCopyInput,
   type FileTouchInput,
+  type OAuthAuthorizationCodeExchangeInput,
   type PutioSdkPromiseClient,
   type TransferAddTrackersInput,
   type TransferRemoveInput,
@@ -219,6 +220,16 @@ const promiseAuthUrl = promiseClient.auth.buildLoginUrl({
   redirectUri: "https://example.com/callback",
   state: "node-smoke",
 });
+const exchangeInput: OAuthAuthorizationCodeExchangeInput = {
+  clientId: "external-node",
+  clientSecret: "compile-only-secret",
+  code: "compile-only-code",
+};
+const compilePromiseAuthorizationCodeExchange = async () => {
+  const accessToken: string = await promiseClient.auth.exchangeAuthorizationCode(exchangeInput);
+  return accessToken.length;
+};
+void compilePromiseAuthorizationCodeExchange;
 const promiseAuthHost = new URL(promiseAuthUrl).host;
 promiseClient.setAccessToken("rotated-compat-token");
 const uploadRequest = await promiseClient.files.createUploadRequest({
@@ -233,6 +244,7 @@ promiseClient.setAccessToken(undefined);
 await promiseClient.dispose();
 
 const effectClient = createPutioSdkEffectClient();
+void effectClient.auth.exchangeAuthorizationCode(exchangeInput);
 void effectClient.files.getChild({ name: "source.txt", parentId: 0 });
 void effectClient.files.copy(copyInput);
 void effectClient.files.canWrite(7);

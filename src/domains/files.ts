@@ -19,8 +19,6 @@ import {
   selectJsonField,
   type PutioSdkConfigShape,
   type PutioSdkContext,
-  type PutioQuery,
-  type PutioQueryValue,
 } from "../core/http.js";
 const RequestedFlag = Schema.Literal(1);
 const NonNegativeFileIdSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
@@ -168,7 +166,6 @@ export const FilesListQuerySchema = FileQuerySchema.mapFields(
 export const FilesSearchQuerySchema = Schema.Struct({
   per_page: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
   query: Schema.String,
-  type: Schema.optional(Schema.Union([FileTypeSchema, Schema.Array(FileTypeSchema)])),
 });
 export const FileBreadcrumbSchema = Schema.Tuple([Schema.Int, Schema.String]);
 const FileEnvelopeSchema = Schema.Struct({
@@ -683,15 +680,6 @@ const failMissingField = (field: string): Effect.Effect<never, PutioValidationEr
 const widenValidationError = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E | PutioValidationError, R> => effect;
-const normalizeFilesSearchQuery = (query: FilesSearchQuery): PutioQuery => {
-  const type: PutioQueryValue =
-    query.type === undefined || typeof query.type === "string" ? query.type : joinCsv(query.type);
-  return {
-    per_page: query.per_page,
-    query: query.query,
-    type,
-  };
-};
 const hasStreamUrl = (
   value: FileBroad,
 ): value is FileBroad & {
@@ -1033,11 +1021,17 @@ export const canWriteFile = (
 export const searchFiles = (
   query: FilesSearchQuery,
 ): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
-  requestJson(FilesSearchEnvelopeSchema, {
-    method: "GET",
-    path: "/v2/files/search",
-    query: normalizeFilesSearchQuery(query),
-  }).pipe(withOperationErrors(SearchFilesErrorSpec));
+  Schema.decodeUnknownEffect(FilesSearchQuerySchema)(query).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedQuery) =>
+      requestJson(FilesSearchEnvelopeSchema, {
+        method: "GET",
+        path: "/v2/files/search",
+        query: decodedQuery,
+      }),
+    ),
+    withOperationErrors(SearchFilesErrorSpec),
+  );
 export const continueSearch = (
   cursor: string,
   query: {

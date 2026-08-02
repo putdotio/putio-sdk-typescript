@@ -367,22 +367,6 @@ await run("payment paddle waiting invalid checkout yields typed 404", async () =
   }
 });
 
-await run("payment coinbase invalid plan yields typed 400", async () => {
-  await getOwnerPaymentInfo();
-
-  try {
-    await ownerClient.payment.methods.createCoinbaseCharge("");
-    throw new Error("expected createCoinbaseCharge to fail");
-  } catch (error) {
-    return assertOperationError(error, {
-      domain: "payment",
-      operation: "createCoinbaseCharge",
-      errorType: "PAYMENT_UNKNOWN_PLAN",
-      statusCode: 400,
-    });
-  }
-});
-
 await run("payment opennode invalid plan yields typed 400", async () => {
   await getOwnerPaymentInfo();
 

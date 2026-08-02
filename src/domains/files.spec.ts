@@ -512,13 +512,11 @@ describe("files domain", () => {
     expect(
       await runSdkEffect(
         files.searchFiles({
+          per_page: 25,
           query: "sdk",
-          type: ["VIDEO", "AUDIO"],
         }),
         (request) => {
-          expect(request.url).toBe(
-            "https://api.put.io/v2/files/search?query=sdk&type=VIDEO%2CAUDIO",
-          );
+          expect(request.url).toBe("https://api.put.io/v2/files/search?per_page=25&query=sdk");
 
           return jsonResponse({
             cursor: "cursor-2",
@@ -530,6 +528,19 @@ describe("files domain", () => {
         { accessToken: "token-123" },
       ),
     ).toMatchObject({ total: 1 });
+
+    const invalidSearch = await runSdkExit(
+      files.searchFiles({
+        // @ts-expect-error JavaScript callers can provide invalid pagination values.
+        per_page: 0,
+        query: "sdk",
+      }),
+      () => {
+        throw new Error("invalid search input must fail before transport");
+      },
+      { accessToken: "token-123" },
+    );
+    expect(expectFailure(invalidSearch)).toBeInstanceOf(PutioValidationError);
 
     expect(
       await runSdkEffect(

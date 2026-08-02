@@ -138,6 +138,10 @@ const compilePublicContracts = async () => {
   promiseClient.account.getInfo({ intercom: 1, platform: "android" });
   // @ts-expect-error App-specific-password IDs must be numbers.
   promiseClient.account.appSpecificPasswords.delete("1");
+  // @ts-expect-error Coinbase charge creation was removed with the deleted backend route.
+  promiseClient.payment.methods.createCoinbaseCharge("pro");
+  // @ts-expect-error The backend does not support filtering file search by type.
+  promiseClient.files.search({ query: "sdk", type: "VIDEO" });
 
   return {
     downloadToken,

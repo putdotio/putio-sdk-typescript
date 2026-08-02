@@ -322,7 +322,6 @@ vi.mock("../domains/payment.js", async () => {
   return {
     classifyPaymentChangePlanResponse: vi.fn((input) => ({ classified: input })),
     confirmFastspringOrder: vi.fn((reference) => Effect.succeed(reference === "ok")),
-    createCoinbaseCharge: vi.fn((planPath) => Effect.succeed(`coinbase:${planPath}`)),
     createOpenNodeCharge: vi.fn((planPath) => Effect.succeed(`opennode:${planPath}`)),
     createPaddleBillingUpdatePaymentMethodTransaction: vi.fn((id) =>
       Effect.succeed(`paddle-billing-update:${id}`),
@@ -751,7 +750,6 @@ describe("sdk promise client adapters", () => {
     expect(await client.payment.methods.addPaddleWaitingPayment({ plan: "pro" } as never)).toEqual({
       waiting: { plan: "pro" },
     });
-    expect(await client.payment.methods.createCoinbaseCharge("pro")).toBe("coinbase:pro");
     expect(await client.payment.methods.createOpenNodeCharge("pro")).toBe("opennode:pro");
     expect(
       await client.payment.methods.createPaddleBillingUpdatePaymentMethodTransaction(456),

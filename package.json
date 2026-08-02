@@ -1,6 +1,6 @@
 {
   "name": "@putdotio/sdk",
-  "version": "11.0.2",
+  "version": "11.1.0",
   "description": "Effect-first TypeScript SDK for the put.io API.",
   "keywords": [
     "effect",

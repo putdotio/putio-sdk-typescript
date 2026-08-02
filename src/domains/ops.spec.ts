@@ -194,6 +194,50 @@ describe("operational domain boundaries", () => {
     });
   });
 
+  it("rejects invalid rss inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const validParams = {
+      rss_source_url: "https://example.com/feed.xml",
+      title: "SDK Feed",
+    };
+    const failures = await Promise.all([
+      runSdkExit(rss.getRssFeed(0), handler),
+      // @ts-expect-error JavaScript callers can provide null instead of feed parameters.
+      runSdkExit(rss.createRssFeed(null), handler),
+      runSdkExit(rss.createRssFeed({ ...validParams, rss_source_url: "" }), handler),
+      runSdkExit(rss.createRssFeed({ ...validParams, title: "" }), handler),
+      runSdkExit(rss.createRssFeed({ ...validParams, parent_dir_id: -1 }), handler),
+      runSdkExit(
+        rss.createRssFeed({
+          ...validParams,
+          // @ts-expect-error JavaScript callers can provide non-boolean flags.
+          delete_old_files: "yes",
+        }),
+        handler,
+      ),
+      runSdkExit(rss.updateRssFeed(0, validParams), handler),
+      // @ts-expect-error JavaScript callers can provide null instead of feed parameters.
+      runSdkExit(rss.updateRssFeed(1, null), handler),
+      runSdkExit(rss.pauseRssFeed(0), handler),
+      runSdkExit(rss.resumeRssFeed(0), handler),
+      runSdkExit(rss.deleteRssFeed(0), handler),
+      runSdkExit(rss.listRssFeedItems(0), handler),
+      runSdkExit(rss.clearRssFeedLogs(0), handler),
+      runSdkExit(rss.retryRssFeedItem(0, 1), handler),
+      runSdkExit(rss.retryRssFeedItem(1, 0), handler),
+      runSdkExit(rss.retryAllRssFeedItems(0), handler),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
+  });
+
   it("covers oauth endpoints and URL helpers", async () => {
     expect(
       oauth.buildOAuthAuthorizeUrl({

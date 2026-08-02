@@ -697,8 +697,10 @@ describe("files domain", () => {
       }),
       runSdkExit(files.deleteFiles([]), handler, { accessToken: "token-123" }),
       runSdkExit(files.deleteFiles([0]), handler, { accessToken: "token-123" }),
+      // @ts-expect-error JavaScript callers can omit the required selection.
       runSdkExit(files.deleteFileSelection({}), handler, { accessToken: "token-123" }),
       runSdkExit(files.moveFiles([], -1), handler, { accessToken: "token-123" }),
+      // @ts-expect-error JavaScript callers can omit the required selection.
       runSdkExit(files.moveFileSelection({}, 0), handler, { accessToken: "token-123" }),
       runSdkExit(files.setStartFrom({ file_id: 0, time: -1 }), handler, {
         accessToken: "token-123",
@@ -708,6 +710,7 @@ describe("files domain", () => {
       runSdkExit(files.deleteFileMp4(0), handler, { accessToken: "token-123" }),
       runSdkExit(files.putMp4ToMyFiles(0), handler, { accessToken: "token-123" }),
       runSdkExit(files.convertFilesToMp4([]), handler, { accessToken: "token-123" }),
+      // @ts-expect-error JavaScript callers can omit the required selection.
       runSdkExit(files.convertFileSelectionToMp4({}), handler, { accessToken: "token-123" }),
       runSdkExit(
         // @ts-expect-error JavaScript callers can omit the required selection.

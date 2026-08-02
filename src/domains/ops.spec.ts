@@ -8,6 +8,7 @@ import * as transfers from "./transfers.js";
 import * as trash from "./trash.js";
 import * as zips from "./zips.js";
 import {
+  arrayBufferResponse,
   expectFailure,
   getFormBody,
   getFormDataBody,
@@ -682,6 +683,20 @@ describe("operational domain boundaries", () => {
     ).toMatchObject({ id: 11 });
 
     expect(
+      Array.from(
+        await runSdkEffect(
+          transfers.getTransferTorrent(11),
+          (request) => {
+            expect(request.method).toBe("GET");
+            expect(request.url).toBe("https://api.put.io/v2/transfers/11/torrent");
+            return arrayBufferResponse([0x64, 0x38, 0x3a]);
+          },
+          { accessToken: "token-123" },
+        ),
+      ),
+    ).toEqual([0x64, 0x38, 0x3a]);
+
+    expect(
       await runSdkEffect(
         transfers.countTransfers(),
         () => jsonResponse({ count: 3, status: "OK" }),
@@ -759,6 +774,58 @@ describe("operational domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toMatchObject({ transfers: [expect.objectContaining({ id: 11 })] });
+
+    await expect(
+      runSdkEffect(
+        transfers.addTransferTrackers({
+          trackers: ["udp://tracker.example:80", "https://tracker.example/announce"],
+          transferId: 11,
+        }),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/transfers/add-trackers/11");
+          expect(getFormBody(request).get("trackers")).toBe(
+            "udp://tracker.example:80,https://tracker.example/announce",
+          );
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).resolves.toBeUndefined();
+
+    await runSdkEffect(
+      transfers.removeTransfers({ ids: [11, 12] }),
+      (request) => {
+        const body = getFormBody(request);
+        expect(request.url).toBe("https://api.put.io/v2/transfers/remove");
+        expect(body.get("transfer_ids")).toBe("11,12");
+        expect(body.has("remove_filter")).toBe(false);
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+
+    await runSdkEffect(
+      transfers.removeTransfers({ filter: "completed" }),
+      (request) => {
+        const body = getFormBody(request);
+        expect(body.get("remove_filter")).toBe("completed");
+        expect(body.has("transfer_ids")).toBe(false);
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+
+    await runSdkEffect(
+      // @ts-expect-error JavaScript callers can provide explicit undefined optional fields.
+      transfers.removeTransfers({ filter: "all", ids: undefined }),
+      (request) => {
+        const body = getFormBody(request);
+        expect(body.get("remove_filter")).toBe("all");
+        expect(body.has("transfer_ids")).toBe(false);
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
 
     await runSdkEffect(
       transfers.cancelTransfers([11, 12]),
@@ -959,6 +1026,51 @@ describe("operational domain boundaries", () => {
     });
   });
 
+  it("rejects invalid transfer utility inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const failures = await Promise.all([
+      runSdkExit(transfers.getTransferTorrent(0), handler, { accessToken: "token-123" }),
+      runSdkExit(transfers.addTransferTrackers({ trackers: [], transferId: 1 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(transfers.addTransferTrackers({ trackers: ["one,two"], transferId: 1 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(
+        transfers.addTransferTrackers({ trackers: ["udp://tracker example"], transferId: 1 }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(transfers.removeTransfers({ ids: [] }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can omit both required selectors.
+        transfers.removeTransfers({}),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(transfers.removeTransfers({ ids: [-1] }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can provide both mutually exclusive selectors.
+        transfers.removeTransfers({ filter: "all", ids: [1] }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
+  });
+
   it("maps representative operation failures in operational domains", async () => {
     const failure = await runSdkExit(
       sharing.getPublicShareFileUrl(7),
@@ -980,6 +1092,79 @@ describe("operational domain boundaries", () => {
       domain: "sharing",
       operation: "getPublicShareFileUrl",
       status: 404,
+    });
+
+    const torrentFailure = await runSdkExit(
+      transfers.getTransferTorrent(11),
+      () =>
+        jsonResponse(
+          {
+            error_message: "Transfer is from a magnet link",
+            error_type: "IS_MAGNET",
+            status_code: 400,
+          },
+          { status: 400 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(torrentFailure)).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "transfers",
+      operation: "getTorrent",
+      reason: {
+        errorType: "IS_MAGNET",
+        kind: "error_type",
+      },
+      status: 400,
+    });
+
+    const addTrackersFailure = await runSdkExit(
+      transfers.addTransferTrackers({
+        trackers: ["udp://tracker.example:80"],
+        transferId: 11,
+      }),
+      () =>
+        jsonResponse(
+          {
+            error_message: "No trackers were accepted",
+            error_type: "NO_TRACKERS",
+            status_code: 400,
+          },
+          { status: 400 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(addTrackersFailure)).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "transfers",
+      operation: "addTrackers",
+      reason: {
+        errorType: "NO_TRACKERS",
+        kind: "error_type",
+      },
+      status: 400,
+    });
+
+    const removeFailure = await runSdkExit(
+      transfers.removeTransfers({ ids: [11] }),
+      () =>
+        jsonResponse(
+          {
+            error_message: "Transfer cannot be removed",
+            status_code: 400,
+          },
+          { status: 400 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(removeFailure)).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "transfers",
+      operation: "remove",
+      status: 400,
     });
   });
 });

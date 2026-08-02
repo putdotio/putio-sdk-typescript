@@ -326,6 +326,27 @@ const writableUserId = await sdk.files.canWrite(copy.id);
 missing, or payment-gated file rejects with the corresponding typed SDK error rather than returning
 `false`.
 
+## Transfer Torrent Operations
+
+Torrent-backed transfers expose their original metainfo bytes and tracker mutation:
+
+```ts
+const torrent = await sdk.transfers.getTorrent(transferId);
+
+await sdk.transfers.addTrackers({
+  transferId,
+  trackers: ["udp://tracker.example:80", "https://tracker.example/announce"],
+});
+```
+
+`getTorrent` rejects for magnet-backed or non-torrent transfers. Remove accepts exactly one selector,
+preventing an ambiguous mix of IDs and filters:
+
+```ts
+await sdk.transfers.remove({ ids: [transferId] });
+await sdk.transfers.remove({ filter: "completed" });
+```
+
 ## Folder Sort and Podcast Feeds
 
 Folder sort settings persist per folder and apply to subsequent file listings:

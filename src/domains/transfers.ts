@@ -1,6 +1,8 @@
 import { Effect, Schema } from "effect";
 import { joinCsv } from "../core/forms.js";
 import {
+  mapDecodeErrorToValidationError,
+  PutioValidationError,
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
@@ -9,11 +11,14 @@ import {
 import {
   OkResponseSchema,
   encodePathSegment,
+  requestArrayBuffer,
   requestJson,
   selectJsonField,
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
+const TransferIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
+const TransferIdsSchema = Schema.Array(TransferIdSchema).check(Schema.isMinLength(1));
 export const TransferTypeSchema = Schema.Literals([
   "URL",
   "TORRENT",
@@ -138,6 +143,23 @@ export const TransferAddInputSchema = Schema.Struct({
   save_parent_id: Schema.optional(Schema.Int),
   url: Schema.String,
 });
+const TrackerSchema = Schema.String.check(Schema.isPattern(/^[^,\s]+$/));
+export const TransferAddTrackersInputSchema = Schema.Struct({
+  trackers: Schema.Array(TrackerSchema).check(Schema.isMinLength(1)),
+  transferId: TransferIdSchema,
+});
+const TransferRemoveIdsInputSchema = Schema.Struct({
+  filter: Schema.optional(Schema.Never),
+  ids: TransferIdsSchema,
+});
+const TransferRemoveFilterInputSchema = Schema.Struct({
+  filter: Schema.Literals(["all", "completed"]),
+  ids: Schema.optional(Schema.Never),
+});
+export const TransferRemoveInputSchema = Schema.Union([
+  TransferRemoveIdsInputSchema,
+  TransferRemoveFilterInputSchema,
+]);
 const TransferInfoItemSchema = Schema.Struct({
   error: Schema.optional(Schema.String),
   error_message: Schema.optional(Schema.String),
@@ -191,6 +213,8 @@ export type TransferLink = Schema.Schema.Type<typeof TransferLinkSchema>;
 export type Transfer = Schema.Schema.Type<typeof TransferSchema>;
 export type TransfersListQuery = Schema.Schema.Type<typeof TransfersListQuerySchema>;
 export type TransferAddInput = Schema.Schema.Type<typeof TransferAddInputSchema>;
+export type TransferAddTrackersInput = Schema.Schema.Type<typeof TransferAddTrackersInputSchema>;
+export type TransferRemoveInput = Schema.Schema.Type<typeof TransferRemoveInputSchema>;
 export type TransferInfoItem = Schema.Schema.Type<typeof TransferInfoItemSchema>;
 export type TransfersListResponse = Schema.Schema.Type<typeof TransfersListEnvelopeSchema>;
 export type TransfersContinueResponse = Schema.Schema.Type<typeof TransfersContinueEnvelopeSchema>;
@@ -209,6 +233,37 @@ export const GetTransferErrorSpec = definePutioOperationErrorSpec({
   knownErrors: [
     { errorType: "invalid_scope", statusCode: 401 as const },
     { statusCode: 404 as const },
+  ],
+});
+export const GetTransferTorrentErrorSpec = definePutioOperationErrorSpec({
+  domain: "transfers",
+  operation: "getTorrent",
+  knownErrors: [
+    { errorType: "NOT_TORRENT", statusCode: 400 as const },
+    { errorType: "IS_MAGNET", statusCode: 400 as const },
+    { errorType: "invalid_scope", statusCode: 401 as const },
+    { statusCode: 404 as const },
+  ],
+});
+export const AddTransferTrackersErrorSpec = definePutioOperationErrorSpec({
+  domain: "transfers",
+  operation: "addTrackers",
+  knownErrors: [
+    { errorType: "NO_TRACKERS", statusCode: 400 as const },
+    { errorType: "TORRENT_NOT_ACTIVE", statusCode: 400 as const },
+    { errorType: "invalid_scope", statusCode: 401 as const },
+    { statusCode: 402 as const },
+    { errorType: "TRANSFER_NOT_FOUND", statusCode: 404 as const },
+    { errorType: "TRANSFER_INVALID", statusCode: 500 as const },
+    { errorType: "TORRENT_NOT_READY", statusCode: 500 as const },
+  ],
+});
+export const RemoveTransfersErrorSpec = definePutioOperationErrorSpec({
+  domain: "transfers",
+  operation: "remove",
+  knownErrors: [
+    { statusCode: 400 as const },
+    { errorType: "invalid_scope", statusCode: 401 as const },
   ],
 });
 export const AddTransferErrorSpec = definePutioOperationErrorSpec({
@@ -265,6 +320,9 @@ export const StopRecordingTransferErrorSpec = definePutioOperationErrorSpec({
 });
 export type ListTransfersError = PutioOperationFailure<typeof ListTransfersErrorSpec>;
 export type GetTransferError = PutioOperationFailure<typeof GetTransferErrorSpec>;
+export type GetTransferTorrentError = PutioOperationFailure<typeof GetTransferTorrentErrorSpec>;
+export type AddTransferTrackersError = PutioOperationFailure<typeof AddTransferTrackersErrorSpec>;
+export type RemoveTransfersError = PutioOperationFailure<typeof RemoveTransfersErrorSpec>;
 export type AddTransferError = PutioOperationFailure<typeof AddTransferErrorSpec>;
 export type AddManyTransfersError = PutioOperationFailure<typeof AddManyTransfersErrorSpec>;
 export type RetryTransferError = PutioOperationFailure<typeof RetryTransferErrorSpec>;
@@ -304,6 +362,19 @@ export const getTransfer = (
     method: "GET",
     path: `/v2/transfers/${encodePathSegment(id)}`,
   }).pipe(selectJsonField("transfer"), withOperationErrors(GetTransferErrorSpec));
+export const getTransferTorrent = (
+  id: number,
+): Effect.Effect<Uint8Array, GetTransferTorrentError | PutioValidationError, PutioSdkContext> =>
+  Schema.decodeUnknownEffect(TransferIdSchema)(id).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedId) =>
+      requestArrayBuffer({
+        method: "GET",
+        path: `/v2/transfers/${encodePathSegment(decodedId)}/torrent`,
+      }),
+    ),
+    withOperationErrors(GetTransferTorrentErrorSpec),
+  );
 export const countTransfers = (): Effect.Effect<number, PutioSdkError, PutioSdkContext> =>
   requestJson(TransferCountEnvelopeSchema, {
     method: "GET",
@@ -360,6 +431,26 @@ export const addManyTransfers = (
     method: "POST",
     path: "/v2/transfers/add-multi",
   }).pipe(selectJsonFields("errors", "transfers"), withOperationErrors(AddManyTransfersErrorSpec));
+export const addTransferTrackers = (
+  input: TransferAddTrackersInput,
+): Effect.Effect<void, AddTransferTrackersError | PutioValidationError, PutioSdkContext> =>
+  Schema.decodeUnknownEffect(TransferAddTrackersInputSchema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "form",
+          value: {
+            trackers: joinCsv(decodedInput.trackers),
+          },
+        },
+        method: "POST",
+        path: `/v2/transfers/add-trackers/${encodePathSegment(decodedInput.transferId)}`,
+      }),
+    ),
+    Effect.asVoid,
+    withOperationErrors(AddTransferTrackersErrorSpec),
+  );
 export const cancelTransfers = (
   ids: ReadonlyArray<number>,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
@@ -390,6 +481,27 @@ export const cleanTransfers = (
     method: "POST",
     path: "/v2/transfers/clean",
   }).pipe(selectJsonFields("deleted_ids"));
+export const removeTransfers = (
+  input: TransferRemoveInput,
+): Effect.Effect<void, RemoveTransfersError | PutioValidationError, PutioSdkContext> =>
+  Schema.decodeUnknownEffect(TransferRemoveInputSchema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "form",
+          value:
+            decodedInput.ids !== undefined
+              ? { transfer_ids: joinCsv(decodedInput.ids) }
+              : { remove_filter: decodedInput.filter },
+        },
+        method: "POST",
+        path: "/v2/transfers/remove",
+      }),
+    ),
+    Effect.asVoid,
+    withOperationErrors(RemoveTransfersErrorSpec),
+  );
 export const retryTransfer = (
   id: number,
 ): Effect.Effect<Transfer, RetryTransferError, PutioSdkContext> =>

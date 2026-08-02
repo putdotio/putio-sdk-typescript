@@ -10,7 +10,7 @@ const { client } = await createClients({
 });
 
 const live = createLiveHarness("download-links live");
-const { assert, assertOperationError, finish, run, sleep } = live;
+const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
 void sleep;
@@ -227,17 +227,12 @@ await run("download links create supports cursor and exclude ids", async () => {
   }
 });
 
-await run("download links empty request yields typed bad request", async () => {
+await run("download links empty request fails before transport", async () => {
   try {
     await retryOnRateLimit(() => client.downloadLinks.create());
     throw new Error("expected empty create request to fail");
   } catch (error) {
-    return assertOperationError(error, {
-      domain: "downloadLinks",
-      errorType: "BadRequest",
-      operation: "create",
-      statusCode: 400,
-    });
+    return assertErrorTag(error, { tag: "PutioValidationError" });
   }
 });
 

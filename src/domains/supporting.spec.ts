@@ -484,28 +484,6 @@ describe("supporting domain boundaries", () => {
 
     expect(
       await runSdkEffect(
-        // @ts-expect-error This covers untyped JavaScript callers.
-        downloadLinks.getDownloadLinks("abc/def"),
-        (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/download_links/abc%2Fdef");
-          return jsonResponse({
-            links: {
-              download_links: ["https://download.put.io/1"],
-              media_links: [],
-              mp4_links: [],
-            },
-            links_status: "DONE",
-            status: "OK",
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({
-      links_status: "DONE",
-    });
-
-    expect(
-      await runSdkEffect(
         downloadLinks.getDownloadLinks(17),
         () =>
           jsonResponse({
@@ -574,6 +552,32 @@ describe("supporting domain boundaries", () => {
         ),
       ),
     ).toEqual([1, 2, 3]);
+  });
+
+  it("rejects invalid download-link inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const failures = await Promise.all([
+      runSdkExit(downloadLinks.createDownloadLinks(), handler),
+      runSdkExit(downloadLinks.createDownloadLinks({ cursor: "" }), handler),
+      runSdkExit(downloadLinks.createDownloadLinks({ ids: [] }), handler),
+      runSdkExit(downloadLinks.createDownloadLinks({ ids: [0] }), handler),
+      runSdkExit(downloadLinks.createDownloadLinks({ cursor: "cursor", excludeIds: [0] }), handler),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can provide non-numeric task IDs.
+        downloadLinks.getDownloadLinks("abc/def"),
+        handler,
+      ),
+      runSdkExit(downloadLinks.getDownloadLinks(0), handler),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
   });
 
   it("covers family, friend invite, and friends endpoints", async () => {

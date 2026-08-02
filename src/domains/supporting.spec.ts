@@ -651,13 +651,21 @@ describe("supporting domain boundaries", () => {
 
     await runSdkEffect(
       family.removeFamilyMember("sdk user"),
-      () => jsonResponse({ status: "OK" }),
+      (request) => {
+        expect(request.url).toBe("https://api.put.io/v2/family/sub_account/sdk%20user");
+        return jsonResponse({ status: "OK" });
+      },
       { accessToken: "token-123" },
     );
 
-    await runSdkEffect(family.joinFamily("family-code"), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
+    await runSdkEffect(
+      family.joinFamily("family/code"),
+      (request) => {
+        expect(request.url).toBe("https://api.put.io/v2/family/join/family%2Fcode");
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
 
     expect(
       await runSdkEffect(
@@ -805,6 +813,35 @@ describe("supporting domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toMatchObject({ id: 7 });
+  });
+
+  it("rejects invalid family and friends requests before transport", async () => {
+    let requestCount = 0;
+    const invalidHandler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+
+    const failures = await Promise.all([
+      runSdkExit(family.removeFamilyMember(""), invalidHandler),
+      runSdkExit(family.joinFamily(""), invalidHandler),
+      runSdkExit(friends.searchFriends(""), invalidHandler),
+      runSdkExit(friends.sendFriendRequest(""), invalidHandler),
+      runSdkExit(friends.removeFriend(""), invalidHandler),
+      runSdkExit(friends.approveFriendRequest(""), invalidHandler),
+      runSdkExit(friends.denyFriendRequest(""), invalidHandler),
+      runSdkExit(friends.getFriendSharedFolder(""), invalidHandler),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can supply non-string usernames.
+        friends.searchFriends(null),
+        invalidHandler,
+      ),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
   });
 
   it("covers ifttt and tunnel routes", async () => {

@@ -335,16 +335,12 @@ await run("payment stop subscription on prepaid account yields typed 404", async
   }
 });
 
-await run("payment report with empty ids yields typed 400", async () => {
+await run("payment report rejects empty ids before transport", async () => {
   try {
     await ownerClient.payment.report([]);
     throw new Error("expected empty report to fail");
   } catch (error) {
-    return assertOperationError(error, {
-      domain: "payment",
-      operation: "reportPayments",
-      statusCode: 400,
-    });
+    return assertErrorTag(error, { tag: "PutioValidationError" });
   }
 });
 
@@ -367,11 +363,11 @@ await run("payment paddle waiting invalid checkout yields typed 404", async () =
   }
 });
 
-await run("payment opennode invalid plan yields typed 400", async () => {
+await run("payment opennode unknown plan yields typed 400", async () => {
   await getOwnerPaymentInfo();
 
   try {
-    await ownerClient.payment.methods.createOpenNodeCharge("");
+    await ownerClient.payment.methods.createOpenNodeCharge("codex-invalid-plan");
     throw new Error("expected createOpenNodeCharge to fail");
   } catch (error) {
     return assertOperationError(error, {

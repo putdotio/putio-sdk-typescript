@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect";
 
 import {
+  PutioErrorEnvelopeSchema,
   definePutioOperationErrorSpec,
   mapDecodeErrorToValidationError,
   withOperationErrors,
@@ -20,7 +21,11 @@ const AppSpecificPasswordNoteSchema = Schema.Trim.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(255),
 );
-const MaskedIpAddressSchema = Schema.String.check(Schema.isPattern(/(?:\.XXX|::X)$/));
+const MaskedIpAddressSchema = Schema.String.check(
+  Schema.isPattern(
+    /^(?:(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}XXX|(?:(?:[\dA-Fa-f]{1,4}:){0,7}|:):X)$/,
+  ),
+);
 
 export const AppSpecificPasswordSchema = Schema.Struct({
   created_at: Schema.String,
@@ -62,13 +67,25 @@ const RestrictedAppSpecificPasswordError: {
   statusCode: 401,
 };
 
+const TooManyAppSpecificPasswordsErrorBodySchema = PutioErrorEnvelopeSchema.pipe(
+  Schema.fieldsAssign({
+    extra: Schema.Struct({
+      limit: Schema.Int,
+    }),
+  }),
+);
+
 export const CreateAppSpecificPasswordErrorSpec = definePutioOperationErrorSpec({
   domain: "account",
   operation: "appSpecificPasswords.create",
   knownErrors: [
     { errorType: "NOTE_REQUIRED", statusCode: 400 as const },
     { errorType: "NOTE_TOO_LONG", statusCode: 400 as const },
-    { errorType: "TOO_MANY_APP_SPECIFIC_PASSWORDS", statusCode: 403 as const },
+    {
+      bodySchema: TooManyAppSpecificPasswordsErrorBodySchema,
+      errorType: "TOO_MANY_APP_SPECIFIC_PASSWORDS",
+      statusCode: 403 as const,
+    },
     RestrictedAppSpecificPasswordError,
   ],
 });

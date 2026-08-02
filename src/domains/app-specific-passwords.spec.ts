@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { PutioOperationError, PutioValidationError } from "../core/errors.js";
+import { PutioAuthError, PutioOperationError, PutioValidationError } from "../core/errors.js";
 import {
   expectFailure,
   getFormBody,
@@ -83,6 +83,22 @@ describe("app-specific password boundaries", () => {
     ]);
   });
 
+  it("rejects malformed masked IP addresses from the API", async () => {
+    const failure = expectFailure(
+      await runSdkExit(
+        listAppSpecificPasswords(),
+        () =>
+          jsonResponse({
+            passwords: [{ ...appSpecificPassword, ip_address: "not-an-ip.XXX" }],
+            status: "OK",
+          }),
+        { accessToken: "token-123" },
+      ),
+    );
+
+    expect(failure).toBeInstanceOf(PutioValidationError);
+  });
+
   it("rejects invalid create and delete inputs before transport", async () => {
     let requestCount = 0;
     const handler = () => {
@@ -144,6 +160,38 @@ describe("app-specific password boundaries", () => {
       },
       status: 403,
     });
+
+    if (
+      !(failure instanceof PutioOperationError) ||
+      failure.body.error_type !== "TOO_MANY_APP_SPECIFIC_PASSWORDS"
+    ) {
+      throw new Error("Expected a typed app-specific password quota failure.");
+    }
+
+    const limit: number = failure.body.extra.limit;
+    expect(limit).toBe(10);
+  });
+
+  it("does not classify malformed quota metadata as a typed operation error", async () => {
+    const failure = expectFailure(
+      await runSdkExit(
+        createAppSpecificPassword({ note: "Laptop" }),
+        () =>
+          jsonResponse(
+            {
+              error_message: "Quota reached.",
+              error_type: "TOO_MANY_APP_SPECIFIC_PASSWORDS",
+              extra: { limit: "10" },
+              status_code: 403,
+            },
+            { status: 403 },
+          ),
+        { accessToken: "token-123" },
+      ),
+    );
+
+    expect(failure).toBeInstanceOf(PutioAuthError);
+    expect(failure).not.toBeInstanceOf(PutioOperationError);
   });
 
   it("deletes one or all app-specific passwords", async () => {

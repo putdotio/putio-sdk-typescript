@@ -152,7 +152,9 @@ export const createAppSpecificPassword = (
   CreateAppSpecificPasswordError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(CreateAppSpecificPasswordInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(CreateAppSpecificPasswordInputSchema, {
+    onExcessProperty: "error",
+  })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(CreateAppSpecificPasswordEnvelopeSchema, {

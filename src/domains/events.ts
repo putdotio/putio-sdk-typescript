@@ -209,7 +209,7 @@ export type GetEventTorrentError = PutioOperationFailure<typeof GetEventTorrentE
 export const listEvents = (
   query: EventsListQuery = {},
 ): Effect.Effect<EventsListResponse, ListEventsError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(EventsListQuerySchema)(query).pipe(
+  Schema.decodeUnknownEffect(EventsListQuerySchema, { onExcessProperty: "error" })(query).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedQuery) =>
       requestJson(EventsListEnvelopeSchema, {

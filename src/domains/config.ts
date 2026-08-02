@@ -346,7 +346,10 @@ export const setConfigKey = (
   key: string,
   value: PutioJsonValue,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigSetKeyInputSchema)({ key, value }).pipe(
+  Schema.decodeUnknownEffect(ConfigSetKeyInputSchema, { onExcessProperty: "error" })({
+    key,
+    value,
+  }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OkResponseSchema, {

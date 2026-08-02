@@ -305,7 +305,7 @@ export const cloneSharedFiles = (
   CreateSharingCloneError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(SharingCloneInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(SharingCloneInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(SharingCloneEnvelopeSchema, {
@@ -339,7 +339,7 @@ export const getSharingCloneInfo = (
 export const shareFiles = (
   input: SharingShareInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, ShareFilesError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(SharingShareInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(SharingShareInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OkResponseSchema, {
@@ -381,7 +381,7 @@ export const getSharedWith = (
 export const unshareFile = (
   input: SharingUnshareInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, UnshareFileError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(SharingUnshareInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(SharingUnshareInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OkResponseSchema, {
@@ -453,7 +453,7 @@ export const listPublicShareFiles = (
   ListPublicShareFilesError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PublicShareListQuerySchema)(query).pipe(
+  Schema.decodeUnknownEffect(PublicShareListQuerySchema, { onExcessProperty: "error" })(query).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedQuery) =>
       requestJson(PublicShareFileListEnvelopeSchema, {
@@ -474,7 +474,10 @@ export const continuePublicShareFiles = (
   ContinuePublicShareFilesError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PublicShareContinueInputSchema)({ cursor, query }).pipe(
+  Schema.decodeUnknownEffect(PublicShareContinueInputSchema, { onExcessProperty: "error" })({
+    cursor,
+    query,
+  }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(PublicShareFileListContinueEnvelopeSchema, {

@@ -214,15 +214,20 @@ export const getOAuthApp = (
 > =>
   Schema.decodeUnknownEffect(
     Schema.Struct({
-      edit: Schema.optional(Schema.Boolean),
       id: OAuthAppIdSchema,
+      options: Schema.optional(
+        Schema.Struct({
+          edit: Schema.optional(Schema.Boolean),
+        }),
+      ),
     }),
-  )({ edit: options?.edit, id }).pipe(
+    { onExcessProperty: "error" },
+  )({ id, options }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OAuthAppWithTokenSchema, {
         method: "GET",
-        path: decodedInput.edit
+        path: decodedInput.options?.edit
           ? `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}/edit`
           : `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}`,
       }),
@@ -238,6 +243,7 @@ export const setOAuthAppIcon = (
       id: OAuthAppIdSchema,
       input: OAuthSetIconInputSchema,
     }),
+    { onExcessProperty: "error" },
   )({ id, input }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) => {
@@ -261,7 +267,7 @@ export const createOAuthApp = (
   CreateOAuthAppError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(OAuthAppCreateInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(OAuthAppCreateInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OAuthAppEnvelopeSchema, {
@@ -282,7 +288,7 @@ export const updateOAuthApp = (
   UpdateOAuthAppError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(OAuthAppUpdateInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(OAuthAppUpdateInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OAuthAppWithTokenSchema, {

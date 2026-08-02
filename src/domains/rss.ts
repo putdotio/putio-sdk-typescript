@@ -255,7 +255,7 @@ export const getRssFeed = (id: number): Effect.Effect<RssFeed, GetRssFeedError, 
 export const createRssFeed = (
   params: RssFeedParams,
 ): Effect.Effect<RssFeed, CreateRssFeedError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(RssFeedParamsSchema)(params).pipe(
+  Schema.decodeUnknownEffect(RssFeedParamsSchema, { onExcessProperty: "error" })(params).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedParams) =>
       requestJson(RssFeedEnvelopeSchema, {
@@ -278,7 +278,10 @@ export const updateRssFeed = (
   UpdateRssFeedError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(RssFeedUpdateInputSchema)({ id, params }).pipe(
+  Schema.decodeUnknownEffect(RssFeedUpdateInputSchema, { onExcessProperty: "error" })({
+    id,
+    params,
+  }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OkResponseSchema, {
@@ -385,7 +388,10 @@ export const retryRssFeedItem = (
   RetryRssFeedItemError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(RssFeedItemRetryInputSchema)({ feedId, itemId }).pipe(
+  Schema.decodeUnknownEffect(RssFeedItemRetryInputSchema, { onExcessProperty: "error" })({
+    feedId,
+    itemId,
+  }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OkResponseSchema, {

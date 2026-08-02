@@ -303,6 +303,30 @@ describe("operational domain boundaries", () => {
       ),
     ).toMatchObject({ token: "token-123" });
 
+    expect(
+      await runSdkEffect(
+        oauth.getOAuthApp(9),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/oauth/apps/9");
+          return jsonResponse({
+            app: {
+              callback: "https://example.com/callback",
+              description: "SDK app",
+              has_icon: false,
+              hidden: false,
+              id: 9,
+              name: "SDK app",
+              secret: "secret",
+              website: "https://example.com",
+            },
+            status: "OK",
+            token: "token-123",
+          });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).toMatchObject({ token: "token-123" });
+
     await runSdkEffect(
       oauth.setOAuthAppIcon(9, {
         icon: new Blob(["icon"], { type: "image/png" }),

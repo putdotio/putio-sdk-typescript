@@ -18,14 +18,17 @@ export const decodeAndRun = <S extends Schema.Top, A, E, R>(
 export const makeCursorSelectionSchema = <
   const TIdsField extends string,
   const TExcludeIdsField extends string,
+  const TFields extends Schema.Struct.Fields,
 >(
   idsField: TIdsField,
   excludeIdsField: TExcludeIdsField,
+  fields: TFields,
 ) =>
   Schema.Struct({
     cursor: Schema.optional(NonEmptyStringSchema),
     [excludeIdsField]: Schema.optional(Schema.Array(PositiveIntegerSchema)),
     [idsField]: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
+    ...fields,
   }).check(
     Schema.makeFilter((input) => input.cursor !== undefined || input[idsField] !== undefined, {
       expected: "a non-empty cursor or file ID selection",

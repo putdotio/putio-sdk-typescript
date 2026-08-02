@@ -369,7 +369,7 @@ const FileExtractionsEnvelopeSchema = Schema.Struct({
   extractions: Schema.Array(FileExtractionSchema),
   status: Schema.optional(Schema.Literal("OK")),
 });
-const FilesBulkSelectionSchema = makeCursorSelectionSchema("ids", "excludeIds");
+const FilesBulkSelectionSchema = makeCursorSelectionSchema("ids", "excludeIds", {});
 const FilesDeleteOptionsSchema = Schema.Struct({
   ignoreFileOwner: Schema.optional(Schema.Boolean),
   partialDelete: Schema.optional(Schema.Boolean),
@@ -388,26 +388,12 @@ const FilesMoveSelectionInputSchema = Schema.Struct({
   parentId: NonNegativeFileIdSchema,
   selection: FilesBulkSelectionSchema,
 });
-const FilesWatchStatusInputSchema = Schema.Struct({
-  cursor: Schema.optional(NonEmptyStringSchema),
-  excludeIds: Schema.optional(Schema.Array(PositiveFileIdSchema)),
-  ids: Schema.optional(FilesIdsInputSchema),
+const FilesWatchStatusInputSchema = makeCursorSelectionSchema("ids", "excludeIds", {
   watched: Schema.Boolean,
-}).check(
-  Schema.makeFilter((input) => input.cursor !== undefined || input.ids !== undefined, {
-    expected: "a non-empty cursor or file ID selection",
-  }),
-);
-const FilesExtractInputSchema = Schema.Struct({
-  cursor: Schema.optional(NonEmptyStringSchema),
-  excludeIds: Schema.optional(Schema.Array(PositiveFileIdSchema)),
-  ids: Schema.optional(FilesIdsInputSchema),
+});
+const FilesExtractInputSchema = makeCursorSelectionSchema("ids", "excludeIds", {
   password: Schema.optional(NonEmptyStringSchema),
-}).check(
-  Schema.makeFilter((input) => input.cursor !== undefined || input.ids !== undefined, {
-    expected: "a non-empty cursor or file ID selection",
-  }),
-);
+});
 const FileUploadInputSchema = Schema.Struct({
   file: Schema.instanceOf(Blob),
   fileName: Schema.optional(NonEmptyStringSchema),

@@ -11,5 +11,6 @@
     "vitest.live.config.ts"
   ],
   "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "*.config.ts"],
+  "ignoreBinaries": ["infisical"],
   "ignoreDependencies": ["is-ci"]
 }

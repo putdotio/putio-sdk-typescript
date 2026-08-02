@@ -16,20 +16,39 @@ missing_identity() {
   return 2
 }
 
+missing_infisical_cli() {
+  echo "The Infisical CLI is unavailable on this runner." >&2
+  echo "Install the runner-managed CLI or inject the live token pair or bootstrap credentials directly." >&2
+  return 2
+}
+
 if [[ -z "${INFISICAL_TOKEN:-}" || -z "${PUTIO_SDK_TYPESCRIPT_INFISICAL_PROJECT_ID:-}" || -z "${PUTIO_SDK_TYPESCRIPT_INFISICAL_PATH:-}" ]]; then
   AGENT_EXPECTED_FAILURE=1 agent_run_logged live missing-runner-identity runner/missing_identity missing_identity
   exit 2
 fi
 
 if ! command -v infisical >/dev/null 2>&1; then
-  AGENT_EXPECTED_FAILURE=1 agent_run_logged live missing-infisical-cli runner/missing_tool missing_identity
+  AGENT_EXPECTED_FAILURE=1 agent_run_logged live missing-infisical-cli runner/missing_tool missing_infisical_cli
   exit 2
 fi
 
-exec infisical run \
-  --silent \
-  --domain "${PUTIO_INFISICAL_DOMAIN:-https://eu.infisical.com/api}" \
-  --projectId "$PUTIO_SDK_TYPESCRIPT_INFISICAL_PROJECT_ID" \
-  --env "${PUTIO_SDK_TYPESCRIPT_INFISICAL_ENV:-dev}" \
-  --path "$PUTIO_SDK_TYPESCRIPT_INFISICAL_PATH" \
-  -- ./scripts/agent-live-execute.sh "$@"
+run_infisical() {
+  node ./scripts/run-infisical.ts "$@"
+}
+
+set +e
+agent_run_logged live-injection infisical-injection runner/secret_injection_failed run_infisical "$@"
+injection_status=$?
+set -e
+
+set +e
+agent_run_logged live-injection-scan scan-infisical-output artifact/secret_leak \
+  node ./scripts/agent-record.ts scan "$AGENT_ATTEMPT_ARTIFACT_DIR/live-injection.log"
+scan_status=$?
+set -e
+
+if ((scan_status != 0)); then
+  exit "$scan_status"
+fi
+
+exit "$injection_status"

@@ -8,6 +8,7 @@ Install the pinned dependencies without changing machine-global tooling:
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm exec vp config
 ```
 
 ## Validation

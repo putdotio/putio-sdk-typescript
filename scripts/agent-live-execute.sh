@@ -16,34 +16,45 @@ if [[ -n "${PUTIO_TEST_USERNAME:-}" && -n "${PUTIO_TEST_PASSWORD:-}" && -n "${PU
   has_bootstrap_credentials=1
 fi
 
-if ((has_token_pair == 0 && has_bootstrap_credentials == 0)); then
-  echo "Runner secret injection must provide a live token pair or the first-party bootstrap credential set." >&2
-  exit 2
-fi
-
-if [[ "${AGENT_LIVE_REFRESH_TOKENS:-0}" == "1" && "$has_bootstrap_credentials" != "1" ]]; then
-  echo "AGENT_LIVE_REFRESH_TOKENS requires the first-party bootstrap credential set." >&2
-  exit 2
-fi
-
-if (($# == 0)); then
-  echo "Pass one or more explicit test/live/*.test.ts targets. The unattended path has no mutation-heavy default." >&2
-  exit 2
-fi
-
-for target in "$@"; do
-  if [[ ! "$target" =~ ^test/live/[A-Za-z0-9._-]+\.test\.ts$ ]] || [[ ! -f "$target" ]]; then
-    echo "Unsupported live target: $target" >&2
-    exit 2
+validate_live_invocation() {
+  if ((has_token_pair == 0 && has_bootstrap_credentials == 0)); then
+    echo "Runner secret injection must provide a live token pair or the first-party bootstrap credential set." >&2
+    return 2
   fi
-done
+
+  if [[ "${AGENT_LIVE_REFRESH_TOKENS:-0}" == "1" && "$has_bootstrap_credentials" != "1" ]]; then
+    echo "AGENT_LIVE_REFRESH_TOKENS requires the first-party bootstrap credential set." >&2
+    return 2
+  fi
+
+  if (($# == 0)); then
+    echo "Pass one or more explicit test/live/*.test.ts targets. The unattended path has no mutation-heavy default." >&2
+    return 2
+  fi
+
+  for target in "$@"; do
+    if [[ ! "$target" =~ ^test/live/[A-Za-z0-9._-]+\.test\.ts$ ]] || [[ ! -f "$target" ]]; then
+      echo "Unsupported live target: $target" >&2
+      return 2
+    fi
+  done
+}
+
+set +e
+AGENT_EXPECTED_FAILURE=1 agent_run_logged live-input validate-live-invocation input/invalid validate_live_invocation "$@"
+input_status=$?
+set -e
+
+if ((input_status != 0)); then
+  exit "$input_status"
+fi
 
 live_test() {
   agent_vp pack
   if [[ "${AGENT_LIVE_REFRESH_TOKENS:-0}" == "1" ]]; then
     node ./scripts/run-live-with-fresh-tokens.ts "$@"
   else
-    agent_vp test run --config vitest.live.config.ts "$@"
+    node ./scripts/run-live-tests.ts "$@"
   fi
 }
 
@@ -52,15 +63,14 @@ agent_run_logged live explicit-live-targets live/failed live_test "$@"
 live_status=$?
 set -e
 
-log_path="$AGENT_ATTEMPT_ARTIFACT_DIR/live.log"
 set +e
-node ./scripts/agent-record.ts scan "$log_path"
+agent_run_logged live-scan scan-live-output artifact/secret_leak \
+  node ./scripts/agent-record.ts scan "$AGENT_ATTEMPT_ARTIFACT_DIR/live.log"
 scan_status=$?
 set -e
 
 if ((scan_status != 0)); then
-  agent_record record live explicit-live-targets failure artifact/secret_leak 0 1 "$log_path"
-  exit 1
+  exit "$scan_status"
 fi
 
 exit "$live_status"

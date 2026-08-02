@@ -2,21 +2,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
+import { collectSecretValues } from "./agent-secret-values.ts";
+
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-const secretKeys = [
-  "INFISICAL_TOKEN",
-  "PUTIO_CLIENT_SECRET_FIRST_PARTY",
-  "PUTIO_TEST_PASSWORD",
-  "PUTIO_TEST_SECONDARY_PASSWORD",
-  "PUTIO_TEST_TOTP",
-  "PUTIO_TEST_TOTP_REFERENCE",
-  "PUTIO_TEST_SECONDARY_TOTP",
-  "PUTIO_TEST_SECONDARY_TOTP_REFERENCE",
-  "PUTIO_TOKEN_FIRST_PARTY",
-  "PUTIO_TOKEN_PAYMENT_OWNER",
-  "PUTIO_TOKEN_PAYMENT_SUB_ACCOUNT",
-  "PUTIO_TOKEN_THIRD_PARTY",
-];
 
 const requireArgument = (value: string | undefined, name: string): string => {
   if (!value) {
@@ -42,19 +30,15 @@ const commandOutput = (command: string, args: readonly string[]): string =>
 const optionalCommandOutput = (command: string, args: readonly string[]): string | null => {
   try {
     return commandOutput(command, args);
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
-      return null;
-    }
-
-    throw error;
+  } catch {
+    return null;
   }
 };
 
 const vitePlusVersion = (): string | null => {
   const localVitePlus = resolve("node_modules/.bin/vp");
   const output = existsSync(localVitePlus)
-    ? commandOutput(localVitePlus, ["--version"])
+    ? optionalCommandOutput(localVitePlus, ["--version"])
     : optionalCommandOutput("vp", ["--version"]);
 
   return output?.split("\n", 1)[0] ?? null;
@@ -130,9 +114,8 @@ const scan = (paths: readonly string[]): void => {
   for (const path of paths) {
     let contents = readFileSync(path, "utf8");
 
-    for (const key of secretKeys) {
-      const value = process.env[key];
-      if (value && value.length >= 8 && contents.includes(value)) {
+    for (const [key, value] of collectSecretValues()) {
+      if (contents.includes(value)) {
         leaks.push(`${path}:${key}`);
         contents = contents.replaceAll(value, `[REDACTED:${key}]`);
       }

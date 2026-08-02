@@ -12,6 +12,10 @@ finish() {
   teardown_status=$?
   set -e
 
+  if ((teardown_status != 0)); then
+    echo "Agent teardown failed with status $teardown_status." >&2
+  fi
+
   if ((run_status != 0)); then
     exit "$run_status"
   fi

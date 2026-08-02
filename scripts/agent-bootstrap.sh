@@ -17,7 +17,7 @@ bootstrap() {
   local expected_vp
   expected_node="$(tr -d '[:space:]' < .node-version)"
   actual_node="$(node -p 'process.versions.node')"
-  expected_pnpm="$(node -p 'JSON.parse(require("node:fs").readFileSync("package.json", "utf8")).packageManager.split("@").at(-1)')"
+  expected_pnpm="$(node -p 'JSON.parse(require("node:fs").readFileSync("package.json", "utf8")).packageManager.split("@").at(-1).split("+")[0]')"
   expected_vp="$(sed -n 's/^  vite-plus: //p' pnpm-workspace.yaml)"
 
   if [[ "$actual_node" != "$expected_node" ]]; then

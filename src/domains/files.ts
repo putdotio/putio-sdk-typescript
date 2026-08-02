@@ -20,7 +20,12 @@ import {
   type PutioSdkConfigShape,
   type PutioSdkContext,
 } from "../core/http.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
+import {
+  NonEmptyStringSchema,
+  PositiveIntegerSchema,
+  decodeAndRun,
+  makeCursorSelectionSchema,
+} from "../core/validation.js";
 const RequestedFlag = Schema.Literal(1);
 const NonNegativeFileIdSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 const PositiveFileIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
@@ -226,17 +231,21 @@ const FileNextInputSchema = Schema.Struct({
   fileType: FileTypeSchema,
 });
 const FileCreateFolderInputSchema = Schema.Struct({
-  name: Schema.optional(Schema.String),
-  parent_id: Schema.optional(Schema.Int),
-  path: Schema.optional(Schema.String),
-});
+  name: Schema.optional(NonEmptyStringSchema),
+  parent_id: Schema.optional(NonNegativeFileIdSchema),
+  path: Schema.optional(NonEmptyStringSchema),
+}).check(
+  Schema.makeFilter((input) => input.name !== undefined || input.path !== undefined, {
+    expected: "a non-empty folder name or path",
+  }),
+);
 const FileRenameInputSchema = Schema.Struct({
-  file_id: Schema.Int,
-  name: Schema.String,
+  file_id: PositiveFileIdSchema,
+  name: NonEmptyStringSchema,
 });
 const FileStartFromSetInputSchema = Schema.Struct({
-  file_id: Schema.Int,
-  time: Schema.Number,
+  file_id: PositiveFileIdSchema,
+  time: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
 });
 const FileStartFromEnvelopeSchema = Schema.Struct({
   start_from: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
@@ -361,9 +370,45 @@ const FileExtractionsEnvelopeSchema = Schema.Struct({
   status: Schema.optional(Schema.Literal("OK")),
 });
 const FilesBulkSelectionSchema = Schema.Struct({
-  cursor: Schema.optional(Schema.String),
-  excludeIds: Schema.optional(Schema.Array(Schema.Int)),
-  ids: Schema.optional(Schema.Array(Schema.Int)),
+  cursor: Schema.optional(NonEmptyStringSchema),
+  excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
+  ids: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
+}).check(
+  Schema.makeFilter((input) => input.cursor !== undefined || input.ids !== undefined, {
+    expected: "a non-empty cursor or file ID selection",
+  }),
+);
+const FilesDeleteOptionsSchema = Schema.Struct({
+  ignoreFileOwner: Schema.optional(Schema.Boolean),
+  partialDelete: Schema.optional(Schema.Boolean),
+  skipTrash: Schema.optional(Schema.Boolean),
+});
+const FilesSelectionDeleteOptionsSchema = Schema.Struct({
+  partialDelete: Schema.optional(Schema.Boolean),
+  skipTrash: Schema.optional(Schema.Boolean),
+});
+const FilesIdsInputSchema = Schema.Array(PositiveFileIdSchema).check(Schema.isMinLength(1));
+const FilesMoveInputSchema = Schema.Struct({
+  ids: FilesIdsInputSchema,
+  parentId: NonNegativeFileIdSchema,
+});
+const FilesMoveSelectionInputSchema = Schema.Struct({
+  parentId: NonNegativeFileIdSchema,
+  selection: FilesBulkSelectionSchema,
+});
+const FilesWatchStatusInputSchema = makeCursorSelectionSchema("ids", "excludeIds", {
+  watched: Schema.Boolean,
+});
+const FilesExtractInputSchema = makeCursorSelectionSchema("ids", "excludeIds", {
+  password: Schema.optional(NonEmptyStringSchema),
+});
+const FileUploadInputSchema = Schema.Struct({
+  file: Schema.instanceOf(Blob),
+  fileName: Schema.optional(NonEmptyStringSchema),
+  parentId: Schema.optional(NonNegativeFileIdSchema),
+});
+const FileUploadOptionsSchema = Schema.Struct({
+  oauthToken: Schema.optional(NonEmptyStringSchema),
 });
 const FilesNextFileSchema = Schema.Struct({
   id: Schema.Int,
@@ -409,7 +454,10 @@ export type FileExtractionStatus = Schema.Schema.Type<typeof FileExtractionStatu
 export type FileExtraction = Schema.Schema.Type<typeof FileExtractionSchema>;
 export type FileSubtitle = Schema.Schema.Type<typeof FileSubtitleSchema>;
 export type FilesMoveError = Schema.Schema.Type<typeof FilesMoveErrorSchema>;
-export type FilesBulkSelection = Schema.Schema.Type<typeof FilesBulkSelectionSchema>;
+type FilesBulkSelectionShape = Schema.Schema.Type<typeof FilesBulkSelectionSchema>;
+export type FilesBulkSelection =
+  | (FilesBulkSelectionShape & { readonly cursor: string })
+  | (FilesBulkSelectionShape & { readonly ids: ReadonlyArray<number> });
 export type FileUploadTransfer = Schema.Schema.Type<typeof FileUploadTransferSchema>;
 export type FileUploadEnvelope = Schema.Schema.Type<typeof FileUploadEnvelopeSchema>;
 export type FileUploadResult =
@@ -1111,25 +1159,29 @@ export const resetFileSortSettings = (): Effect.Effect<void, PutioSdkError, Puti
 export const createFolder = (
   input: FileCreateFolderInput,
 ): Effect.Effect<FileBroad, CreateFolderError, PutioSdkContext> =>
-  requestJson(FileEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: input,
-    },
-    method: "POST",
-    path: "/v2/files/create-folder",
-  }).pipe(selectJsonField("file"), withOperationErrors(CreateFolderErrorSpec));
+  decodeAndRun(FileCreateFolderInputSchema, input, (decodedInput) =>
+    requestJson(FileEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: decodedInput,
+      },
+      method: "POST",
+      path: "/v2/files/create-folder",
+    }),
+  ).pipe(selectJsonField("file"), withOperationErrors(CreateFolderErrorSpec));
 export const renameFile = (
   input: FileRenameInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, RenameFileError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: input,
-    },
-    method: "POST",
-    path: "/v2/files/rename",
-  }).pipe(withOperationErrors(RenameFileErrorSpec));
+  decodeAndRun(FileRenameInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: decodedInput,
+      },
+      method: "POST",
+      path: "/v2/files/rename",
+    }),
+  ).pipe(withOperationErrors(RenameFileErrorSpec));
 export const deleteFiles = (
   ids: ReadonlyArray<number>,
   options: {
@@ -1142,22 +1194,27 @@ export const deleteFiles = (
   PutioSdkError,
   PutioSdkContext
 > =>
-  requestJson(FileDeleteResultEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        file_ids: joinCsv(ids),
-      },
-    },
-    method: "POST",
-    path: "/v2/files/delete",
-    query: {
-      partial_delete: options.partialDelete,
-      skip_nonexistents: true,
-      skip_owner_check: options.ignoreFileOwner,
-      skip_trash: options.skipTrash,
-    },
-  });
+  decodeAndRun(
+    Schema.Struct({ ids: FilesIdsInputSchema, options: FilesDeleteOptionsSchema }),
+    { ids, options },
+    (decodedInput) =>
+      requestJson(FileDeleteResultEnvelopeSchema, {
+        body: {
+          type: "form",
+          value: {
+            file_ids: joinCsv(decodedInput.ids),
+          },
+        },
+        method: "POST",
+        path: "/v2/files/delete",
+        query: {
+          partial_delete: decodedInput.options.partialDelete,
+          skip_nonexistents: true,
+          skip_owner_check: decodedInput.options.ignoreFileOwner,
+          skip_trash: decodedInput.options.skipTrash,
+        },
+      }),
+  );
 export const deleteFileSelection = (
   selection: FilesBulkSelection,
   options: {
@@ -1169,49 +1226,61 @@ export const deleteFileSelection = (
   PutioSdkError,
   PutioSdkContext
 > =>
-  requestJson(FileDeleteResultEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: toCursorSelectionForm(selection),
-    },
-    method: "POST",
-    path: "/v2/files/delete",
-    query: {
-      partial_delete: options.partialDelete,
-      skip_nonexistents: true,
-      skip_trash: options.skipTrash,
-    },
-  });
+  decodeAndRun(
+    Schema.Struct({
+      options: FilesSelectionDeleteOptionsSchema,
+      selection: FilesBulkSelectionSchema,
+    }),
+    { options, selection },
+    (decodedInput) =>
+      requestJson(FileDeleteResultEnvelopeSchema, {
+        body: {
+          type: "form",
+          value: toCursorSelectionForm(decodedInput.selection),
+        },
+        method: "POST",
+        path: "/v2/files/delete",
+        query: {
+          partial_delete: decodedInput.options.partialDelete,
+          skip_nonexistents: true,
+          skip_trash: decodedInput.options.skipTrash,
+        },
+      }),
+  );
 export const moveFiles = (
   ids: ReadonlyArray<number>,
   parentId: number,
 ): Effect.Effect<ReadonlyArray<FilesMoveError>, PutioSdkError, PutioSdkContext> =>
-  requestJson(FilesMoveEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        file_ids: joinCsv(ids),
-        parent_id: parentId,
+  decodeAndRun(FilesMoveInputSchema, { ids, parentId }, (decodedInput) =>
+    requestJson(FilesMoveEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          file_ids: joinCsv(decodedInput.ids),
+          parent_id: decodedInput.parentId,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/files/move",
-  }).pipe(selectJsonField("errors"));
+      method: "POST",
+      path: "/v2/files/move",
+    }),
+  ).pipe(selectJsonField("errors"));
 export const moveFileSelection = (
   selection: FilesBulkSelection,
   parentId: number,
 ): Effect.Effect<ReadonlyArray<FilesMoveError>, PutioSdkError, PutioSdkContext> =>
-  requestJson(FilesMoveEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        ...toCursorSelectionForm(selection),
-        parent_id: parentId,
+  decodeAndRun(FilesMoveSelectionInputSchema, { parentId, selection }, (decodedInput) =>
+    requestJson(FilesMoveEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          ...toCursorSelectionForm(decodedInput.selection),
+          parent_id: decodedInput.parentId,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/files/move",
-  }).pipe(selectJsonField("errors"));
+      method: "POST",
+      path: "/v2/files/move",
+    }),
+  ).pipe(selectJsonField("errors"));
 export const getStartFrom = (
   fileId: number,
 ): Effect.Effect<number, StartFromError, PutioSdkContext> =>
@@ -1305,23 +1374,27 @@ export const listFileSubtitles = (
 export const setStartFrom = (
   input: FileStartFromSetInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, StartFromError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: {
-        time: input.time,
+  decodeAndRun(FileStartFromSetInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          time: decodedInput.time,
+        },
       },
-    },
-    method: "POST",
-    path: `/v2/files/${encodePathSegment(input.file_id)}/start-from`,
-  }).pipe(withOperationErrors(StartFromErrorSpec));
+      method: "POST",
+      path: `/v2/files/${encodePathSegment(decodedInput.file_id)}/start-from`,
+    }),
+  ).pipe(withOperationErrors(StartFromErrorSpec));
 export const resetStartFrom = (
   fileId: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, StartFromError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/files/${encodePathSegment(fileId)}/start-from/delete`,
-  }).pipe(withOperationErrors(StartFromErrorSpec));
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestJson(OkResponseSchema, {
+      method: "POST",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/start-from/delete`,
+    }),
+  ).pipe(withOperationErrors(StartFromErrorSpec));
 export const getMp4Status = (
   fileId: number,
 ): Effect.Effect<FileConversionStatus, FileMp4Error, PutioSdkContext> =>
@@ -1334,48 +1407,58 @@ export const getMp4Status = (
 export const convertFileToMp4 = (
   fileId: number,
 ): Effect.Effect<FileConversionStatus, FileMp4Error, PutioSdkContext> =>
-  requestJson(FileConversionStatusEnvelopeSchema, {
-    method: "POST",
-    path: `/v2/files/${encodePathSegment(fileId)}/mp4`,
-  }).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestJson(FileConversionStatusEnvelopeSchema, {
+      method: "POST",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/mp4`,
+    }),
+  ).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
 export const deleteFileMp4 = (
   fileId: number,
 ): Effect.Effect<void, FileMp4MutationError, PutioSdkContext> =>
-  requestVoid({
-    method: "DELETE",
-    path: `/v2/files/${encodePathSegment(fileId)}/mp4`,
-  }).pipe(withOperationErrors(FileMp4MutationErrorSpec));
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestVoid({
+      method: "DELETE",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/mp4`,
+    }),
+  ).pipe(withOperationErrors(FileMp4MutationErrorSpec));
 export const putMp4ToMyFiles = (
   fileId: number,
 ): Effect.Effect<void, FileMp4MutationError, PutioSdkContext> =>
-  requestVoid({
-    method: "GET",
-    path: `/v2/files/${encodePathSegment(fileId)}/put-mp4-to-my-folders`,
-  }).pipe(withOperationErrors(FileMp4MutationErrorSpec));
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestVoid({
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/put-mp4-to-my-folders`,
+    }),
+  ).pipe(withOperationErrors(FileMp4MutationErrorSpec));
 export const convertFilesToMp4 = (
   ids: ReadonlyArray<number>,
 ): Effect.Effect<number, PutioSdkError, PutioSdkContext> =>
-  requestJson(FilesBulkConvertEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        file_ids: joinCsv(ids),
+  decodeAndRun(FilesIdsInputSchema, ids, (decodedIds) =>
+    requestJson(FilesBulkConvertEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          file_ids: joinCsv(decodedIds),
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/files/convert_mp4",
-  }).pipe(selectJsonField("count"));
+      method: "POST",
+      path: "/v2/files/convert_mp4",
+    }),
+  ).pipe(selectJsonField("count"));
 export const convertFileSelectionToMp4 = (
   selection: FilesBulkSelection,
 ): Effect.Effect<number, PutioSdkError, PutioSdkContext> =>
-  requestJson(FilesBulkConvertEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: toCursorSelectionForm(selection),
-    },
-    method: "POST",
-    path: "/v2/files/convert_mp4",
-  }).pipe(selectJsonField("count"));
+  decodeAndRun(FilesBulkSelectionSchema, selection, (decodedSelection) =>
+    requestJson(FilesBulkConvertEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: toCursorSelectionForm(decodedSelection),
+      },
+      method: "POST",
+      path: "/v2/files/convert_mp4",
+    }),
+  ).pipe(selectJsonField("count"));
 export const listActiveMp4Conversions = (): Effect.Effect<
   ReadonlyArray<FileActiveConversion>,
   FileActiveConversionsError,
@@ -1390,33 +1473,37 @@ export const setFilesWatchStatus = (
     readonly watched: boolean;
   },
 ): Effect.Effect<void, FileWatchStatusError, PutioSdkContext> =>
-  requestVoid({
-    body: {
-      type: "form",
-      value: {
-        ...toCursorSelectionForm(selection),
-        watched: selection.watched,
+  decodeAndRun(FilesWatchStatusInputSchema, selection, (decodedSelection) =>
+    requestVoid({
+      body: {
+        type: "form",
+        value: {
+          ...toCursorSelectionForm(decodedSelection),
+          watched: decodedSelection.watched,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/files/watch-status",
-  }).pipe(withOperationErrors(FileWatchStatusErrorSpec));
+      method: "POST",
+      path: "/v2/files/watch-status",
+    }),
+  ).pipe(withOperationErrors(FileWatchStatusErrorSpec));
 export const extractFiles = (
   selection: FilesBulkSelection & {
     readonly password?: string;
   },
 ): Effect.Effect<ReadonlyArray<FileExtraction>, FileExtractionsError, PutioSdkContext> =>
-  requestJson(FileExtractionsEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        ...toCursorSelectionForm(selection, "user_file_ids"),
-        password: selection.password,
+  decodeAndRun(FilesExtractInputSchema, selection, (decodedSelection) =>
+    requestJson(FileExtractionsEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          ...toCursorSelectionForm(decodedSelection, "user_file_ids"),
+          password: decodedSelection.password,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/files/extract",
-  }).pipe(selectJsonField("extractions"), withOperationErrors(FileExtractionsErrorSpec));
+      method: "POST",
+      path: "/v2/files/extract",
+    }),
+  ).pipe(selectJsonField("extractions"), withOperationErrors(FileExtractionsErrorSpec));
 export const listFileExtractions = (): Effect.Effect<
   ReadonlyArray<FileExtraction>,
   FileExtractionsError,
@@ -1429,10 +1516,12 @@ export const listFileExtractions = (): Effect.Effect<
 export const deleteFileExtraction = (
   extractionId: number,
 ): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
-  requestVoid({
-    method: "DELETE",
-    path: `/v2/files/extract/${encodePathSegment(extractionId)}`,
-  });
+  decodeAndRun(PositiveIntegerSchema, extractionId, (decodedExtractionId) =>
+    requestVoid({
+      method: "DELETE",
+      path: `/v2/files/extract/${encodePathSegment(decodedExtractionId)}`,
+    }),
+  );
 export const findNextFile = (
   fileId: number,
   fileType: FileType,
@@ -1461,14 +1550,19 @@ export const createFileUploadRequest = (
     readonly oauthToken?: string;
   } = {},
 ): Effect.Effect<FileUploadRequestDescriptor, PutioSdkError, PutioSdkConfig> =>
-  resolveRouteContext(options.oauthToken).pipe(
-    Effect.map(({ config, oauthToken }) => ({
-      body: createFileUploadFormData(input),
-      method: "POST" as const,
-      url: buildPutioUrl(config.uploadBaseUrl ?? "https://upload.put.io", "/v2/files/upload", {
-        oauth_token: oauthToken,
-      }),
-    })),
+  decodeAndRun(
+    Schema.Struct({ input: FileUploadInputSchema, options: FileUploadOptionsSchema }),
+    { input, options },
+    (decoded) =>
+      resolveRouteContext(decoded.options.oauthToken).pipe(
+        Effect.map(({ config, oauthToken }) => ({
+          body: createFileUploadFormData(decoded.input),
+          method: "POST" as const,
+          url: buildPutioUrl(config.uploadBaseUrl ?? "https://upload.put.io", "/v2/files/upload", {
+            oauth_token: oauthToken,
+          }),
+        })),
+      ),
   );
 export const uploadFile = (
   input: FileUploadInput,
@@ -1476,24 +1570,27 @@ export const uploadFile = (
     readonly oauthToken?: string;
   } = {},
 ): Effect.Effect<FileUploadResult, FileUploadError | PutioValidationError, PutioSdkContext> =>
-  resolveRouteContext(options.oauthToken).pipe(
-    Effect.flatMap(({ config, oauthToken }) =>
-      requestJson(FileUploadEnvelopeSchema, {
-        auth: {
-          type: "none",
-        },
-        baseUrl: config.uploadBaseUrl ?? "https://upload.put.io",
-        body: {
-          type: "form-data",
-          value: createFileUploadFormData(input),
-        },
-        method: "POST",
-        path: "/v2/files/upload",
-        query: {
-          oauth_token: oauthToken,
-        },
-      }),
-    ),
-    Effect.map(toUploadResult),
-    withOperationErrors(FileUploadErrorSpec),
-  );
+  decodeAndRun(
+    Schema.Struct({ input: FileUploadInputSchema, options: FileUploadOptionsSchema }),
+    { input, options },
+    (decoded) =>
+      resolveRouteContext(decoded.options.oauthToken).pipe(
+        Effect.flatMap(({ config, oauthToken }) =>
+          requestJson(FileUploadEnvelopeSchema, {
+            auth: {
+              type: "none",
+            },
+            baseUrl: config.uploadBaseUrl ?? "https://upload.put.io",
+            body: {
+              type: "form-data",
+              value: createFileUploadFormData(decoded.input),
+            },
+            method: "POST",
+            path: "/v2/files/upload",
+            query: {
+              oauth_token: oauthToken,
+            },
+          }),
+        ),
+      ),
+  ).pipe(Effect.map(toUploadResult), withOperationErrors(FileUploadErrorSpec));

@@ -14,7 +14,7 @@ import {
   type PutioSdkContext,
 } from "../core/http.js";
 export const DownloadLinksStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
-export const DownloadLinksCreateInputSchema = makeCursorSelectionSchema("ids", "excludeIds");
+export const DownloadLinksCreateInputSchema = makeCursorSelectionSchema("ids", "excludeIds", {});
 export const DownloadLinksPayloadSchema = Schema.Struct({
   download_links: Schema.Array(Schema.String),
   media_links: Schema.Array(Schema.String),

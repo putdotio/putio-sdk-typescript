@@ -192,6 +192,7 @@ If you create a long-lived Promise client in a script, test harness, or server i
 | `ifttt`         | IFTTT integration endpoints                                                                      |
 | `oauth`         | OAuth app management                                                                             |
 | `payment`       | plans, vouchers, payment flows, payment history                                                  |
+| `podcast`       | podcast feed links for folders and media types                                                   |
 | `rss`           | RSS feed management                                                                              |
 | `sharing`       | friend shares, public shares, clone flows                                                        |
 | `transfers`     | transfer list, add/retry/cancel/clean flows                                                      |

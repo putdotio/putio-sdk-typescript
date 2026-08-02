@@ -312,6 +312,20 @@ describe("files domain", () => {
       ),
     ).toMatchObject({ id: 9 });
 
+    expect(
+      await runSdkEffect(
+        files.getFile({ id: 0 }),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/files/0");
+          return jsonResponse({
+            file: { ...baseFile, id: 0, name: "Root" },
+            status: "OK",
+          });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).toMatchObject({ id: 0, name: "Root" });
+
     const file = await runSdkEffect(
       files.getFile({
         id: 9,
@@ -685,7 +699,6 @@ describe("files domain", () => {
       runSdkExit(files.continueFiles("cursor", { per_page: 0 }), handler, {
         accessToken: "token-123",
       }),
-      runSdkExit(files.getFile({ id: 0 }), handler, { accessToken: "token-123" }),
       runSdkExit(
         // @ts-expect-error JavaScript callers can supply non-numeric file IDs.
         files.getFile({ id: "1/../../account/info" }),

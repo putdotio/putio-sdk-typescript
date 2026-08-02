@@ -206,7 +206,7 @@ const FilesContinueInputSchema = Schema.Struct({
   }),
 });
 const FileGetInputSchema = Schema.Struct({
-  id: PositiveFileIdSchema,
+  id: NonNegativeFileIdSchema,
   query: Schema.optional(FileQuerySchema),
 });
 const FilesSearchContinueInputSchema = Schema.Struct({

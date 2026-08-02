@@ -32,7 +32,7 @@ export type PodcastLinksResponse = Pick<
 export const getPodcastLinks = (
   input: PodcastGetLinksInput,
 ): Effect.Effect<PodcastLinksResponse, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PodcastGetLinksInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(PodcastGetLinksInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(PodcastLinksEnvelopeSchema, {

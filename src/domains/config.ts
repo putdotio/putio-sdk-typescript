@@ -297,7 +297,7 @@ export const readConfigWith = <A>(
 export const writeConfig = (
   config: PutioJsonObject,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(JsonObjectSchema)(config).pipe(
+  Schema.decodeUnknownEffect(JsonObjectSchema, { onExcessProperty: "error" })(config).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedConfig) =>
       requestJson(OkResponseSchema, {
@@ -315,7 +315,7 @@ export const writeConfig = (
 export const getConfigKey = (
   key: string,
 ): Effect.Effect<PutioJsonValue, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigKeySchema)(key).pipe(
+  Schema.decodeUnknownEffect(ConfigKeySchema, { onExcessProperty: "error" })(key).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedKey) =>
       requestJson(ConfigValueEnvelopeSchema, {
@@ -329,7 +329,7 @@ export const getConfigKeyWith = <A>(
   key: string,
   schema: Schema.ConstraintDecoder<A, never>,
 ): Effect.Effect<A, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigKeySchema)(key).pipe(
+  Schema.decodeUnknownEffect(ConfigKeySchema, { onExcessProperty: "error" })(key).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedKey) =>
       requestJson(
@@ -346,7 +346,10 @@ export const setConfigKey = (
   key: string,
   value: PutioJsonValue,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigSetKeyInputSchema)({ key, value }).pipe(
+  Schema.decodeUnknownEffect(ConfigSetKeyInputSchema, { onExcessProperty: "error" })({
+    key,
+    value,
+  }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OkResponseSchema, {
@@ -364,7 +367,7 @@ export const setConfigKey = (
 export const deleteConfigKey = (
   key: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigKeySchema)(key).pipe(
+  Schema.decodeUnknownEffect(ConfigKeySchema, { onExcessProperty: "error" })(key).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedKey) =>
       requestJson(OkResponseSchema, {

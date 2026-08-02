@@ -1045,7 +1045,9 @@ export function getFileChild<TQuery extends FileQuery>(input: {
   PutioSdkContext
 >;
 export function getFileChild(input: FileGetChildInput) {
-  return Schema.decodeUnknownEffect(FileGetChildInputSchema)(input).pipe(
+  return Schema.decodeUnknownEffect(FileGetChildInputSchema, { onExcessProperty: "error" })(
+    input,
+  ).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) => {
       const effect = requestJson(FileEnvelopeSchema, {
@@ -1065,7 +1067,7 @@ export function getFileChild(input: FileGetChildInput) {
 export const copyFile = (
   input: FileCopyInput,
 ): Effect.Effect<FileBroad, CopyFileError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FileCopyInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(FileCopyInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(FileEnvelopeSchema, {
@@ -1087,7 +1089,7 @@ export const copyFile = (
 export const touchFiles = (
   input: FileTouchInput,
 ): Effect.Effect<void, TouchFilesError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FileTouchInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(FileTouchInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OkResponseSchema, {
@@ -1108,7 +1110,7 @@ export const touchFiles = (
 export const canWriteFile = (
   fileId: number,
 ): Effect.Effect<number, CanWriteFileError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveFileIdSchema)(fileId).pipe(
+  Schema.decodeUnknownEffect(PositiveFileIdSchema, { onExcessProperty: "error" })(fileId).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedFileId) =>
       requestJson(FileCanWriteEnvelopeSchema, {
@@ -1122,7 +1124,7 @@ export const canWriteFile = (
 export const searchFiles = (
   query: FilesSearchQuery,
 ): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FilesSearchQuerySchema)(query).pipe(
+  Schema.decodeUnknownEffect(FilesSearchQuerySchema, { onExcessProperty: "error" })(query).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedQuery) =>
       requestJson(FilesSearchEnvelopeSchema, {
@@ -1155,7 +1157,7 @@ export const continueSearch = (
 export const setFileSort = (
   input: FileSetSortInput,
 ): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FileSetSortInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(FileSetSortInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OkResponseSchema, {

@@ -83,7 +83,9 @@ export const createDownloadLinks = (
   CreateDownloadLinksError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(DownloadLinksCreateInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(DownloadLinksCreateInputSchema, { onExcessProperty: "error" })(
+    input,
+  ).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(DownloadLinksCreateEnvelopeSchema, {
@@ -101,7 +103,7 @@ export const createDownloadLinks = (
 export const getDownloadLinks = (
   id: number,
 ): Effect.Effect<DownloadLinksInfo, GetDownloadLinksError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema, { onExcessProperty: "error" })(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(DownloadLinksInfoSchema, {

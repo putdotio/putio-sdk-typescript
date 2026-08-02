@@ -217,7 +217,8 @@ export const getOAuthApp = (
       edit: Schema.optional(Schema.Boolean),
       id: OAuthAppIdSchema,
     }),
-  )({ edit: options?.edit, id }).pipe(
+    { onExcessProperty: "error" },
+  )({ ...options, id }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OAuthAppWithTokenSchema, {
@@ -238,6 +239,7 @@ export const setOAuthAppIcon = (
       id: OAuthAppIdSchema,
       input: OAuthSetIconInputSchema,
     }),
+    { onExcessProperty: "error" },
   )({ id, input }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) => {
@@ -261,7 +263,7 @@ export const createOAuthApp = (
   CreateOAuthAppError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(OAuthAppCreateInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(OAuthAppCreateInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OAuthAppEnvelopeSchema, {
@@ -282,7 +284,7 @@ export const updateOAuthApp = (
   UpdateOAuthAppError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(OAuthAppUpdateInputSchema)(input).pipe(
+  Schema.decodeUnknownEffect(OAuthAppUpdateInputSchema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OAuthAppWithTokenSchema, {
@@ -303,7 +305,7 @@ export const deleteOAuthApp = (
   DeleteOAuthAppError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(OAuthAppIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(OAuthAppIdSchema, { onExcessProperty: "error" })(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -316,7 +318,7 @@ export const deleteOAuthApp = (
 export const regenerateOAuthAppToken = (
   id: number,
 ): Effect.Effect<string, RegenerateOAuthAppTokenError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(OAuthAppIdSchema)(id).pipe(
+  Schema.decodeUnknownEffect(OAuthAppIdSchema, { onExcessProperty: "error" })(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OAuthRegeneratedTokenEnvelopeSchema, {

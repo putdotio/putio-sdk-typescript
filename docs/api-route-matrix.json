@@ -1,0 +1,205 @@
+{
+  "routes": [
+    {
+      "classification": "sdk",
+      "method": "POST",
+      "operation": "account.clear",
+      "path": "/v2/account/clear",
+      "rationale": "The account client exposes the backend clear operation directly.",
+      "source": "putio/api2/account.py:350"
+    },
+    {
+      "classification": "sdk",
+      "method": "GET",
+      "operation": "account.listConfirmations",
+      "path": "/v2/account/confirmation/list",
+      "rationale": "The account client exposes confirmation listing directly.",
+      "source": "putio/api2/account.py:409"
+    },
+    {
+      "classification": "sdk",
+      "method": "POST",
+      "operation": "account.destroy",
+      "path": "/v2/account/destroy",
+      "rationale": "The account client exposes the destructive account operation directly.",
+      "source": "putio/api2/account.py:300"
+    },
+    {
+      "classification": "sdk",
+      "method": "GET",
+      "operation": "account.getInfo",
+      "path": "/v2/account/info",
+      "rationale": "The account client exposes the conditional account-info contract directly.",
+      "source": "putio/api2/account.py:137"
+    },
+    {
+      "classification": "sdk",
+      "method": "GET",
+      "operation": "account.getSettings",
+      "path": "/v2/account/settings",
+      "rationale": "The account client exposes account settings retrieval directly.",
+      "source": "putio/api2/account.py:179"
+    },
+    {
+      "classification": "sdk",
+      "method": "POST",
+      "operation": "account.saveSettings",
+      "path": "/v2/account/settings",
+      "rationale": "The account client exposes JSON settings updates directly.",
+      "source": "putio/api2/account.py:188"
+    },
+    {
+      "classification": "sdk",
+      "method": "GET",
+      "operation": "account.listSubtitleLanguages",
+      "path": "/v2/account/subtitle_languages",
+      "rationale": "The account client exposes the backend subtitle-language list directly.",
+      "source": "putio/api2/account.py:425"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/app_specific_password/:passwordId/delete",
+      "rationale": "The audited endpoint implementation is in the app-password stack and is not on this branch yet.",
+      "source": "putio/login/app_specific_password/api.py:92"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/app_specific_password/create",
+      "rationale": "The audited endpoint implementation is in the app-password stack and is not on this branch yet.",
+      "source": "putio/login/app_specific_password/api.py:34"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/app_specific_password/delete_all",
+      "rationale": "The audited endpoint implementation is in the app-password stack and is not on this branch yet.",
+      "source": "putio/login/app_specific_password/api.py:112"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "GET",
+      "path": "/v2/app_specific_password/list",
+      "rationale": "The audited endpoint implementation is in the app-password stack and is not on this branch yet.",
+      "source": "putio/login/app_specific_password/api.py:78"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "GET",
+      "path": "/v2/files/:fileId/can-write",
+      "rationale": "The audit confirmed a public route but has not yet selected SDK support or exclusion.",
+      "source": "putio/api2/files.py:2175"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "GET",
+      "path": "/v2/files/:parentId/child",
+      "rationale": "The audit confirmed a public route but has not yet selected SDK support or exclusion.",
+      "source": "putio/api2/files.py:786"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/files/:fileId/start-from",
+      "rationale": "The canonical playback operation is implemented in the contract stack and is not on this branch yet.",
+      "source": "putio/api2/files.py:2090"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/files/:fileId/start-from/delete",
+      "rationale": "The canonical playback reset is implemented in the contract stack and is not on this branch yet.",
+      "source": "putio/api2/files.py:2132"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/files/copy",
+      "rationale": "The audit confirmed a public route but has not yet selected SDK support or exclusion.",
+      "source": "putio/api2/files.py:1381"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/files/remove-sort-by-settings",
+      "rationale": "The audited endpoint implementation is in the file-sort stack and is not on this branch yet.",
+      "source": "putio/api2/files.py:707"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/files/set-sort-by",
+      "rationale": "The audited endpoint implementation is in the file-sort stack and is not on this branch yet.",
+      "source": "putio/api2/files.py:678"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/files/touch",
+      "rationale": "The audit confirmed a public route but has not yet selected SDK support or exclusion.",
+      "source": "putio/api2/files.py:1222"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "GET",
+      "path": "/v2/oauth2/access_token",
+      "rationale": "Authorization-code exchange needs a public SDK design and explicit credential-handling contract.",
+      "source": "putio/oauth/blueprints/api.py:190"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/oauth2/access_token",
+      "rationale": "Authorization-code exchange needs a public SDK design and explicit credential-handling contract.",
+      "source": "putio/oauth/blueprints/api.py:190"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "GET",
+      "path": "/v2/podcast/links",
+      "rationale": "The audited endpoint implementation is in the podcast stack and is not on this branch yet.",
+      "source": "putio/podcast/api.py:19"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/transfers/add-trackers/:transferId",
+      "rationale": "The audit confirmed a public route but has not yet selected SDK support or exclusion.",
+      "source": "putio/api2/transfers.py:813"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "GET",
+      "path": "/v2/transfers/:transferId/torrent",
+      "rationale": "The audit confirmed a public route but has not yet selected SDK support or exclusion.",
+      "source": "putio/api2/transfers.py:344"
+    },
+    {
+      "classification": "investigate",
+      "followUp": "https://github.com/putdotio/putio-sdk-typescript/issues/108",
+      "method": "POST",
+      "path": "/v2/transfers/remove",
+      "rationale": "The audit confirmed a public route but has not yet selected SDK support or exclusion.",
+      "source": "putio/api2/transfers.py:669"
+    }
+  ],
+  "version": 1
+}

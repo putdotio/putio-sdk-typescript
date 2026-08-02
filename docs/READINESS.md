@@ -1,6 +1,6 @@
 # SDK Readiness
 
-This document answers one question: how ready is `@putdotio/sdk` by domain right now?
+This document records the current verification program for `@putdotio/sdk`.
 
 Readiness here is based on four things:
 
@@ -11,10 +11,21 @@ Readiness here is based on four things:
 
 ## Overall Status
 
-- namespace coverage is effectively complete for the current planned public domains
+- domain namespace coverage is broad, but endpoint completeness is not yet established
 - unit verification now covers all production code under `src/**` with a global 90% coverage guardrail
 - live coverage exists for every implemented domain
-- the main remaining work is depth of verification, not breadth of implementation
+- the route audit has confirmed both missing operations and contract drift
+
+## Public Route Matrix
+
+[`api-route-matrix.json`](./api-route-matrix.json) records method-level backend evidence and one
+of four decisions for each audited public route: `sdk`, `equivalent`, `excluded`, or
+`investigate`. `vp run verify` validates its shape, rejects internal or duplicate routes, and
+checks every named operation on both Effect and Promise clients.
+
+The matrix is currently an audited seed, not a completeness claim. Its `investigate` entries are
+linked to the endpoint-parity epic and do not count as supported. Endpoint completeness requires a
+full backend comparison and zero unresolved `investigate` entries.
 
 ## Last Full Sweep
 

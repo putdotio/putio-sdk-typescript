@@ -987,5 +987,39 @@ describe("supporting domain boundaries", () => {
       operation: "get",
       status: 404,
     });
+
+    const iftttFailure = await runSdkExit(
+      ifttt.sendIftttEvent({
+        eventType: "playback_started",
+        ingredients: {
+          file_id: 7,
+          file_name: "SDK File",
+          file_type: "VIDEO",
+        },
+      }),
+      () =>
+        jsonResponse(
+          {
+            error_message: "Missing ingredients",
+            error_type: "MISSING_INGREDIENTS",
+            status_code: 400,
+          },
+          { status: 400 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    const iftttError = expectFailure(iftttFailure);
+    expect(iftttError).toBeInstanceOf(PutioOperationError);
+    expect(iftttError).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "ifttt",
+      operation: "sendEvent",
+      reason: {
+        errorType: "MISSING_INGREDIENTS",
+        kind: "error_type",
+      },
+      status: 400,
+    });
   });
 });

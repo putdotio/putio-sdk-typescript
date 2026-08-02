@@ -50,6 +50,7 @@
     "prepack": "vp pack",
     "secrets:setup": "bash ./scripts/secrets-setup.sh",
     "secrets:clean": "rm -f .env.local .env.local.* .env.local.swp",
+    "test:secrets": "bash ./scripts/secrets-setup.test.sh",
     "test": "vp test --passWithNoTests",
     "test:compat": "node ./scripts/test-compat-node.ts && node ./scripts/test-compat-browser.ts && node ./scripts/test-compat-bun.ts",
     "test:compat:browser": "node ./scripts/test-compat-browser.ts",
@@ -60,7 +61,7 @@
     "test:live:fresh": "vp pack && node ./scripts/test-live-fresh.ts",
     "validate:routes": "vp pack && vp run validate:routes:packed",
     "validate:routes:packed": "node ./scripts/validate-route-matrix.ts",
-    "verify": "vp check . && vp pack && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests"
+    "verify": "vp check . && vp pack && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests && vp run test:secrets"
   },
   "dependencies": {
     "effect": "4.0.0-beta.101"

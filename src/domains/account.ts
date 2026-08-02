@@ -469,9 +469,7 @@ export const clearAccount = (
 export const destroyAccount = (
   currentPassword: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(Schema.String.check(Schema.isMinLength(1)), {
-    onExcessProperty: "error",
-  })(currentPassword).pipe(
+  Schema.decodeUnknownEffect(Schema.String.check(Schema.isMinLength(1)))(currentPassword).pipe(
     Effect.mapError(mapSensitiveAccountDecodeError("destroy")),
     Effect.flatMap((decodedPassword) =>
       requestJson(OkResponseSchema, {
@@ -489,9 +487,7 @@ export const destroyAccount = (
 export const listAccountConfirmations = (
   subject?: AccountConfirmation["subject"],
 ): Effect.Effect<ReadonlyArray<AccountConfirmation>, AccountConfirmationsError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(Schema.UndefinedOr(AccountConfirmationSubjectSchema), {
-    onExcessProperty: "error",
-  })(subject).pipe(
+  Schema.decodeUnknownEffect(Schema.UndefinedOr(AccountConfirmationSubjectSchema))(subject).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedSubject) =>
       requestJson(AccountConfirmationsEnvelopeSchema, {

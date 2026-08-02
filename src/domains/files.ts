@@ -1110,7 +1110,7 @@ export const touchFiles = (
 export const canWriteFile = (
   fileId: number,
 ): Effect.Effect<number, CanWriteFileError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveFileIdSchema, { onExcessProperty: "error" })(fileId).pipe(
+  Schema.decodeUnknownEffect(PositiveFileIdSchema)(fileId).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedFileId) =>
       requestJson(FileCanWriteEnvelopeSchema, {

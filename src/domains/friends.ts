@@ -136,7 +136,7 @@ export type ApproveFriendRequestError = PutioOperationFailure<typeof ApproveFrie
 export type DenyFriendRequestError = PutioOperationFailure<typeof DenyFriendRequestErrorSpec>;
 export type FriendSharedFolderError = PutioOperationFailure<typeof FriendSharedFolderErrorSpec>;
 const decodeUsername = (username: string) =>
-  Schema.decodeUnknownEffect(NonEmptyStringSchema, { onExcessProperty: "error" })(username).pipe(
+  Schema.decodeUnknownEffect(NonEmptyStringSchema)(username).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
   );
 export const listFriends = (): Effect.Effect<

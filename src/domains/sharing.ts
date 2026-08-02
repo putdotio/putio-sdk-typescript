@@ -326,7 +326,7 @@ export const cloneSharedFiles = (
 export const getSharingCloneInfo = (
   id: number,
 ): Effect.Effect<SharingCloneInfo, GetSharingCloneInfoError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema, { onExcessProperty: "error" })(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(SharingCloneInfoSchema, {
@@ -368,7 +368,7 @@ export const listSharedFiles = (): Effect.Effect<
 export const getSharedWith = (
   fileId: number,
 ): Effect.Effect<SharedFileSharedWith, GetSharedWithError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema, { onExcessProperty: "error" })(fileId).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(fileId).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedFileId) =>
       requestJson(SharedFileSharedWithSchema, {
@@ -400,7 +400,7 @@ export const unshareFile = (
 export const createPublicShare = (
   fileId: number,
 ): Effect.Effect<PublicShare, CreatePublicShareError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema, { onExcessProperty: "error" })(fileId).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(fileId).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedFileId) =>
       requestJson(PublicShareEnvelopeSchema, {
@@ -427,7 +427,7 @@ export const deletePublicShare = (
   DeletePublicShareError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema, { onExcessProperty: "error" })(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -495,7 +495,7 @@ export const continuePublicShareFiles = (
 export const getPublicShareFileUrl = (
   fileId: number,
 ): Effect.Effect<string, GetPublicShareFileUrlError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema, { onExcessProperty: "error" })(fileId).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(fileId).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedFileId) =>
       requestJson(PublicShareFileUrlEnvelopeSchema, {

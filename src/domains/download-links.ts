@@ -103,7 +103,7 @@ export const createDownloadLinks = (
 export const getDownloadLinks = (
   id: number,
 ): Effect.Effect<DownloadLinksInfo, GetDownloadLinksError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema, { onExcessProperty: "error" })(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(DownloadLinksInfoSchema, {

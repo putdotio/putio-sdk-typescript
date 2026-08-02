@@ -135,7 +135,7 @@ export const createFamilyInvite = (): Effect.Effect<
 export const removeFamilyMember = (
   username: string,
 ): Effect.Effect<void, RemoveFamilyMemberError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(NonEmptyStringSchema, { onExcessProperty: "error" })(username).pipe(
+  Schema.decodeUnknownEffect(NonEmptyStringSchema)(username).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedUsername) =>
       requestJson(OkResponseSchema, {
@@ -149,7 +149,7 @@ export const removeFamilyMember = (
 export const joinFamily = (
   inviteCode: string,
 ): Effect.Effect<void, JoinFamilyError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(NonEmptyStringSchema, { onExcessProperty: "error" })(inviteCode).pipe(
+  Schema.decodeUnknownEffect(NonEmptyStringSchema)(inviteCode).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInviteCode) =>
       requestJson(OkResponseSchema, {

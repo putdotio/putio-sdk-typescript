@@ -183,7 +183,7 @@ export const listAppSpecificPasswords = (): Effect.Effect<
 export const deleteAppSpecificPassword = (
   id: number,
 ): Effect.Effect<void, DeleteAppSpecificPasswordError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(AppSpecificPasswordIdSchema, { onExcessProperty: "error" })(id).pipe(
+  Schema.decodeUnknownEffect(AppSpecificPasswordIdSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {

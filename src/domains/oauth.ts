@@ -309,7 +309,7 @@ export const deleteOAuthApp = (
   DeleteOAuthAppError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(OAuthAppIdSchema, { onExcessProperty: "error" })(id).pipe(
+  Schema.decodeUnknownEffect(OAuthAppIdSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -322,7 +322,7 @@ export const deleteOAuthApp = (
 export const regenerateOAuthAppToken = (
   id: number,
 ): Effect.Effect<string, RegenerateOAuthAppTokenError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(OAuthAppIdSchema, { onExcessProperty: "error" })(id).pipe(
+  Schema.decodeUnknownEffect(OAuthAppIdSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OAuthRegeneratedTokenEnvelopeSchema, {

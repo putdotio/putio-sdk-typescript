@@ -223,7 +223,7 @@ export const listEvents = (
 export const deleteEvent = (
   id: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, DeleteEventError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema, { onExcessProperty: "error" })(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestJson(OkResponseSchema, {
@@ -245,7 +245,7 @@ export const clearEvents = (): Effect.Effect<
 export const getEventTorrent = (
   id: number,
 ): Effect.Effect<Uint8Array, GetEventTorrentError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema, { onExcessProperty: "error" })(id).pipe(
+  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedId) =>
       requestArrayBuffer({

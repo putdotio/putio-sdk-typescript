@@ -1,0 +1,84 @@
+name: Live SDK confidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Safe live target group
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - files
+          - transfers
+          - all-safe
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  live:
+    if: github.ref == 'refs/heads/main'
+    name: Fresh-token live / ${{ inputs.scope }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: live-sdk-confidence
+      cancel-in-progress: false
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Vite+
+        uses: ./.github/actions/setup-vp
+        with:
+          node-version-file: ".node-version"
+          cache: true
+
+      - name: Install dependencies
+        run: vp install
+
+      - name: Fetch live credentials from Infisical
+        uses: Infisical/secrets-action@8a06c1bdcd5b8635d510c52d4b57a92c1ccef785 # v1.0.9
+        with:
+          method: oidc
+          identity-id: ${{ vars.PUTIO_SDK_TYPESCRIPT_INFISICAL_IDENTITY_ID }}
+          oidc-audience: https://github.com/putdotio
+          project-slug: ${{ vars.PUTIO_SDK_TYPESCRIPT_INFISICAL_PROJECT_SLUG }}
+          env-slug: dev
+          domain: https://eu.infisical.com
+          secret-path: /sdk-typescript
+          include-imports: true
+
+      - name: Run fresh-token live targets
+        shell: bash
+        run: |
+          case "${{ inputs.scope }}" in
+            smoke)
+              targets=(test/live/account.test.ts test/live/tunnel.test.ts)
+              ;;
+            files)
+              targets=(test/live/files.test.ts test/live/file-direct.test.ts test/live/file-tasks.test.ts)
+              ;;
+            transfers)
+              targets=(test/live/transfers.test.ts)
+              ;;
+            all-safe)
+              targets=(
+                test/live/account.test.ts
+                test/live/tunnel.test.ts
+                test/live/files.test.ts
+                test/live/file-direct.test.ts
+                test/live/file-tasks.test.ts
+                test/live/transfers.test.ts
+              )
+              ;;
+          esac
+
+          vp run test:live:fresh -- "${targets[@]}"

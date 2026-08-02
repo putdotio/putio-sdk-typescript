@@ -206,6 +206,21 @@ infisical run --silent \
   -- pnpm test:live:fresh -- test/live/account.test.ts test/live/tunnel.test.ts
 ```
 
+Maintainers can also dispatch the `Live SDK confidence` GitHub workflow on
+`main`. It offers fixed `smoke`, `files`, `transfers`, and `all-safe` target
+groups, authenticates to Infisical with GitHub OIDC, and runs the same
+fresh-token lifecycle. Configure these repository variables before the first
+run:
+
+- `PUTIO_SDK_TYPESCRIPT_INFISICAL_IDENTITY_ID`
+- `PUTIO_SDK_TYPESCRIPT_INFISICAL_PROJECT_SLUG`
+
+The Infisical identity should trust only the `putdotio/putio-sdk-typescript`
+repository on `refs/heads/main`, use the `https://github.com/putdotio`
+audience, and have read-only access to the `dev` `/sdk-typescript` path. The
+workflow stores neither an Infisical client secret nor the fresh put.io runtime
+tokens.
+
 Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from the
 Infisical `/sdk-typescript` path. The materialized file is `0600` and
 gitignored. Live commands auto-load `.env.local` first and then `.env`;

@@ -11,6 +11,7 @@ import {
   selectJsonField,
   type PutioSdkContext,
 } from "../core/http.js";
+import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
 export const PaymentPlanTypeSchema = Schema.Literals(["onetime", "subscription"]);
 export const PaymentOptionPlanTypeSchema = Schema.Literals(["onetime", "subscription", "trial"]);
 export const PaymentProviderNameSchema = Schema.Literals([
@@ -278,24 +279,35 @@ export type PaymentChangePlanSubmitResponse = Schema.Schema.Type<
   typeof PaymentChangePlanSubmitSchema
 >;
 export type PaymentVoucherInfo = Schema.Schema.Type<typeof PaymentVoucherInfoSchema>;
-export type PaymentHistoryQuery = {
-  readonly unreported_only?: boolean;
-};
-export type PaymentChangePlanPreviewInput = {
-  readonly coupon_code?: string;
-  readonly payment_type?: Schema.Schema.Type<typeof PaymentTypeSchema>;
-  readonly plan_path: string;
-};
-export type PaymentChangePlanSubmitInput = {
-  readonly confirmation_code?: string;
-  readonly coupon_code?: string;
-  readonly payment_type?: Schema.Schema.Type<typeof PaymentTypeSchema>;
-  readonly plan_path: string;
-};
-export type PaymentPaddleWaitingPaymentInput = {
-  readonly checkout_id: string;
-  readonly product_id: number | string;
-};
+const PaymentHistoryQuerySchema = Schema.Struct({
+  unreported_only: Schema.optional(Schema.Boolean),
+});
+const PaymentChangePlanPreviewInputSchema = Schema.Struct({
+  coupon_code: Schema.optional(NonEmptyStringSchema),
+  payment_type: Schema.optional(PaymentTypeSchema),
+  plan_path: NonEmptyStringSchema,
+});
+const PaymentChangePlanSubmitInputSchema = Schema.Struct({
+  confirmation_code: Schema.optional(NonEmptyStringSchema),
+  coupon_code: Schema.optional(NonEmptyStringSchema),
+  payment_type: Schema.optional(PaymentTypeSchema),
+  plan_path: NonEmptyStringSchema,
+});
+const PaymentPaddleWaitingPaymentInputSchema = Schema.Struct({
+  checkout_id: NonEmptyStringSchema,
+  product_id: Schema.Union([NonEmptyStringSchema, PositiveIntegerSchema]),
+});
+const PaymentIdsSchema = Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1));
+export type PaymentHistoryQuery = Schema.Schema.Type<typeof PaymentHistoryQuerySchema>;
+export type PaymentChangePlanPreviewInput = Schema.Schema.Type<
+  typeof PaymentChangePlanPreviewInputSchema
+>;
+export type PaymentChangePlanSubmitInput = Schema.Schema.Type<
+  typeof PaymentChangePlanSubmitInputSchema
+>;
+export type PaymentPaddleWaitingPaymentInput = Schema.Schema.Type<
+  typeof PaymentPaddleWaitingPaymentInputSchema
+>;
 const RestrictedPaymentError = { errorType: "invalid_scope", statusCode: 401 as const };
 const CommonPaymentActionErrors = [
   { errorType: "PAYMENT_SUB_ACCOUNT_NOT_ALLOWED", statusCode: 403 as const },
@@ -560,13 +572,15 @@ export const listPaymentOptions = (): Effect.Effect<
     path: "/v2/payment/options",
   }).pipe(selectJsonField("options"), withOperationErrors(ListPaymentOptionsErrorSpec));
 export const listPaymentHistory = (
-  query?: PaymentHistoryQuery,
+  query: PaymentHistoryQuery = {},
 ): Effect.Effect<ReadonlyArray<PaymentHistoryItem>, ListPaymentHistoryError, PutioSdkContext> =>
-  requestJson(PaymentHistoryEnvelopeSchema, {
-    method: "GET",
-    path: "/v2/payment/history",
-    query,
-  }).pipe(selectJsonField("payments"), withOperationErrors(ListPaymentHistoryErrorSpec));
+  decodeAndRun(PaymentHistoryQuerySchema, query, (decodedQuery) =>
+    requestJson(PaymentHistoryEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/payment/history",
+      query: decodedQuery,
+    }).pipe(selectJsonField("payments")),
+  ).pipe(withOperationErrors(ListPaymentHistoryErrorSpec));
 export const listPaymentInvites = (): Effect.Effect<
   ReadonlyArray<Schema.Schema.Type<typeof PaymentInviteSchema>>,
   ListPaymentInvitesError,
@@ -579,38 +593,44 @@ export const listPaymentInvites = (): Effect.Effect<
 export const previewPaymentChangePlan = (
   input: PaymentChangePlanPreviewInput,
 ): Effect.Effect<PaymentChangePlanPreview, PreviewPaymentChangePlanError, PutioSdkContext> =>
-  requestJson(PaymentChangePlanPreviewSchema, {
-    method: "GET",
-    path: `/v2/payment/change_plan/${encodeURIComponent(input.plan_path)}`,
-    query: {
-      coupon_code: input.coupon_code,
-      payment_type: input.payment_type,
-    },
-  }).pipe(withOperationErrors(PreviewPaymentChangePlanErrorSpec));
+  decodeAndRun(PaymentChangePlanPreviewInputSchema, input, (decodedInput) =>
+    requestJson(PaymentChangePlanPreviewSchema, {
+      method: "GET",
+      path: `/v2/payment/change_plan/${encodeURIComponent(decodedInput.plan_path)}`,
+      query: {
+        coupon_code: decodedInput.coupon_code,
+        payment_type: decodedInput.payment_type,
+      },
+    }),
+  ).pipe(withOperationErrors(PreviewPaymentChangePlanErrorSpec));
 export const submitPaymentChangePlan = (
   input: PaymentChangePlanSubmitInput,
 ): Effect.Effect<PaymentChangePlanSubmitResponse, SubmitPaymentChangePlanError, PutioSdkContext> =>
-  requestJson(PaymentChangePlanSubmitSchema, {
-    body: {
-      type: "form",
-      value: {
-        confirmation_code: input.confirmation_code,
-        payment_type: input.payment_type,
+  decodeAndRun(PaymentChangePlanSubmitInputSchema, input, (decodedInput) =>
+    requestJson(PaymentChangePlanSubmitSchema, {
+      body: {
+        type: "form",
+        value: {
+          confirmation_code: decodedInput.confirmation_code,
+          payment_type: decodedInput.payment_type,
+        },
       },
-    },
-    method: "POST",
-    path: `/v2/payment/change_plan/${encodeURIComponent(input.plan_path)}`,
-    query: {
-      coupon_code: input.coupon_code,
-    },
-  }).pipe(withOperationErrors(SubmitPaymentChangePlanErrorSpec));
+      method: "POST",
+      path: `/v2/payment/change_plan/${encodeURIComponent(decodedInput.plan_path)}`,
+      query: {
+        coupon_code: decodedInput.coupon_code,
+      },
+    }),
+  ).pipe(withOperationErrors(SubmitPaymentChangePlanErrorSpec));
 export const confirmFastspringOrder = (
   reference: string,
 ): Effect.Effect<boolean, ConfirmFastspringOrderError, PutioSdkContext> =>
-  requestJson(PaymentFastspringConfirmEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/payment/fs-confirm/${encodeURIComponent(reference)}`,
-  }).pipe(selectJsonField("confirmed"), withOperationErrors(ConfirmFastspringOrderErrorSpec));
+  decodeAndRun(NonEmptyStringSchema, reference, (decodedReference) =>
+    requestJson(PaymentFastspringConfirmEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/payment/fs-confirm/${encodeURIComponent(decodedReference)}`,
+    }).pipe(selectJsonField("confirmed")),
+  ).pipe(withOperationErrors(ConfirmFastspringOrderErrorSpec));
 export const stopPaymentSubscription = (): Effect.Effect<
   void,
   StopSubscriptionError,
@@ -623,74 +643,84 @@ export const stopPaymentSubscription = (): Effect.Effect<
 export const getPaymentVoucherInfo = (
   code: string,
 ): Effect.Effect<PaymentVoucherInfo, GetPaymentVoucherInfoError, PutioSdkContext> =>
-  requestJson(PaymentVoucherInfoSchema, {
-    method: "GET",
-    path: `/v2/payment/redeem_voucher/${encodeURIComponent(code)}`,
-  }).pipe(withOperationErrors(GetPaymentVoucherInfoErrorSpec));
+  decodeAndRun(NonEmptyStringSchema, code, (decodedCode) =>
+    requestJson(PaymentVoucherInfoSchema, {
+      method: "GET",
+      path: `/v2/payment/redeem_voucher/${encodeURIComponent(decodedCode)}`,
+    }),
+  ).pipe(withOperationErrors(GetPaymentVoucherInfoErrorSpec));
 export const redeemPaymentVoucher = (
   code: string,
 ): Effect.Effect<void, RedeemPaymentVoucherError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    method: "POST",
-    path: `/v2/payment/redeem_voucher/${encodeURIComponent(code)}`,
-  }).pipe(Effect.asVoid, withOperationErrors(RedeemPaymentVoucherErrorSpec));
+  decodeAndRun(NonEmptyStringSchema, code, (decodedCode) =>
+    requestJson(OkResponseSchema, {
+      method: "POST",
+      path: `/v2/payment/redeem_voucher/${encodeURIComponent(decodedCode)}`,
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(RedeemPaymentVoucherErrorSpec));
 export const reportPayments = (
   paymentIds: ReadonlyArray<number>,
 ): Effect.Effect<void, ReportPaymentsError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: {
-        payment_ids: joinCsv(paymentIds),
+  decodeAndRun(PaymentIdsSchema, paymentIds, (decodedPaymentIds) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          payment_ids: joinCsv(decodedPaymentIds),
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/payment/report",
-  }).pipe(Effect.asVoid, withOperationErrors(ReportPaymentsErrorSpec));
+      method: "POST",
+      path: "/v2/payment/report",
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(ReportPaymentsErrorSpec));
 export const createPaddleWaitingPayment = (
   input: PaymentPaddleWaitingPaymentInput,
 ): Effect.Effect<void, CreatePaddleWaitingPaymentError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: input,
-    },
-    method: "POST",
-    path: "/v2/payment/paddle_waiting_payment",
-  }).pipe(Effect.asVoid, withOperationErrors(CreatePaddleWaitingPaymentErrorSpec));
+  decodeAndRun(PaymentPaddleWaitingPaymentInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: decodedInput,
+      },
+      method: "POST",
+      path: "/v2/payment/paddle_waiting_payment",
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(CreatePaddleWaitingPaymentErrorSpec));
 export const getPaddleBillingInvoiceUrl = (
   paymentId: number,
 ): Effect.Effect<string, GetPaddleBillingInvoiceUrlError, PutioSdkContext> =>
-  requestJson(PaymentPaddleBillingInvoiceEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/payment/methods/paddle_billing/invoice/${encodeURIComponent(paymentId)}`,
-  }).pipe(selectJsonField("url"), withOperationErrors(GetPaddleBillingInvoiceUrlErrorSpec));
+  decodeAndRun(PositiveIntegerSchema, paymentId, (decodedPaymentId) =>
+    requestJson(PaymentPaddleBillingInvoiceEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/payment/methods/paddle_billing/invoice/${encodeURIComponent(decodedPaymentId)}`,
+    }).pipe(selectJsonField("url")),
+  ).pipe(withOperationErrors(GetPaddleBillingInvoiceUrlErrorSpec));
 export const createPaddleBillingUpdatePaymentMethodTransaction = (
   userSubscriptionId: number,
 ): Effect.Effect<string, CreatePaddleBillingUpdatePaymentMethodTransactionError, PutioSdkContext> =>
-  requestJson(PaymentPaddleBillingUpdatePaymentMethodEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/payment/methods/paddle_billing/update_payment_method/${encodeURIComponent(
-      userSubscriptionId,
-    )}`,
-  }).pipe(
-    selectJsonField("transaction_id"),
-    withOperationErrors(CreatePaddleBillingUpdatePaymentMethodTransactionErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, userSubscriptionId, (decodedUserSubscriptionId) =>
+    requestJson(PaymentPaddleBillingUpdatePaymentMethodEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/payment/methods/paddle_billing/update_payment_method/${encodeURIComponent(
+        decodedUserSubscriptionId,
+      )}`,
+    }).pipe(selectJsonField("transaction_id")),
+  ).pipe(withOperationErrors(CreatePaddleBillingUpdatePaymentMethodTransactionErrorSpec));
 export const createOpenNodeCharge = (
   planPath: string,
 ): Effect.Effect<string, CreateOpenNodeChargeError, PutioSdkContext> =>
-  requestJson(PaymentOpenNodeChargeEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        plan_fs_path: planPath,
+  decodeAndRun(NonEmptyStringSchema, planPath, (decodedPlanPath) =>
+    requestJson(PaymentOpenNodeChargeEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          plan_fs_path: decodedPlanPath,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/payment/methods/opennode/charge",
-  }).pipe(
-    selectJsonField("opennode"),
-    Effect.map(({ checkout_url }) => checkout_url),
-    withOperationErrors(CreateOpenNodeChargeErrorSpec),
-  );
+      method: "POST",
+      path: "/v2/payment/methods/opennode/charge",
+    }).pipe(
+      selectJsonField("opennode"),
+      Effect.map(({ checkout_url }) => checkout_url),
+    ),
+  ).pipe(withOperationErrors(CreateOpenNodeChargeErrorSpec));

@@ -1,8 +1,7 @@
 import { Effect, Schema } from "effect";
 import { joinCsv } from "../core/forms.js";
+import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
 import {
-  mapDecodeErrorToValidationError,
-  PutioValidationError,
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
@@ -17,7 +16,7 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
-const TransferIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
+const TransferIdSchema = PositiveIntegerSchema;
 const TransferIdsSchema = Schema.Array(TransferIdSchema).check(Schema.isMinLength(1));
 export const TransferTypeSchema = Schema.Literals([
   "URL",
@@ -136,13 +135,26 @@ export const TransferSchema = Schema.Union([
   TransferBaseSchema,
 ]);
 export const TransfersListQuerySchema = Schema.Struct({
-  per_page: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
+  per_page: Schema.optional(PositiveIntegerSchema),
 });
 export const TransferAddInputSchema = Schema.Struct({
-  callback_url: Schema.optional(Schema.String),
-  save_parent_id: Schema.optional(Schema.Int),
-  url: Schema.String,
+  callback_url: Schema.optional(NonEmptyStringSchema),
+  save_parent_id: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  url: NonEmptyStringSchema,
 });
+const TransferContinueInputSchema = Schema.Struct({
+  cursor: NonEmptyStringSchema,
+  query: TransfersListQuerySchema,
+});
+const TransferInfoUrlSchema = Schema.String.check(
+  Schema.isMinLength(1),
+  Schema.isPattern(/^[^\r\n]+$/),
+);
+const TransferInfoUrlsSchema = Schema.Array(TransferInfoUrlSchema).check(Schema.isMinLength(1));
+const TransferAddManyInputSchema = Schema.Array(TransferAddInputSchema).check(
+  Schema.isMinLength(1),
+);
+const TransferCleanIdsSchema = Schema.Array(TransferIdSchema);
 const TrackerSchema = Schema.String.check(Schema.isPattern(/^[^,\s]+$/));
 export const TransferAddTrackersInputSchema = Schema.Struct({
   trackers: Schema.Array(TrackerSchema).check(Schema.isMinLength(1)),
@@ -333,48 +345,48 @@ export type StopRecordingTransferError = PutioOperationFailure<
 export const listTransfers = (
   query: TransfersListQuery = {},
 ): Effect.Effect<TransfersListResponse, ListTransfersError, PutioSdkContext> =>
-  requestJson(TransfersListEnvelopeSchema, {
-    method: "GET",
-    path: "/v2/transfers/list",
-    query,
-  }).pipe(withOperationErrors(ListTransfersErrorSpec));
+  decodeAndRun(TransfersListQuerySchema, query, (decodedQuery) =>
+    requestJson(TransfersListEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/transfers/list",
+      query: decodedQuery,
+    }),
+  ).pipe(withOperationErrors(ListTransfersErrorSpec));
 export const continueTransfers = (
   cursor: string,
-  query: {
-    readonly per_page?: number;
-  } = {},
+  query: TransfersListQuery = {},
 ): Effect.Effect<TransfersContinueResponse, ListTransfersError, PutioSdkContext> =>
-  requestJson(TransfersContinueEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        cursor,
+  decodeAndRun(TransferContinueInputSchema, { cursor, query }, (decodedInput) =>
+    requestJson(TransfersContinueEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          cursor: decodedInput.cursor,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/transfers/list/continue",
-    query,
-  }).pipe(withOperationErrors(ListTransfersErrorSpec));
+      method: "POST",
+      path: "/v2/transfers/list/continue",
+      query: decodedInput.query,
+    }),
+  ).pipe(withOperationErrors(ListTransfersErrorSpec));
 export const getTransfer = (
   id: number,
 ): Effect.Effect<Transfer, GetTransferError, PutioSdkContext> =>
-  requestJson(TransferEnvelopeSchema, {
-    method: "GET",
-    path: `/v2/transfers/${encodePathSegment(id)}`,
-  }).pipe(selectJsonField("transfer"), withOperationErrors(GetTransferErrorSpec));
+  decodeAndRun(TransferIdSchema, id, (decodedId) =>
+    requestJson(TransferEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/transfers/${encodePathSegment(decodedId)}`,
+    }).pipe(selectJsonField("transfer")),
+  ).pipe(withOperationErrors(GetTransferErrorSpec));
 export const getTransferTorrent = (
   id: number,
-): Effect.Effect<Uint8Array, GetTransferTorrentError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(TransferIdSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestArrayBuffer({
-        method: "GET",
-        path: `/v2/transfers/${encodePathSegment(decodedId)}/torrent`,
-      }),
-    ),
-    withOperationErrors(GetTransferTorrentErrorSpec),
-  );
+): Effect.Effect<Uint8Array, GetTransferTorrentError, PutioSdkContext> =>
+  decodeAndRun(TransferIdSchema, id, (decodedId) =>
+    requestArrayBuffer({
+      method: "GET",
+      path: `/v2/transfers/${encodePathSegment(decodedId)}/torrent`,
+    }),
+  ).pipe(withOperationErrors(GetTransferTorrentErrorSpec));
 export const countTransfers = (): Effect.Effect<number, PutioSdkError, PutioSdkContext> =>
   requestJson(TransferCountEnvelopeSchema, {
     method: "GET",
@@ -390,27 +402,31 @@ export const getTransferInfo = (
   PutioSdkError,
   PutioSdkContext
 > =>
-  requestJson(TransferInfoEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        urls: urls.join("\n"),
+  decodeAndRun(TransferInfoUrlsSchema, urls, (decodedUrls) =>
+    requestJson(TransferInfoEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          urls: decodedUrls.join("\n"),
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/transfers/info",
-  }).pipe(selectJsonFields("disk_avail", "ret"));
+      method: "POST",
+      path: "/v2/transfers/info",
+    }).pipe(selectJsonFields("disk_avail", "ret")),
+  );
 export const addTransfer = (
   input: TransferAddInput,
 ): Effect.Effect<Transfer, AddTransferError, PutioSdkContext> =>
-  requestJson(TransferEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: input,
-    },
-    method: "POST",
-    path: "/v2/transfers/add",
-  }).pipe(selectJsonField("transfer"), withOperationErrors(AddTransferErrorSpec));
+  decodeAndRun(TransferAddInputSchema, input, (decodedInput) =>
+    requestJson(TransferEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: decodedInput,
+      },
+      method: "POST",
+      path: "/v2/transfers/add",
+    }).pipe(selectJsonField("transfer")),
+  ).pipe(withOperationErrors(AddTransferErrorSpec));
 export const addManyTransfers = (
   inputs: ReadonlyArray<TransferAddInput>,
 ): Effect.Effect<
@@ -421,49 +437,48 @@ export const addManyTransfers = (
   AddManyTransfersError,
   PutioSdkContext
 > =>
-  requestJson(TransfersAddMultiEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        urls: JSON.stringify(inputs),
+  decodeAndRun(TransferAddManyInputSchema, inputs, (decodedInputs) =>
+    requestJson(TransfersAddMultiEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          urls: JSON.stringify(decodedInputs),
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/transfers/add-multi",
-  }).pipe(selectJsonFields("errors", "transfers"), withOperationErrors(AddManyTransfersErrorSpec));
+      method: "POST",
+      path: "/v2/transfers/add-multi",
+    }).pipe(selectJsonFields("errors", "transfers")),
+  ).pipe(withOperationErrors(AddManyTransfersErrorSpec));
 export const addTransferTrackers = (
   input: TransferAddTrackersInput,
-): Effect.Effect<void, AddTransferTrackersError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(TransferAddTrackersInputSchema)(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value: {
-            trackers: joinCsv(decodedInput.trackers),
-          },
+): Effect.Effect<void, AddTransferTrackersError, PutioSdkContext> =>
+  decodeAndRun(TransferAddTrackersInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          trackers: joinCsv(decodedInput.trackers),
         },
-        method: "POST",
-        path: `/v2/transfers/add-trackers/${encodePathSegment(decodedInput.transferId)}`,
-      }),
-    ),
-    Effect.asVoid,
-    withOperationErrors(AddTransferTrackersErrorSpec),
-  );
+      },
+      method: "POST",
+      path: `/v2/transfers/add-trackers/${encodePathSegment(decodedInput.transferId)}`,
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(AddTransferTrackersErrorSpec));
 export const cancelTransfers = (
   ids: ReadonlyArray<number>,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: {
-        transfer_ids: joinCsv(ids),
+  decodeAndRun(TransferIdsSchema, ids, (decodedIds) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          transfer_ids: joinCsv(decodedIds),
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/transfers/cancel",
-  });
+      method: "POST",
+      path: "/v2/transfers/cancel",
+    }),
+  );
 export const cleanTransfers = (
   ids: ReadonlyArray<number> = [],
 ): Effect.Effect<
@@ -473,48 +488,47 @@ export const cleanTransfers = (
   PutioSdkError,
   PutioSdkContext
 > =>
-  requestJson(TransfersCleanEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: ids.length > 0 ? { transfer_ids: joinCsv(ids) } : {},
-    },
-    method: "POST",
-    path: "/v2/transfers/clean",
-  }).pipe(selectJsonFields("deleted_ids"));
+  decodeAndRun(TransferCleanIdsSchema, ids, (decodedIds) =>
+    requestJson(TransfersCleanEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: decodedIds.length > 0 ? { transfer_ids: joinCsv(decodedIds) } : {},
+      },
+      method: "POST",
+      path: "/v2/transfers/clean",
+    }).pipe(selectJsonFields("deleted_ids")),
+  );
 export const removeTransfers = (
   input: TransferRemoveInput,
-): Effect.Effect<void, RemoveTransfersError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(TransferRemoveInputSchema)(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value:
-            decodedInput.ids !== undefined
-              ? { transfer_ids: joinCsv(decodedInput.ids) }
-              : { remove_filter: decodedInput.filter },
-        },
-        method: "POST",
-        path: "/v2/transfers/remove",
-      }),
-    ),
-    Effect.asVoid,
-    withOperationErrors(RemoveTransfersErrorSpec),
-  );
+): Effect.Effect<void, RemoveTransfersError, PutioSdkContext> =>
+  decodeAndRun(TransferRemoveInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value:
+          decodedInput.ids !== undefined
+            ? { transfer_ids: joinCsv(decodedInput.ids) }
+            : { remove_filter: decodedInput.filter },
+      },
+      method: "POST",
+      path: "/v2/transfers/remove",
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(RemoveTransfersErrorSpec));
 export const retryTransfer = (
   id: number,
 ): Effect.Effect<Transfer, RetryTransferError, PutioSdkContext> =>
-  requestJson(TransferEnvelopeSchema, {
-    body: {
-      type: "form",
-      value: {
-        id,
+  decodeAndRun(TransferIdSchema, id, (decodedId) =>
+    requestJson(TransferEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          id: decodedId,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/transfers/retry",
-  }).pipe(selectJsonField("transfer"), withOperationErrors(RetryTransferErrorSpec));
+      method: "POST",
+      path: "/v2/transfers/retry",
+    }).pipe(selectJsonField("transfer")),
+  ).pipe(withOperationErrors(RetryTransferErrorSpec));
 export const reannounceTransfer = (
   id: number,
 ): Effect.Effect<
@@ -522,16 +536,18 @@ export const reannounceTransfer = (
   ReannounceTransferError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: {
-        id,
+  decodeAndRun(TransferIdSchema, id, (decodedId) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          id: decodedId,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/transfers/reannounce",
-  }).pipe(withOperationErrors(ReannounceTransferErrorSpec));
+      method: "POST",
+      path: "/v2/transfers/reannounce",
+    }),
+  ).pipe(withOperationErrors(ReannounceTransferErrorSpec));
 export const stopTransferRecording = (
   id: number,
 ): Effect.Effect<
@@ -539,13 +555,15 @@ export const stopTransferRecording = (
   StopRecordingTransferError,
   PutioSdkContext
 > =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: {
-        transfer_id: id,
+  decodeAndRun(TransferIdSchema, id, (decodedId) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          transfer_id: decodedId,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/transfers/stop-recording",
-  }).pipe(withOperationErrors(StopRecordingTransferErrorSpec));
+      method: "POST",
+      path: "/v2/transfers/stop-recording",
+    }),
+  ).pipe(withOperationErrors(StopRecordingTransferErrorSpec));

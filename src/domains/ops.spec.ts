@@ -1170,7 +1170,50 @@ describe("operational domain boundaries", () => {
       return jsonResponse({ status: "OK" });
     };
     const failures = await Promise.all([
+      // @ts-expect-error JavaScript callers can provide null instead of a query object.
+      runSdkExit(transfers.listTransfers(null), handler, { accessToken: "token-123" }),
+      runSdkExit(transfers.listTransfers({ per_page: 0 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(transfers.listTransfers({ per_page: 1.5 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(transfers.continueTransfers(""), handler, { accessToken: "token-123" }),
+      // @ts-expect-error JavaScript callers can provide null instead of a query object.
+      runSdkExit(transfers.continueTransfers("cursor", null), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(transfers.continueTransfers("cursor", { per_page: 0 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(transfers.getTransfer(0), handler, { accessToken: "token-123" }),
       runSdkExit(transfers.getTransferTorrent(0), handler, { accessToken: "token-123" }),
+      runSdkExit(transfers.getTransferInfo([]), handler, { accessToken: "token-123" }),
+      runSdkExit(
+        transfers.getTransferInfo(["https://example.com/a\nhttps://example.com/b"]),
+        handler,
+        {
+          accessToken: "token-123",
+        },
+      ),
+      runSdkExit(transfers.addTransfer({ url: "" }), handler, { accessToken: "token-123" }),
+      runSdkExit(
+        transfers.addTransfer({ save_parent_id: -1, url: "https://example.com" }),
+        handler,
+        {
+          accessToken: "token-123",
+        },
+      ),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can provide unknown request properties.
+        transfers.addTransfer({ unexpected: true, url: "https://example.com" }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(transfers.addManyTransfers([]), handler, { accessToken: "token-123" }),
+      runSdkExit(transfers.addManyTransfers([{ url: "" }]), handler, {
+        accessToken: "token-123",
+      }),
       runSdkExit(transfers.addTransferTrackers({ trackers: [], transferId: 1 }), handler, {
         accessToken: "token-123",
       }),
@@ -1182,6 +1225,9 @@ describe("operational domain boundaries", () => {
         handler,
         { accessToken: "token-123" },
       ),
+      runSdkExit(transfers.cancelTransfers([]), handler, { accessToken: "token-123" }),
+      runSdkExit(transfers.cancelTransfers([0]), handler, { accessToken: "token-123" }),
+      runSdkExit(transfers.cleanTransfers([-1]), handler, { accessToken: "token-123" }),
       runSdkExit(transfers.removeTransfers({ ids: [] }), handler, {
         accessToken: "token-123",
       }),
@@ -1200,6 +1246,15 @@ describe("operational domain boundaries", () => {
         handler,
         { accessToken: "token-123" },
       ),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can provide unsupported filter literals.
+        transfers.removeTransfers({ filter: "pending" }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(transfers.retryTransfer(0), handler, { accessToken: "token-123" }),
+      runSdkExit(transfers.reannounceTransfer(0), handler, { accessToken: "token-123" }),
+      runSdkExit(transfers.stopTransferRecording(0), handler, { accessToken: "token-123" }),
     ]);
 
     expect(

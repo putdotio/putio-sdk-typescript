@@ -6,7 +6,7 @@ const { authClient, oauthClient } = await createClients({
 });
 
 const live = createLiveHarness("ifttt live");
-const { assert, assertOperationError, finish, run, sleep } = live;
+const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
 void sleep;

@@ -38,6 +38,11 @@ import {
   runSdkExit,
 } from "../../test/support/sdk-test.js";
 
+const renderErrorForSecretCheck = (error: unknown): string =>
+  error instanceof Error
+    ? `${String(error)}\n${error.stack ?? ""}\n${JSON.stringify(error)}`
+    : `${String(error)}\n${JSON.stringify(error)}`;
+
 describe("auth domain", () => {
   it("builds the hosted login URL", () => {
     expect(
@@ -116,7 +121,7 @@ describe("auth domain", () => {
     );
 
     expect(invalid).toBeInstanceOf(PutioValidationError);
-    expect(JSON.stringify(invalid)).not.toContain(sensitiveSecret);
+    expect(renderErrorForSecretCheck(invalid)).not.toContain(sensitiveSecret);
     expect(requestCount).toBe(0);
   });
 
@@ -464,9 +469,10 @@ describe("auth domain", () => {
     ]);
 
     const errors = failures.map(expectFailure);
+    const renderedErrors = errors.map(renderErrorForSecretCheck).join("\n");
     expect(errors.every((error) => error instanceof PutioValidationError)).toBe(true);
-    expect(JSON.stringify(errors)).not.toContain(sensitiveSecret);
-    expect(JSON.stringify(errors)).not.toContain(sensitivePassword);
+    expect(renderedErrors).not.toContain(sensitiveSecret);
+    expect(renderedErrors).not.toContain(sensitivePassword);
     expect(requestCount).toBe(0);
   });
 

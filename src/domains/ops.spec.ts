@@ -274,7 +274,7 @@ describe("operational domain boundaries", () => {
       await runSdkEffect(
         oauth.createOAuthApp({
           callback: "https://example.com/callback",
-          description: "SDK app",
+          description: "SDK app test",
           hidden: true,
           icon: new Blob(["icon"], { type: "image/png" }),
           name: "SDK app",
@@ -365,6 +365,58 @@ describe("operational domain boundaries", () => {
     await runSdkEffect(oauth.deleteOAuthApp(9), () => jsonResponse({ status: "OK" }), {
       accessToken: "token-123",
     });
+  });
+
+  it("rejects invalid oauth app inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const validCreateInput = {
+      callback: "https://example.com/callback",
+      description: "A valid SDK application",
+      name: "SDK app",
+      website: "https://example.com",
+    };
+
+    const failures = await Promise.all([
+      runSdkExit(oauth.getOAuthApp(0), handler),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can provide invalid option values.
+        oauth.getOAuthApp(1, { edit: "yes" }),
+        handler,
+      ),
+      runSdkExit(
+        oauth.setOAuthAppIcon(0, { icon: new Blob(["icon"], { type: "image/png" }) }),
+        handler,
+      ),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can provide non-Blob icon values.
+        oauth.setOAuthAppIcon(1, { icon: "icon" }),
+        handler,
+      ),
+      runSdkExit(oauth.createOAuthApp({ ...validCreateInput, name: "app" }), handler),
+      runSdkExit(oauth.createOAuthApp({ ...validCreateInput, description: "too short" }), handler),
+      runSdkExit(oauth.createOAuthApp({ ...validCreateInput, website: "x".repeat(256) }), handler),
+      runSdkExit(oauth.createOAuthApp({ ...validCreateInput, callback: "x".repeat(256) }), handler),
+      runSdkExit(
+        oauth.updateOAuthApp({
+          callback: validCreateInput.callback,
+          description: "too short",
+          id: 1,
+          website: validCreateInput.website,
+        }),
+        handler,
+      ),
+      runSdkExit(oauth.deleteOAuthApp(0), handler),
+      runSdkExit(oauth.regenerateOAuthAppToken(0), handler),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
   });
 
   it("covers sharing endpoints", async () => {

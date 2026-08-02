@@ -168,9 +168,9 @@ safe owned MP4 fixture for media flag, URL, HLS, watch status, and start-from
 coverage. The shared-friend clone fixture is seeded from the configured
 secondary account.
 
-Use `pnpm secrets:setup` to render the shared live variables from Infisical into
-`.env.local`. The live harness also accepts legacy local aliases when they are
-already exported in the shell.
+Use `pnpm secrets:setup` to validate the maintainer-provided SOPS ciphertext and
+render shared live variables into `.env.local`. The live harness also accepts
+legacy local aliases when they are already exported in the shell.
 
 Keep token values out of command output, docs, comments, and commits.
 
@@ -199,22 +199,19 @@ runs only the named test files, and revokes the fresh first-party session before
 exiting, including when a test fails. It never writes the runtime tokens to an
 env file.
 
-An unattended runner can inject a scoped `INFISICAL_TOKEN` machine-identity
-access token and run the same command without materializing secrets:
+An unattended runner with a scoped age identity can run a command without
+materializing secrets:
 
 ```bash
-infisical run --silent \
-  --domain "$PUTIO_INFISICAL_DOMAIN" \
-  --projectId "$PUTIO_SDK_TYPESCRIPT_INFISICAL_PROJECT_ID" \
-  --env "$PUTIO_SDK_TYPESCRIPT_INFISICAL_ENV" \
-  --path "$PUTIO_SDK_TYPESCRIPT_INFISICAL_PATH" \
-  -- pnpm test:live:fresh -- test/live/account.test.ts test/live/tunnel.test.ts
+sops exec-env --same-process "$PUTIO_SDK_TYPESCRIPT_SOPS_FILE" \
+  'pnpm test:live:fresh -- test/live/account.test.ts test/live/tunnel.test.ts'
 ```
 
-Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from the
-Infisical `/sdk-typescript` path. The materialized file is `0600` and
-gitignored. Live commands auto-load `.env.local` first and then `.env`;
-already-exported environment variables keep highest priority.
+Run `pnpm secrets:setup` once per worktree with
+`PUTIO_SDK_TYPESCRIPT_SOPS_FILE` pointing to the supplied ciphertext. The
+materialized file is `0600` and gitignored. Live commands auto-load
+`.env.local` first and then `.env`; already-exported environment variables keep
+highest priority.
 
 ```bash
 pnpm secrets:setup        # one-time per worktree
@@ -224,9 +221,9 @@ pnpm test:live            # runs the broader live suite against pre-existing tok
 pnpm secrets:clean        # before `git worktree remove`
 ```
 
-`secrets:setup` requires the Infisical CLI and access to the put.io frontend
-Development environment. You can copy `.env.example` manually when using your
-own live credentials, and unit tests do not require live credentials.
+`secrets:setup` requires SOPS 3.10 or newer and an authorized age identity. You can
+copy `.env.example` manually when using your own live credentials, and unit
+tests do not require live credentials.
 
 `bootstrap:live-fixtures` validates and seeds the live fixtures that are safe to
 prepare through the public SDK. It establishes the secondary friendship/shared

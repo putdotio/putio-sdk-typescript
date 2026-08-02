@@ -2,7 +2,6 @@ import { Effect, Schema } from "effect";
 import { joinCsv } from "../core/forms.js";
 import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
 import {
-  PutioValidationError,
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
@@ -345,11 +344,7 @@ export type StopRecordingTransferError = PutioOperationFailure<
 >;
 export const listTransfers = (
   query: TransfersListQuery = {},
-): Effect.Effect<
-  TransfersListResponse,
-  ListTransfersError | PutioValidationError,
-  PutioSdkContext
-> =>
+): Effect.Effect<TransfersListResponse, ListTransfersError, PutioSdkContext> =>
   decodeAndRun(TransfersListQuerySchema, query, (decodedQuery) =>
     requestJson(TransfersListEnvelopeSchema, {
       method: "GET",
@@ -360,11 +355,7 @@ export const listTransfers = (
 export const continueTransfers = (
   cursor: string,
   query: TransfersListQuery = {},
-): Effect.Effect<
-  TransfersContinueResponse,
-  ListTransfersError | PutioValidationError,
-  PutioSdkContext
-> =>
+): Effect.Effect<TransfersContinueResponse, ListTransfersError, PutioSdkContext> =>
   decodeAndRun(TransferContinueInputSchema, { cursor, query }, (decodedInput) =>
     requestJson(TransfersContinueEnvelopeSchema, {
       body: {
@@ -380,7 +371,7 @@ export const continueTransfers = (
   ).pipe(withOperationErrors(ListTransfersErrorSpec));
 export const getTransfer = (
   id: number,
-): Effect.Effect<Transfer, GetTransferError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<Transfer, GetTransferError, PutioSdkContext> =>
   decodeAndRun(TransferIdSchema, id, (decodedId) =>
     requestJson(TransferEnvelopeSchema, {
       method: "GET",
@@ -389,7 +380,7 @@ export const getTransfer = (
   ).pipe(withOperationErrors(GetTransferErrorSpec));
 export const getTransferTorrent = (
   id: number,
-): Effect.Effect<Uint8Array, GetTransferTorrentError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<Uint8Array, GetTransferTorrentError, PutioSdkContext> =>
   decodeAndRun(TransferIdSchema, id, (decodedId) =>
     requestArrayBuffer({
       method: "GET",
@@ -425,7 +416,7 @@ export const getTransferInfo = (
   );
 export const addTransfer = (
   input: TransferAddInput,
-): Effect.Effect<Transfer, AddTransferError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<Transfer, AddTransferError, PutioSdkContext> =>
   decodeAndRun(TransferAddInputSchema, input, (decodedInput) =>
     requestJson(TransferEnvelopeSchema, {
       body: {
@@ -443,7 +434,7 @@ export const addManyTransfers = (
     readonly errors: ReadonlyArray<TransfersAddMultiError>;
     readonly transfers: ReadonlyArray<Transfer>;
   },
-  AddManyTransfersError | PutioValidationError,
+  AddManyTransfersError,
   PutioSdkContext
 > =>
   decodeAndRun(TransferAddManyInputSchema, inputs, (decodedInputs) =>
@@ -460,7 +451,7 @@ export const addManyTransfers = (
   ).pipe(withOperationErrors(AddManyTransfersErrorSpec));
 export const addTransferTrackers = (
   input: TransferAddTrackersInput,
-): Effect.Effect<void, AddTransferTrackersError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<void, AddTransferTrackersError, PutioSdkContext> =>
   decodeAndRun(TransferAddTrackersInputSchema, input, (decodedInput) =>
     requestJson(OkResponseSchema, {
       body: {
@@ -509,7 +500,7 @@ export const cleanTransfers = (
   );
 export const removeTransfers = (
   input: TransferRemoveInput,
-): Effect.Effect<void, RemoveTransfersError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<void, RemoveTransfersError, PutioSdkContext> =>
   decodeAndRun(TransferRemoveInputSchema, input, (decodedInput) =>
     requestJson(OkResponseSchema, {
       body: {
@@ -525,7 +516,7 @@ export const removeTransfers = (
   ).pipe(Effect.asVoid, withOperationErrors(RemoveTransfersErrorSpec));
 export const retryTransfer = (
   id: number,
-): Effect.Effect<Transfer, RetryTransferError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<Transfer, RetryTransferError, PutioSdkContext> =>
   decodeAndRun(TransferIdSchema, id, (decodedId) =>
     requestJson(TransferEnvelopeSchema, {
       body: {
@@ -542,7 +533,7 @@ export const reannounceTransfer = (
   id: number,
 ): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
-  ReannounceTransferError | PutioValidationError,
+  ReannounceTransferError,
   PutioSdkContext
 > =>
   decodeAndRun(TransferIdSchema, id, (decodedId) =>
@@ -561,7 +552,7 @@ export const stopTransferRecording = (
   id: number,
 ): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
-  StopRecordingTransferError | PutioValidationError,
+  StopRecordingTransferError,
   PutioSdkContext
 > =>
   decodeAndRun(TransferIdSchema, id, (decodedId) =>

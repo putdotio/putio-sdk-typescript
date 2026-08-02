@@ -10,7 +10,7 @@ export const decodeAndRun = <S extends Schema.Top, A, E, R>(
   input: unknown,
   run: (decoded: S["Type"]) => Effect.Effect<A, E, R>,
 ) =>
-  Schema.decodeUnknownEffect(schema)(input).pipe(
+  Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(input).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap(run),
   );

@@ -251,7 +251,7 @@ declare global {
 
 const run = async () => {
   const promiseClient = createPutioSdkPromiseClient({
-    accessToken: "compat-token",
+    accessToken: "test-token",
   });
   const authUrl = promiseClient.auth.buildLoginUrl({
     clientId: "external-browser",

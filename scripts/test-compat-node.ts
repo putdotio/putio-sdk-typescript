@@ -72,7 +72,7 @@ import {
 import { toHumanFileSize } from "@putdotio/sdk/utilities";
 
 const promiseClient: PutioSdkPromiseClient = createPutioSdkPromiseClient({
-  accessToken: "compat-token",
+  accessToken: "test-token",
 });
 
 const compilePublicContracts = async () => {
@@ -222,8 +222,8 @@ const promiseAuthUrl = promiseClient.auth.buildLoginUrl({
 });
 const exchangeInput: OAuthAuthorizationCodeExchangeInput = {
   clientId: "external-node",
-  clientSecret: "compile-only-secret",
-  code: "compile-only-code",
+  clientSecret: "test-secret",
+  code: "example",
 };
 const compilePromiseAuthorizationCodeExchange = async () => {
   const accessToken: string = await promiseClient.auth.exchangeAuthorizationCode(exchangeInput);
@@ -231,13 +231,13 @@ const compilePromiseAuthorizationCodeExchange = async () => {
 };
 void compilePromiseAuthorizationCodeExchange;
 const promiseAuthHost = new URL(promiseAuthUrl).host;
-promiseClient.setAccessToken("rotated-compat-token");
+promiseClient.setAccessToken("test-auth-token");
 const uploadRequest = await promiseClient.files.createUploadRequest({
   file: new Blob(["hello from node"]),
   fileName: "node.txt",
 });
 const uploadToken = new URL(uploadRequest.url).searchParams.get("oauth_token");
-if (uploadToken !== "rotated-compat-token") {
+if (uploadToken !== "test-auth-token") {
   throw new Error("Promise access-token replacement did not reach the upload request");
 }
 promiseClient.setAccessToken(undefined);

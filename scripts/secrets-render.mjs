@@ -41,8 +41,8 @@ for (const value of Object.values(payload)) {
     throw new Error("decrypted payload contains a quote-wrapped value");
   }
 
-  if (value.includes("\n") || value.includes("\r")) {
-    throw new Error("decrypted payload contains a multiline value");
+  if (value.includes("\0") || value.includes("\n") || value.includes("\r")) {
+    throw new Error("decrypted payload contains an unsafe control character");
   }
 }
 

@@ -111,7 +111,7 @@ NODE
 rm -f "$output"
 
 mutate_payload() {
-  node - "$payload" "$1" <<'NODE'
+  node --input-type=module - "$payload" "$1" <<'NODE'
 import { readFileSync, writeFileSync } from "node:fs"
 const [path, mutation] = process.argv.slice(2)
 const payload = JSON.parse(readFileSync(path, "utf8"))
@@ -125,6 +125,7 @@ switch (mutation) {
   case "special": payload.PUTIO_CLIENT_SECRET_FIRST_PARTY = "single'quote\\backslash"; payload.PUTIO_TEST_PASSWORD = 'double"quote\\backslash'; payload.PUTIO_TOKEN_FIRST_PARTY = "single'double\"back\\slash"; break
   case "unrenderable": payload.PUTIO_TEST_PASSWORD = "single'double\"back`tick"; break
   case "multiline": payload.PUTIO_TEST_PASSWORD = "line one\nline two"; break
+  case "nul": payload.PUTIO_TEST_PASSWORD = "before\0after"; break
   default: process.exit(2)
 }
 writeFileSync(path, JSON.stringify(payload))
@@ -185,6 +186,11 @@ expect_failure run_setup
 
 write_valid_payload
 mutate_payload multiline
+expect_failure run_setup
+[ ! -e "$output" ]
+
+write_valid_payload
+mutate_payload nul
 expect_failure run_setup
 [ ! -e "$output" ]
 

@@ -1,4 +1,4 @@
-import { PutioOperationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError } from "../core/errors.js";
 import { describe, expect, it } from "vite-plus/test";
 
 import * as payment from "./payment.js";
@@ -394,6 +394,53 @@ describe("payment domain", () => {
         { accessToken: "token-123" },
       ),
     ).toBe("https://checkout.opennode.com");
+  });
+
+  it("rejects invalid payment inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const failures = await Promise.all([
+      // @ts-expect-error JavaScript callers can provide null instead of a query object.
+      runSdkExit(payment.listPaymentHistory(null), handler),
+      runSdkExit(payment.previewPaymentChangePlan({ plan_path: "" }), handler),
+      runSdkExit(
+        payment.previewPaymentChangePlan({
+          // @ts-expect-error JavaScript callers can provide unsupported payment types.
+          payment_type: "cash",
+          plan_path: "pro/monthly",
+        }),
+        handler,
+      ),
+      runSdkExit(
+        payment.submitPaymentChangePlan({
+          plan_path: "pro/monthly",
+          // @ts-expect-error JavaScript callers can provide unknown request properties.
+          unexpected: true,
+        }),
+        handler,
+      ),
+      runSdkExit(payment.confirmFastspringOrder(""), handler),
+      runSdkExit(payment.getPaymentVoucherInfo(""), handler),
+      runSdkExit(payment.redeemPaymentVoucher(""), handler),
+      runSdkExit(payment.reportPayments([]), handler),
+      runSdkExit(payment.reportPayments([0]), handler),
+      runSdkExit(payment.createPaddleWaitingPayment({ checkout_id: "", product_id: 1 }), handler),
+      runSdkExit(
+        payment.createPaddleWaitingPayment({ checkout_id: "checkout", product_id: 0 }),
+        handler,
+      ),
+      runSdkExit(payment.getPaddleBillingInvoiceUrl(0), handler),
+      runSdkExit(payment.createPaddleBillingUpdatePaymentMethodTransaction(1.5), handler),
+      runSdkExit(payment.createOpenNodeCharge(""), handler),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
   });
 
   it("maps payment operation failures", async () => {

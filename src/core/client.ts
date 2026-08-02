@@ -19,6 +19,15 @@ import {
   type AccountClearOptions,
 } from "../domains/account.js";
 import {
+  createAppSpecificPassword,
+  deleteAllAppSpecificPasswords,
+  deleteAppSpecificPassword,
+  listAppSpecificPasswords,
+  type AppSpecificPassword,
+  type CreateAppSpecificPasswordInput,
+  type CreateAppSpecificPasswordResult,
+} from "../domains/app-specific-passwords.js";
+import {
   buildAuthLoginUrl,
   checkCodeMatch,
   clients,
@@ -346,6 +355,12 @@ const provideSdk = async <A, E>(
 
 export const createPutioSdkEffectClient = () => ({
   account: {
+    appSpecificPasswords: {
+      create: createAppSpecificPassword,
+      delete: deleteAppSpecificPassword,
+      deleteAll: deleteAllAppSpecificPasswords,
+      list: listAppSpecificPasswords,
+    },
     clear: clearAccount,
     destroy: destroyAccount,
     getInfo: getAccountInfo,
@@ -647,6 +662,14 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
   return {
     dispose: () => disposePromiseClientRuntime(config),
     account: {
+      appSpecificPasswords: {
+        create: (input: CreateAppSpecificPasswordInput): Promise<CreateAppSpecificPasswordResult> =>
+          provideSdk(config, createAppSpecificPassword(input)),
+        delete: (id: number): Promise<void> => provideSdk(config, deleteAppSpecificPassword(id)),
+        deleteAll: (): Promise<void> => provideSdk(config, deleteAllAppSpecificPasswords()),
+        list: (): Promise<ReadonlyArray<AppSpecificPassword>> =>
+          provideSdk(config, listAppSpecificPasswords()),
+      },
       clear: (options: AccountClearOptions) => provideSdk(config, clearAccount(options)),
       destroy: (currentPassword: string) => provideSdk(config, destroyAccount(currentPassword)),
       getInfo,

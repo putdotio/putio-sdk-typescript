@@ -36,6 +36,7 @@ describe("sdk client factories", () => {
   it("creates the Effect-first SDK client surface", () => {
     const client = createPutioSdkEffectClient();
 
+    expect(client.account.appSpecificPasswords.create).toBeTypeOf("function");
     expect(client.account.getInfo).toBeTypeOf("function");
     expect(client.account.listSubtitleLanguages).toBeTypeOf("function");
     expect(client.auth.getCode).toBeTypeOf("function");
@@ -89,6 +90,7 @@ describe("sdk client factories", () => {
     const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
 
     expect(client.dispose).toBeTypeOf("function");
+    expect(client.account.appSpecificPasswords.create).toBeTypeOf("function");
     expect(client.account.getInfo).toBeTypeOf("function");
     expect(client.account.listSubtitleLanguages).toBeTypeOf("function");
     expect(client.auth.getCode).toBeTypeOf("function");

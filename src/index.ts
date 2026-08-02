@@ -22,6 +22,7 @@ export * from "./core/defaults.js";
 export * from "./core/errors.js";
 export * from "./core/http.js";
 export * from "./domains/account.js";
+export * from "./domains/app-specific-passwords.js";
 export * from "./domains/auth.js";
 export * from "./domains/config.js";
 export * from "./domains/download-links.js";

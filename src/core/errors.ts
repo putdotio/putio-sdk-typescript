@@ -16,7 +16,9 @@ export type PutioErrorEnvelope = Schema.Schema.Type<typeof PutioErrorEnvelopeSch
 export interface PutioKnownErrorContract<
   TType extends string = string,
   TStatus extends number = number,
+  TBody extends PutioErrorEnvelope = PutioErrorEnvelope,
 > {
+  readonly bodySchema?: Schema.Schema<TBody> | undefined;
   readonly errorType?: TType | undefined;
   readonly statusCode?: TStatus | undefined;
 }
@@ -27,18 +29,24 @@ type ContractErrorType<TContract extends PutioKnownErrorContract> =
 type ContractStatusCode<TContract extends PutioKnownErrorContract> =
   TContract extends PutioKnownErrorContract<string, infer TStatus> ? TStatus : never;
 
-export type PutioTypedErrorEnvelope<TContract extends PutioKnownErrorContract> = Omit<
-  PutioErrorEnvelope,
-  "error_message" | "error_type" | "status_code"
-> & {
-  readonly error_message?: string;
-  readonly error_type?: [ContractErrorType<TContract>] extends [never]
-    ? string
-    : ContractErrorType<TContract>;
-  readonly status_code?: [ContractStatusCode<TContract>] extends [never]
-    ? number
-    : ContractStatusCode<TContract>;
-};
+type ContractBody<TContract extends PutioKnownErrorContract> = TContract extends {
+  readonly bodySchema: Schema.Schema<infer TBody extends PutioErrorEnvelope>;
+}
+  ? TBody
+  : PutioErrorEnvelope;
+
+export type PutioTypedErrorEnvelope<TContract extends PutioKnownErrorContract> =
+  TContract extends PutioKnownErrorContract
+    ? Omit<ContractBody<TContract>, "error_message" | "error_type" | "status_code"> & {
+        readonly error_message?: string;
+        readonly error_type?: [ContractErrorType<TContract>] extends [never]
+          ? string
+          : ContractErrorType<TContract>;
+        readonly status_code?: [ContractStatusCode<TContract>] extends [never]
+          ? number
+          : ContractStatusCode<TContract>;
+      }
+    : never;
 
 export interface PutioOperationErrorSpec<
   TDomain extends string = string,
@@ -90,6 +98,10 @@ const isKnownContractMatch = <TContract extends PutioKnownErrorContract>(
   contract: TContract,
   error: PutioApiError | PutioAuthError,
 ): contract is Extract<TContract, PutioKnownOperationErrorContract> => {
+  if (contract.bodySchema !== undefined && !Schema.is(contract.bodySchema)(error.body)) {
+    return false;
+  }
+
   if (contract.errorType !== undefined) {
     if (error.body.error_type !== contract.errorType) {
       return false;

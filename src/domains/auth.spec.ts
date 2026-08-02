@@ -38,6 +38,11 @@ import {
   runSdkExit,
 } from "../../test/support/sdk-test.js";
 
+const renderErrorForSecretCheck = (error: unknown): string =>
+  error instanceof Error
+    ? `${String(error)}\n${error.stack ?? ""}\n${JSON.stringify(error)}`
+    : `${String(error)}\n${JSON.stringify(error)}`;
+
 describe("auth domain", () => {
   it("builds the hosted login URL", () => {
     expect(
@@ -116,7 +121,7 @@ describe("auth domain", () => {
     );
 
     expect(invalid).toBeInstanceOf(PutioValidationError);
-    expect(JSON.stringify(invalid)).not.toContain(sensitiveSecret);
+    expect(renderErrorForSecretCheck(invalid)).not.toContain(sensitiveSecret);
     expect(requestCount).toBe(0);
   });
 
@@ -404,6 +409,71 @@ describe("auth domain", () => {
       codes: [{ code: "xyz", used_at: null }],
       created_at: "2026-03-18",
     });
+  });
+
+  it("rejects invalid auth inputs before transport without exposing credentials", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const sensitiveSecret = "sensitive-client-secret";
+    const sensitivePassword = "sensitive-password";
+    const failures = await Promise.all([
+      runSdkExit(
+        login({
+          clientId: 42,
+          clientSecret: sensitiveSecret,
+          password: sensitivePassword,
+          username: "",
+        }),
+        handler,
+      ),
+      runSdkExit(
+        register({
+          client_id: 42,
+          mail: "sdk@put.io",
+          password: sensitivePassword,
+          username: "",
+        }),
+        handler,
+      ),
+      runSdkExit(
+        register({
+          client_id: 42,
+          mail: "sdk@put.io",
+          password: sensitivePassword,
+          // @ts-expect-error JavaScript callers can provide unknown request properties.
+          unexpected: true,
+          username: "sdk",
+        }),
+        handler,
+      ),
+      runSdkExit(exists("username", ""), handler),
+      // @ts-expect-error JavaScript callers can provide unsupported lookup keys.
+      runSdkExit(exists("phone", "sdk"), handler),
+      runSdkExit(getVoucher(""), handler),
+      runSdkExit(getGiftCard(""), handler),
+      runSdkExit(getFamilyInvite(""), handler),
+      runSdkExit(getFriendInvite(""), handler),
+      runSdkExit(forgotPassword(""), handler),
+      runSdkExit(resetPassword("", sensitivePassword), handler),
+      runSdkExit(getCode({ appId: 0 }), handler),
+      runSdkExit(checkCodeMatch(""), handler),
+      runSdkExit(linkDevice(""), handler),
+      runSdkExit(revokeApp(0), handler),
+      runSdkExit(revokeClient(1.5), handler),
+      runSdkExit(validateToken(""), handler),
+      runSdkExit(verifyTOTP("", "123456"), handler),
+      runSdkExit(verifyTOTP("temporary-token", ""), handler),
+    ]);
+
+    const errors = failures.map(expectFailure);
+    const renderedErrors = errors.map(renderErrorForSecretCheck).join("\n");
+    expect(errors.every((error) => error instanceof PutioValidationError)).toBe(true);
+    expect(renderedErrors).not.toContain(sensitiveSecret);
+    expect(renderedErrors).not.toContain(sensitivePassword);
+    expect(requestCount).toBe(0);
   });
 
   it("maps auth operation errors", async () => {

@@ -303,11 +303,26 @@ describe("files domain", () => {
       }),
       runConfigExit(files.getApiContentUrl(0), { accessToken: "token-123" }),
       runConfigExit(
+        // @ts-expect-error JavaScript callers can supply invalid boolean options.
+        files.getApiContentUrl(42, { useTunnel: "yes" }),
+        { accessToken: "token-123" },
+      ),
+      runConfigExit(
+        // @ts-expect-error JavaScript callers can supply null options.
+        files.getApiContentUrl(42, null),
+        { accessToken: "token-123" },
+      ),
+      runConfigExit(
         // @ts-expect-error JavaScript callers can supply excess option properties.
         files.getApiContentUrl(42, { unexpected: true }),
         { accessToken: "token-123" },
       ),
       runConfigExit(files.getApiMp4DownloadUrl(0), { accessToken: "token-123" }),
+      runConfigExit(
+        // @ts-expect-error JavaScript callers can supply invalid boolean options.
+        files.getApiMp4DownloadUrl(42, { convert: "yes" }),
+        { accessToken: "token-123" },
+      ),
       runConfigExit(files.getHlsStreamUrl(42, { maxSubtitleCount: 0 }), {
         accessToken: "token-123",
       }),
@@ -318,11 +333,9 @@ describe("files domain", () => {
         accessToken: "token-123",
       }),
     ]);
-    expect(
-      invalidDirectAccess
-        .map(expectFailure)
-        .every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(invalidDirectAccess.map(expectFailure)).toEqual(
+      invalidDirectAccess.map(() => expect.any(PutioValidationError)),
+    );
   });
 
   it("covers file reads, searches, and requested-field validation", async () => {

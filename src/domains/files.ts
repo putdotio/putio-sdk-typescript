@@ -1325,7 +1325,10 @@ export const getApiDownloadUrl = (
   options: FileApiDownloadUrlOptions = {},
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
   decodeAndRun(
-    Schema.Struct({ fileId: PositiveFileIdSchema, options: FileApiDownloadUrlOptionsSchema }),
+    Schema.Struct({
+      fileId: PositiveFileIdSchema,
+      options: FileApiDownloadUrlOptionsSchema,
+    }),
     { fileId, options },
     (decoded) =>
       resolveRouteContext(decoded.options.oauthToken).pipe(
@@ -1342,7 +1345,10 @@ export const getApiContentUrl = (
   options: FileDirectAccessOptions = {},
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
   decodeAndRun(
-    Schema.Struct({ fileId: PositiveFileIdSchema, options: FileDirectAccessOptionsSchema }),
+    Schema.Struct({
+      fileId: PositiveFileIdSchema,
+      options: FileDirectAccessOptionsSchema,
+    }),
     { fileId, options },
     (decoded) =>
       resolveRouteContext(decoded.options.oauthToken).pipe(
@@ -1359,7 +1365,10 @@ export const getApiMp4DownloadUrl = (
   options: FileApiMp4DownloadUrlOptions = {},
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
   decodeAndRun(
-    Schema.Struct({ fileId: PositiveFileIdSchema, options: FileApiMp4DownloadUrlOptionsSchema }),
+    Schema.Struct({
+      fileId: PositiveFileIdSchema,
+      options: FileApiMp4DownloadUrlOptionsSchema,
+    }),
     { fileId, options },
     (decoded) =>
       resolveRouteContext(decoded.options.oauthToken).pipe(
@@ -1376,7 +1385,10 @@ export const getHlsStreamUrl = (
   options: FileHlsStreamUrlOptions = {},
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
   decodeAndRun(
-    Schema.Struct({ fileId: PositiveFileIdSchema, options: FileHlsStreamUrlOptionsSchema }),
+    Schema.Struct({
+      fileId: PositiveFileIdSchema,
+      options: FileHlsStreamUrlOptionsSchema,
+    }),
     { fileId, options },
     (decoded) =>
       resolveRouteContext(decoded.options.oauthToken).pipe(

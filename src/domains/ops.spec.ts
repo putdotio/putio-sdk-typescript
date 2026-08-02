@@ -691,6 +691,51 @@ describe("operational domain boundaries", () => {
     ).toBe("https://download.put.io/public-share");
   });
 
+  it("rejects invalid sharing inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const failures = await Promise.all([
+      // @ts-expect-error JavaScript callers can provide null instead of a request object.
+      runSdkExit(sharing.cloneSharedFiles(null), handler),
+      runSdkExit(sharing.cloneSharedFiles({ cursor: "" }), handler),
+      runSdkExit(sharing.cloneSharedFiles({ ids: [0] }), handler),
+      runSdkExit(sharing.cloneSharedFiles({ parentId: -1 }), handler),
+      runSdkExit(sharing.getSharingCloneInfo(0), handler),
+      // @ts-expect-error JavaScript callers can provide null instead of a request object.
+      runSdkExit(sharing.shareFiles(null), handler),
+      runSdkExit(sharing.shareFiles({ ids: [0], target: { type: "everyone" } }), handler),
+      runSdkExit(
+        sharing.shareFiles({
+          ids: [7],
+          target: { friendNames: [""], type: "friends" },
+        }),
+        handler,
+      ),
+      runSdkExit(sharing.getSharedWith(0), handler),
+      runSdkExit(sharing.unshareFile({ fileId: 0 }), handler),
+      runSdkExit(sharing.unshareFile({ fileId: 7, shares: [0] }), handler),
+      runSdkExit(sharing.createPublicShare(0), handler),
+      runSdkExit(sharing.deletePublicShare(0), handler),
+      // @ts-expect-error JavaScript callers can provide null instead of a query object.
+      runSdkExit(sharing.listPublicShareFiles(null), handler),
+      runSdkExit(sharing.listPublicShareFiles({ parent_id: -1 }), handler),
+      runSdkExit(sharing.listPublicShareFiles({ per_page: 0 }), handler),
+      runSdkExit(sharing.continuePublicShareFiles(""), handler),
+      // @ts-expect-error JavaScript callers can provide null instead of a query object.
+      runSdkExit(sharing.continuePublicShareFiles("cursor", null), handler),
+      runSdkExit(sharing.continuePublicShareFiles("cursor", { per_page: 0 }), handler),
+      runSdkExit(sharing.getPublicShareFileUrl(0), handler),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
+  });
+
   it("covers transfers, trash, and zips", async () => {
     expect(
       await runSdkEffect(

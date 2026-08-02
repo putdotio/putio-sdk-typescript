@@ -214,6 +214,152 @@ describe("account domain", () => {
     );
 
     expect(result).toEqual({ status: "OK" });
+
+    const combinedResult = await runSdkEffect(
+      saveAccountSettings({
+        current_password: "current-secret",
+        locale: "tr",
+        mail: "sdk-next@put.io",
+        theme: "auto",
+        username: "sdk-next",
+      }),
+      (request) => {
+        expect(getJsonBody(request)).toEqual({
+          current_password: "current-secret",
+          locale: "tr",
+          mail: "sdk-next@put.io",
+          theme: "auto",
+          username: "sdk-next",
+        });
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+
+    expect(combinedResult).toEqual({ status: "OK" });
+
+    const twoFactorResult = await runSdkEffect(
+      saveAccountSettings({
+        two_factor_enabled: {
+          code: "123456",
+          enable: true,
+        },
+      }),
+      (request) => {
+        expect(getJsonBody(request)).toEqual({
+          two_factor_enabled: {
+            code: "123456",
+            enable: true,
+          },
+        });
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+
+    expect(twoFactorResult).toEqual({ status: "OK" });
+  });
+
+  it("rejects invalid account request inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+
+    const invalidQuery = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can still supply invalid query flags.
+        getAccountInfo({ download_token: 2 }),
+        handler,
+      ),
+    );
+    const invalidNestedSettings = expectFailure(
+      await runSdkExit(
+        saveAccountSettings({
+          two_factor_enabled: {
+            code: "123456",
+            // @ts-expect-error JavaScript callers can still supply invalid nested values.
+            enable: "yes",
+          },
+        }),
+        handler,
+      ),
+    );
+    const sensitiveSettings = "settings-secret-value";
+    const invalidSensitiveSettings = expectFailure(
+      await runSdkExit(
+        saveAccountSettings({
+          current_password: sensitiveSettings,
+          // @ts-expect-error JavaScript callers can supply non-string mail values.
+          mail: { value: sensitiveSettings },
+        }),
+        handler,
+      ),
+    );
+    const invalidSubtitleCount = expectFailure(
+      await runSdkExit(
+        saveAccountSettings({
+          subtitle_languages: ["en", "tr", "de"],
+        }),
+        handler,
+      ),
+    );
+    const unknownSetting = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply unknown settings.
+        saveAccountSettings({ unknown_setting: true }),
+        handler,
+      ),
+    );
+    const incompleteClearOptions = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can omit required clear flags.
+        clearAccount({ files: true }),
+        handler,
+      ),
+    );
+    const invalidPassword = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply non-string passwords.
+        destroyAccount({ value: "destroy-secret-value" }),
+        handler,
+      ),
+    );
+    const emptyPassword = expectFailure(await runSdkExit(destroyAccount(""), handler));
+    const invalidConfirmationSubject = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can supply unknown confirmation subjects.
+        listAccountConfirmations("username_change"),
+        handler,
+      ),
+    );
+
+    expect(invalidQuery).toBeInstanceOf(PutioValidationError);
+    expect(invalidNestedSettings).toBeInstanceOf(PutioValidationError);
+    expect(invalidSensitiveSettings).toMatchObject({
+      cause: {
+        domain: "account",
+        operation: "saveSettings",
+        reason: "Invalid request input",
+      },
+    });
+    expect(JSON.stringify(invalidSensitiveSettings)).not.toContain(sensitiveSettings);
+    expect(invalidSubtitleCount).toBeInstanceOf(PutioValidationError);
+    expect(unknownSetting).toBeInstanceOf(PutioValidationError);
+    expect(incompleteClearOptions).toBeInstanceOf(PutioValidationError);
+    expect(invalidPassword).toBeInstanceOf(PutioValidationError);
+    expect(invalidPassword).toMatchObject({
+      cause: {
+        domain: "account",
+        operation: "destroy",
+        reason: "Invalid request input",
+      },
+    });
+    expect(JSON.stringify(invalidPassword)).not.toContain("destroy-secret-value");
+    expect(emptyPassword).toBeInstanceOf(PutioValidationError);
+    expect(invalidConfirmationSubject).toBeInstanceOf(PutioValidationError);
+    expect(requestCount).toBe(0);
   });
 
   it("lists supported subtitle languages", async () => {

@@ -680,6 +680,83 @@ describe("files domain", () => {
     ).toEqual([]);
   });
 
+  it("rejects invalid file mutation inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+
+    const failures = await Promise.all([
+      runSdkExit(files.createFolder({}), handler, { accessToken: "token-123" }),
+      runSdkExit(files.createFolder({ name: "", parent_id: -1 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.renameFile({ file_id: 0, name: "" }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.deleteFiles([]), handler, { accessToken: "token-123" }),
+      runSdkExit(files.deleteFiles([0]), handler, { accessToken: "token-123" }),
+      runSdkExit(files.deleteFileSelection({}), handler, { accessToken: "token-123" }),
+      runSdkExit(files.moveFiles([], -1), handler, { accessToken: "token-123" }),
+      runSdkExit(files.moveFileSelection({}, 0), handler, { accessToken: "token-123" }),
+      runSdkExit(files.setStartFrom({ file_id: 0, time: -1 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.resetStartFrom(0), handler, { accessToken: "token-123" }),
+      runSdkExit(files.convertFileToMp4(0), handler, { accessToken: "token-123" }),
+      runSdkExit(files.deleteFileMp4(0), handler, { accessToken: "token-123" }),
+      runSdkExit(files.putMp4ToMyFiles(0), handler, { accessToken: "token-123" }),
+      runSdkExit(files.convertFilesToMp4([]), handler, { accessToken: "token-123" }),
+      runSdkExit(files.convertFileSelectionToMp4({}), handler, { accessToken: "token-123" }),
+      runSdkExit(
+        // @ts-expect-error JavaScript callers can omit the required selection.
+        files.setFilesWatchStatus({ watched: true }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(files.extractFiles({ ids: [9], password: "" }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.deleteFileExtraction(0), handler, { accessToken: "token-123" }),
+      runSdkExit(
+        files.uploadFile({
+          file: new Blob(["hello"]),
+          fileName: "",
+          parentId: -1,
+        }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+      runSdkExit(
+        files.uploadFile(
+          { file: new Blob(["hello"]) },
+          {
+            oauthToken: "",
+          },
+        ),
+        handler,
+        { accessToken: "token-123" },
+      ),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
+
+    const descriptorFailure = expectFailure(
+      await runConfigExit(
+        files.createFileUploadRequest({
+          file: new Blob(["hello"]),
+          fileName: "",
+        }),
+        { accessToken: "token-123" },
+      ),
+    );
+    expect(descriptorFailure).toBeInstanceOf(PutioValidationError);
+  });
+
   it("rejects invalid file read inputs before transport", async () => {
     let requestCount = 0;
     const handler = () => {

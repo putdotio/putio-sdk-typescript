@@ -554,6 +554,27 @@ describe("supporting domain boundaries", () => {
     ).toEqual([1, 2, 3]);
   });
 
+  it("rejects invalid event inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const failures = await Promise.all([
+      // @ts-expect-error JavaScript callers can provide null instead of a query object.
+      runSdkExit(events.listEvents(null), handler),
+      runSdkExit(events.listEvents({ before: 0 }), handler),
+      runSdkExit(events.listEvents({ per_page: 0 }), handler),
+      runSdkExit(events.deleteEvent(0), handler),
+      runSdkExit(events.getEventTorrent(0), handler),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
+  });
+
   it("rejects invalid download-link inputs before transport", async () => {
     let requestCount = 0;
     const handler = () => {

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { validateRouteMatrix } from "./route-matrix.mts";
+import { validateRouteMatrix } from "./route-matrix.ts";
 
 const matrixUrl = new URL("../docs/api-route-matrix.json", import.meta.url);
 const input: unknown = JSON.parse(await readFile(matrixUrl, "utf8"));

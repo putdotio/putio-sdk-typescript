@@ -58,7 +58,7 @@
     "test:compat:node": "node ./scripts/test-compat-node.ts",
     "test:live": "vp pack && vp test run --config vitest.live.config.ts",
     "validate:routes": "vp pack && vp run validate:routes:packed",
-    "validate:routes:packed": "node ./scripts/validate-route-matrix.mts",
+    "validate:routes:packed": "node ./scripts/validate-route-matrix.ts",
     "verify": "vp check . && vp pack && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests"
   },
   "dependencies": {

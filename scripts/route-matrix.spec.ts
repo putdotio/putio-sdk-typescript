@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { RouteMatrixValidationError, validateRouteMatrix } from "./route-matrix.mts";
+import { RouteMatrixValidationError, validateRouteMatrix } from "./route-matrix.ts";
 
 const clients = {
   effect: {

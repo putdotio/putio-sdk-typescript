@@ -10,8 +10,9 @@ Explain the actual `@putdotio/sdk` package shape for humans and agents.
 graph LR
   Consumer["consumer app or script"] --> Promise["Promise client"]
   Consumer --> EffectClient["Effect client"]
-  Promise --> Domains["domain namespaces"]
-  EffectClient --> Domains
+  Promise --> Operations["canonical operation tree"]
+  EffectClient --> Operations
+  Operations --> Domains["domain namespaces"]
   Domains --> Http["shared http/runtime"]
   Domains --> Errors["typed error model"]
   Domains --> Schemas["Schema contracts"]
@@ -85,7 +86,7 @@ That split is deliberate:
 
 The Effect client is available as both a factory value and a `PutioSdk` service layer for workflows that prefer dependency injection.
 `makePutioSdkLiveClientLayer(...)` composes the SDK service, SDK config, and fetch-backed transport for the normal live boundary.
-The Promise client owns a managed Effect runtime per client instance and exposes `dispose()` so host applications can tear it down explicitly.
+Both clients are assembled from one typed operation tree. The Promise client adapts its Effect operations through one managed runtime per client instance, while keeping lifecycle methods, token replacement, overload-specific signatures, and pure helpers explicit. It exposes `dispose()` so host applications can tear the runtime down explicitly.
 
 ## What This Package Is Not
 

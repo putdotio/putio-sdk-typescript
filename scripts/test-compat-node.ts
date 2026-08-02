@@ -76,6 +76,11 @@ const promiseClient: PutioSdkPromiseClient = createPutioSdkPromiseClient({
 });
 
 const compilePublicContracts = async () => {
+  promiseClient.events.clear = promiseClient.events.clear;
+  promiseClient.auth.twoFactor.generateTOTP = promiseClient.auth.twoFactor.generateTOTP;
+  effectClient.events.clear = effectClient.events.clear;
+  effectClient.auth.twoFactor.generateTOTP = effectClient.auth.twoFactor.generateTOTP;
+
   const broad: AccountInfoBroad = await promiseClient.account.getInfo();
   const optionalDownloadToken: string | undefined = broad.download_token;
   const optionalFeatures: Readonly<Record<string, boolean>> | undefined = broad.features;

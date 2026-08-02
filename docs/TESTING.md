@@ -52,6 +52,11 @@ vp run test:compat
 `lint:package` packs the package and runs `publint` plus Are The Types Wrong against the published ESM entrypoints.
 `vp run verify` blocks on both Knip graphs and executes the covered unit suite once. CI follows it with `lint:package`; Knip governs source reachability and dependency usage, while package checks and explicit API/type tests govern intentional public exports.
 
+The deterministic suite also replays sanitized public contract fixtures from
+`test/fixtures/public-contracts.ts`. They pin representative unauthenticated and
+authenticated form requests, query serialization, JSON response decoding, and
+binary response handling without credentials or private backend evidence.
+
 ## Runtime Compatibility Checks
 
 Compatibility checks are package-consumer smoke tests, not live API tests. They pack the SDK, install the tarball into throwaway external projects, and verify the public ESM entrypoints from outside the repo.

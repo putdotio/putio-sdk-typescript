@@ -406,6 +406,70 @@ describe("auth domain", () => {
     });
   });
 
+  it("rejects invalid auth inputs before transport without exposing credentials", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const sensitiveSecret = "sensitive-client-secret";
+    const sensitivePassword = "sensitive-password";
+    const failures = await Promise.all([
+      runSdkExit(
+        login({
+          clientId: 42,
+          clientSecret: sensitiveSecret,
+          password: sensitivePassword,
+          username: "",
+        }),
+        handler,
+      ),
+      runSdkExit(
+        register({
+          client_id: 42,
+          mail: "sdk@put.io",
+          password: sensitivePassword,
+          username: "",
+        }),
+        handler,
+      ),
+      runSdkExit(
+        register({
+          client_id: 42,
+          mail: "sdk@put.io",
+          password: sensitivePassword,
+          // @ts-expect-error JavaScript callers can provide unknown request properties.
+          unexpected: true,
+          username: "sdk",
+        }),
+        handler,
+      ),
+      runSdkExit(exists("username", ""), handler),
+      // @ts-expect-error JavaScript callers can provide unsupported lookup keys.
+      runSdkExit(exists("phone", "sdk"), handler),
+      runSdkExit(getVoucher(""), handler),
+      runSdkExit(getGiftCard(""), handler),
+      runSdkExit(getFamilyInvite(""), handler),
+      runSdkExit(getFriendInvite(""), handler),
+      runSdkExit(forgotPassword(""), handler),
+      runSdkExit(resetPassword("", sensitivePassword), handler),
+      runSdkExit(getCode({ appId: 0 }), handler),
+      runSdkExit(checkCodeMatch(""), handler),
+      runSdkExit(linkDevice(""), handler),
+      runSdkExit(revokeApp(0), handler),
+      runSdkExit(revokeClient(1.5), handler),
+      runSdkExit(validateToken(""), handler),
+      runSdkExit(verifyTOTP("", "123456"), handler),
+      runSdkExit(verifyTOTP("temporary-token", ""), handler),
+    ]);
+
+    const errors = failures.map(expectFailure);
+    expect(errors.every((error) => error instanceof PutioValidationError)).toBe(true);
+    expect(JSON.stringify(errors)).not.toContain(sensitiveSecret);
+    expect(JSON.stringify(errors)).not.toContain(sensitivePassword);
+    expect(requestCount).toBe(0);
+  });
+
   it("maps auth operation errors", async () => {
     const exit = await runSdkExit(
       register({

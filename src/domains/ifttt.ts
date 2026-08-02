@@ -11,6 +11,8 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
+import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
+import { JsonObjectSchema } from "./config.js";
 
 const IFTTTStatusEnvelopeSchema = Schema.Struct({
   enabled: Schema.Boolean,
@@ -34,6 +36,26 @@ export type IftttEventInput =
       readonly eventType: IftttEventType;
       readonly ingredients: Record<string, unknown>;
     };
+
+const IftttPlaybackIngredientsSchema = Schema.Struct({
+  file_id: PositiveIntegerSchema,
+  file_name: NonEmptyStringSchema,
+  file_type: NonEmptyStringSchema,
+});
+const isIftttPlaybackIngredients = Schema.is(IftttPlaybackIngredientsSchema);
+const IftttEventInputSchema = Schema.Struct({
+  clientName: Schema.optional(NonEmptyStringSchema),
+  eventType: NonEmptyStringSchema,
+  ingredients: JsonObjectSchema,
+}).check(
+  Schema.makeFilter(
+    (input) =>
+      input.eventType !== "playback_started" && input.eventType !== "playback_stopped"
+        ? true
+        : isIftttPlaybackIngredients(input.ingredients),
+    { expected: "complete playback ingredients for playback events" },
+  ),
+);
 
 export const GetIftttStatusErrorSpec = definePutioOperationErrorSpec({
   domain: "ifttt",
@@ -69,15 +91,17 @@ export const getIftttStatus = (): Effect.Effect<
 export const sendIftttEvent = (
   input: IftttEventInput,
 ): Effect.Effect<void, SendIftttEventError, PutioSdkContext> =>
-  requestJson(OkResponseSchema, {
-    body: {
-      type: "form",
-      value: {
-        client_name: input.clientName,
-        event_type: input.eventType,
-        ingredients: input.ingredients,
+  decodeAndRun(IftttEventInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          client_name: decodedInput.clientName,
+          event_type: decodedInput.eventType,
+          ingredients: decodedInput.ingredients,
+        },
       },
-    },
-    method: "POST",
-    path: "/v2/ifttt-client/event",
-  }).pipe(Effect.asVoid, withOperationErrors(SendIftttEventErrorSpec));
+      method: "POST",
+      path: "/v2/ifttt-client/event",
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(SendIftttEventErrorSpec));

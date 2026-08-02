@@ -898,6 +898,54 @@ describe("supporting domain boundaries", () => {
     ]);
   });
 
+  it("rejects invalid ifttt inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+    const failures = await Promise.all([
+      // @ts-expect-error JavaScript callers can provide null instead of a request object.
+      runSdkExit(ifttt.sendIftttEvent(null), handler),
+      runSdkExit(ifttt.sendIftttEvent({ eventType: "", ingredients: {} }), handler),
+      runSdkExit(
+        ifttt.sendIftttEvent({
+          eventType: "playback_started",
+          ingredients: { file_id: 7, file_name: "SDK File" },
+        }),
+        handler,
+      ),
+      runSdkExit(
+        ifttt.sendIftttEvent({
+          eventType: "playback_stopped",
+          ingredients: { file_id: 0, file_name: "SDK File", file_type: "VIDEO" },
+        }),
+        handler,
+      ),
+      runSdkExit(
+        ifttt.sendIftttEvent({
+          eventType: "custom_event",
+          ingredients: { created_at: new Date() },
+        }),
+        handler,
+      ),
+      runSdkExit(
+        ifttt.sendIftttEvent({
+          eventType: "custom_event",
+          ingredients: {},
+          // @ts-expect-error JavaScript callers can provide unknown request properties.
+          unexpected: true,
+        }),
+        handler,
+      ),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
+  });
+
   it("maps representative operation failures in supporting domains", async () => {
     const failure = await runSdkExit(
       downloadLinks.getDownloadLinks(9),

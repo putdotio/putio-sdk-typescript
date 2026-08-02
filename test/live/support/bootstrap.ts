@@ -179,30 +179,46 @@ export const bootstrapFirstPartyTokenWithCredentials = async (
   });
 
   let accessToken = loginResult.access_token;
-  let validation = await resolvedSdk.auth.validateToken(accessToken);
 
-  if (validation.token_scope === "two_factor") {
-    accessToken = await verifyTwoFactorToken(
+  try {
+    let validation = await resolvedSdk.auth.validateToken(accessToken);
+
+    if (validation.token_scope === "two_factor") {
+      accessToken = await verifyTwoFactorToken(
+        accessToken,
+        {
+          credentials,
+          firstPartyClient,
+        } as PutioBootstrapSecrets,
+        createClient,
+      );
+      validation = await resolvedSdk.auth.validateToken(accessToken);
+    }
+
+    if (validation.result !== true) {
+      throw new Error("first-party token validation did not succeed");
+    }
+
+    return {
       accessToken,
-      {
-        credentials,
-        firstPartyClient,
-      } as PutioBootstrapSecrets,
-      createClient,
-    );
-    validation = await resolvedSdk.auth.validateToken(accessToken);
-  }
+      scope: validation.token_scope,
+      tokenId: validation.token_id,
+      userId: validation.user_id,
+    };
+  } catch (error) {
+    resolvedSdk.setAccessToken(accessToken);
 
-  if (validation.result !== true) {
-    throw new Error("first-party token validation did not succeed");
-  }
+    try {
+      await resolvedSdk.auth.logout();
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        "First-party token bootstrap failed and its session could not be revoked",
+      );
+    }
 
-  return {
-    accessToken,
-    scope: validation.token_scope,
-    tokenId: validation.token_id,
-    userId: validation.user_id,
-  };
+    throw error;
+  }
 };
 
 export const bootstrapThirdPartyToken = async (

@@ -183,6 +183,29 @@ Single target:
 vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
 ```
 
+Run explicit targets with fresh runtime tokens:
+
+```bash
+pnpm test:live:fresh -- test/live/account.test.ts test/live/tunnel.test.ts
+```
+
+`test:live:fresh` uses the existing credential fixture to mint runtime tokens,
+runs only the named test files, and revokes the fresh first-party session before
+exiting, including when a test fails. It never writes the runtime tokens to an
+env file.
+
+An unattended runner can inject a scoped `INFISICAL_TOKEN` machine-identity
+access token and run the same command without materializing secrets:
+
+```bash
+infisical run --silent \
+  --domain "$PUTIO_INFISICAL_DOMAIN" \
+  --projectId "$PUTIO_SDK_TYPESCRIPT_INFISICAL_PROJECT_ID" \
+  --env "$PUTIO_SDK_TYPESCRIPT_INFISICAL_ENV" \
+  --path "$PUTIO_SDK_TYPESCRIPT_INFISICAL_PATH" \
+  -- pnpm test:live:fresh -- test/live/account.test.ts test/live/tunnel.test.ts
+```
+
 Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from the
 Infisical `/sdk-typescript` path. The materialized file is `0600` and
 gitignored. Live commands auto-load `.env.local` first and then `.env`;

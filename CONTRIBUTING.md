@@ -61,7 +61,7 @@ pnpm secrets:setup        # validates SOPS ciphertext and materializes .env.loca
 pnpm bootstrap:tokens     # mints fresh first/third-party tokens against the live API
 ```
 
-`secrets:setup` requires `sops`, `jq`, an authorized age identity, and
+`secrets:setup` requires SOPS 3.10 or newer, an authorized age identity, and
 `PUTIO_SDK_TYPESCRIPT_SOPS_FILE` pointing to the maintainer-provided ciphertext.
 Run `pnpm secrets:clean` before tearing down the worktree.
 

@@ -22,6 +22,8 @@ set -euo pipefail
 
 case "${1:-}" in
   filestatus)
+    [ "${2:-}" = "--input-type" ]
+    [ "${3:-}" = "dotenv" ]
     printf '{"encrypted":%s}\n' "${FAKE_SOPS_ENCRYPTED:-true}"
     ;;
   decrypt)
@@ -108,26 +110,81 @@ for (const [key, value] of Object.entries(expected)) {
 NODE
 rm -f "$output"
 
-jq 'del(.PUTIO_CLIENT_ID)' "$payload" >"$tmp_dir/invalid.json"
-mv "$tmp_dir/invalid.json" "$payload"
+mutate_payload() {
+  node - "$payload" "$1" <<'NODE'
+import { readFileSync, writeFileSync } from "node:fs"
+const [path, mutation] = process.argv.slice(2)
+const payload = JSON.parse(readFileSync(path, "utf8"))
+switch (mutation) {
+  case "missing": delete payload.PUTIO_CLIENT_ID; break
+  case "extra": payload.EXTRA = "unexpected"; break
+  case "empty": payload.PUTIO_TEST_PASSWORD = ""; break
+  case "numeric": payload.PUTIO_CLIENT_ID = "not-numeric"; break
+  case "double-wrapper": payload.PUTIO_TEST_PASSWORD = '\"quoted\"'; break
+  case "single-wrapper": payload.PUTIO_TEST_PASSWORD = "'quoted'"; break
+  case "special": payload.PUTIO_CLIENT_SECRET_FIRST_PARTY = "single'quote\\backslash"; payload.PUTIO_TEST_PASSWORD = 'double"quote\\backslash'; payload.PUTIO_TOKEN_FIRST_PARTY = "single'double\"back\\slash"; break
+  case "unrenderable": payload.PUTIO_TEST_PASSWORD = "single'double\"back`tick"; break
+  case "multiline": payload.PUTIO_TEST_PASSWORD = "line one\nline two"; break
+  default: process.exit(2)
+}
+writeFileSync(path, JSON.stringify(payload))
+NODE
+}
+
+write_valid_payload
+mutate_payload special
+run_setup >/dev/null
+node - "$output" <<'NODE'
+const path = process.argv[2]
+process.loadEnvFile(path)
+const expected = {
+  PUTIO_CLIENT_SECRET_FIRST_PARTY: "single'quote\\backslash",
+  PUTIO_TEST_PASSWORD: 'double"quote\\backslash',
+  PUTIO_TOKEN_FIRST_PARTY: "single'double\"back\\slash",
+}
+for (const [key, value] of Object.entries(expected)) {
+  if (process.env[key] !== value) process.exit(1)
+}
+NODE
+rm -f "$output"
+
+write_valid_payload
+mutate_payload missing
 expect_failure run_setup
 [ ! -e "$output" ]
 
 write_valid_payload
-jq '.PUTIO_CLIENT_ID = "not-numeric"' "$payload" >"$tmp_dir/invalid.json"
-mv "$tmp_dir/invalid.json" "$payload"
+mutate_payload extra
 expect_failure run_setup
 [ ! -e "$output" ]
 
 write_valid_payload
-jq '.PUTIO_TEST_PASSWORD = "\"quoted\""' "$payload" >"$tmp_dir/invalid.json"
-mv "$tmp_dir/invalid.json" "$payload"
+mutate_payload empty
 expect_failure run_setup
 [ ! -e "$output" ]
 
 write_valid_payload
-jq ".PUTIO_TEST_PASSWORD = \"'quoted'\"" "$payload" >"$tmp_dir/invalid.json"
-mv "$tmp_dir/invalid.json" "$payload"
+mutate_payload numeric
+expect_failure run_setup
+[ ! -e "$output" ]
+
+write_valid_payload
+mutate_payload double-wrapper
+expect_failure run_setup
+[ ! -e "$output" ]
+
+write_valid_payload
+mutate_payload single-wrapper
+expect_failure run_setup
+[ ! -e "$output" ]
+
+write_valid_payload
+mutate_payload unrenderable
+expect_failure run_setup
+[ ! -e "$output" ]
+
+write_valid_payload
+mutate_payload multiline
 expect_failure run_setup
 [ ! -e "$output" ]
 

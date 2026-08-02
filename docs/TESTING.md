@@ -221,7 +221,7 @@ pnpm test:live            # runs the broader live suite against pre-existing tok
 pnpm secrets:clean        # before `git worktree remove`
 ```
 
-`secrets:setup` requires `sops`, `jq`, and an authorized age identity. You can
+`secrets:setup` requires SOPS 3.10 or newer and an authorized age identity. You can
 copy `.env.example` manually when using your own live credentials, and unit
 tests do not require live credentials.
 

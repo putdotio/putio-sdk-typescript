@@ -77,6 +77,17 @@ await sdk.account.appSpecificPasswords.deleteAll();
 
 The plaintext `password` is returned only by `create`. List results contain metadata instead, including a nullable `last_used_at` timestamp and a null or masked `ip_address`. The Effect client exposes the same namespace with typed errors in its Effect channel.
 
+Long-lived Promise clients can replace or clear their token without recreating the client:
+
+```ts
+sdk.setAccessToken(nextUserAccessToken);
+const account = await sdk.account.getInfo({});
+
+sdk.setAccessToken(undefined);
+```
+
+The token is snapshotted when each Promise-client operation is invoked. Token changes apply to subsequent operations; an operation already in flight keeps the snapshot it started with. Base, upload, and web app URLs remain fixed from client creation.
+
 ## Utilities
 
 Shared formatting, URL, and error-localization helpers are available from the utilities subpath:
@@ -160,7 +171,7 @@ Effect is the canonical typed surface. The Promise client is an adapter for envi
 - Authenticated endpoints need a token through client config or the Effect layer config
 - Effect client: keeps errors in the Effect error channel with operation-specific typing
 - Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`
-- Promise client: rotates or clears credentials synchronously with `setAccessToken(...)`; each operation uses the token active when it is invoked
+- Promise client: rotates or clears credentials synchronously with `setAccessToken(...)`; each operation snapshots the token active when invoked without recreating its runtime
 - Promise client: owns a managed Effect runtime and exposes `dispose()` for explicit teardown
 
 If you create a long-lived Promise client in a script, test harness, or server integration, call `await sdk.dispose()` during teardown.

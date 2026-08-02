@@ -128,6 +128,7 @@ vi.mock("../domains/files.js", async () => {
   const { Effect } = await import("effect");
 
   return {
+    canWriteFile: vi.fn((fileId) => Effect.succeed(fileId + 100)),
     continueFiles: vi.fn((cursor, query) => Effect.succeed({ cursor, files: [], query })),
     continueSearch: vi.fn((cursor, query) =>
       Effect.succeed({ cursor, files: [], query, total: 0 }),
@@ -137,6 +138,13 @@ vi.mock("../domains/files.js", async () => {
     ),
     convertFileSelectionToMp4: vi.fn((selection) => Effect.succeed((selection.ids ?? []).length)),
     convertFilesToMp4: vi.fn((ids) => Effect.succeed(ids.length)),
+    copyFile: vi.fn((input) =>
+      Effect.succeed({
+        id: input.fileId + 1,
+        name: input.name ?? "copy",
+        parent_id: input.parentId,
+      }),
+    ),
     createFileUploadFormData: vi.fn((input) => {
       const form = new FormData();
       form.set("file", input.file, input.fileName ?? "upload.bin");
@@ -184,6 +192,9 @@ vi.mock("../domains/files.js", async () => {
       Effect.succeed(`https://api.put.io/files/${fileId}/mp4/download`),
     ),
     getDownloadUrl: vi.fn((fileId) => Effect.succeed(`https://download.put.io/${fileId}`)),
+    getFileChild: vi.fn((input) =>
+      Effect.succeed({ id: input.parentId + 1, name: input.name, file_type: "FILE" }),
+    ),
     getFile: vi.fn((input) => Effect.succeed({ id: input.id, name: "file", file_type: "FILE" })),
     getHlsStreamUrl: vi.fn((fileId) =>
       Effect.succeed(`https://api.put.io/files/${fileId}/hls/media.m3u8`),
@@ -250,6 +261,7 @@ vi.mock("../domains/files.js", async () => {
     searchFiles: vi.fn((query) => Effect.succeed({ cursor: null, files: [], query, total: 0 })),
     setFilesWatchStatus: vi.fn((selection) => Effect.succeed({ watched: selection.watched })),
     setStartFrom: vi.fn((input) => Effect.succeed({ start_from: input.time })),
+    touchFiles: vi.fn(() => Effect.void),
     uploadFile: vi.fn((input) =>
       Effect.succeed({ type: "file", file: { id: 1, name: input.fileName ?? "upload.bin" } }),
     ),
@@ -623,7 +635,17 @@ describe("sdk promise client adapters", () => {
     });
     expect(await client.files.move([1, 2], 9)).toHaveLength(2);
     expect(await client.files.moveSelection({ ids: [1] }, 9)).toEqual([]);
+    expect(await client.files.canWrite(4)).toBe(104);
+    expect(await client.files.copy({ fileId: 4, name: "copy", parentId: 9 })).toMatchObject({
+      id: 5,
+      name: "copy",
+      parent_id: 9,
+    });
     expect(await client.files.get({ id: 4 })).toMatchObject({ id: 4 });
+    expect(await client.files.getChild({ name: "child", parentId: 4 })).toMatchObject({
+      id: 5,
+      name: "child",
+    });
     expect(await client.files.getDownloadUrl(4)).toBe("https://download.put.io/4");
     expect(await client.files.getApiDownloadUrl(4)).toBe("https://api.put.io/files/4/download");
     expect(await client.files.getApiContentUrl(4)).toBe("https://api.put.io/files/4/stream");
@@ -650,6 +672,7 @@ describe("sdk promise client adapters", () => {
     expect(await client.files.setWatchStatus({ ids: [1], watched: true })).toEqual({
       watched: true,
     });
+    await expect(client.files.touch({ fileIds: [1, 2] })).resolves.toBeUndefined();
     expect(await client.files.putMp4ToMyFiles(4)).toEqual({ movedMp4: 4 });
     expect(await client.files.deleteMp4(4)).toEqual({ deletedMp4: 4 });
     expect(

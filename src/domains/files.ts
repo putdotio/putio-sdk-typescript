@@ -23,6 +23,8 @@ import {
   type PutioQueryValue,
 } from "../core/http.js";
 const RequestedFlag = Schema.Literal(1);
+const NonNegativeFileIdSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const PositiveFileIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
 export const FileTypeSchema = Schema.Literals([
   "FOLDER",
   "FILE",
@@ -50,8 +52,17 @@ export const FileSortSchema = Schema.Literals([
   "WATCH_DESC",
 ]);
 export const FileSetSortInputSchema = Schema.Struct({
-  fileId: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  fileId: NonNegativeFileIdSchema,
   sortBy: FileSortSchema,
+});
+export const FileCopyInputSchema = Schema.Struct({
+  fileId: PositiveFileIdSchema,
+  name: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
+  parentId: NonNegativeFileIdSchema,
+});
+export const FileTouchInputSchema = Schema.Struct({
+  fileIds: Schema.Array(NonNegativeFileIdSchema).check(Schema.isMinLength(1)),
+  updatedAt: Schema.optional(Schema.DateValid),
 });
 export const FileMediaMetadataSchema = Schema.Struct({
   aspect_ratio: Schema.optional(
@@ -127,6 +138,11 @@ export const FileQuerySchema = Schema.Struct({
   stream_url: Schema.optional(RequestedFlag),
   video_metadata: Schema.optional(RequestedFlag),
 });
+export const FileGetChildInputSchema = Schema.Struct({
+  name: Schema.String.check(Schema.isMinLength(1)),
+  parentId: NonNegativeFileIdSchema,
+  query: Schema.optional(FileQuerySchema),
+});
 export const FilesListQuerySchema = FileQuerySchema.mapFields(
   ({ codecs: _codecs, media_info: _mediaInfo, ...fields }) => fields,
 ).pipe(
@@ -201,6 +217,10 @@ const FileStartFromEnvelopeSchema = Schema.Struct({
 const FileDownloadUrlEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   url: Schema.String,
+});
+const FileCanWriteEnvelopeSchema = Schema.Struct({
+  status: Schema.Literal("OK"),
+  user_id: Schema.Int,
 });
 const FileUploadTransferSchema = Schema.Struct({
   id: Schema.Int,
@@ -334,6 +354,8 @@ export type FileType = Schema.Schema.Type<typeof FileTypeSchema>;
 export type FolderType = Schema.Schema.Type<typeof FolderTypeSchema>;
 export type FileSort = Schema.Schema.Type<typeof FileSortSchema>;
 export type FileSetSortInput = Schema.Schema.Type<typeof FileSetSortInputSchema>;
+export type FileCopyInput = Schema.Schema.Type<typeof FileCopyInputSchema>;
+export type FileTouchInput = Schema.Schema.Type<typeof FileTouchInputSchema>;
 export type FileMediaMetadata = Schema.Schema.Type<typeof FileMediaMetadataSchema>;
 export type FileMediaInfo = Schema.Schema.Type<typeof FileMediaInfoSchema>;
 export type FileBase = Schema.Schema.Type<typeof FileBaseSchema>;
@@ -341,6 +363,7 @@ export type FileBroad = Schema.Schema.Type<typeof FileBroadSchema>;
 export type FileCore = FileBase;
 export type FileVideoMetadata = FileMediaMetadata;
 export type FileQuery = Schema.Schema.Type<typeof FileQuerySchema>;
+export type FileGetChildInput = Schema.Schema.Type<typeof FileGetChildInputSchema>;
 export type FilesListQuery = Schema.Schema.Type<typeof FilesListQuerySchema>;
 export type FilesSearchQuery = Schema.Schema.Type<typeof FilesSearchQuerySchema>;
 export type FileBreadcrumb = Schema.Schema.Type<typeof FileBreadcrumbSchema>;
@@ -469,6 +492,46 @@ export const GetFileErrorSpec = definePutioOperationErrorSpec({
     { errorType: "invalid_scope", statusCode: 401 as const },
   ],
 });
+export const GetFileChildErrorSpec = definePutioOperationErrorSpec({
+  domain: "files",
+  operation: "getChild",
+  knownErrors: [
+    { statusCode: 400 as const },
+    { errorType: "invalid_scope", statusCode: 401 as const },
+    { statusCode: 403 as const },
+    { statusCode: 404 as const },
+  ],
+});
+export const CopyFileErrorSpec = definePutioOperationErrorSpec({
+  domain: "files",
+  operation: "copy",
+  knownErrors: [
+    { errorType: "NAME_ALREADY_EXIST", statusCode: 400 as const },
+    { errorType: "invalid_scope", statusCode: 401 as const },
+    { statusCode: 400 as const },
+    { statusCode: 403 as const },
+    { statusCode: 404 as const },
+  ],
+});
+export const TouchFilesErrorSpec = definePutioOperationErrorSpec({
+  domain: "files",
+  operation: "touch",
+  knownErrors: [
+    { errorType: "invalid_scope", statusCode: 401 as const },
+    { statusCode: 400 as const },
+    { statusCode: 403 as const },
+  ],
+});
+export const CanWriteFileErrorSpec = definePutioOperationErrorSpec({
+  domain: "files",
+  operation: "canWrite",
+  knownErrors: [
+    { errorType: "invalid_scope", statusCode: 401 as const },
+    { statusCode: 402 as const },
+    { statusCode: 403 as const },
+    { statusCode: 404 as const },
+  ],
+});
 export const SearchFilesErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "search",
@@ -593,6 +656,10 @@ export const FileUploadErrorSpec = definePutioOperationErrorSpec({
 export type QueryFilesError = PutioOperationFailure<typeof QueryFilesErrorSpec>;
 export type ContinueFilesError = PutioOperationFailure<typeof ContinueFilesErrorSpec>;
 export type GetFileError = PutioOperationFailure<typeof GetFileErrorSpec>;
+export type GetFileChildError = PutioOperationFailure<typeof GetFileChildErrorSpec>;
+export type CopyFileError = PutioOperationFailure<typeof CopyFileErrorSpec>;
+export type TouchFilesError = PutioOperationFailure<typeof TouchFilesErrorSpec>;
+export type CanWriteFileError = PutioOperationFailure<typeof CanWriteFileErrorSpec>;
 export type SearchFilesError = PutioOperationFailure<typeof SearchFilesErrorSpec>;
 export type CreateFolderError = PutioOperationFailure<typeof CreateFolderErrorSpec>;
 export type RenameFileError = PutioOperationFailure<typeof RenameFileErrorSpec>;
@@ -875,6 +942,94 @@ export function getFile(input: { readonly id: number; readonly query?: FileQuery
   }
   return ensureFileQueryFields(effect, input.query);
 }
+export function getFileChild(input: {
+  readonly name: string;
+  readonly parentId: number;
+}): Effect.Effect<FileCore, GetFileChildError | PutioValidationError, PutioSdkContext>;
+export function getFileChild<TQuery extends FileQuery>(input: {
+  readonly name: string;
+  readonly parentId: number;
+  readonly query: TQuery;
+}): Effect.Effect<
+  FileResponseFor<TQuery>,
+  GetFileChildError | PutioValidationError,
+  PutioSdkContext
+>;
+export function getFileChild(input: FileGetChildInput) {
+  return Schema.decodeUnknownEffect(FileGetChildInputSchema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) => {
+      const effect = requestJson(FileEnvelopeSchema, {
+        method: "GET",
+        path: `/v2/files/${encodePathSegment(decodedInput.parentId)}/child`,
+        query: {
+          ...decodedInput.query,
+          name: decodedInput.name,
+        },
+      }).pipe(selectJsonField("file"), withOperationErrors(GetFileChildErrorSpec));
+      return decodedInput.query === undefined
+        ? effect
+        : ensureFileQueryFields(effect, decodedInput.query);
+    }),
+  );
+}
+export const copyFile = (
+  input: FileCopyInput,
+): Effect.Effect<FileBroad, CopyFileError | PutioValidationError, PutioSdkContext> =>
+  Schema.decodeUnknownEffect(FileCopyInputSchema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(FileEnvelopeSchema, {
+        body: {
+          type: "form",
+          value: {
+            file_id: decodedInput.fileId,
+            name: decodedInput.name,
+            parent_id: decodedInput.parentId,
+          },
+        },
+        method: "POST",
+        path: "/v2/files/copy",
+      }),
+    ),
+    selectJsonField("file"),
+    withOperationErrors(CopyFileErrorSpec),
+  );
+export const touchFiles = (
+  input: FileTouchInput,
+): Effect.Effect<void, TouchFilesError | PutioValidationError, PutioSdkContext> =>
+  Schema.decodeUnknownEffect(FileTouchInputSchema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "form",
+          value: {
+            file_ids: joinCsv(decodedInput.fileIds),
+            updated_at: decodedInput.updatedAt?.toISOString(),
+          },
+        },
+        method: "POST",
+        path: "/v2/files/touch",
+      }),
+    ),
+    Effect.asVoid,
+    withOperationErrors(TouchFilesErrorSpec),
+  );
+export const canWriteFile = (
+  fileId: number,
+): Effect.Effect<number, CanWriteFileError | PutioValidationError, PutioSdkContext> =>
+  Schema.decodeUnknownEffect(PositiveFileIdSchema)(fileId).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedFileId) =>
+      requestJson(FileCanWriteEnvelopeSchema, {
+        method: "GET",
+        path: `/v2/files/${encodePathSegment(decodedFileId)}/can-write`,
+      }),
+    ),
+    selectJsonField("user_id"),
+    withOperationErrors(CanWriteFileErrorSpec),
+  );
 export const searchFiles = (
   query: FilesSearchQuery,
 ): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>

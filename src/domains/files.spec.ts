@@ -36,6 +36,113 @@ const baseFile = {
 };
 
 describe("files domain", () => {
+  it("gets a named child with query-conditioned fields", async () => {
+    await expect(
+      runSdkEffect(
+        files.getFileChild({
+          name: "SDK File",
+          parentId: 7,
+          query: { stream_url: 1 },
+        }),
+        (request) => {
+          const url = new URL(request.url);
+          expect(request.method).toBe("GET");
+          expect(url.pathname).toBe("/v2/files/7/child");
+          expect(url.searchParams.get("name")).toBe("SDK File");
+          expect(url.searchParams.get("stream_url")).toBe("1");
+          return jsonResponse({
+            file: { ...baseFile, stream_url: "https://download.put.io/stream" },
+            status: "OK",
+          });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).resolves.toMatchObject({
+      id: 9,
+      stream_url: "https://download.put.io/stream",
+    });
+  });
+
+  it("copies, touches, and checks write access", async () => {
+    await expect(
+      runSdkEffect(
+        files.copyFile({ fileId: 9, name: "SDK Copy", parentId: 7 }),
+        (request) => {
+          const body = getFormBody(request);
+          expect(request.method).toBe("POST");
+          expect(request.url).toBe("https://api.put.io/v2/files/copy");
+          expect(body.get("file_id")).toBe("9");
+          expect(body.get("name")).toBe("SDK Copy");
+          expect(body.get("parent_id")).toBe("7");
+          return jsonResponse({
+            file: { ...baseFile, id: 10, name: "SDK Copy", parent_id: 7 },
+            status: "OK",
+          });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).resolves.toMatchObject({ id: 10, name: "SDK Copy", parent_id: 7 });
+
+    await expect(
+      runSdkEffect(
+        files.touchFiles({
+          fileIds: [9, 10],
+          updatedAt: new Date("2026-08-01T12:30:00.000Z"),
+        }),
+        (request) => {
+          const body = getFormBody(request);
+          expect(request.method).toBe("POST");
+          expect(request.url).toBe("https://api.put.io/v2/files/touch");
+          expect(body.get("file_ids")).toBe("9,10");
+          expect(body.get("updated_at")).toBe("2026-08-01T12:30:00.000Z");
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      runSdkEffect(
+        files.canWriteFile(9),
+        (request) => {
+          expect(request.method).toBe("GET");
+          expect(request.url).toBe("https://api.put.io/v2/files/9/can-write");
+          return jsonResponse({ status: "OK", user_id: 23 });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).resolves.toBe(23);
+  });
+
+  it("rejects invalid file utility inputs before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+
+    const failures = await Promise.all([
+      runSdkExit(files.getFileChild({ name: "", parentId: 0 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.copyFile({ fileId: 0, parentId: 0 }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.touchFiles({ fileIds: [] }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.touchFiles({ fileIds: [9], updatedAt: new Date(Number.NaN) }), handler, {
+        accessToken: "token-123",
+      }),
+      runSdkExit(files.canWriteFile(0), handler, { accessToken: "token-123" }),
+    ]);
+
+    expect(
+      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
+    ).toBe(true);
+    expect(requestCount).toBe(0);
+  });
+
   it("sets and resets folder sort settings", async () => {
     await expect(
       runSdkEffect(

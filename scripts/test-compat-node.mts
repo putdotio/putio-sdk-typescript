@@ -61,6 +61,9 @@ import {
   type AccountInfoBroad,
   type CreateAppSpecificPasswordError,
   type PutioErrorEnvelope,
+  type FileBroad,
+  type FileCopyInput,
+  type FileTouchInput,
   type PutioSdkPromiseClient,
 } from "@putdotio/sdk";
 import { toHumanFileSize } from "@putdotio/sdk/utilities";
@@ -183,6 +186,20 @@ const knownAppSpecificPasswordError: CreateAppSpecificPasswordErrorType =
   "TOO_MANY_APP_SPECIFIC_PASSWORDS";
 // @ts-expect-error unknown app-specific-password error literals are not part of the public contract
 const unknownAppSpecificPasswordError: CreateAppSpecificPasswordErrorType = "UNKNOWN_ERROR";
+const copyInput: FileCopyInput = { fileId: 7, name: "copy.txt", parentId: 0 };
+const touchInput: FileTouchInput = { fileIds: [7], updatedAt: new Date() };
+const compilePromiseFileUtilities = async () => {
+  const child = await promiseClient.files.getChild({
+    name: "source.txt",
+    parentId: 0,
+    query: { stream_url: 1 },
+  });
+  const copy: FileBroad = await promiseClient.files.copy(copyInput);
+  const writableUserId: number = await promiseClient.files.canWrite(copy.id);
+  await promiseClient.files.touch(touchInput);
+  return { streamUrl: child.stream_url, writableUserId };
+};
+void compilePromiseFileUtilities;
 const promiseAuthUrl = promiseClient.auth.buildLoginUrl({
   clientId: "external-node",
   redirectUri: "https://example.com/callback",
@@ -202,6 +219,10 @@ promiseClient.setAccessToken(undefined);
 await promiseClient.dispose();
 
 const effectClient = createPutioSdkEffectClient();
+void effectClient.files.getChild({ name: "source.txt", parentId: 0 });
+void effectClient.files.copy(copyInput);
+void effectClient.files.canWrite(7);
+void effectClient.files.touch(touchInput);
 const effectAuthHost = await Effect.runPromise(
   Effect.succeed(
     new URL(

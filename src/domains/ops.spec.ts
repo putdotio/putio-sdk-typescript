@@ -1218,6 +1218,8 @@ describe("operational domain boundaries", () => {
       // @ts-expect-error JavaScript callers can provide null instead of a query object.
       runSdkExit(trash.listTrash(null), handler),
       runSdkExit(trash.listTrash({ per_page: 0 }), handler),
+      // @ts-expect-error JavaScript callers can provide unknown query properties.
+      runSdkExit(trash.listTrash({ unexpected: true }), handler),
       runSdkExit(trash.continueTrash(""), handler),
       runSdkExit(trash.continueTrash("cursor", { per_page: 0 }), handler),
       // @ts-expect-error JavaScript callers can provide null instead of a query object.
@@ -1247,6 +1249,8 @@ describe("operational domain boundaries", () => {
       runSdkExit(zips.createZip({ file_ids: [] }), handler),
       runSdkExit(zips.createZip({ file_ids: [0] }), handler),
       runSdkExit(zips.createZip({ cursor: "cursor", exclude_ids: [0] }), handler),
+      // @ts-expect-error JavaScript callers can provide unknown request properties.
+      runSdkExit(zips.createZip({ file_ids: [1], unexpected: true }), handler),
       runSdkExit(zips.getZip(0), handler),
       runSdkExit(zips.cancelZip(0), handler),
     ]);

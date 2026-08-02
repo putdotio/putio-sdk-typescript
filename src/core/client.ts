@@ -618,8 +618,9 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
   function getInfo(query: {
     readonly push_token: 1;
   }): Promise<AccountInfoBase & { readonly push_token: string }>;
+  function getInfo(): Promise<AccountInfoBroad>;
   function getInfo(query: AccountInfoQuery): Promise<AccountInfoBroad>;
-  function getInfo(query: AccountInfoQuery) {
+  function getInfo(query: AccountInfoQuery = {}) {
     return provideSdk(config, getAccountInfo(query));
   }
 

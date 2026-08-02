@@ -58,7 +58,9 @@ const main = async () => {
 import {
   createPutioSdkEffectClient,
   createPutioSdkPromiseClient,
+  type AccountInfoBroad,
   type CreateAppSpecificPasswordError,
+  type PutioErrorEnvelope,
   type PutioSdkPromiseClient,
 } from "@putdotio/sdk";
 import { toHumanFileSize } from "@putdotio/sdk/utilities";
@@ -66,6 +68,94 @@ import { toHumanFileSize } from "@putdotio/sdk/utilities";
 const promiseClient: PutioSdkPromiseClient = createPutioSdkPromiseClient({
   accessToken: "compat-token",
 });
+
+const compilePublicContracts = async () => {
+  const broad: AccountInfoBroad = await promiseClient.account.getInfo();
+  const optionalDownloadToken: string | undefined = broad.download_token;
+  const optionalFeatures: Readonly<Record<string, boolean>> | undefined = broad.features;
+  const optionalIntercomHash: string | undefined = broad.user_hash;
+  const optionalPas: { readonly user_hash: string } | undefined = broad.pas;
+  const optionalPaddleId: number | string | null | undefined = broad.paddle_user_id;
+  const optionalPushToken: string | undefined = broad.push_token;
+
+  const downloadInfo = await promiseClient.account.getInfo({ download_token: 1 });
+  const downloadToken: string = downloadInfo.download_token;
+  const featuresInfo = await promiseClient.account.getInfo({ features: 1 });
+  const features: Readonly<Record<string, boolean>> = featuresInfo.features;
+  const intercomInfo = await promiseClient.account.getInfo({ intercom: 1, platform: "ios" });
+  const intercomHash: string | undefined = intercomInfo.user_hash;
+  const pasInfo = await promiseClient.account.getInfo({ pas: 1 });
+  const pasHash: string = pasInfo.pas.user_hash;
+  const profitwellInfo = await promiseClient.account.getInfo({ profitwell: 1 });
+  const paddleId: number | string | null = profitwellInfo.paddle_user_id;
+  const pushInfo = await promiseClient.account.getInfo({ push_token: 1 });
+  const pushToken: string = pushInfo.push_token;
+
+  const createdPassword = await promiseClient.account.appSpecificPasswords.create({
+    note: "Node contract fixture",
+  });
+  const plaintextPassword: string = createdPassword.password;
+  const listedPasswords = await promiseClient.account.appSpecificPasswords.list();
+  const listedNote: string | undefined = listedPasswords[0]?.note;
+  await promiseClient.account.appSpecificPasswords.delete(1);
+  await promiseClient.account.appSpecificPasswords.deleteAll();
+
+  const errorEnvelope: PutioErrorEnvelope = {
+    error_id: null,
+    error_uri: "https://api.put.io/errors/example",
+    extra: { limit: 10 },
+    status: "ERROR",
+  };
+
+  Effect.map(effectClient.account.getInfo({ intercom: 1, platform: "web" }), (info) => {
+    const hash: string | undefined = info.user_hash;
+    return hash;
+  });
+  Effect.map(effectClient.account.getInfo({ profitwell: 1 }), (info) => {
+    const id: number | string | null = info.paddle_user_id;
+    return id;
+  });
+  Effect.map(effectClient.account.appSpecificPasswords.create({ note: "Effect fixture" }), (value) => {
+    const password: string = value.password;
+    return password;
+  });
+
+  // @ts-expect-error Unrequested conditional fields are not guaranteed.
+  const requiredDownloadInfo: { readonly download_token: string } = broad;
+  // @ts-expect-error Intercom may legitimately omit user_hash.
+  const requiredIntercomHash: string = intercomInfo.user_hash;
+  // @ts-expect-error Paddle IDs are not string-only.
+  const stringOnlyPaddleId: string = profitwellInfo.paddle_user_id;
+  // @ts-expect-error Listed metadata never exposes the one-time plaintext password.
+  const listedPlaintextPassword = listedPasswords[0]?.password;
+  // @ts-expect-error Only web and ios are valid Intercom platforms.
+  promiseClient.account.getInfo({ intercom: 1, platform: "android" });
+  // @ts-expect-error App-specific-password IDs must be numbers.
+  promiseClient.account.appSpecificPasswords.delete("1");
+
+  return {
+    downloadToken,
+    errorEnvelope,
+    features,
+    intercomHash,
+    listedNote,
+    optionalDownloadToken,
+    optionalFeatures,
+    optionalIntercomHash,
+    optionalPaddleId,
+    optionalPas,
+    optionalPushToken,
+    paddleId,
+    pasHash,
+    plaintextPassword,
+    pushToken,
+    requiredDownloadInfo,
+    requiredIntercomHash,
+    stringOnlyPaddleId,
+  };
+};
+void compilePublicContracts;
+
 type SubtitleLanguages = Awaited<
   ReturnType<PutioSdkPromiseClient["account"]["listSubtitleLanguages"]>
 >;

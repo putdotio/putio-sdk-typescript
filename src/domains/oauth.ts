@@ -214,16 +214,20 @@ export const getOAuthApp = (
 > =>
   Schema.decodeUnknownEffect(
     Schema.Struct({
-      edit: Schema.optional(Schema.Boolean),
       id: OAuthAppIdSchema,
+      options: Schema.optional(
+        Schema.Struct({
+          edit: Schema.optional(Schema.Boolean),
+        }),
+      ),
     }),
     { onExcessProperty: "error" },
-  )({ ...options, id }).pipe(
+  )({ id, options }).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
     Effect.flatMap((decodedInput) =>
       requestJson(OAuthAppWithTokenSchema, {
         method: "GET",
-        path: decodedInput.edit
+        path: decodedInput.options?.edit
           ? `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}/edit`
           : `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}`,
       }),

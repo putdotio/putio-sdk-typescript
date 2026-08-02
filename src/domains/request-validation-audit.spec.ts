@@ -104,6 +104,14 @@ describe("request validation audit", () => {
         config,
       ),
       runSdkExit(
+        oauth.getOAuthApp(1, {
+          // @ts-expect-error JavaScript callers can collide with positional fields.
+          id: 2,
+        }),
+        handler,
+        config,
+      ),
+      runSdkExit(
         oauth.setOAuthAppIcon(1, {
           icon: new Blob(["icon"]),
           // @ts-expect-error JavaScript callers can supply excess properties.

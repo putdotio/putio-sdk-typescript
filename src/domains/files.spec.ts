@@ -36,6 +36,61 @@ const baseFile = {
 };
 
 describe("files domain", () => {
+  it("sets and resets folder sort settings", async () => {
+    await expect(
+      runSdkEffect(
+        files.setFileSort({ fileId: 42, sortBy: "MODIFIED_DESC" }),
+        (request) => {
+          const body = getFormBody(request);
+          expect(request.method).toBe("POST");
+          expect(request.url).toBe("https://api.put.io/v2/files/set-sort-by");
+          expect(body.get("file_id")).toBe("42");
+          expect(body.get("sort_by")).toBe("MODIFIED_DESC");
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      runSdkEffect(
+        files.resetFileSortSettings(),
+        (request) => {
+          expect(request.method).toBe("POST");
+          expect(request.url).toBe("https://api.put.io/v2/files/remove-sort-by-settings");
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("rejects invalid folder sort settings before transport", async () => {
+    let requestCount = 0;
+    const handler = () => {
+      requestCount += 1;
+      return jsonResponse({ status: "OK" });
+    };
+
+    const invalidFileId = expectFailure(
+      await runSdkExit(files.setFileSort({ fileId: -1, sortBy: "NAME_ASC" }), handler, {
+        accessToken: "token-123",
+      }),
+    );
+    const invalidSort = expectFailure(
+      await runSdkExit(
+        // @ts-expect-error JavaScript callers can still supply unknown sort values.
+        files.setFileSort({ fileId: 1, sortBy: "INVALID" }),
+        handler,
+        { accessToken: "token-123" },
+      ),
+    );
+
+    expect(invalidFileId).toBeInstanceOf(PutioValidationError);
+    expect(invalidSort).toBeInstanceOf(PutioValidationError);
+    expect(requestCount).toBe(0);
+  });
+
   it("builds direct access URLs and config-backed helpers", async () => {
     expect(
       files.buildFileApiDownloadUrl("https://api.put.io", 42, {

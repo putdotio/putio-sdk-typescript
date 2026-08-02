@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect";
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
 import {
+  mapDecodeErrorToValidationError,
   mapConfigurationError,
   PutioValidationError,
   definePutioOperationErrorSpec,
@@ -48,6 +49,10 @@ export const FileSortSchema = Schema.Literals([
   "WATCH_ASC",
   "WATCH_DESC",
 ]);
+export const FileSetSortInputSchema = Schema.Struct({
+  fileId: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  sortBy: FileSortSchema,
+});
 export const FileMediaMetadataSchema = Schema.Struct({
   aspect_ratio: Schema.optional(
     Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
@@ -328,6 +333,7 @@ const FilesNextVideoEnvelopeSchema = Schema.Struct({
 export type FileType = Schema.Schema.Type<typeof FileTypeSchema>;
 export type FolderType = Schema.Schema.Type<typeof FolderTypeSchema>;
 export type FileSort = Schema.Schema.Type<typeof FileSortSchema>;
+export type FileSetSortInput = Schema.Schema.Type<typeof FileSetSortInputSchema>;
 export type FileMediaMetadata = Schema.Schema.Type<typeof FileMediaMetadataSchema>;
 export type FileMediaInfo = Schema.Schema.Type<typeof FileMediaInfoSchema>;
 export type FileBase = Schema.Schema.Type<typeof FileBaseSchema>;
@@ -894,6 +900,31 @@ export const continueSearch = (
     path: "/v2/files/search/continue",
     query,
   }).pipe(withOperationErrors(SearchFilesErrorSpec));
+export const setFileSort = (
+  input: FileSetSortInput,
+): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
+  Schema.decodeUnknownEffect(FileSetSortInputSchema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((decodedInput) =>
+      requestJson(OkResponseSchema, {
+        body: {
+          type: "form",
+          value: {
+            file_id: decodedInput.fileId,
+            sort_by: decodedInput.sortBy,
+          },
+        },
+        method: "POST",
+        path: "/v2/files/set-sort-by",
+      }),
+    ),
+    Effect.asVoid,
+  );
+export const resetFileSortSettings = (): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
+  requestJson(OkResponseSchema, {
+    method: "POST",
+    path: "/v2/files/remove-sort-by-settings",
+  }).pipe(Effect.asVoid);
 export const createFolder = (
   input: FileCreateFolderInput,
 ): Effect.Effect<FileBroad, CreateFolderError, PutioSdkContext> =>

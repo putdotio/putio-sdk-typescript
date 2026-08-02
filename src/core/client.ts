@@ -592,14 +592,14 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
   }): Promise<AccountInfoBase & { readonly features: Record<string, boolean> }>;
   function getInfo(query: {
     readonly intercom: 1;
-    readonly platform?: string;
-  }): Promise<AccountInfoBase & { readonly user_hash: string }>;
+    readonly platform?: "web" | "ios";
+  }): Promise<AccountInfoBase & { readonly user_hash?: string }>;
   function getInfo(query: {
     readonly pas: 1;
   }): Promise<AccountInfoBase & { readonly pas: PasInfo }>;
   function getInfo(query: {
     readonly profitwell: 1;
-  }): Promise<AccountInfoBase & { readonly paddle_user_id: number | null }>;
+  }): Promise<AccountInfoBase & { readonly paddle_user_id: number | string | null }>;
   function getInfo(query: {
     readonly push_token: 1;
   }): Promise<AccountInfoBase & { readonly push_token: string }>;

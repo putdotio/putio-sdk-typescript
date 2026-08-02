@@ -115,7 +115,7 @@ describe("account domain", () => {
             features: {
               beta: true,
             },
-            paddle_user_id: 99,
+            paddle_user_id: "ctm_99",
             user_hash: "intercom-user",
           },
           status: "OK",
@@ -126,7 +126,21 @@ describe("account domain", () => {
 
     expect(fullInfo.features.beta).toBe(true);
     expect(fullInfo.user_hash).toBe("intercom-user");
-    expect(fullInfo.paddle_user_id).toBe(99);
+    expect(fullInfo.paddle_user_id).toBe("ctm_99");
+
+    const intercomInfo = await runSdkEffect(
+      getAccountInfo({
+        intercom: 1,
+        platform: "ios",
+      }),
+      (request) => {
+        expect(request.url).toBe("https://api.put.io/v2/account/info?intercom=1&platform=ios");
+        return jsonResponse({ info: baseAccountInfo, status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+
+    expect(intercomInfo.user_hash).toBeUndefined();
 
     const exit = await runSdkExit(
       getAccountInfo({
@@ -149,7 +163,6 @@ describe("account domain", () => {
 
     for (const [query, expectedCause] of [
       [{ features: 1 }, 'Expected put.io to include "features" because it was requested'],
-      [{ intercom: 1 }, 'Expected put.io to include "user_hash" because it was requested'],
       [{ profitwell: 1 }, 'Expected put.io to include "paddle_user_id" because it was requested'],
     ] as const) {
       const missingExit = await runSdkExit(

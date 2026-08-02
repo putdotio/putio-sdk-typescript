@@ -168,16 +168,24 @@ describe("sdk core errors", () => {
     const body = await Effect.runPromise(
       parseErrorBody(400, {
         details: { field: "name" },
+        error_id: null,
         error_message: "Bad request",
         error_type: "BadRequest",
+        error_uri: "http://api.put.io/v2/docs",
+        extra: { field: "name", limit: 10 },
+        status: "ERROR",
         status_code: 400,
       }),
     );
 
     expect(body).toEqual({
       details: { field: "name" },
+      error_id: null,
       error_message: "Bad request",
       error_type: "BadRequest",
+      error_uri: "http://api.put.io/v2/docs",
+      extra: { field: "name", limit: 10 },
+      status: "ERROR",
       status_code: 400,
     });
   });

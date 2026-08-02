@@ -196,6 +196,11 @@ The package compatibility gate installs the packed tarball into external consume
 
 Promise consumers receive tagged SDK error objects:
 
+Backend error bodies preserve `status`, `status_code`, `error_type`, `error_message`,
+`error_uri`, nullable `error_id`, and structured `extra` metadata. The legacy
+`details` field remains available for compatibility, but current backend errors use
+`extra`; `details` is planned for removal in the next major release.
+
 ```ts
 import {
   createPutioSdkPromiseClient,

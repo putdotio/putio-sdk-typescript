@@ -600,6 +600,14 @@ describe("files domain", () => {
 
     expect(
       await runSdkEffect(
+        files.getMp4Status(9),
+        () => jsonResponse({ mp4: { id: 9, status: "IN_QUEUE" }, status: "OK" }),
+        { accessToken: "token-123" },
+      ),
+    ).toEqual({ id: 9, status: "IN_QUEUE" });
+
+    expect(
+      await runSdkEffect(
         files.convertFileToMp4(9),
         () => jsonResponse({ mp4: { id: 9, status: "NOT_AVAILABLE" }, status: "OK" }),
         { accessToken: "token-123" },

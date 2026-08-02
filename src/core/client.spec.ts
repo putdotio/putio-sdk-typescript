@@ -53,6 +53,21 @@ describe("sdk client factories", () => {
     expect(client.transfers.list).toBeTypeOf("function");
   });
 
+  it("keeps writable Effect client namespaces isolated", () => {
+    const first = createPutioSdkEffectClient();
+    const second = createPutioSdkEffectClient();
+    const clearEvents = first.events.clear;
+    const generateTOTP = first.auth.twoFactor.generateTOTP;
+
+    first.events.clear = () => clearEvents();
+    first.auth.twoFactor.generateTOTP = () => generateTOTP();
+
+    expect(first.events.clear).not.toBe(clearEvents);
+    expect(first.auth.twoFactor.generateTOTP).not.toBe(generateTOTP);
+    expect(second.events.clear).toBe(clearEvents);
+    expect(second.auth.twoFactor.generateTOTP).toBe(generateTOTP);
+  });
+
   it("provides the Effect client as an Effect service", async () => {
     const program = Effect.gen(function* () {
       const client = yield* PutioSdk;

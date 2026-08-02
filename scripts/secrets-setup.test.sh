@@ -82,7 +82,11 @@ expect_failure() {
 
 write_valid_payload
 run_setup >/dev/null
-output_mode="$(stat -f '%Lp' "$output" 2>/dev/null || stat -c '%a' "$output")"
+if output_mode="$(stat -c '%a' "$output" 2>/dev/null)"; then
+  :
+else
+  output_mode="$(stat -f '%Lp' "$output")"
+fi
 [ "$output_mode" = 600 ]
 node - "$output" <<'NODE'
 const path = process.argv[2]

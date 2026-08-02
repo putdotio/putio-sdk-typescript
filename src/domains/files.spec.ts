@@ -548,12 +548,12 @@ describe("files domain", () => {
       await runSdkEffect(
         files.createFolder({
           name: "SDK",
-          parent_id: 5,
+          parent_id: 0,
         }),
         (request) => {
           const body = getFormBody(request);
           expect(body.get("name")).toBe("SDK");
-          expect(body.get("parent_id")).toBe("5");
+          expect(body.get("parent_id")).toBe("0");
 
           return jsonResponse({
             file: {
@@ -662,13 +662,13 @@ describe("files domain", () => {
             cursor: "cursor-1",
             ids: [9],
           },
-          7,
+          0,
         ),
         (request) => {
           const body = getFormBody(request);
           expect(body.get("cursor")).toBe("cursor-1");
           expect(body.get("file_ids")).toBe("9");
-          expect(body.get("parent_id")).toBe("7");
+          expect(body.get("parent_id")).toBe("0");
 
           return jsonResponse({
             errors: [],

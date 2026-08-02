@@ -369,7 +369,15 @@ const FileExtractionsEnvelopeSchema = Schema.Struct({
   extractions: Schema.Array(FileExtractionSchema),
   status: Schema.optional(Schema.Literal("OK")),
 });
-const FilesBulkSelectionSchema = makeCursorSelectionSchema("ids", "excludeIds", {});
+const FilesBulkSelectionSchema = Schema.Struct({
+  cursor: Schema.optional(NonEmptyStringSchema),
+  excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
+  ids: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
+}).check(
+  Schema.makeFilter((input) => input.cursor !== undefined || input.ids !== undefined, {
+    expected: "a non-empty cursor or file ID selection",
+  }),
+);
 const FilesDeleteOptionsSchema = Schema.Struct({
   ignoreFileOwner: Schema.optional(Schema.Boolean),
   partialDelete: Schema.optional(Schema.Boolean),
@@ -446,7 +454,10 @@ export type FileExtractionStatus = Schema.Schema.Type<typeof FileExtractionStatu
 export type FileExtraction = Schema.Schema.Type<typeof FileExtractionSchema>;
 export type FileSubtitle = Schema.Schema.Type<typeof FileSubtitleSchema>;
 export type FilesMoveError = Schema.Schema.Type<typeof FilesMoveErrorSchema>;
-export type FilesBulkSelection = Schema.Schema.Type<typeof FilesBulkSelectionSchema>;
+type FilesBulkSelectionShape = Schema.Schema.Type<typeof FilesBulkSelectionSchema>;
+export type FilesBulkSelection =
+  | (FilesBulkSelectionShape & { readonly cursor: string })
+  | (FilesBulkSelectionShape & { readonly ids: ReadonlyArray<number> });
 export type FileUploadTransfer = Schema.Schema.Type<typeof FileUploadTransferSchema>;
 export type FileUploadEnvelope = Schema.Schema.Type<typeof FileUploadEnvelopeSchema>;
 export type FileUploadResult =

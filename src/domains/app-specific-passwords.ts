@@ -21,9 +21,33 @@ const AppSpecificPasswordNoteSchema = Schema.Trim.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(255),
 );
+const MaskedIpv4AddressPattern = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}XXX$/;
+const Ipv6HextetPattern = /^[\dA-Fa-f]{1,4}$/;
+
+const isMaskedIpv6Address = (value: string): boolean => {
+  const compressedParts = value.split("::");
+
+  if (compressedParts.length > 2) {
+    return false;
+  }
+
+  const hextets = compressedParts.flatMap((part) => (part === "" ? [] : part.split(":")));
+
+  if (
+    hextets.at(-1) !== "X" ||
+    !hextets.slice(0, -1).every((part) => Ipv6HextetPattern.test(part))
+  ) {
+    return false;
+  }
+
+  return compressedParts.length === 2 ? hextets.length < 8 : hextets.length === 8;
+};
+
 const MaskedIpAddressSchema = Schema.String.check(
-  Schema.isPattern(
-    /^(?:(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}XXX|(?:(?:[\dA-Fa-f]{1,4}:){0,7}|:):X)$/,
+  Schema.makeFilter((value) =>
+    MaskedIpv4AddressPattern.test(value) || isMaskedIpv6Address(value)
+      ? undefined
+      : "Expected a masked IP address",
   ),
 );
 

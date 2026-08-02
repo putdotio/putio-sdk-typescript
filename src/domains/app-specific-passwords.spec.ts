@@ -83,21 +83,41 @@ describe("app-specific password boundaries", () => {
     ]);
   });
 
-  it("rejects malformed masked IP addresses from the API", async () => {
-    const failure = expectFailure(
-      await runSdkExit(
-        listAppSpecificPasswords(),
-        () =>
-          jsonResponse({
-            passwords: [{ ...appSpecificPassword, ip_address: "not-an-ip.XXX" }],
-            status: "OK",
-          }),
-        { accessToken: "token-123" },
-      ),
-    );
+  it.each(["127.0.0.XXX", "2001::db8:X", "1:2:3:4:5:6:7:X"])(
+    "accepts masked IP address %s from the API",
+    async (ipAddress) => {
+      await expect(
+        runSdkEffect(
+          listAppSpecificPasswords(),
+          () =>
+            jsonResponse({
+              passwords: [{ ...appSpecificPassword, ip_address: ipAddress }],
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).resolves.toEqual([{ ...appSpecificPassword, ip_address: ipAddress }]);
+    },
+  );
 
-    expect(failure).toBeInstanceOf(PutioValidationError);
-  });
+  it.each(["not-an-ip.XXX", "1:2:3:4:5:6:7::X", "2001:::X"])(
+    "rejects malformed masked IP address %s from the API",
+    async (ipAddress) => {
+      const failure = expectFailure(
+        await runSdkExit(
+          listAppSpecificPasswords(),
+          () =>
+            jsonResponse({
+              passwords: [{ ...appSpecificPassword, ip_address: ipAddress }],
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      expect(failure).toBeInstanceOf(PutioValidationError);
+    },
+  );
 
   it("rejects invalid create and delete inputs before transport", async () => {
     let requestCount = 0;

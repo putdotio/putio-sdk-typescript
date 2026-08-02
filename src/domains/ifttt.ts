@@ -12,7 +12,7 @@ import {
   type PutioSdkContext,
 } from "../core/http.js";
 import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
-import { JsonObjectSchema } from "./config.js";
+import { JsonObjectSchema, type PutioJsonObject } from "./config.js";
 
 const IFTTTStatusEnvelopeSchema = Schema.Struct({
   enabled: Schema.Boolean,
@@ -34,7 +34,7 @@ export type IftttEventInput =
   | {
       readonly clientName?: string;
       readonly eventType: IftttEventType;
-      readonly ingredients: Record<string, unknown>;
+      readonly ingredients: PutioJsonObject;
     };
 
 const IftttPlaybackIngredientsSchema = Schema.Struct({

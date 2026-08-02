@@ -16,11 +16,32 @@ Readiness here is based on four things:
 - live coverage exists for every implemented domain
 - the route audit has confirmed both missing operations and contract drift
 
+## Automation Contract
+
+The repository exposes one unattended lifecycle for implementation and package
+QA:
+
+1. `./scripts/agent-bootstrap.sh` validates task identity, runner versions, frozen
+   dependency setup, and the pinned Effect research checkout
+2. `./scripts/agent-verify.sh` runs the canonical deterministic and package-surface gates
+3. `./scripts/agent-teardown.sh` records the terminal status on success or failure
+4. `./scripts/agent-run.sh` composes all three and guarantees teardown
+
+CI runs the same lifecycle and retains the machine-readable evidence bundle.
+Safe scripted live QA uses `./scripts/agent-live-test.sh <explicit targets>` with direct
+runner secret injection or a scoped Infisical machine-identity token. Human
+login, profile switching, copied env files, and implicit full-suite selection
+are outside that unattended contract.
+
+The dependable scope is implementation, packed-package QA, and explicitly
+selected safe live targets. The full mutation-heavy live suite still requires
+fixture-aware scheduling because concurrent runs share account state and quotas.
+
 ## Public Route Matrix
 
 [`api-route-matrix.json`](./api-route-matrix.json) records method-level backend evidence and one
 of four decisions for each audited public route: `sdk`, `equivalent`, `excluded`, or
-`investigate`. `vp run verify` validates its shape, rejects internal or duplicate routes, and
+`investigate`. `pnpm exec vp run verify` validates its shape, rejects internal or duplicate routes, and
 checks every named operation on both Effect and Promise clients.
 
 The matrix is currently an audited seed, not a completeness claim. Every route in the seed has a

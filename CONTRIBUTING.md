@@ -4,16 +4,10 @@ Thanks for contributing to `@putdotio/sdk`.
 
 ## Setup
 
-Install dependencies with Vite+:
+Install the pinned dependencies without changing machine-global tooling:
 
 ```bash
-vp install
-```
-
-Then install the stock Vite+ hook wiring for this clone:
-
-```bash
-vp config
+pnpm install --frozen-lockfile
 ```
 
 ## Validation
@@ -21,14 +15,14 @@ vp config
 Run the full repo guardrail before opening or updating a pull request:
 
 ```bash
-vp run verify
+pnpm exec vp run verify
 ```
 
 That command runs formatting, linting, package build, unit tests, and coverage using the same repo-local entrypoint CI relies on.
 
 The coverage guardrail is unit-only and counts all production files under `src/**`.
 Live tests are separate confidence checks outside the coverage threshold.
-Package-surface verification runs in CI through `vp run lint:package`.
+Package-surface verification runs in CI through `pnpm exec vp run lint:package`.
 
 ## Live Verification
 
@@ -43,13 +37,13 @@ cp .env.example .env
 Run the full live suite:
 
 ```bash
-vp run test:live
+pnpm exec vp run test:live
 ```
 
 Run the package-surface checks:
 
 ```bash
-vp run lint:package
+pnpm exec vp run lint:package
 ```
 
 The package-surface checks do not require live credentials. Use live tests when you need backend sanity checks, release confidence, or verification for stateful flows that unit tests cannot prove.
@@ -71,7 +65,7 @@ For single-target commands, safety rules, and fixture expectations, see [Testing
 
 ## Development Notes
 
-- Prefer `vp` for repo commands.
+- Use `pnpm exec vp` for direct Vite+ commands; package scripts can use their pinned `vp` binary.
 - Treat `@putdotio/sdk` as a new public package, not a compatibility wrapper around `putio-js`.
 - Keep the public surface domain-first and Effect-first.
 - Put end-user usage in [Overview](./README.md). Put deeper contributor and architecture notes in `docs/*`.

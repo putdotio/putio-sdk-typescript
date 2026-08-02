@@ -19,6 +19,10 @@ jobs:
       cancel-in-progress: true
     permissions:
       contents: read
+    env:
+      AGENT_ATTEMPT_ID: verify-${{ github.run_attempt }}
+      AGENT_TASK_CLASS: implementation
+      AGENT_TASK_ID: github-${{ github.run_id }}
 
     steps:
       - name: Check out repository
@@ -33,14 +37,17 @@ jobs:
           node-version-file: ".node-version"
           cache: true
 
-      - name: Install dependencies
-        run: vp install
+      - name: Run agent lifecycle
+        run: ./scripts/agent-run.sh
 
-      - name: Verify repository
-        run: vp run verify
-
-      - name: Verify package metadata
-        run: vp run lint:package
+      - name: Upload agent evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: agent-readiness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .artifacts/agent-readiness
+          if-no-files-found: error
+          retention-days: 14
 
   compatibility:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')

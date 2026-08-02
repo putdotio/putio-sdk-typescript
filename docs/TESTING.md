@@ -22,7 +22,7 @@ The live verification layer lives in:
 - `test/live/domains/*.ts`
 - `test/live/support/*`
 
-Live tests execute the built SDK from `dist/**`, so direct live targets should always run after `vp pack`.
+Live tests execute the built SDK from `dist/**`, so direct live targets should always run after `pnpm exec vp pack`.
 
 ## Local Checks
 
@@ -31,26 +31,47 @@ Default test runs intentionally exclude `test/live/**`.
 Run:
 
 ```bash
-vp install
-vp check .
-vp pack
-vp test
-vp test --coverage
+pnpm install --frozen-lockfile
+pnpm exec vp check .
+pnpm exec vp pack
+pnpm exec vp test
+pnpm exec vp test --coverage
 ```
 
 Additional package and cleanup checks:
 
 ```bash
-vp run lint:unused
-vp run lint:unused:prod
-vp run lint:package
-vp run test:compat
+pnpm exec vp run lint:unused
+pnpm exec vp run lint:unused:prod
+pnpm exec vp run lint:package
+pnpm exec vp run test:compat
 ```
 
 `lint:unused` runs Knip against source, tests, live tests, scripts, and config files to detect unused files, dependencies, and exports.
 `lint:unused:prod` packs the package, then runs Knip's production-only graph with ignored build output visible. Knip's explicit entry and project patterns keep that analysis limited to the package, tests, scripts, and root config rather than unrelated ignored files.
 `lint:package` packs the package and runs `publint` plus Are The Types Wrong against the published ESM entrypoints.
-`vp run verify` blocks on both Knip graphs and executes the covered unit suite once. CI follows it with `lint:package`; Knip governs source reachability and dependency usage, while package checks and explicit API/type tests govern intentional public exports.
+`pnpm exec vp run verify` blocks on both Knip graphs and executes the covered unit suite once. CI follows it with `lint:package`; Knip governs source reachability and dependency usage, while package checks and explicit API/type tests govern intentional public exports.
+
+## Unattended Agent Lifecycle
+
+The checked-in lifecycle requires stable task and attempt identifiers, validates
+the pinned Node.js and pnpm versions, installs from the frozen lockfile, runs the
+canonical repository and package gates, and always records teardown:
+
+```bash
+export AGENT_TASK_ID="issue-123"
+export AGENT_ATTEMPT_ID="attempt-1"
+./scripts/agent-run.sh
+```
+
+Evidence is written with mode `0600` under
+`.artifacts/agent-readiness/<task>/<attempt>/`. Each JSON record includes the
+source revision, runner, duration, result, retry count, and failure class. CI
+uses the same lifecycle and uploads the evidence bundle.
+
+Managed worktrees copy only the pinned `.repos/effect` research checkout.
+Secrets are injected by the runner or fetched per worktree; ignored env files
+are not copied automatically.
 
 ## Runtime Compatibility Checks
 
@@ -59,21 +80,21 @@ Compatibility checks are package-consumer smoke tests, not live API tests. They 
 Run all compatibility checks:
 
 ```bash
-vp run test:compat
+pnpm exec vp run test:compat
 ```
 
 Target one runtime:
 
 ```bash
-vp run test:compat:node
-PUTIO_COMPAT_BROWSERS=chromium vp run test:compat:browser
-vp run test:compat:bun
+pnpm exec vp run test:compat:node
+PUTIO_COMPAT_BROWSERS=chromium pnpm exec vp run test:compat:browser
+pnpm exec vp run test:compat:bun
 ```
 
 The browser check uses Playwright. Install local browser engines once when needed:
 
 ```bash
-vp run test:compat:browser:install
+pnpm exec vp run test:compat:browser:install
 ```
 
 The compatibility layer proves:
@@ -92,7 +113,7 @@ Unit coverage now includes all production code under `src/**`, including:
 - `src/utilities/*`
 - barrel entrypoints such as `src/index.ts` and `src/utilities.ts`
 
-`vp run verify` enforces the repo coverage floor through the unit suite only.
+`pnpm exec vp run verify` enforces the repo coverage floor through the unit suite only.
 Live tests stay separate on purpose:
 
 - they stay outside the coverage report
@@ -174,13 +195,13 @@ Keep token values out of command output, docs, comments, and commits.
 Full live suite:
 
 ```bash
-vp run test:live
+pnpm exec vp run test:live
 ```
 
 Single target:
 
 ```bash
-vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
+pnpm exec vp pack && pnpm exec vp test run --config vitest.live.config.ts test/live/auth.test.ts
 ```
 
 Run `pnpm secrets:setup` once per worktree to materialize `.env.local` from the
@@ -199,6 +220,39 @@ pnpm secrets:clean        # before `git worktree remove`
 `secrets:setup` requires the Infisical CLI and access to the put.io frontend
 Development environment. You can copy `.env.example` manually when using your
 own live credentials, and unit tests do not require live credentials.
+
+### Unattended live targets
+
+For unattended live verification, the runner must inject a live token pair or
+the first-party bootstrap credential set directly, or inject an
+`INFISICAL_TOKEN` machine-identity access token plus the repo-specific
+`PUTIO_SDK_TYPESCRIPT_INFISICAL_PROJECT_ID` and
+`PUTIO_SDK_TYPESCRIPT_INFISICAL_PATH` coordinates. The repository does not log
+in, switch a human profile, or persist fetched secrets.
+
+```bash
+export AGENT_TASK_ID="live-contract-123"
+export AGENT_ATTEMPT_ID="attempt-1"
+export AGENT_TASK_CLASS="scripted-qa"
+./scripts/agent-live-test.sh test/live/tunnel.test.ts
+```
+
+Targets that need ordinary first- and third-party tokens can bootstrap them
+ephemerally from the injected credential set. Values exist only in the test
+child process and are never printed or written to an env file. The fresh
+first-party session is revoked after success or failure:
+
+```bash
+AGENT_LIVE_REFRESH_TOKENS=1 ./scripts/agent-live-test.sh \
+  test/live/account.test.ts \
+  test/live/tunnel.test.ts
+```
+
+The unattended command requires explicit `test/live/*.test.ts` targets so a
+runner cannot accidentally select the mutation-heavy full suite. Its evidence
+log is checked against injected secret values before the result is accepted.
+Missing identity fails as `runner/missing_identity` with status 2 and an
+inspectable result record.
 
 `bootstrap:live-fixtures` validates and seeds the live fixtures that are safe to
 prepare through the public SDK. It establishes the secondary friendship/shared

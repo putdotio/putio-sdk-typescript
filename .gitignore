@@ -1,4 +1,5 @@
 .DS_Store
+.artifacts
 .env
 .env.*
 !.env.example

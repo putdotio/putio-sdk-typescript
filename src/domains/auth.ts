@@ -199,6 +199,7 @@ export type GenerateTOTPResponse = Schema.Schema.Type<typeof GenerateTOTPRespons
 export type VerifyTOTPResponse = Schema.Schema.Type<typeof VerifyTOTPResponseSchema>;
 export type RegisterInput = Schema.Schema.Type<typeof RegisterInputSchema>;
 export type LoginInput = Schema.Schema.Type<typeof LoginInputSchema>;
+export type AuthGetCodeInput = Schema.Schema.Type<typeof AuthGetCodeInputSchema>;
 export type OAuthAuthorizationCodeExchangeInput = Schema.Schema.Type<
   typeof OAuthAuthorizationCodeExchangeInputSchema
 >;
@@ -613,7 +614,7 @@ export const resetPassword = (
       }).pipe(selectJsonFields("access_token")),
   ).pipe(withOperationErrors(ResetPasswordErrorSpec));
 export const getCode = (
-  input: Schema.Schema.Type<typeof AuthGetCodeInputSchema>,
+  input: AuthGetCodeInput,
 ): Effect.Effect<
   Schema.Schema.Type<typeof AuthorizationCodeSchema>,
   PutioSdkError,

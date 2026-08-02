@@ -3,12 +3,12 @@ import { toCursorSelectionForm } from "../core/forms.js";
 import { PositiveIntegerSchema, makeCursorSelectionSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
-  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
 import {
   OkResponseSchema,
+  decodeAndRun,
   encodePathSegment,
   requestJson,
   selectJsonField,
@@ -112,47 +112,33 @@ export const listZips = (): Effect.Effect<
 export const createZip = (
   input: CreateZipInput,
 ): Effect.Effect<number, CreateZipError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(CreateZipInputSchema)(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(ZipCreateEnvelopeSchema, {
-        body: {
-          type: "form",
-          value: {
-            ...toCursorSelectionForm({
-              cursor: decodedInput.cursor,
-              excludeIds: decodedInput.exclude_ids,
-              ids: decodedInput.file_ids,
-            }),
-          },
+  decodeAndRun(CreateZipInputSchema, input, (decodedInput) =>
+    requestJson(ZipCreateEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          ...toCursorSelectionForm({
+            cursor: decodedInput.cursor,
+            excludeIds: decodedInput.exclude_ids,
+            ids: decodedInput.file_ids,
+          }),
         },
-        method: "POST",
-        path: "/v2/zips/create",
-      }),
-    ),
-    selectJsonField("zip_id"),
-    withOperationErrors(CreateZipErrorSpec),
-  );
+      },
+      method: "POST",
+      path: "/v2/zips/create",
+    }),
+  ).pipe(selectJsonField("zip_id"), withOperationErrors(CreateZipErrorSpec));
 export const getZip = (id: number): Effect.Effect<ZipInfo, GetZipError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestJson(ZipInfoSchema, {
-        method: "GET",
-        path: `/v2/zips/${encodePathSegment(decodedId)}`,
-      }),
-    ),
-    withOperationErrors(GetZipErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, id, (decodedId) =>
+    requestJson(ZipInfoSchema, {
+      method: "GET",
+      path: `/v2/zips/${encodePathSegment(decodedId)}`,
+    }),
+  ).pipe(withOperationErrors(GetZipErrorSpec));
 export const cancelZip = (id: number): Effect.Effect<void, CancelZipError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestJson(OkResponseSchema, {
-        method: "GET",
-        path: `/v2/zips/${encodePathSegment(decodedId)}/cancel`,
-      }),
-    ),
-    Effect.asVoid,
-    withOperationErrors(CancelZipErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, id, (decodedId) =>
+    requestJson(OkResponseSchema, {
+      method: "GET",
+      path: `/v2/zips/${encodePathSegment(decodedId)}/cancel`,
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(CancelZipErrorSpec));

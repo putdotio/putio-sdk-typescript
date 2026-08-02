@@ -170,6 +170,16 @@ const decodeSuccessJson = <S extends Schema.Top>(schema: S, response: PutioHttpR
     Effect.mapError(mapDecodeErrorToValidationError),
   );
 
+export const decodeAndRun = <S extends Schema.Top, A, E, R>(
+  schema: S,
+  input: unknown,
+  run: (decoded: S["Type"]) => Effect.Effect<A, E, R>,
+) =>
+  Schema.decodeUnknownEffect(schema)(input).pipe(
+    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap(run),
+  );
+
 const decodeFailure = (response: PutioHttpResponse, headers: Headers) =>
   response.json.pipe(
     Effect.flatMap((json) => parseErrorBody(response.status, json)),

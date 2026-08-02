@@ -858,6 +858,9 @@ describe("supporting domain boundaries", () => {
         clientName: "SDK",
         eventType: "playback_started",
         ingredients: {
+          client_id: "sdk",
+          client_name: "SDK",
+          created_at: "2026-08-02T00:00:00Z",
           file_id: 7,
           file_name: "SDK File",
           file_type: "VIDEO",
@@ -868,6 +871,21 @@ describe("supporting domain boundaries", () => {
         expect(body.get("client_name")).toBe("SDK");
         expect(body.get("event_type")).toBe("playback_started");
         expect(body.get("ingredients")).toContain("file_id");
+        expect(body.get("ingredients")).toContain("created_at");
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+
+    await runSdkEffect(
+      ifttt.sendIftttEvent({
+        eventType: "custom_event",
+        ingredients: { nested: { enabled: true } },
+      }),
+      (request) => {
+        const body = getFormBody(request);
+        expect(body.get("event_type")).toBe("custom_event");
+        expect(body.get("ingredients")).toContain('"nested"');
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },

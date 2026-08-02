@@ -531,7 +531,6 @@ describe("files domain", () => {
 
     const invalidSearch = await runSdkExit(
       files.searchFiles({
-        // @ts-expect-error JavaScript callers can provide invalid pagination values.
         per_page: 0,
         query: "sdk",
       }),

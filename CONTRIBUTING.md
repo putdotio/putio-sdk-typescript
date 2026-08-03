@@ -57,7 +57,7 @@ The package-surface checks do not require live credentials. Use live tests when 
 Bootstrap runtime tokens from the rendered live credentials:
 
 ```bash
-pnpm secrets:setup        # validates SOPS ciphertext and materializes .env.local
+pnpm secrets:setup        # materializes .env.local from SOPS ciphertext
 pnpm bootstrap:tokens     # mints fresh first/third-party tokens against the live API
 ```
 

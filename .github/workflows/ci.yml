@@ -131,6 +131,19 @@ jobs:
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
+      - name: Resolve release bot identity
+        id: release-bot-identity
+        env:
+          GH_TOKEN: ${{ steps.release-bot.outputs.token }}
+          APP_SLUG: ${{ steps.release-bot.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          if [[ ! "$user_id" =~ ^[0-9]+$ ]]; then
+            echo "failed to resolve numeric bot user id for ${APP_SLUG}[bot]" >&2
+            exit 1
+          fi
+          echo "user-id=${user_id}" >> "$GITHUB_OUTPUT"
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -164,6 +177,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.release-bot.outputs.token }}
           GIT_AUTHOR_NAME: ${{ steps.release-bot.outputs.app-slug }}[bot]
-          GIT_AUTHOR_EMAIL: 283001373+${{ steps.release-bot.outputs.app-slug }}[bot]@users.noreply.github.com
+          GIT_AUTHOR_EMAIL: ${{ steps.release-bot-identity.outputs.user-id }}+${{ steps.release-bot.outputs.app-slug }}[bot]@users.noreply.github.com
           GIT_COMMITTER_NAME: ${{ steps.release-bot.outputs.app-slug }}[bot]
-          GIT_COMMITTER_EMAIL: 283001373+${{ steps.release-bot.outputs.app-slug }}[bot]@users.noreply.github.com
+          GIT_COMMITTER_EMAIL: ${{ steps.release-bot-identity.outputs.user-id }}+${{ steps.release-bot.outputs.app-slug }}[bot]@users.noreply.github.com

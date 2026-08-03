@@ -12,15 +12,13 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 ciphertext="${PUTIO_SDK_TYPESCRIPT_SOPS_FILE:?Set PUTIO_SDK_TYPESCRIPT_SOPS_FILE to the SDK ciphertext file}"
-output="${SECRETS_OUTPUT:-.env.local}"
+output=".env.local"
+[ -z "${SECRETS_OUTPUT+x}" ] || fail "SECRETS_OUTPUT is no longer supported; setup writes .env.local"
 
 command -v sops >/dev/null 2>&1 || fail "sops is required"
 
 [ -f "$ciphertext" ] || fail "ciphertext input must be one regular file"
 [ ! -L "$ciphertext" ] || fail "ciphertext input must not be a symlink"
-case "$output" in
-  /*|..|../*|*/../*) fail "SECRETS_OUTPUT must be a repository-relative ignored path" ;;
-esac
 git check-ignore -q -- "$output" || fail "output path is not gitignored: $output"
 [ ! -L "$output" ] || fail "output path must not be a symlink: $output"
 [ ! -e "$output" ] || [ -f "$output" ] || fail "output path must be a regular file: $output"

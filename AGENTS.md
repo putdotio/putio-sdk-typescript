@@ -11,7 +11,6 @@
 - [Overview](./README.md)
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Testing](./docs/TESTING.md)
-- [Readiness](./docs/READINESS.md)
 - [Distribution](./docs/DISTRIBUTION.md)
 
 ## Commands
@@ -27,8 +26,8 @@
 
 ## Worktrees
 
-`.worktreeinclude` carries `.env` and `.repos` into managed worktrees; Claude
-symlinks `.repos`. Run `vp install`, `vp config`, then `vp run verify`. Use
+`.worktreeinclude` carries `.env` and `.env.local` into managed worktrees. Run
+`vp install`, `vp config`, then `vp run verify`. Use
 `pnpm secrets:setup` with `PUTIO_SDK_TYPESCRIPT_SOPS_FILE` if live-test env is
 missing or stale.
 

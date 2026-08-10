@@ -7,7 +7,6 @@
 coverage
 dist
 node_modules
-/.repos
 src/**/*.d.ts
 *.log
 *.tsbuildinfo

@@ -1,3 +1,5 @@
+import { Predicate } from "effect";
+
 import {
   PutioApiError,
   PutioAuthError,
@@ -69,16 +71,13 @@ export type PutioLocalizableError = {
 
 export type PutioErrorWithBody = StatusAndBodyError;
 
-const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null;
-
 const isLocalizablePutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelope =>
-  isObject(value) &&
+  Predicate.isObject(value) &&
   ("status_code" in value || "error_type" in value || "error_message" in value) &&
   isPutioErrorEnvelope(value);
 
 const isPutioErrorWithBody = (value: unknown): value is PutioLocalizableError =>
-  isObject(value) && "body" in value && isPutioErrorEnvelope(value.body);
+  Predicate.isObject(value) && "body" in value && isPutioErrorEnvelope(value.body);
 
 const normalizePutioError = (
   error: PutioErrorEnvelope | PutioLocalizableError,

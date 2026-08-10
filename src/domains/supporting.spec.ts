@@ -1,5 +1,5 @@
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
-import { Effect, Schema } from "effect";
+import { Cause, Effect, Schema, SchemaIssue, SchemaParser } from "effect";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -124,6 +124,19 @@ describe("supporting domain boundaries", () => {
     forgedPrototypeConfig.locale = "en";
     expect(() => decodeJsonObject(forgedPrototypeConfig)).toThrow("Expected a JSON object");
     expect(() => decodeJsonObject(["nope"])).toThrow("Expected a JSON object");
+
+    const reportedInput = ["not-an-object"];
+    const reportedExit = SchemaParser.decodeUnknownExit(configDomain.JsonObjectSchema, {
+      reportInput: true,
+    })(reportedInput);
+    expect(reportedExit._tag).toBe("Failure");
+    if (reportedExit._tag === "Failure") {
+      const failure = reportedExit.cause.reasons.find(Cause.isFailReason);
+      expect(failure && SchemaIssue.hasInput(failure.error)).toBe(true);
+      if (failure && SchemaIssue.hasInput(failure.error)) {
+        expect(failure.error.input).toBe(reportedInput);
+      }
+    }
 
     const responseConfig = {
       nested: {

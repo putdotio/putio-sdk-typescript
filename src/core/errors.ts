@@ -1,4 +1,4 @@
-import { Data, Effect, Schema } from "effect";
+import { Data, Effect, Predicate, Schema } from "effect";
 
 export const PutioErrorEnvelopeSchema = Schema.Struct({
   status: Schema.optional(Schema.String),
@@ -121,9 +121,6 @@ const isKnownContractMatch = <TContract extends PutioKnownErrorContract>(
 const isMatchableApiError = (error: PutioSdkError): error is PutioApiError | PutioAuthError =>
   error._tag === "PutioApiError" || error._tag === "PutioAuthError";
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null;
-
 const hasOptionalString = (record: Readonly<Record<string, unknown>>, key: string): boolean =>
   !(key in record) || record[key] === undefined || typeof record[key] === "string";
 
@@ -142,12 +139,10 @@ const hasOptionalNullableString = (
   typeof record[key] === "string";
 
 const hasOptionalRecord = (record: Readonly<Record<string, unknown>>, key: string): boolean =>
-  !(key in record) ||
-  record[key] === undefined ||
-  (isRecord(record[key]) && !Array.isArray(record[key]));
+  !(key in record) || record[key] === undefined || Predicate.isObject(record[key]);
 
 const isKnownOperationErrorContract = (value: unknown): value is PutioKnownOperationErrorContract =>
-  isRecord(value) &&
+  Predicate.isObject(value) &&
   (typeof value.errorType === "string" || typeof value.statusCode === "number") &&
   hasOptionalString(value, "errorType") &&
   hasOptionalInteger(value, "statusCode");
@@ -155,7 +150,7 @@ const isKnownOperationErrorContract = (value: unknown): value is PutioKnownOpera
 const isOperationReason = (
   value: unknown,
 ): value is PutioOperationErrorReason<PutioKnownOperationErrorContract> => {
-  if (!isRecord(value)) {
+  if (!Predicate.isObject(value)) {
     return false;
   }
 
@@ -209,15 +204,15 @@ const PutioResponseErrorFields = {
   body: PutioErrorEnvelopeSchema,
 };
 
-export class PutioApiError extends Schema.TaggedErrorClass<PutioApiError>()("PutioApiError", {
+export class PutioApiError extends Schema.TaggedError<PutioApiError>()("PutioApiError", {
   ...PutioResponseErrorFields,
 }) {}
 
-export class PutioAuthError extends Schema.TaggedErrorClass<PutioAuthError>()("PutioAuthError", {
+export class PutioAuthError extends Schema.TaggedError<PutioAuthError>()("PutioAuthError", {
   ...PutioResponseErrorFields,
 }) {}
 
-export class PutioRateLimitError extends Schema.TaggedErrorClass<PutioRateLimitError>()(
+export class PutioRateLimitError extends Schema.TaggedError<PutioRateLimitError>()(
   "PutioRateLimitError",
   {
     ...PutioResponseErrorFields,
@@ -283,7 +278,7 @@ export const definePutioOperationErrorSpec = <
 export const decodePutioErrorEnvelope = Schema.decodeUnknownEffect(PutioErrorEnvelopeSchema);
 
 export const isPutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelope =>
-  isRecord(value) &&
+  Predicate.isObject(value) &&
   hasOptionalString(value, "status") &&
   hasOptionalString(value, "error") &&
   hasOptionalString(value, "error_message") &&
@@ -301,7 +296,7 @@ const hasStatusAndBody = <TTag extends string>(
   readonly body: PutioErrorEnvelope;
   readonly status: number;
 } =>
-  isRecord(value) &&
+  Predicate.isObject(value) &&
   value._tag === tag &&
   typeof value.status === "number" &&
   isPutioErrorEnvelope(value.body);
@@ -314,7 +309,7 @@ export const isPutioAuthError = (value: unknown): value is PutioAuthError =>
 
 export const isPutioRateLimitError = (value: unknown): value is PutioRateLimitError =>
   hasStatusAndBody(value, "PutioRateLimitError") &&
-  isRecord(value) &&
+  Predicate.isObject(value) &&
   hasOptionalString(value, "action") &&
   hasOptionalString(value, "id") &&
   hasOptionalString(value, "limit") &&
@@ -323,7 +318,7 @@ export const isPutioRateLimitError = (value: unknown): value is PutioRateLimitEr
   hasOptionalString(value, "reset");
 
 export const isPutioOperationError = (value: unknown): value is AnyPutioOperationError =>
-  isRecord(value) &&
+  Predicate.isObject(value) &&
   value._tag === "PutioOperationError" &&
   isPutioErrorEnvelope(value.body) &&
   isKnownOperationErrorContract(value.contract) &&

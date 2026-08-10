@@ -6,7 +6,6 @@ const coverageConfig = {
     "src/**/*.spec.*",
     "src/**/*.d.ts",
     "src/test-support/**",
-    ".repos/**",
     "dist/**",
     "coverage/**",
   ],
@@ -36,7 +35,7 @@ export default defineConfig({
   },
   test: {
     coverage: coverageConfig,
-    exclude: [".repos/**", "test/live/**"],
+    exclude: ["test/live/**"],
     include: ["scripts/**/*.spec.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
   },
 });

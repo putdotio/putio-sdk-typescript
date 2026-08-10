@@ -11,7 +11,6 @@
 - [Overview](./README.md)
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Testing](./docs/TESTING.md)
-- [Readiness](./docs/READINESS.md)
 - [Distribution](./docs/DISTRIBUTION.md)
 
 ## Commands
@@ -27,8 +26,8 @@
 
 ## Worktrees
 
-`.worktreeinclude` carries `.env` and `.repos` into managed worktrees; Claude
-symlinks `.repos`. Run `vp install`, `vp config`, then `vp run verify`. Use
+`.worktreeinclude` carries `.env` and `.env.local` into managed worktrees. Run
+`vp install`, `vp config`, then `vp run verify`. Use
 `pnpm secrets:setup` with `PUTIO_SDK_TYPESCRIPT_SOPS_FILE` if live-test env is
 missing or stale.
 
@@ -44,6 +43,15 @@ missing or stale.
 - Use typed parsing and real checks; change thresholds only with explicit approval.
 - Update docs when the public surface, verification workflow, or repo shape changes.
 - `CLAUDE.md` should remain a symlink to this file.
+
+## Learning More About Effect
+
+This repository uses the Effect TypeScript library.
+
+Before writing any Effect code, read `node_modules/effect/AGENTS.md` completely
+and follow its links when required. If that guide does not cover an API or
+concept, search `node_modules/effect/src` for the installed implementation and
+types.
 
 ## Testing
 

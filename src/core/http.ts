@@ -6,7 +6,6 @@ import {
   DEFAULT_PUTIO_WEB_APP_URL,
 } from "./defaults.js";
 import {
-  fallbackPutioErrorEnvelope,
   makeResponseError,
   mapConfigurationError,
   mapDecodeErrorToValidationError,
@@ -166,14 +165,16 @@ const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
 const decodeSuccessJson = <S extends Schema.Top>(schema: S, response: PutioHttpResponse) =>
   response.json.pipe(
-    Effect.flatMap(Schema.decodeUnknownEffect(schema)),
-    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.flatMap((json) =>
+      Schema.decodeUnknownEffect(schema)(json).pipe(
+        Effect.mapError(mapDecodeErrorToValidationError),
+      ),
+    ),
   );
 
 const decodeFailure = (response: PutioHttpResponse, headers: Headers) =>
   response.json.pipe(
     Effect.flatMap((json) => parseErrorBody(response.status, json)),
-    Effect.orElseSucceed(() => fallbackPutioErrorEnvelope(response.status)),
     Effect.map((body) => makeResponseError(response.status, headers, body)),
   );
 
@@ -336,10 +337,7 @@ export const requestArrayBuffer = (
   executeRequest(options).pipe(
     Effect.flatMap((response) =>
       isSuccessStatus(response.status)
-        ? response.arrayBuffer.pipe(
-            Effect.mapError(mapTransportError),
-            Effect.map((buffer) => new Uint8Array(buffer)),
-          )
+        ? response.arrayBuffer.pipe(Effect.map((buffer) => new Uint8Array(buffer)))
         : decodeFailure(response, response.headers).pipe(Effect.flatMap(Effect.fail)),
     ),
   );

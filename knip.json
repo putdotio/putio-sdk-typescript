@@ -10,6 +10,5 @@
     "scripts/**/*.ts",
     "vitest.live.config.ts"
   ],
-  "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "*.config.ts"],
-  "ignoreDependencies": ["is-ci"]
+  "project": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "*.config.ts"]
 }

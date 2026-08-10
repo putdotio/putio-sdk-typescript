@@ -79,7 +79,6 @@ Useful references:
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Testing](./docs/TESTING.md)
 - [Distribution](./docs/DISTRIBUTION.md)
-- [Readiness](./docs/READINESS.md)
 
 ## Pull Requests
 

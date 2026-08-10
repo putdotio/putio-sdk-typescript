@@ -66,7 +66,7 @@ export const FileCopyInputSchema = Schema.Struct({
 });
 export const FileTouchInputSchema = Schema.Struct({
   fileIds: Schema.Array(NonNegativeFileIdSchema).check(Schema.isMinLength(1)),
-  updatedAt: Schema.optional(Schema.DateValid),
+  updatedAt: Schema.optional(Schema.Date),
 });
 export const FileMediaMetadataSchema = Schema.Struct({
   aspect_ratio: Schema.optional(

@@ -440,7 +440,6 @@ export const useFiles = (parentId: number) =>
 - [Migrating to v11](./docs/MIGRATING_V11.md) for the removed Coinbase and file-search contracts
 - [Architecture](./docs/ARCHITECTURE.md) for package shape and boundaries
 - [Testing](./docs/TESTING.md) for local and live verification
-- [Readiness](./docs/READINESS.md) for domain readiness
 - [Distribution](./docs/DISTRIBUTION.md) for release automation
 - [Security](./SECURITY.md) for private-first vulnerability disclosure
 

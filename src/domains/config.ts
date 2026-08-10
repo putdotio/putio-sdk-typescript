@@ -1,4 +1,4 @@
-import { Effect, Option, Schema, SchemaIssue, SchemaParser } from "effect";
+import { Effect, Schema, SchemaIssue, SchemaParser } from "effect";
 import { mapDecodeErrorToValidationError, type PutioSdkError } from "../core/errors.js";
 import {
   OkResponseSchema,
@@ -175,10 +175,10 @@ const isJsonObject = (value: unknown): value is PutioJsonObject =>
   typeof value === "object" && value !== null && isJsonValue(value) && !Array.isArray(value);
 export const JsonValueSchema = Schema.declareConstructor<PutioJsonValue>()(
   [],
-  () => (input, ast) => {
+  () => (input, ast, options) => {
     const snapshot = snapshotJsonValue(input);
     return snapshot === undefined
-      ? Effect.fail(new SchemaIssue.InvalidType(ast, Option.none()))
+      ? Effect.fail(new SchemaIssue.InvalidType(ast, input, options))
       : Effect.succeed(snapshot);
   },
   {
@@ -187,30 +187,30 @@ export const JsonValueSchema = Schema.declareConstructor<PutioJsonValue>()(
 );
 const JsonValueResponseSchema = Schema.declareConstructor<PutioJsonValue>()(
   [],
-  () => (input, ast) =>
+  () => (input, ast, options) =>
     isJsonValue(input)
       ? Effect.succeed(input)
-      : Effect.fail(new SchemaIssue.InvalidType(ast, Option.none())),
+      : Effect.fail(new SchemaIssue.InvalidType(ast, input, options)),
   {
     expected: "a JSON-compatible value",
   },
 );
 const JsonObjectResponseSchema = Schema.declareConstructor<PutioJsonObject>()(
   [],
-  () => (input, ast) =>
+  () => (input, ast, options) =>
     isJsonObject(input)
       ? Effect.succeed(input)
-      : Effect.fail(new SchemaIssue.InvalidType(ast, Option.none())),
+      : Effect.fail(new SchemaIssue.InvalidType(ast, input, options)),
   {
     expected: "a JSON object",
   },
 );
 export const JsonObjectSchema = Schema.declareConstructor<PutioJsonObject>()(
   [],
-  () => (input, ast) => {
+  () => (input, ast, options) => {
     const snapshot = snapshotJsonObject(input);
     return snapshot === undefined
-      ? Effect.fail(new SchemaIssue.InvalidType(ast, Option.none()))
+      ? Effect.fail(new SchemaIssue.InvalidType(ast, input, options))
       : Effect.succeed(snapshot);
   },
   {
@@ -261,7 +261,7 @@ const makeConfigEnvelopeSchema = <A>(schema: Schema.ConstraintDecoder<A, never>)
   }>()([schema], ([configSchema]) => (input, ast, options) => {
     const fields = getResponseEnvelopeFields(input, "config");
     if (fields === undefined || fields.status !== "OK") {
-      return Effect.fail(new SchemaIssue.InvalidType(ast, Option.none()));
+      return Effect.fail(new SchemaIssue.InvalidType(ast, input, options));
     }
     return SchemaParser.decodeUnknownEffect(configSchema)(fields.value, options).pipe(
       Effect.map((config) => ({ config, status: "OK" })),
@@ -274,7 +274,7 @@ const makeConfigValueEnvelopeSchema = <A>(schema: Schema.ConstraintDecoder<A, ne
   }>()([schema], ([valueSchema]) => (input, ast, options) => {
     const fields = getResponseEnvelopeFields(input, "value");
     if (fields === undefined || fields.status !== "OK") {
-      return Effect.fail(new SchemaIssue.InvalidType(ast, Option.none()));
+      return Effect.fail(new SchemaIssue.InvalidType(ast, input, options));
     }
     return SchemaParser.decodeUnknownEffect(valueSchema)(fields.value, options).pipe(
       Effect.map((value) => ({ status: "OK", value })),

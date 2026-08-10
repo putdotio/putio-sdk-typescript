@@ -1,5 +1,13 @@
 /// <reference lib="esnext.disposable" />
 
+// effect@4.0.0-beta.107 references this internal type without emitting its declaration.
+declare module "effect/SchemaAST" {
+  export interface Sentinel {
+    readonly key: PropertyKey;
+    readonly literal: LiteralValue | symbol;
+  }
+}
+
 declare global {
   interface SymbolConstructor {
     readonly asyncDispose: unique symbol;

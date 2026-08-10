@@ -63,7 +63,7 @@
     "verify": "vp check . && vp pack && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests"
   },
   "dependencies": {
-    "effect": "4.0.0-beta.101"
+    "effect": "4.0.0-beta.107"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",

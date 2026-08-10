@@ -30,7 +30,7 @@ export const OAuthAuthorizationCodeExchangeErrorCodeSchema = Schema.Literals([
   "invalid_request",
   "unauthorized_client",
 ]);
-export class OAuthAuthorizationCodeExchangeError extends Schema.TaggedErrorClass<OAuthAuthorizationCodeExchangeError>()(
+export class OAuthAuthorizationCodeExchangeError extends Schema.TaggedError<OAuthAuthorizationCodeExchangeError>()(
   "OAuthAuthorizationCodeExchangeError",
   {
     code: OAuthAuthorizationCodeExchangeErrorCodeSchema,

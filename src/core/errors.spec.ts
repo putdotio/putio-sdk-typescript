@@ -125,6 +125,7 @@ describe("sdk core errors", () => {
 
     expect(isPutioErrorEnvelope(apiError.body)).toBe(true);
     expect(isPutioErrorEnvelope({})).toBe(true);
+    expect(isPutioErrorEnvelope([])).toBe(false);
     expect(isPutioErrorEnvelope({ error: "access_denied" })).toBe(true);
     expect(isPutioErrorEnvelope({ error: 400 })).toBe(false);
     expect(isPutioErrorEnvelope({ error_message: 500 })).toBe(false);

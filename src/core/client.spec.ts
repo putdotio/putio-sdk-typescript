@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import * as sdk from "../index.js";
@@ -11,15 +11,12 @@ import {
 } from "./client.js";
 import { PutioSdkConfig } from "./http.js";
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
-
 const collectFunctionPaths = (value: unknown, parentPath = ""): ReadonlyArray<string> => {
   if (typeof value === "function") {
     return parentPath ? [parentPath] : [];
   }
 
-  if (!isRecord(value)) {
+  if (!Predicate.isObject(value)) {
     return [];
   }
 

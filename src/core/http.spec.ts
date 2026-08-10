@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Schema } from "effect";
+import { Cause, Effect, Exit, Fiber, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -99,24 +99,35 @@ describe("sdk core http", () => {
     expect(result.httpClient).toBeDefined();
   });
 
-  it("passes the Effect cancellation signal to fetch transport", async () => {
+  it("aborts fetch transport when the Effect is interrupted", async () => {
     let observedSignal: AbortSignal | undefined;
+    let markStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
     const httpClient = makePutioFetchClient((_input, init) => {
       observedSignal = init?.signal ?? undefined;
 
-      return Promise.resolve(new Response(JSON.stringify({ status: "OK" }), { status: 200 }));
+      return new Promise<Response>((_resolve, reject) => {
+        observedSignal?.addEventListener("abort", () => reject(observedSignal?.reason), {
+          once: true,
+        });
+        markStarted?.();
+      });
     });
 
-    const response = await Effect.runPromise(
+    const fiber = Effect.runFork(
       httpClient.execute({
         headers: new Headers(),
         method: "GET",
         url: "https://api.put.io/v2/test",
       }),
     );
+    await started;
+    await Effect.runPromise(Fiber.interrupt(fiber));
 
-    expect(response.status).toBe(200);
     expect(observedSignal).toBeInstanceOf(AbortSignal);
+    expect(observedSignal?.aborted).toBe(true);
   });
 
   it("builds URLs and skips nullish query values", () => {
@@ -326,6 +337,49 @@ describe("sdk core http", () => {
     );
 
     expect(Array.from(result)).toEqual([1, 2, 3]);
+  });
+
+  it("preserves typed response body read failures", async () => {
+    const jsonFailure = new PutioTransportError({ cause: "json read failed" });
+    const binaryFailure = new PutioTransportError({ cause: "binary read failed" });
+    const httpClient: PutioHttpClientShape = {
+      execute: (_request) =>
+        Effect.succeed({
+          arrayBuffer: Effect.fail(binaryFailure),
+          headers: new Headers(),
+          json: Effect.fail(jsonFailure),
+          status: 200,
+        }),
+    };
+    const provideClient = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
+      effect.pipe(
+        Effect.provideService(PutioHttpClient, httpClient),
+        Effect.provide(makePutioSdkLayer({})),
+      );
+
+    const [jsonExit, binaryExit] = await Promise.all([
+      Effect.runPromiseExit(
+        provideClient(
+          requestJson(OkResponseSchema, {
+            auth: { type: "none" },
+            method: "GET",
+            path: "/v2/json",
+          }),
+        ),
+      ),
+      Effect.runPromiseExit(
+        provideClient(
+          requestArrayBuffer({
+            auth: { type: "none" },
+            method: "GET",
+            path: "/v2/binary",
+          }),
+        ),
+      ),
+    ]);
+
+    expect(expectFailure(jsonExit)).toBe(jsonFailure);
+    expect(expectFailure(binaryExit)).toBe(binaryFailure);
   });
 
   it("maps failed binary responses to sdk errors", async () => {

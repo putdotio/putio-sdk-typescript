@@ -45,6 +45,15 @@ missing or stale.
 - Update docs when the public surface, verification workflow, or repo shape changes.
 - `CLAUDE.md` should remain a symlink to this file.
 
+## Learning More About Effect
+
+This repository uses the Effect TypeScript library.
+
+Before writing any Effect code, read `node_modules/effect/AGENTS.md` completely
+and follow its links when required. If that guide does not cover an API or
+concept, search `node_modules/effect/src` for the installed implementation and
+types.
+
 ## Testing
 
 - Default tests exclude `test/live/**`.

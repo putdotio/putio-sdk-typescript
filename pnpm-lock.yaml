@@ -34,9 +34,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.10(@vitest/browser@4.1.10)(vitest@4.1.10)
-      is-ci:
-        specifier: ^4.1.0
-        version: 4.1.0
       knip:
         specifier: ^6.24.0
         version: 6.31.0
@@ -1182,10 +1179,6 @@ packages:
     resolution: {integrity: sha512-kWWXztvZ5SBQV+eRgKFeh8q5sLuZY2+8WUIzlxWVTg+oGwY14qylx1KbKzHd8P6ZYkAg0xyIDU9JMHhyJMZ1jw==}
     engines: {node: '>=10'}
 
-  ci-info@4.4.0:
-    resolution: {integrity: sha512-77PSwercCZU2Fc4sX94eF8k8Pxte6JAwL4/ICZLFjJLqegs7kCuAsqqj/70NQF6TvDpgFjkubQB2FW2ZZddvQg==}
-    engines: {node: '>=8'}
-
   cjs-module-lexer@1.4.3:
     resolution: {integrity: sha512-9z8TZaGM1pfswYeXrUpzPrkx8UnWYdhJclsiYMm6x/w5+nN+8Tf/LnAgfLGQCm59qAOxU8WwHEq2vNwF6i4j+Q==}
 
@@ -1303,10 +1296,6 @@ packages:
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
-
-  is-ci@4.1.0:
-    resolution: {integrity: sha512-Ab9bQDQ11lWootZUI5qxgN2ZXwxNI5hTwnsvOc1wyxQ7zQ8OkEDw79mI0+9jI3x432NfwbVRru+3noJfXF6lSQ==}
-    hasBin: true
 
   is-fullwidth-code-point@3.0.0:
     resolution: {integrity: sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==}
@@ -2521,8 +2510,6 @@ snapshots:
 
   char-regex@1.0.2: {}
 
-  ci-info@4.4.0: {}
-
   cjs-module-lexer@1.4.3: {}
 
   cli-highlight@2.1.11:
@@ -2621,10 +2608,6 @@ snapshots:
   highlight.js@10.7.3: {}
 
   html-escaper@2.0.2: {}
-
-  is-ci@4.1.0:
-    dependencies:
-      ci-info: 4.4.0
 
   is-fullwidth-code-point@3.0.0: {}
 

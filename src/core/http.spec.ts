@@ -341,15 +341,18 @@ describe("sdk core http", () => {
 
   it("preserves typed response body read failures", async () => {
     const jsonFailure = new PutioTransportError({ cause: "json read failed" });
+    const errorJsonFailure = new PutioTransportError({ cause: "error json read failed" });
     const binaryFailure = new PutioTransportError({ cause: "binary read failed" });
     const httpClient: PutioHttpClientShape = {
-      execute: (_request) =>
-        Effect.succeed({
+      execute: (request) => {
+        const isErrorResponse = request.url.endsWith("/v2/error");
+        return Effect.succeed({
           arrayBuffer: Effect.fail(binaryFailure),
           headers: new Headers(),
-          json: Effect.fail(jsonFailure),
-          status: 200,
-        }),
+          json: Effect.fail(isErrorResponse ? errorJsonFailure : jsonFailure),
+          status: isErrorResponse ? 500 : 200,
+        });
+      },
     };
     const provideClient = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
       effect.pipe(
@@ -357,13 +360,22 @@ describe("sdk core http", () => {
         Effect.provide(makePutioSdkLayer({})),
       );
 
-    const [jsonExit, binaryExit] = await Promise.all([
+    const [jsonExit, errorJsonExit, binaryExit] = await Promise.all([
       Effect.runPromiseExit(
         provideClient(
           requestJson(OkResponseSchema, {
             auth: { type: "none" },
             method: "GET",
             path: "/v2/json",
+          }),
+        ),
+      ),
+      Effect.runPromiseExit(
+        provideClient(
+          requestVoid({
+            auth: { type: "none" },
+            method: "GET",
+            path: "/v2/error",
           }),
         ),
       ),
@@ -379,6 +391,7 @@ describe("sdk core http", () => {
     ]);
 
     expect(expectFailure(jsonExit)).toBe(jsonFailure);
+    expect(expectFailure(errorJsonExit)).toBe(errorJsonFailure);
     expect(expectFailure(binaryExit)).toBe(binaryFailure);
   });
 

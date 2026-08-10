@@ -6,7 +6,6 @@ import {
   DEFAULT_PUTIO_WEB_APP_URL,
 } from "./defaults.js";
 import {
-  fallbackPutioErrorEnvelope,
   makeResponseError,
   mapConfigurationError,
   mapDecodeErrorToValidationError,
@@ -176,7 +175,6 @@ const decodeSuccessJson = <S extends Schema.Top>(schema: S, response: PutioHttpR
 const decodeFailure = (response: PutioHttpResponse, headers: Headers) =>
   response.json.pipe(
     Effect.flatMap((json) => parseErrorBody(response.status, json)),
-    Effect.orElseSucceed(() => fallbackPutioErrorEnvelope(response.status)),
     Effect.map((body) => makeResponseError(response.status, headers, body)),
   );
 

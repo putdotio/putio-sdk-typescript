@@ -327,7 +327,7 @@ Upload targets `upload.put.io` internally because `api.put.io/v2/files/upload` i
 ## Endpoint Coverage
 
 The TypeScript SDK mirrors the supported public put.io API surface. The current audit outcome,
-scope, exclusions, and refresh contract are documented in [API Coverage](docs/API-COVERAGE.md)
+scope, exclusions, and refresh contract are documented in [API Coverage](docs/API-COVERAGE.md).
 The portable route matrix is public evidence for selected decisions, not a published backend
 inventory.
 

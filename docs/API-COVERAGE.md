@@ -7,7 +7,7 @@ canonical equivalent, or a direct-route URL helper.
 ## Current Audit Outcome
 
 The maintained public backend surface and first-party consumers were compared with the canonical
-SDK operation tree for issue [#172](https://github.com/putdotio/putio-sdk-typescript/issues/172)
+SDK operation tree for issue [#172](https://github.com/putdotio/putio-sdk-typescript/issues/172).
 The comparison found one unresolved supported capability: the XSPF playlist route used for VLC
 handoff. `files.getXspfPlaylistUrl(...)` closes that gap. No supported public endpoint gaps remain
 from that audit.
@@ -16,7 +16,7 @@ The audit enumerated current public route registrations, compared method and pat
 SDK requests and direct-route helpers, inspected backend authentication and response behavior for
 every mismatch, and checked current first-party web and CLI usage before deciding whether a route
 was supported, equivalent, legacy, or private. Earlier request, response, and typed-error contract
-alignment is recorded in [#108](https://github.com/putdotio/putio-sdk-typescript/issues/108)
+alignment is recorded in [#108](https://github.com/putdotio/putio-sdk-typescript/issues/108).
 
 This is a point-in-time completeness result, not a claim that future backend changes are detected
 automatically. Response-branch and mutation-depth confidence remains a separate live-testing

@@ -106,6 +106,14 @@
     },
     {
       "classification": "sdk",
+      "method": "GET",
+      "operation": "files.getXspfPlaylistUrl",
+      "path": "/v2/files/:fileId/xspf",
+      "rationale": "The files client exposes a tokenized URL for the backend XSPF playlist used by first-party VLC handoff.",
+      "source": "putio/api2/download.py:84"
+    },
+    {
+      "classification": "sdk",
       "method": "POST",
       "operation": "files.setStartFrom",
       "path": "/v2/files/:fileId/start-from",

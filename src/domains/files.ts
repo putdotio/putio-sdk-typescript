@@ -431,6 +431,9 @@ const FileHlsStreamUrlOptionsSchema = Schema.Struct({
     Schema.Array(NonEmptyStringSchema).check(Schema.isMinLength(1)),
   ),
 });
+const FileXspfPlaylistUrlOptionsSchema = Schema.Struct({
+  oauthToken: Schema.optional(NonEmptyStringSchema),
+});
 const FilesNextFileSchema = Schema.Struct({
   id: Schema.Int,
   name: Schema.String,
@@ -506,6 +509,9 @@ export type FileHlsStreamUrlOptions = {
   readonly oauthToken?: string;
   readonly playOriginal?: boolean;
   readonly subtitleLanguages?: ReadonlyArray<string>;
+};
+export type FileXspfPlaylistUrlOptions = {
+  readonly oauthToken?: string;
 };
 export type FileUploadInput = {
   readonly file: Blob;
@@ -928,6 +934,14 @@ export const buildFileHlsStreamUrl = (
     original:
       typeof options.playOriginal === "boolean" ? (options.playOriginal ? 1 : 0) : undefined,
     subtitle_languages: joinCsv(options.subtitleLanguages),
+  });
+export const buildFileXspfPlaylistUrl = (
+  baseUrl: string | URL,
+  fileId: number,
+  options: FileXspfPlaylistUrlOptions = {},
+): string =>
+  buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/xspf`, {
+    oauth_token: options.oauthToken,
   });
 export const createFileUploadFormData = (input: FileUploadInput): FormData => {
   const formData = new FormData();
@@ -1397,6 +1411,25 @@ export const getHlsStreamUrl = (
         Effect.map(({ config, oauthToken }) =>
           buildFileHlsStreamUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
             ...decoded.options,
+            oauthToken,
+          }),
+        ),
+      ),
+  );
+export const getXspfPlaylistUrl = (
+  fileId: number,
+  options: FileXspfPlaylistUrlOptions = {},
+): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
+  decodeAndRun(
+    Schema.Struct({
+      fileId: PositiveFileIdSchema,
+      options: FileXspfPlaylistUrlOptionsSchema,
+    }),
+    { fileId, options },
+    (decoded) =>
+      resolveRouteContext(decoded.options.oauthToken).pipe(
+        Effect.map(({ config, oauthToken }) =>
+          buildFileXspfPlaylistUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
             oauthToken,
           }),
         ),

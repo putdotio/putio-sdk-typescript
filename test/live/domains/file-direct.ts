@@ -134,6 +134,25 @@ await run("files hls url is tokenized", async () => {
   };
 });
 
+await run("files XSPF playlist is fetchable for owned video", async () => {
+  const video = await requireOwnedVideoFixture(client);
+  const url = await client.files.getXspfPlaylistUrl(video.id);
+  const response = await fetch(url);
+  const body = await response.text();
+
+  assert(response.ok, "expected XSPF playlist route to be fetchable");
+  assert(
+    response.headers.get("content-type")?.includes("application/xspf+xml") === true,
+    "expected XSPF content type",
+  );
+  assert(body.includes("<playlist"), "expected XSPF playlist body");
+
+  return {
+    status: response.status,
+    video_id: video.id,
+  };
+});
+
 await run("files upload works through upload.put.io", async () => {
   const name = `codex_sdk_upload_probe_${Date.now()}.txt`;
   const upload = await client.files.upload({

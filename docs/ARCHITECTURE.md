@@ -65,7 +65,7 @@ This split is the stable default unless a domain grows large enough to earn its 
 The `files` namespace owns both:
 
 - JSON operations like `files.get(...)`, `files.list(...)`, `files.extract(...)`
-- direct route helpers like `files.getApiDownloadUrl(...)`, `files.getApiContentUrl(...)`, `files.getHlsStreamUrl(...)`
+- direct route helpers like `files.getApiDownloadUrl(...)`, `files.getApiContentUrl(...)`, `files.getHlsStreamUrl(...)`, and `files.getXspfPlaylistUrl(...)`
 - upload helpers like `files.createUploadRequest(...)` and `files.upload(...)`
 
 That split is deliberate:

@@ -274,7 +274,7 @@ Those stay source-backed or sandbox-only until we have a sacrificial account spe
 | `account`          | account info, settings, confirmations                                |
 | `config`           | app-owned JSON config storage                                        |
 | `files`            | core file listing, search, and mutations                             |
-| `file-direct`      | direct file URLs and upload                                          |
+| `file-direct`      | direct file URLs, XSPF playlists, and upload                         |
 | `file-tasks`       | extractions, watch status, MP4 tasks                                 |
 | `transfers`        | transfer orchestration                                               |
 | `events`           | event history                                                        |

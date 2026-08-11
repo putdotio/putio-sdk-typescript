@@ -18,6 +18,7 @@ describe("sdk root entry", () => {
       getCode: expect.any(Function),
       getConfigKey: expect.any(Function),
       getFile: expect.any(Function),
+      getXspfPlaylistUrl: expect.any(Function),
       getPaymentInfo: expect.any(Function),
       getTransfer: expect.any(Function),
       isPutioOperationError: expect.any(Function),

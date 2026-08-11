@@ -314,6 +314,8 @@ const playlistUrl = await sdk.files.getHlsStreamUrl(fileId, {
   maxSubtitleCount: 1,
 });
 
+const vlcPlaylistUrl = await sdk.files.getXspfPlaylistUrl(fileId);
+
 const upload = await sdk.files.upload({
   file: new File(["hello"], "hello.txt"),
   parentId: 0,
@@ -321,6 +323,13 @@ const upload = await sdk.files.upload({
 ```
 
 Upload targets `upload.put.io` internally because `api.put.io/v2/files/upload` is only a redirect shim.
+
+## Endpoint Coverage
+
+The TypeScript SDK mirrors the supported public put.io API surface. The current audit outcome,
+scope, exclusions, and refresh contract are documented in [API Coverage](docs/API-COVERAGE.md).
+The portable route matrix is public evidence for selected decisions, not a published backend
+inventory.
 
 ## File Lookup and Mutations
 

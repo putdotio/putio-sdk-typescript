@@ -117,6 +117,7 @@ describe("sdk client factories", () => {
     expect(client.files.copy).toBeTypeOf("function");
     expect(client.files.createUploadFormData).toBeTypeOf("function");
     expect(client.files.getApiDownloadUrl).toBeTypeOf("function");
+    expect(client.files.getXspfPlaylistUrl).toBeTypeOf("function");
     expect(client.files.setSort).toBeTypeOf("function");
     expect(client.payment.changePlan.preview).toBeTypeOf("function");
     expect(client.podcast.getLinks).toBeTypeOf("function");
@@ -230,6 +231,9 @@ describe("sdk client factories", () => {
     );
     expect(await client.files.getHlsStreamUrl(42)).toBe(
       "https://api.put.io/v2/files/42/hls/media.m3u8?oauth_token=token-123",
+    );
+    expect(await client.files.getXspfPlaylistUrl(42)).toBe(
+      "https://api.put.io/v2/files/42/xspf?oauth_token=token-123",
     );
     expect(
       await client.files.createUploadRequest({

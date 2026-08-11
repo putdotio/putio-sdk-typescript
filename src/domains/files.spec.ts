@@ -238,6 +238,12 @@ describe("files domain", () => {
     );
 
     expect(
+      files.buildFileXspfPlaylistUrl("https://api.put.io", 42, {
+        oauthToken: "token-123",
+      }),
+    ).toBe("https://api.put.io/v2/files/42/xspf?oauth_token=token-123");
+
+    expect(
       await runConfigEffect(files.getApiDownloadUrl(42), {
         accessToken: "token-123",
         baseUrl: "https://api.put.io",
@@ -274,6 +280,13 @@ describe("files domain", () => {
         baseUrl: "https://api.put.io",
       }),
     ).toBe("https://api.put.io/v2/files/42/hls/media.m3u8?oauth_token=token-123");
+
+    expect(
+      await runConfigEffect(files.getXspfPlaylistUrl(42), {
+        accessToken: "token-123",
+        baseUrl: "https://api.put.io",
+      }),
+    ).toBe("https://api.put.io/v2/files/42/xspf?oauth_token=token-123");
 
     const uploadRequest = await runConfigEffect(
       files.createFileUploadRequest({
@@ -330,6 +343,10 @@ describe("files domain", () => {
         accessToken: "token-123",
       }),
       runConfigExit(files.getHlsStreamUrl(42, { oauthToken: "" }), {
+        accessToken: "token-123",
+      }),
+      runConfigExit(files.getXspfPlaylistUrl(0), { accessToken: "token-123" }),
+      runConfigExit(files.getXspfPlaylistUrl(42, { oauthToken: "" }), {
         accessToken: "token-123",
       }),
     ]);

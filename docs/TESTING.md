@@ -50,7 +50,7 @@ vp run test:compat
 `lint:unused` runs Knip against source, tests, live tests, scripts, and config files to detect unused files, dependencies, and exports.
 `lint:unused:prod` packs the package, then runs Knip's production-only graph with ignored build output visible. Knip's explicit entry and project patterns keep that analysis limited to the package, tests, scripts, and root config rather than unrelated ignored files.
 `lint:package` packs the package and runs `publint` plus Are The Types Wrong against the published ESM entrypoints.
-`vp run verify` blocks on both Knip graphs and executes the covered unit suite once. CI follows it with `lint:package`; Knip governs source reachability and dependency usage, while package checks and explicit API/type tests govern intentional public exports.
+`vp run verify` blocks on both Knip graphs, runs `lint:package`, and executes the covered unit suite once; CI runs the same command. Knip governs source reachability and dependency usage, while package checks and explicit API/type tests govern intentional public exports.
 
 The deterministic suite also replays sanitized public contract fixtures from
 `test/fixtures/public-contracts.ts`. They pin representative unauthenticated and

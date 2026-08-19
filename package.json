@@ -59,7 +59,7 @@
     "test:live:fresh": "vp pack && node ./scripts/test-live-fresh.ts",
     "validate:routes": "vp pack && vp run validate:routes:packed",
     "validate:routes:packed": "node ./scripts/validate-route-matrix.ts",
-    "verify": "vp check . && vp pack && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests"
+    "verify": "vp check . && vp run lint:package && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests"
   },
   "dependencies": {
     "effect": "4.0.0-beta.107"

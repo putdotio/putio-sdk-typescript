@@ -24,11 +24,11 @@ Run the full repo guardrail before opening or updating a pull request:
 vp run verify
 ```
 
-That command runs formatting, linting, package build, unit tests, and coverage using the same repo-local entrypoint CI relies on.
+That command runs formatting, linting, package build, package-surface checks, unit tests, and coverage using the same repo-local entrypoint CI relies on.
 
 The coverage guardrail is unit-only and counts all production files under `src/**`.
 Live tests are separate confidence checks outside the coverage threshold.
-Package-surface verification runs in CI through `vp run lint:package`.
+Package-surface verification runs inside `vp run verify` through `lint:package`.
 
 ## Live Verification
 

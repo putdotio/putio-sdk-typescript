@@ -9,10 +9,9 @@ GitHub Actions owns releases for this repo and the workflow runs on GitHub-hoste
 The pipeline runs these release steps on `main`:
 
 1. `vp install`
-2. `vp run verify`
-3. `vp run lint:package`
-4. compatibility matrix for Node, Chromium, Firefox, WebKit, and Bun
-5. run `semantic-release` through the release action
+2. `vp run verify` (includes `lint:package`)
+3. compatibility matrix for Node, Chromium, Firefox, WebKit, and Bun, plus the aggregate `Compatibility result` job
+4. run `semantic-release` through the release action
 
 The workflow uses `.releaserc.json` as the release source of truth. The release action is SHA-pinned and every `extra_plugins` entry is version-pinned, so the secret-bearing release job does not fetch unversioned semantic-release plugins.
 
@@ -55,7 +54,6 @@ Before changing distribution wiring, validate the repo-local guardrails the work
 ```bash
 vp install
 vp run verify
-vp run lint:package
 vp run test:compat
 ```
 

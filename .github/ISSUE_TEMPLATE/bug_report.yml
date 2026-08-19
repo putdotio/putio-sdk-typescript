@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a reproducible problem in @putdotio/sdk
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal code sample, the SDK call, or a failing test if useful.
+      placeholder: |
+        1. Create a client with ...
+        2. Call ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: SDK version, runtime and version (Node, Bun, browser), and any relevant bundler or framework notes.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description: Paste any relevant error output, typed failure values, or stack traces.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched for existing issues covering the same problem
+          required: true
+        - label: I removed secrets, tokens, and private account data from the report
+          required: true

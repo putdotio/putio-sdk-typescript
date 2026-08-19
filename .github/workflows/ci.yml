@@ -100,6 +100,26 @@ jobs:
         env:
           PUTIO_COMPAT_BROWSERS: ${{ matrix.browser }}
 
+  compatibility-result:
+    if: always() && (github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]'))
+    name: Compatibility result
+    needs:
+      - compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+
+    steps:
+      - name: Check compatibility matrix result
+        env:
+          COMPATIBILITY_RESULT: ${{ needs.compatibility.result }}
+        run: |
+          set -euo pipefail
+          echo "compatibility matrix result: ${COMPATIBILITY_RESULT}"
+          if [[ "${COMPATIBILITY_RESULT}" == "failure" || "${COMPATIBILITY_RESULT}" == "cancelled" ]]; then
+            exit 1
+          fi
+
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]')
     name: Release SDK

@@ -12,6 +12,8 @@
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Testing](./docs/TESTING.md)
 - [Distribution](./docs/DISTRIBUTION.md)
+- [API Coverage](./docs/API-COVERAGE.md) — endpoint completeness contract and the route matrix
+- [Migrating to v11](./docs/MIGRATING_V11.md) — removed public contracts and their replacements
 
 ## Commands
 
@@ -23,6 +25,11 @@
 - `vp run test:live`
 - `vp run verify`
 - `vp run bootstrap:tokens`
+
+## Teardown
+
+- `vp run clean` — remove generated artifacts (`.live-build`, `.turbo`, `coverage`, `dist`)
+- `pnpm secrets:clean` — remove the ignored live-test `.env.local` files
 
 ## Worktrees
 

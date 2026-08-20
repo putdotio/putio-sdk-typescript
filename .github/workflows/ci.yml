@@ -91,6 +91,7 @@ jobs:
 
       - name: Install browser runtime
         if: startsWith(matrix.target, 'browser-')
+        timeout-minutes: 10
         run: vp exec playwright install --with-deps ${{ matrix.browser }}
 
       - name: Verify compatibility

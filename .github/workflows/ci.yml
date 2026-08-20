@@ -8,15 +8,16 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   verify:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     name: Verify SDK
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    concurrency:
-      group: verify-${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
     permissions:
       contents: read
 
@@ -46,9 +47,6 @@ jobs:
       - verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    concurrency:
-      group: compatibility-${{ matrix.target }}-${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
     permissions:
       contents: read
     strategy:
@@ -93,6 +91,7 @@ jobs:
 
       - name: Install browser runtime
         if: startsWith(matrix.target, 'browser-')
+        timeout-minutes: 10
         run: vp exec playwright install --with-deps ${{ matrix.browser }}
 
       - name: Verify compatibility

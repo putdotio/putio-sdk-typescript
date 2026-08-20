@@ -62,8 +62,20 @@ jobs:
         with:
           node-version-file: .node-version
 
+      # --no-save keeps package.json and the lockfile's specifier records at
+      # their committed values; without it pnpm 11 update rewrites both and a
+      # lockfile-only commit fails frozen installs with a specifier mismatch.
       - name: Refresh transitive lockfile resolutions
-        run: corepack pnpm update --lockfile-only -r
+        run: corepack pnpm update --no-save --lockfile-only -r
+
+      - name: Assert only the lockfile changed
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- ':(exclude)pnpm-lock.yaml'; then
+            echo "unexpected working-tree changes beyond pnpm-lock.yaml:" >&2
+            git status --porcelain >&2
+            exit 1
+          fi
 
       - name: Open or update pull request
         env:

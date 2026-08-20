@@ -16,11 +16,18 @@ permissions: {}
 jobs:
   refresh:
     name: Refresh lockfile
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
       group: lockfile-maintenance-${{ github.repository }}
       cancel-in-progress: false
+    environment:
+      name: release
+      deployment: false
+    permissions:
+      contents: read
+
     steps:
       - name: Create release bot token
         id: release-bot
@@ -38,12 +45,12 @@ jobs:
           APP_SLUG: ${{ steps.release-bot.outputs.app-slug }}
         run: |
           set -euo pipefail
-          user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          user_id="$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)"
           if [[ ! "$user_id" =~ ^[0-9]+$ ]]; then
             echo "failed to resolve numeric bot user id for ${APP_SLUG}[bot]" >&2
             exit 1
           fi
-          echo "user-id=${user_id}" >> "$GITHUB_OUTPUT"
+          echo "user_id=${user_id}" >> "$GITHUB_OUTPUT"
 
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,7 +69,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.release-bot.outputs.token }}
           APP_SLUG: ${{ steps.release-bot.outputs.app-slug }}
-          BOT_USER_ID: ${{ steps.release-bot-identity.outputs.user-id }}
+          BOT_USER_ID: ${{ steps.release-bot-identity.outputs.user_id }}
         run: |
           set -euo pipefail
           if git diff --quiet -- pnpm-lock.yaml; then

@@ -1,9 +1,6 @@
-# Compensates for pnpm 11.x ignoring targeted updates of transitive-only
-# dependencies (https://github.com/pnpm/pnpm/issues/12744), which makes
-# Dependabot's transitive security updates a silent no-op. Refreshes every
-# in-range transitive resolution with workspace overrides untouched. Run it
-# from the Actions tab when a security alert fires; the cron covers drift.
-# Retire path: bump packageManager once a stable pnpm ships the upstream fix.
+# Refreshes every in-range transitive resolution with workspace overrides and
+# manifest ranges untouched. Run it from the Actions tab when a security alert
+# needs a full refresh; the cron covers routine drift.
 name: Lockfile maintenance
 
 on:
@@ -100,5 +97,5 @@ jobs:
             gh pr create \
               --head "$branch" \
               --title "chore(deps): refresh transitive lockfile resolutions" \
-              --body "Scheduled lockfile maintenance. Re-resolves transitive dependencies within existing ranges because pnpm 11.x ignores targeted transitive updates (pnpm/pnpm#12744), so Dependabot security updates cannot land them. Workspace overrides are untouched."
+              --body "Scheduled lockfile maintenance. Re-resolves transitive dependencies within existing ranges under the repository-pinned pnpm. Workspace overrides and manifest ranges are untouched."
           fi

@@ -16,7 +16,7 @@ jobs:
   verify:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     name: Verify SDK
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 20
     permissions:
       contents: read
@@ -45,7 +45,7 @@ jobs:
     name: Compatibility / ${{ matrix.target }}
     needs:
       - verify
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 30
     permissions:
       contents: read
@@ -104,7 +104,7 @@ jobs:
     name: Compatibility result
     needs:
       - compatibility
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions: {}
 
@@ -125,7 +125,7 @@ jobs:
     needs:
       - verify
       - compatibility
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # npm Trusted Publishing rejects self-hosted runners
     timeout-minutes: 20
     concurrency:
       group: release-${{ github.repository }}-main

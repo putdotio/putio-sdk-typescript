@@ -30,7 +30,7 @@ await run("ifttt sendEvent negative behavior", async () => {
 
   try {
     await authClient.ifttt.sendEvent({
-      eventType: "codex_invalid_event",
+      eventType: "putio-typescript-sdk-invalid-event",
       ingredients: {
         file_id: 1,
       },
@@ -64,7 +64,7 @@ await run("ifttt sendEvent rejects missing playback ingredients before transport
       eventType: "playback_started",
       ingredients: {
         file_id: 1,
-        file_name: "codex.mp4",
+        file_name: "putio-typescript-sdk.mp4",
       },
     });
     throw new Error("expected missing ingredients to fail");
@@ -79,7 +79,7 @@ await run("ifttt sendEvent requires restricted scope for oauth token", async () 
       eventType: "playback_started",
       ingredients: {
         file_id: 1,
-        file_name: "codex.mp4",
+        file_name: "putio-typescript-sdk.mp4",
         file_type: "VIDEO",
       },
     });
@@ -101,7 +101,7 @@ await run("ifttt valid playback event currently succeeds even when disabled", as
     eventType: "playback_started",
     ingredients: {
       file_id: 1,
-      file_name: "codex.mp4",
+      file_name: "putio-typescript-sdk.mp4",
       file_type: "VIDEO",
     },
   });

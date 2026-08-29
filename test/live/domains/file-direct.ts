@@ -12,7 +12,7 @@ void assertOperationError;
 void sleep;
 
 const createDisposableTextFile = async (label: string) => {
-  const name = `codex_sdk_${label}_${Date.now()}.txt`;
+  const name = `putio-typescript-sdk-${label}-${Date.now()}.txt`;
   const upload = await client.files.upload({
     file: new File(["sdk live probe\n"], name, {
       type: "text/plain",
@@ -102,7 +102,7 @@ await run("files api mp4 download url redirects for owned video", async () => {
   });
 
   const url = await client.files.getApiMp4DownloadUrl(video.id, {
-    name: "codex-sdk-live.mp4",
+    name: "putio-typescript-sdk-live.mp4",
   });
   const response = await fetch(url, {
     redirect: "manual",
@@ -154,7 +154,7 @@ await run("files XSPF playlist is fetchable for owned video", async () => {
 });
 
 await run("files upload works through upload.put.io", async () => {
-  const name = `codex_sdk_upload_probe_${Date.now()}.txt`;
+  const name = `putio-typescript-sdk-upload-probe-${Date.now()}.txt`;
   const upload = await client.files.upload({
     file: new File(["sdk upload probe\n"], name, {
       type: "text/plain",

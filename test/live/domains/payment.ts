@@ -175,7 +175,7 @@ await run("payment invites require restricted scope", async () => {
 
 await run("payment fastspring confirm requires restricted scope", async () => {
   try {
-    await oauthClient.payment.confirmFastspringOrder("codex-bogus-reference");
+    await oauthClient.payment.confirmFastspringOrder("putio-typescript-sdk-bogus-reference");
     throw new Error("expected confirmFastspringOrder to fail with invalid_scope");
   } catch (error) {
     return assertOperationError(error, {
@@ -189,7 +189,7 @@ await run("payment fastspring confirm requires restricted scope", async () => {
 
 await run("payment fastspring confirm bogus reference currently yields generic 500", async () => {
   try {
-    await ownerClient.payment.confirmFastspringOrder("codex-bogus-reference");
+    await ownerClient.payment.confirmFastspringOrder("putio-typescript-sdk-bogus-reference");
     throw new Error("expected bogus fastspring reference to fail");
   } catch (error) {
     return assertErrorTag(error, {
@@ -234,7 +234,7 @@ await run("payment preview invalid coupon yields typed 404", async () => {
 
   try {
     await ownerClient.payment.changePlan.preview({
-      coupon_code: "codex_invalid_coupon",
+      coupon_code: "putio-typescript-sdk-invalid-coupon",
       payment_type: "credit-card",
       plan_path: "1TB_365_once",
     });
@@ -255,7 +255,7 @@ await run("payment preview invalid plan yields typed 404", async () => {
   try {
     await ownerClient.payment.changePlan.preview({
       payment_type: "credit-card",
-      plan_path: "codex_invalid_plan_path",
+      plan_path: "putio-typescript-sdk-invalid-plan-path",
     });
     throw new Error("expected previewChangePlan to fail");
   } catch (error) {
@@ -274,7 +274,7 @@ await run("payment submit invalid plan yields typed 404", async () => {
   try {
     await ownerClient.payment.changePlan.submit({
       payment_type: "credit-card",
-      plan_path: "codex_invalid_plan_path",
+      plan_path: "putio-typescript-sdk-invalid-plan-path",
     });
     throw new Error("expected submitChangePlan to fail");
   } catch (error) {
@@ -291,7 +291,7 @@ await run("payment voucher info invalid code yields typed 404", async () => {
   await getOwnerPaymentInfo();
 
   try {
-    await ownerClient.payment.voucher.getInfo("codex-invalid-voucher");
+    await ownerClient.payment.voucher.getInfo("putio-typescript-sdk-invalid-voucher");
     throw new Error("expected getVoucherInfo to fail");
   } catch (error) {
     return assertOperationError(error, {
@@ -307,7 +307,7 @@ await run("payment redeem invalid code yields typed 404", async () => {
   await getOwnerPaymentInfo();
 
   try {
-    await ownerClient.payment.voucher.redeem("codex-invalid-voucher");
+    await ownerClient.payment.voucher.redeem("putio-typescript-sdk-invalid-voucher");
     throw new Error("expected redeemVoucher to fail");
   } catch (error) {
     return assertOperationError(error, {
@@ -367,7 +367,7 @@ await run("payment opennode unknown plan yields typed 400", async () => {
   await getOwnerPaymentInfo();
 
   try {
-    await ownerClient.payment.methods.createOpenNodeCharge("codex-invalid-plan");
+    await ownerClient.payment.methods.createOpenNodeCharge("putio-typescript-sdk-invalid-plan");
     throw new Error("expected createOpenNodeCharge to fail");
   } catch (error) {
     return assertOperationError(error, {
@@ -422,7 +422,7 @@ await run("payment sub-account voucher redeem is rejected", async () => {
   const subAccountClient = await getSubAccountClient();
 
   try {
-    await subAccountClient.payment.voucher.redeem("codex-invalid-voucher");
+    await subAccountClient.payment.voucher.redeem("putio-typescript-sdk-invalid-voucher");
     throw new Error("expected redeemVoucher to reject sub-account fixture");
   } catch (error) {
     return assertPaymentSubAccountRestriction(error, "redeemVoucher");

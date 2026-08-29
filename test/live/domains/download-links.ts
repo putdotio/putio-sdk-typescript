@@ -87,9 +87,13 @@ const findProbeFile = async (): Promise<ProbeFile> => {
   }
 
   const upload = await client.files.upload({
-    file: new File(["sdk download-links probe\n"], `codex_sdk_download_links_${Date.now()}.txt`, {
-      type: "text/plain",
-    }),
+    file: new File(
+      ["sdk download-links probe\n"],
+      `putio-typescript-sdk-download-links-${Date.now()}.txt`,
+      {
+        type: "text/plain",
+      },
+    ),
     parentId: 0,
   });
 
@@ -104,7 +108,7 @@ const createCursorProbeFiles = async () => {
   const ids: number[] = [];
 
   for (let index = 0; index < 2; index += 1) {
-    const name = `codex_sdk_download_links_cursor_${Date.now()}_${index}.txt`;
+    const name = `putio-typescript-sdk-download-links-cursor-${Date.now()}-${index}.txt`;
     const upload = await client.files.upload({
       file: new File([`sdk download-links cursor probe ${index}\n`], name, {
         type: "text/plain",

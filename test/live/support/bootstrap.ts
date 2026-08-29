@@ -49,9 +49,9 @@ export type BootstrappedTokens = {
   };
 };
 
-const THIRD_PARTY_BOOTSTRAP_APP_NAME = "Codex SDK Live App";
-const THIRD_PARTY_BOOTSTRAP_CALLBACK = "https://example.com/codex-sdk-live/callback";
-const THIRD_PARTY_BOOTSTRAP_WEBSITE = "https://example.com/codex-sdk-live";
+const THIRD_PARTY_BOOTSTRAP_APP_NAME = "put.io TypeScript SDK Live App";
+const THIRD_PARTY_BOOTSTRAP_CALLBACK = "https://example.com/putio-typescript-sdk-live/callback";
+const THIRD_PARTY_BOOTSTRAP_WEBSITE = "https://example.com/putio-typescript-sdk-live";
 const TOTP_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));

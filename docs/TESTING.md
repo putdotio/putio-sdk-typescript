@@ -109,6 +109,7 @@ Live tests stay separate on purpose:
 Default local env files, loaded in order:
 
 - direct process environment
+- `.env.live-tokens`
 - `.env.local`
 - `.env`
 
@@ -151,10 +152,9 @@ Optional direct runtime variables:
 
 `PUTIO_LIVE_OWNED_VIDEO_FILE_ID` can pin media live tests to an explicit safe,
 owned, unshared MP4 fixture. If it is unset, the live harness only accepts
-owned MP4s with SDK/example fixture names such as `codex_sdk_*`,
-`codex-sdk-*`, `Mario1_507_512kb.mp4`, `Sintel.mp4`, or
-`Big Buck Bunny.mp4`; it never selects an arbitrary private video from the
-account.
+owned MP4s with SDK/example fixture names such as `putio-typescript-sdk-*`,
+`Mario1_507_512kb.mp4`, `Sintel.mp4`, or `Big Buck Bunny.mp4`; it never selects
+an arbitrary private video from the account.
 
 `PUTIO_LIVE_RSS_SOURCE_URL` must point at a known-good RSS feed when running the
 `rss` target. `PUTIO_TOKEN_PAYMENT_OWNER` must belong to a prepaid owner account
@@ -167,6 +167,15 @@ The `sharing`, `files`, `file-direct`, and `file-tasks` targets also expect a
 safe owned MP4 fixture for media flag, URL, HLS, watch status, and start-from
 coverage. The shared-friend clone fixture is seeded from the configured
 secondary account.
+
+File and transfer tests create timestamped `putio-typescript-sdk-*` resources.
+Each test removes its archive, extracted files, or transfer before it exits.
+Torrent fixtures use an unreachable `example.invalid` tracker. URL fixtures
+cover the terminal error and retry states.
+
+Uploaded torrents did not create a predictable history event. The suite tests
+the missing-event result from `events.getTorrent(...)` and leaves existing
+account history alone.
 
 Use `pnpm secrets:setup` to validate the maintainer-provided SOPS ciphertext and
 render shared live variables into `.env.local`. The live harness also accepts
@@ -188,34 +197,38 @@ Single target:
 vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
 ```
 
-Run explicit targets with fresh runtime tokens:
+Run explicit targets with the provisioned runtime tokens:
 
 ```bash
-pnpm test:live:fresh -- test/live/account.test.ts test/live/tunnel.test.ts
+pnpm test:live:targets -- test/live/account.test.ts test/live/tunnel.test.ts
 ```
 
-`test:live:fresh` uses the existing credential fixture to mint runtime tokens,
-runs only the named test files, and revokes the fresh first-party session before
-exiting, including when a test fails. It never writes the runtime tokens to an
-env file.
+`test:live:targets` runs only the named files. It reads
+`PUTIO_TOKEN_FIRST_PARTY` and `PUTIO_TOKEN_THIRD_PARTY` and never calls password
+login. It rejects `auth-credentials`, `family`, `friend-invites`, `friends`,
+`podcast`, and `sharing` because those targets bootstrap account credentials.
+
+`pnpm bootstrap:tokens` writes new tokens to the ignored `0600`
+`.env.live-tokens` cache. Live commands load it before `.env.local`. Bootstrap
+refuses to replace the cache unless you pass `--refresh`.
 
 An unattended runner with a scoped age identity can run a command without
 materializing secrets:
 
 ```bash
 sops exec-env --same-process "$PUTIO_SDK_TYPESCRIPT_SOPS_FILE" \
-  'pnpm test:live:fresh -- test/live/account.test.ts test/live/tunnel.test.ts'
+  'pnpm test:live:targets -- test/live/account.test.ts test/live/tunnel.test.ts'
 ```
 
 Run `pnpm secrets:setup` once per worktree with
 `PUTIO_SDK_TYPESCRIPT_SOPS_FILE` pointing to the supplied ciphertext. The
-materialized file is `0600` and gitignored. Live commands auto-load
-`.env.local` first and then `.env`; already-exported environment variables keep
-highest priority.
+materialized file is `0600` and gitignored. Live commands load
+`.env.live-tokens`, `.env.local`, and `.env` in that order. Exported environment
+variables keep highest priority.
 
 ```bash
 pnpm secrets:setup        # one-time per worktree
-pnpm bootstrap:tokens     # mints fresh tokens
+pnpm bootstrap:tokens     # mints and caches tokens once
 pnpm bootstrap:live-fixtures
 pnpm test:live            # runs the broader live suite against pre-existing tokens
 pnpm secrets:clean        # before `git worktree remove`

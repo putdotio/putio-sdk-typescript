@@ -224,7 +224,7 @@ await runCheck("rss source fixture", async () => {
   const created = await primaryClient.rss.create({
     dont_process_whole_feed: true,
     rss_source_url: rssSourceUrl,
-    title: `codex sdk rss fixture ${Date.now()}`,
+    title: `putio-typescript-sdk rss fixture ${Date.now()}`,
   });
 
   try {

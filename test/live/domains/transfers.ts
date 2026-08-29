@@ -1,16 +1,13 @@
 import { createClients, createLiveHarness } from "../support/harness.js";
+import { createTorrentFile } from "../support/binary-fixtures.ts";
 
-const { client } = await createClients({
+const { authClient, client } = await createClients({
+  authClient: "PUTIO_TOKEN_FIRST_PARTY",
   client: "PUTIO_TOKEN_THIRD_PARTY",
 });
 
 const live = createLiveHarness("transfers live");
-const { assert, assertOperationError, finish, run, sleep } = live;
-
-void assertOperationError;
-void sleep;
-
-const SLOW_TRANSFER_PROBE_URL = "https://speed.hetzner.de/100MB.bin";
+const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 const waitForTransferError = async (id: number) => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -24,6 +21,20 @@ const waitForTransferError = async (id: number) => {
   }
 
   throw new Error("timed out waiting for transfer to reach ERROR");
+};
+
+const waitForTorrentTransfer = async (id: number) => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const transfer = await authClient.transfers.get(id);
+
+    if (transfer.type === "TORRENT") {
+      return transfer;
+    }
+
+    await sleep(500);
+  }
+
+  throw new Error("timed out waiting for uploaded transfer to decode as TORRENT");
 };
 
 await run("transfers list shape", async () => {
@@ -75,32 +86,25 @@ await run("transfers info external analysis", async () => {
 await run("transfers addMany envelope shape", async () => {
   const result = await client.transfers.addMany([
     {
-      url: `https://example.invalid/codex-transfer-${Date.now()}.iso`,
+      url: `https://example.invalid/putio-typescript-sdk-transfer-${Date.now()}.iso`,
     },
     {
-      url: "",
+      url: "not-a-url",
     },
   ]);
 
-  assert(Array.isArray(result.transfers), "expected transfers array");
-  assert(Array.isArray(result.errors), "expected per-item errors array");
-  assert(result.transfers.length >= 1, "expected at least one created transfer");
-
-  const firstTransferId = result.transfers[0]?.id;
-  const firstError = result.errors[0];
-
-  if (typeof firstTransferId === "number") {
-    await client.transfers.cancel([firstTransferId]).catch(() => undefined);
-    await client.transfers.clean([firstTransferId]).catch(() => undefined);
+  try {
+    assert(Array.isArray(result.transfers), "expected transfers array");
+    assert(Array.isArray(result.errors), "expected per-item errors array");
+    assert(result.transfers.length >= 1, "expected at least one created transfer");
+    assert(result.errors.length === 1, "expected one invalid URL error");
+  } finally {
+    for (const transfer of result.transfers) {
+      await client.transfers.cancel([transfer.id]).catch(() => undefined);
+      await client.transfers.remove({ ids: [transfer.id] }).catch(() => undefined);
+      await client.transfers.clean([transfer.id]).catch(() => undefined);
+    }
   }
-
-  return {
-    behaves_like_partial: result.errors.length > 0,
-    first_error_type: firstError?.error_type ?? null,
-    first_transfer_id: firstTransferId ?? null,
-    transfer_count: result.transfers.length,
-    error_count: result.errors.length,
-  };
 });
 
 await run("empty transfer url yields typed error", async () => {
@@ -110,12 +114,7 @@ await run("empty transfer url yields typed error", async () => {
     });
     throw new Error("expected empty transfer url to fail");
   } catch (error) {
-    return assertOperationError(error, {
-      domain: "transfers",
-      errorType: "EMPTY_URL",
-      operation: "add",
-      statusCode: 400,
-    });
+    return assertErrorTag(error, { tag: "PutioValidationError" });
   }
 });
 
@@ -147,7 +146,7 @@ await run("missing transfer stop recording yields typed error", async () => {
 
 await run("non-live transfer stop recording yields typed not-recording", async () => {
   const created = await client.transfers.add({
-    url: `https://example.invalid/codex-transfer-${Date.now()}.iso`,
+    url: `https://example.invalid/putio-typescript-sdk-transfer-${Date.now()}.iso`,
   });
 
   try {
@@ -190,7 +189,7 @@ await run("reannounce currently rejects with typed bad request", async () => {
 
 await run("non-torrent reannounce currently falls back to typed bad request", async () => {
   const created = await client.transfers.add({
-    url: `https://example.invalid/codex-transfer-${Date.now()}.iso`,
+    url: `https://example.invalid/putio-typescript-sdk-transfer-${Date.now()}.iso`,
   });
 
   try {
@@ -209,39 +208,11 @@ await run("non-torrent reannounce currently falls back to typed bad request", as
   }
 });
 
-await run("retry on fresh non-error transfer returns transfer shape", async () => {
+await run("failed URL transfer can be retried and cancelled", async () => {
   const created = await client.transfers.add({
-    url: SLOW_TRANSFER_PROBE_URL,
+    url: `https://example.invalid/putio-typescript-sdk-transfer-${Date.now()}.iso`,
   });
-
-  try {
-    const current = await client.transfers.get(created.id);
-
-    if (current.status === "ERROR") {
-      throw new Error("fresh transfer reached ERROR before the non-error retry branch was checked");
-    }
-
-    const retried = await client.transfers.retry(created.id);
-
-    assert(retried.id === created.id, "expected retry to return same transfer");
-    assert(retried.status !== "ERROR", "expected retried transfer to remain non-error");
-
-    return {
-      initial_status: current.status,
-      retried_status: retried.status,
-    };
-  } finally {
-    await client.transfers.cancel([created.id]).catch(() => undefined);
-    await client.transfers.clean([created.id]).catch(() => undefined);
-  }
-});
-
-await run("transfers disposable lifecycle", async () => {
-  const countBefore = await client.transfers.count();
-
-  const created = await client.transfers.add({
-    url: `https://example.invalid/codex-transfer-${Date.now()}.iso`,
-  });
+  const transferIds = new Set([created.id]);
 
   try {
     assert(typeof created.id === "number", "expected created transfer id");
@@ -259,22 +230,50 @@ await run("transfers disposable lifecycle", async () => {
     const errored = await waitForTransferError(created.id);
     assert(typeof errored.error_message === "string", "expected transfer error message");
 
-    const fetched = await client.transfers.get(created.id);
-    assert(fetched.id === created.id, "expected get to return created transfer");
+    const retried = await client.transfers.retry(created.id);
+    transferIds.add(retried.id);
+    assert(retried.status !== "ERROR", "expected retry to leave terminal error state");
+    await waitForTransferError(retried.id);
 
-    await client.transfers.cancel([created.id]);
+    const fetched = await client.transfers.get(retried.id);
+    assert(fetched.id === retried.id, "expected get to return retried transfer");
 
-    const countAfter = await client.transfers.count();
-
-    return {
-      count_after_cancel: countAfter,
-      count_before: countBefore,
-      created_id: created.id,
-      final_status: errored.status,
-    };
+    await client.transfers.cancel([retried.id]);
   } finally {
-    await client.transfers.cancel([created.id]).catch(() => undefined);
-    await client.transfers.clean([created.id]).catch(() => undefined);
+    for (const id of transferIds) {
+      await client.transfers.cancel([id]).catch(() => undefined);
+      await client.transfers.clean([id]).catch(() => undefined);
+    }
+  }
+});
+
+await run("torrent upload returns a decoded transfer and metainfo", async () => {
+  const name = `putio-typescript-sdk-torrent-transfer-${Date.now()}`;
+  const upload = await authClient.files.upload({
+    file: createTorrentFile(name),
+    fileName: `${name}.torrent`,
+    parentId: 0,
+  });
+
+  if (upload.type === "file") {
+    try {
+      throw new Error("expected torrent upload to return a transfer");
+    } finally {
+      await authClient.files.delete([upload.file.id], { skipTrash: true });
+    }
+  }
+
+  const transferId = upload.transfer.id;
+
+  try {
+    await waitForTorrentTransfer(transferId);
+    const torrent = await authClient.transfers.getTorrent(transferId);
+    assert(torrent.byteLength > 20, "expected torrent metainfo bytes");
+    assert(torrent[0] === 0x64, "expected bencoded torrent metainfo");
+  } finally {
+    await authClient.transfers.cancel([transferId]).catch(() => undefined);
+    await authClient.transfers.remove({ ids: [transferId] }).catch(() => undefined);
+    await authClient.transfers.clean([transferId]).catch(() => undefined);
   }
 });
 

@@ -124,7 +124,7 @@ await run("trash list shape", async () => {
 
 await run("trash continue invalid cursor yields typed 400", async () => {
   try {
-    await authClient.trash.continue("codex-invalid-trash-cursor", {
+    await authClient.trash.continue("putio-typescript-sdk-invalid-trash-cursor", {
       per_page: 1,
     });
     throw new Error("expected invalid trash cursor to fail");
@@ -164,7 +164,7 @@ await run("trash disposable lifecycle", () =>
     try {
       for (const suffix of ["a", "b", "c"]) {
         const folder = await authClient.files.createFolder({
-          name: `codex_sdk_trash_${seed}_${suffix}`,
+          name: `putio-typescript-sdk-trash-${seed}-${suffix}`,
           parent_id: 0,
         });
 
@@ -265,7 +265,7 @@ await run("trash bulk restore restores multiple top-level entries", () =>
     try {
       for (const suffix of ["bulk_a", "bulk_b"]) {
         const folder = await authClient.files.createFolder({
-          name: `codex_sdk_trash_${seed}_${suffix}`,
+          name: `putio-typescript-sdk-trash-${seed}-${suffix}`,
           parent_id: 0,
         });
 
@@ -319,13 +319,13 @@ await run("trash child restore and delete reject non-toplevel entries", () =>
 
     try {
       const parent = await authClient.files.createFolder({
-        name: `codex_sdk_trash_${seed}_parent`,
+        name: `putio-typescript-sdk-trash-${seed}-parent`,
         parent_id: 0,
       });
       parentId = parent.id;
 
       const child = await authClient.files.createFolder({
-        name: `codex_sdk_trash_${seed}_child`,
+        name: `putio-typescript-sdk-trash-${seed}-child`,
         parent_id: parent.id,
       });
       childId = child.id;

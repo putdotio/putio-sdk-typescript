@@ -32,7 +32,7 @@ const cleanupOwnedProbeFiles = async (ids: readonly number[]): Promise<void> => 
 };
 
 const createOwnedProbeFile = async (): Promise<OwnedProbeFile> => {
-  const name = `codex_sdk_public_share_probe_${Date.now()}.txt`;
+  const name = `putio-typescript-sdk-public-share-probe-${Date.now()}.txt`;
   const upload = await authClient.files.upload({
     file: new File(["sdk public share probe\n"], name, {
       type: "text/plain",
@@ -100,7 +100,7 @@ await run("sharing list shared files shape", async () => {
 await run("sharing everyone lifecycle", async () => {
   const seed = Date.now();
   const folder = await authClient.files.createFolder({
-    name: `codex_sdk_sharing_everyone_${seed}`,
+    name: `putio-typescript-sdk-sharing-everyone-${seed}`,
     parent_id: 0,
   });
 
@@ -138,7 +138,7 @@ await run("sharing specific-friend lifecycle", async () => {
 
   const seed = Date.now();
   const folder = await authClient.files.createFolder({
-    name: `codex_sdk_sharing_friend_${seed}`,
+    name: `putio-typescript-sdk-sharing-friend-${seed}`,
     parent_id: 0,
   });
 
@@ -191,11 +191,11 @@ await run("sharing child of shared parent yields typed already shared", async ()
 
   const seed = Date.now();
   const parent = await authClient.files.createFolder({
-    name: `codex_sdk_sharing_parent_${seed}`,
+    name: `putio-typescript-sdk-sharing-parent-${seed}`,
     parent_id: 0,
   });
   const child = await authClient.files.createFolder({
-    name: `codex_sdk_sharing_child_${seed}`,
+    name: `putio-typescript-sdk-sharing-child-${seed}`,
     parent_id: parent.id,
   });
 
@@ -347,17 +347,17 @@ await run("sharing public share access without token yields configuration error"
 await run("sharing public share pagination mirrors backend contract", async () => {
   const seed = Date.now();
   const folder = await authClient.files.createFolder({
-    name: `codex_sdk_public_share_pagination_${seed}`,
+    name: `putio-typescript-sdk-public-share-pagination-${seed}`,
     parent_id: 0,
   });
 
   try {
     const childA = await authClient.files.createFolder({
-      name: `codex_sdk_public_share_child_a_${seed}`,
+      name: `putio-typescript-sdk-public-share-child-a-${seed}`,
       parent_id: folder.id,
     });
     const childB = await authClient.files.createFolder({
-      name: `codex_sdk_public_share_child_b_${seed}`,
+      name: `putio-typescript-sdk-public-share-child-b-${seed}`,
       parent_id: folder.id,
     });
 
@@ -498,7 +498,7 @@ await run("sharing clone lifecycle", async () => {
   );
 
   const destination = await authClient.files.createFolder({
-    name: `codex_sdk_clone_target_${Date.now()}`,
+    name: `putio-typescript-sdk-clone-target-${Date.now()}`,
     parent_id: 0,
   });
 

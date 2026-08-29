@@ -49,7 +49,7 @@ const createCursorProbeFiles = async () => {
   const ids: number[] = [];
 
   for (let index = 0; index < 6; index += 1) {
-    const name = `codex_sdk_zip_cursor_${Date.now()}_${index}.txt`;
+    const name = `putio-typescript-sdk-zip-cursor-${Date.now()}-${index}.txt`;
     const upload = await authClient.files.upload({
       file: new File([`sdk zip cursor probe ${index}\n`], name, {
         type: "text/plain",

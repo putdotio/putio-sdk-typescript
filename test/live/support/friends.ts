@@ -83,8 +83,8 @@ type SecondaryClientFactory = (config?: {
   readonly accessToken?: string;
 }) => Promise<LiveFriendsClient>;
 
-const SHARED_FRIEND_FIXTURE_FOLDER_NAME = "codex_sdk_shared_friend_fixture";
-const SHARED_FRIEND_FIXTURE_FILE_NAME = "codex_sdk_shared_friend_fixture.txt";
+const SHARED_FRIEND_FIXTURE_FOLDER_NAME = "putio-typescript-sdk-shared-friend-fixture";
+const SHARED_FRIEND_FIXTURE_FILE_NAME = "putio-typescript-sdk-shared-friend-fixture.txt";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 

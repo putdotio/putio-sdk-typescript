@@ -5,7 +5,7 @@ const { oauthClient } = await createClients({
 });
 
 const now = new Date().toISOString();
-const probeKey = "codex_sdk_config_probe";
+const probeKey = "putio-typescript-sdk-config-probe";
 const probeValue = {
   enabled: true,
   tags: ["config", "effect", "sdk"],

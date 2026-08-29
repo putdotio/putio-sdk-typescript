@@ -96,7 +96,9 @@ await run("files root list shape", async () => {
 });
 
 await run("files list continue", async () => {
-  const probe = await createCursorProbeFolder(`codex_sdk_files_list_cursor_${Date.now()}`);
+  const probe = await createCursorProbeFolder(
+    `putio-typescript-sdk-files-list-cursor-${Date.now()}`,
+  );
 
   try {
     const firstPage = await oauthClient.files.list(probe.folderId, {
@@ -139,7 +141,7 @@ await run("files shared-with-you list", async () => {
 
 await run("files search and continue", async () => {
   const seed = Date.now();
-  const query = `codex_sdk_files_search_cursor_${seed}`;
+  const query = `putio-typescript-sdk-files-search-cursor-${seed}`;
   const probe = await createCursorProbeFolder(query, 6);
 
   try {
@@ -394,8 +396,8 @@ await run("files next-file and next-video", async () => {
 
 await run("files folder lifecycle", async () => {
   const suffix = Date.now();
-  const folderAName = `codex_sdk_files_a_${suffix}`;
-  const folderBName = `codex_sdk_files_b_${suffix}`;
+  const folderAName = `putio-typescript-sdk-files-a-${suffix}`;
+  const folderBName = `putio-typescript-sdk-files-b-${suffix}`;
   const folderARenamed = `${folderAName}_renamed`;
 
   const folderA = await authClient.files.createFolder({
@@ -493,7 +495,7 @@ await run("empty folder name yields typed error", async () => {
 
 await run("folder mp4 status yields typed error", async () => {
   const folder = await authClient.files.createFolder({
-    name: `codex_sdk_mp4_status_folder_${Date.now()}`,
+    name: `putio-typescript-sdk-mp4-status-folder-${Date.now()}`,
     parent_id: 0,
   });
 

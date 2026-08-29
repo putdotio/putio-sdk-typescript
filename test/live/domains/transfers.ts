@@ -212,6 +212,7 @@ await run("failed URL transfer can be retried and cancelled", async () => {
   const created = await client.transfers.add({
     url: `https://example.invalid/putio-typescript-sdk-transfer-${Date.now()}.iso`,
   });
+  const transferIds = new Set([created.id]);
 
   try {
     assert(typeof created.id === "number", "expected created transfer id");
@@ -230,16 +231,19 @@ await run("failed URL transfer can be retried and cancelled", async () => {
     assert(typeof errored.error_message === "string", "expected transfer error message");
 
     const retried = await client.transfers.retry(created.id);
+    transferIds.add(retried.id);
     assert(retried.status !== "ERROR", "expected retry to leave terminal error state");
-    await waitForTransferError(created.id);
+    await waitForTransferError(retried.id);
 
-    const fetched = await client.transfers.get(created.id);
-    assert(fetched.id === created.id, "expected get to return created transfer");
+    const fetched = await client.transfers.get(retried.id);
+    assert(fetched.id === retried.id, "expected get to return retried transfer");
 
-    await client.transfers.cancel([created.id]);
+    await client.transfers.cancel([retried.id]);
   } finally {
-    await client.transfers.cancel([created.id]).catch(() => undefined);
-    await client.transfers.clean([created.id]).catch(() => undefined);
+    for (const id of transferIds) {
+      await client.transfers.cancel([id]).catch(() => undefined);
+      await client.transfers.clean([id]).catch(() => undefined);
+    }
   }
 });
 

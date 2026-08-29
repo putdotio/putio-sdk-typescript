@@ -150,15 +150,23 @@ export const readFirstPartyClientCredentials = (): PutioClientCredentials => ({
 });
 
 export const hydrateLiveTokenEnv = (): void => {
+  loadPackageEnvFile();
+
   if (process.env.PUTIO_TOKEN_FIRST_PARTY && process.env.PUTIO_TOKEN_THIRD_PARTY) {
     return;
   }
 
   if (!process.env.PUTIO_TOKEN_FIRST_PARTY) {
-    process.env.PUTIO_TOKEN_FIRST_PARTY = readOptionalSecret("PUTIO_AUTH_TOKEN");
+    const legacyToken = readOptionalSecret("PUTIO_AUTH_TOKEN");
+    if (legacyToken) {
+      process.env.PUTIO_TOKEN_FIRST_PARTY = legacyToken;
+    }
   }
 
   if (!process.env.PUTIO_TOKEN_THIRD_PARTY) {
-    process.env.PUTIO_TOKEN_THIRD_PARTY = readOptionalSecret("PUTIO_OAUTH_TOKEN");
+    const legacyToken = readOptionalSecret("PUTIO_OAUTH_TOKEN");
+    if (legacyToken) {
+      process.env.PUTIO_TOKEN_THIRD_PARTY = legacyToken;
+    }
   }
 };

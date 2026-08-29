@@ -6,10 +6,7 @@ const { authClient, oauthClient } = await createClients({
 });
 
 const live = createLiveHarness("events live");
-const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
-
-void assertOperationError;
-void sleep;
+const { assert, assertErrorTag, assertOperationError, finish, run } = live;
 
 await run("events list shape", async () => {
   const result = await oauthClient.events.list({

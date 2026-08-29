@@ -2,7 +2,6 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
-import { formatLiveError } from "./live-error.ts";
 import { readLiveTokens } from "../test/live/support/secrets.ts";
 
 const args = process.argv.slice(2);
@@ -38,7 +37,7 @@ const result = spawnSync("vp", ["test", "run", "--config", "vitest.live.config.t
 });
 
 if (result.error) {
-  console.error(`Live test execution failed: ${formatLiveError(result.error)}`);
+  console.error(`Live test execution failed: ${result.error.message}`);
 }
 
 process.exit(result.status ?? 1);

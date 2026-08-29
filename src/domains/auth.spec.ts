@@ -48,12 +48,12 @@ describe("auth domain", () => {
     expect(
       buildAuthLoginUrl({
         clientId: 42,
-        clientName: "Codex",
+        clientName: "putio-typescript-sdk",
         redirectUri: "https://example.com/callback",
         state: "state-123",
       }),
     ).toBe(
-      "https://app.put.io/authenticate?client_id=42&client_name=Codex&isolated=1&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&response_type=token&state=state-123",
+      "https://app.put.io/authenticate?client_id=42&client_name=putio-typescript-sdk&isolated=1&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&response_type=token&state=state-123",
     );
   });
 
@@ -144,7 +144,7 @@ describe("auth domain", () => {
       login({
         callbackUrl: "https://example.com/callback",
         clientId: 42,
-        clientName: "Codex",
+        clientName: "putio-typescript-sdk",
         clientSecret: "secret",
         fingerprint: "fingerprint-1",
         password: "pass",
@@ -152,7 +152,7 @@ describe("auth domain", () => {
       }),
       (request) => {
         expect(request.url).toBe(
-          "https://api.put.io/v2/oauth2/authorizations/clients/42/fingerprint-1?callback_url=https%3A%2F%2Fexample.com%2Fcallback&client_name=Codex&client_secret=secret",
+          "https://api.put.io/v2/oauth2/authorizations/clients/42/fingerprint-1?callback_url=https%3A%2F%2Fexample.com%2Fcallback&client_name=putio-typescript-sdk&client_secret=secret",
         );
         expect(getAuthorizationHeader(request)).toBe("Basic c2RrOnBhc3M=");
 

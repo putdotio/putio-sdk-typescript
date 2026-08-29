@@ -70,7 +70,7 @@ describe.sequential("account live", () => {
   test("invalid callback url yields a typed operation error", async () => {
     await expect(
       clients.authClient.account.saveSettings({
-        callback_url: "codex-invalid-callback",
+        callback_url: "putio-typescript-sdk-invalid-callback",
       }),
     ).rejects.toMatchObject({
       _tag: "PutioOperationError",

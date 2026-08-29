@@ -1,26 +1,13 @@
-import { access, chmod, writeFile } from "node:fs/promises";
+import { chmod, writeFile } from "node:fs/promises";
 
 export const liveTokenCacheUrl = new URL("../.env.live-tokens", import.meta.url);
 
-export const hasLiveTokenCache = async (url: URL = liveTokenCacheUrl): Promise<boolean> => {
-  try {
-    await access(url);
-    return true;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      return false;
-    }
-
-    throw error;
-  }
-};
-
 export const writeLiveTokenCache = async (
+  url: URL,
   tokens: {
     readonly firstPartyToken: string;
     readonly thirdPartyToken: string;
   },
-  url: URL = liveTokenCacheUrl,
 ): Promise<void> => {
   const contents = [
     `PUTIO_TOKEN_FIRST_PARTY=${JSON.stringify(tokens.firstPartyToken)}`,

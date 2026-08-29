@@ -9,7 +9,7 @@ const SAFE_OWNED_VIDEO_FIXTURE_NAMES = new Set([
   "Mario1_507_HQ_512kb.mp4",
   "Sintel.mp4",
 ]);
-const SAFE_OWNED_VIDEO_FIXTURE_PREFIXES = ["codex_sdk_", "codex-sdk-"];
+const SAFE_OWNED_VIDEO_FIXTURE_PREFIXES = ["putio-typescript-sdk-"];
 
 const isSafeOwnedVideoFixtureName = (name: string): boolean =>
   SAFE_OWNED_VIDEO_FIXTURE_NAMES.has(name) ||
@@ -98,6 +98,6 @@ export const requireOwnedVideoFixture = async (
   }
 
   throw new Error(
-    "Missing safe owned MP4 fixture. Set PUTIO_LIVE_OWNED_VIDEO_FILE_ID or upload an unshared codex_sdk_*/codex-sdk-* MP4 fixture.",
+    "Missing safe owned MP4 fixture. Set PUTIO_LIVE_OWNED_VIDEO_FILE_ID or upload an unshared putio-typescript-sdk-* MP4 fixture.",
   );
 };

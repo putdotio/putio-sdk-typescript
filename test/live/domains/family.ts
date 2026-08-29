@@ -156,7 +156,7 @@ await run("family positive invite lookup with secondary fixture", async () => {
 
 await run("family remove missing member yields 404", async () => {
   try {
-    await authClient.family.removeMember("codex-no-such-family-member");
+    await authClient.family.removeMember("putio-typescript-sdk-no-such-family-member");
     throw new Error("expected remove missing family member to fail");
   } catch (error) {
     return assertOperationError(error, {
@@ -169,7 +169,7 @@ await run("family remove missing member yields 404", async () => {
 
 await run("family remove member requires restricted scope for oauth token", async () => {
   try {
-    await oauthClient.family.removeMember("codex-no-such-family-member");
+    await oauthClient.family.removeMember("putio-typescript-sdk-no-such-family-member");
     throw new Error("expected app-token removeMember to fail");
   } catch (error) {
     return assertOperationError(error, {
@@ -183,7 +183,7 @@ await run("family remove member requires restricted scope for oauth token", asyn
 
 await run("family join bogus code yields known 403", async () => {
   try {
-    await authClient.family.join("codex-invalid-family-code");
+    await authClient.family.join("putio-typescript-sdk-invalid-family-code");
     throw new Error("expected join with bogus code to fail");
   } catch (error) {
     const operationError = expectOperationError(error);
@@ -216,7 +216,7 @@ await run("family join bogus code yields known 403", async () => {
 
 await run("family join requires restricted scope for oauth token", async () => {
   try {
-    await oauthClient.family.join("codex-invalid-family-code");
+    await oauthClient.family.join("putio-typescript-sdk-invalid-family-code");
     throw new Error("expected join with app token to fail");
   } catch (error) {
     return assertOperationError(error, {

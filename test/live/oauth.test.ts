@@ -2,8 +2,8 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { createLiveTokenClients } from "./support/helpers.js";
 
-const DISPOSABLE_CALLBACK = "https://example.com/codex-sdk-live/oauth/callback";
-const DISPOSABLE_WEBSITE = "https://example.com/codex-sdk-live/oauth";
+const DISPOSABLE_CALLBACK = "https://example.com/putio-typescript-sdk-live/oauth/callback";
+const DISPOSABLE_WEBSITE = "https://example.com/putio-typescript-sdk-live/oauth";
 const DISPOSABLE_ICON_BYTES = Uint8Array.from(
   Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlAb9sAAAAASUVORK5CYII=",
@@ -61,9 +61,9 @@ describe.sequential("oauth live", () => {
     try {
       const created = await authClient.oauth.create({
         callback: DISPOSABLE_CALLBACK,
-        description: `codex oauth disposable ${seed}`,
+        description: `putio-typescript-sdk oauth disposable ${seed}`,
         hidden: true,
-        name: `Codex SDK Disposable ${seed}`,
+        name: `put.io TypeScript SDK Disposable ${seed}`,
         website: DISPOSABLE_WEBSITE,
       });
 
@@ -76,7 +76,7 @@ describe.sequential("oauth live", () => {
 
       const updated = await authClient.oauth.update({
         callback: `${DISPOSABLE_CALLBACK}?updated=${seed}`,
-        description: `codex oauth disposable updated ${seed}`,
+        description: `putio-typescript-sdk oauth disposable updated ${seed}`,
         hidden: false,
         id: created.app.id,
         website: `${DISPOSABLE_WEBSITE}?updated=${seed}`,

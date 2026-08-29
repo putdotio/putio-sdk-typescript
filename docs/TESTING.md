@@ -151,10 +151,9 @@ Optional direct runtime variables:
 
 `PUTIO_LIVE_OWNED_VIDEO_FILE_ID` can pin media live tests to an explicit safe,
 owned, unshared MP4 fixture. If it is unset, the live harness only accepts
-owned MP4s with SDK/example fixture names such as `codex_sdk_*`,
-`codex-sdk-*`, `Mario1_507_512kb.mp4`, `Sintel.mp4`, or
-`Big Buck Bunny.mp4`; it never selects an arbitrary private video from the
-account.
+owned MP4s with SDK/example fixture names such as `putio-typescript-sdk-*`,
+`Mario1_507_512kb.mp4`, `Sintel.mp4`, or `Big Buck Bunny.mp4`; it never selects
+an arbitrary private video from the account.
 
 `PUTIO_LIVE_RSS_SOURCE_URL` must point at a known-good RSS feed when running the
 `rss` target. `PUTIO_TOKEN_PAYMENT_OWNER` must belong to a prepaid owner account
@@ -168,17 +167,14 @@ safe owned MP4 fixture for media flag, URL, HLS, watch status, and start-from
 coverage. The shared-friend clone fixture is seeded from the configured
 secondary account.
 
-Branch-heavy file, event, and transfer checks create only timestamped
-`codex_sdk_*` resources. Archive fixtures are uploaded, extracted to a terminal
-state, and removed in the same test. Torrent fixtures use a unique unreachable
-`example.invalid` tracker so the suite can verify decoded torrent transfers and
-metainfo bytes before cancelling and cleaning the owned transfer. URL transfer
-fixtures cover terminal error and retry transitions separately.
+File and transfer tests create timestamped `putio-typescript-sdk-*` resources.
+Each test removes its archive, extracted files, or transfer before it exits.
+Torrent fixtures use an unreachable `example.invalid` tracker. URL fixtures
+cover the terminal error and retry states.
 
-A successful `events.getTorrent(...)` check remains intentionally unseeded.
-Uploaded torrent transfers did not produce a deterministic owned history event
-during repeated live probes, so the suite keeps the missing-event typed error
-branch without selecting an arbitrary existing history event.
+Uploaded torrents did not create a predictable history event. The suite tests
+the missing-event result from `events.getTorrent(...)` and leaves existing
+account history alone.
 
 Use `pnpm secrets:setup` to validate the maintainer-provided SOPS ciphertext and
 render shared live variables into `.env.local`. The live harness also accepts
@@ -206,16 +202,13 @@ Run explicit targets with the provisioned runtime tokens:
 pnpm test:live:targets -- test/live/account.test.ts test/live/tunnel.test.ts
 ```
 
-`test:live:targets` runs only the named test files with the existing
-`PUTIO_TOKEN_FIRST_PARTY` and `PUTIO_TOKEN_THIRD_PARTY` fixtures. Live-test
-execution never calls the password-login endpoint. Refreshing tokens remains a
-separate, deliberate bootstrap operation.
+`test:live:targets` runs only the named files. It reads
+`PUTIO_TOKEN_FIRST_PARTY` and `PUTIO_TOKEN_THIRD_PARTY` and never calls password
+login.
 
-`pnpm bootstrap:tokens` performs that bootstrap once and writes the resulting
-tokens to the ignored, owner-readable `.env.live-tokens` cache. Live commands
-load that cache before `.env.local`, so routine runs reuse the same sessions.
-If the cached sessions expire, run `pnpm bootstrap:tokens -- --refresh` to
-replace them deliberately; bootstrap refuses to replace the cache otherwise.
+`pnpm bootstrap:tokens` writes new tokens to the ignored `0600`
+`.env.live-tokens` cache. Live commands load it before `.env.local`. Bootstrap
+refuses to replace the cache unless you pass `--refresh`.
 
 An unattended runner with a scoped age identity can run a command without
 materializing secrets:
@@ -227,9 +220,9 @@ sops exec-env --same-process "$PUTIO_SDK_TYPESCRIPT_SOPS_FILE" \
 
 Run `pnpm secrets:setup` once per worktree with
 `PUTIO_SDK_TYPESCRIPT_SOPS_FILE` pointing to the supplied ciphertext. The
-materialized file is `0600` and gitignored. Live commands auto-load
-`.env.local` first and then `.env`; already-exported environment variables keep
-highest priority.
+materialized file is `0600` and gitignored. Live commands load
+`.env.live-tokens`, `.env.local`, and `.env` in that order. Exported environment
+variables keep highest priority.
 
 ```bash
 pnpm secrets:setup        # one-time per worktree

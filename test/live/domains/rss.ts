@@ -71,7 +71,7 @@ await run("rss create update lifecycle", async () => {
     dont_process_whole_feed: true,
     keyword: "",
     parent_dir_id: 0,
-    title: `codex sdk rss ${seed}`,
+    title: `putio-typescript-sdk rss ${seed}`,
     unwanted_keywords: "",
   });
 
@@ -84,7 +84,7 @@ await run("rss create update lifecycle", async () => {
     const fetched = await authClient.rss.get(created.id);
     assert(fetched.id === created.id, "expected fetched feed id");
 
-    const updatedTitle = `codex sdk rss updated ${seed}`;
+    const updatedTitle = `putio-typescript-sdk rss updated ${seed}`;
 
     await authClient.rss.update(created.id, {
       delete_old_files: true,
@@ -138,7 +138,7 @@ await run("rss create update lifecycle", async () => {
 
 await run("rss create is writable with oauth token", async () => {
   const createdProbe = await createProbeRssFeed(oauthClient, {
-    title: `codex oauth rss ${Date.now()}`,
+    title: `putio-typescript-sdk oauth rss ${Date.now()}`,
   });
 
   const created = createdProbe.feed;
@@ -155,7 +155,7 @@ await run("rss invalid url yields typed error", async () => {
   try {
     await authClient.rss.create({
       rss_source_url: "not-a-url",
-      title: "codex invalid rss",
+      title: "putio-typescript-sdk invalid rss",
     });
     throw new Error("expected invalid URL to fail");
   } catch (error) {
@@ -291,7 +291,7 @@ await run("rss missing update feed yields typed not found", async () => {
   try {
     await authClient.rss.update(2147483647, {
       rss_source_url: rssSourceUrl,
-      title: "codex missing rss",
+      title: "putio-typescript-sdk missing rss",
     });
     throw new Error("expected missing update feed to fail");
   } catch (error) {

@@ -1,12 +1,13 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
-import { hasLiveTokenCache, writeLiveTokenCache } from "./live-token-cache.ts";
+import { liveTokenCacheUrl, writeLiveTokenCache } from "./live-token-cache.ts";
 import { bootstrapRuntimeTokens } from "../test/live/support/bootstrap.ts";
 import { readBootstrapSecrets } from "../test/live/support/secrets.ts";
 
 const refresh = process.argv.slice(2).includes("--refresh");
 
-if ((await hasLiveTokenCache()) && !refresh) {
+if (existsSync(liveTokenCacheUrl) && !refresh) {
   throw new Error(
     "Live tokens are already cached; use test:live or pass --refresh to replace expired tokens",
   );
@@ -30,7 +31,7 @@ const bootstrapped = await bootstrapRuntimeTokens(secrets, async (config = {}) =
   createPutioSdkPromiseClient(config),
 );
 
-await writeLiveTokenCache({
+await writeLiveTokenCache(liveTokenCacheUrl, {
   firstPartyToken: bootstrapped.firstParty.accessToken,
   thirdPartyToken: bootstrapped.thirdParty.accessToken,
 });

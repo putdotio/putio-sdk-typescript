@@ -1,6 +1,15 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
+const CREDENTIAL_BACKED_TARGETS = new Set([
+  "auth-credentials.test.ts",
+  "family.test.ts",
+  "friend-invites.test.ts",
+  "friends.test.ts",
+  "podcast.test.ts",
+  "sharing.test.ts",
+]);
+
 export const resolveLiveTestTargets = (
   targets: ReadonlyArray<string>,
   cwd = process.cwd(),
@@ -18,6 +27,10 @@ export const resolveLiveTestTargets = (
 
     if (!isLiveTest || !existsSync(resolvedTarget)) {
       throw new Error(`Unsupported live test target: ${target}`);
+    }
+
+    if (CREDENTIAL_BACKED_TARGETS.has(relativeTarget)) {
+      throw new Error(`Credential-backed target is not allowed: ${target}`);
     }
 
     return resolvedTarget;

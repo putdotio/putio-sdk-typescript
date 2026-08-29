@@ -109,6 +109,7 @@ Live tests stay separate on purpose:
 Default local env files, loaded in order:
 
 - direct process environment
+- `.env.live-tokens`
 - `.env.local`
 - `.env`
 
@@ -204,7 +205,8 @@ pnpm test:live:targets -- test/live/account.test.ts test/live/tunnel.test.ts
 
 `test:live:targets` runs only the named files. It reads
 `PUTIO_TOKEN_FIRST_PARTY` and `PUTIO_TOKEN_THIRD_PARTY` and never calls password
-login.
+login. It rejects `auth-credentials`, `family`, `friend-invites`, `friends`,
+`podcast`, and `sharing` because those targets bootstrap account credentials.
 
 `pnpm bootstrap:tokens` writes new tokens to the ignored `0600`
 `.env.live-tokens` cache. Live commands load it before `.env.local`. Bootstrap

@@ -39,4 +39,20 @@ describe("resolveLiveTestTargets", () => {
       await rm(cwd, { force: true, recursive: true });
     }
   });
+
+  it("rejects targets that log in with account credentials", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "putio-sdk-live-targets-"));
+    const target = join(cwd, "test/live/podcast.test.ts");
+
+    try {
+      await mkdir(join(cwd, "test/live"), { recursive: true });
+      await writeFile(target, "");
+
+      expect(() => resolveLiveTestTargets([target], cwd)).toThrow(
+        `Credential-backed target is not allowed: ${target}`,
+      );
+    } finally {
+      await rm(cwd, { force: true, recursive: true });
+    }
+  });
 });

@@ -255,8 +255,12 @@ await run("torrent upload returns a decoded transfer and metainfo", async () => 
     parentId: 0,
   });
 
-  if (upload.type !== "transfer") {
-    throw new Error("expected torrent upload to return a transfer");
+  if (upload.type === "file") {
+    try {
+      throw new Error("expected torrent upload to return a transfer");
+    } finally {
+      await authClient.files.delete([upload.file.id], { skipTrash: true });
+    }
   }
 
   const transferId = upload.transfer.id;

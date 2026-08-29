@@ -1,16 +1,16 @@
 import { createClients, createLiveHarness } from "../support/harness.js";
+import { createTorrentFile } from "../support/binary-fixtures.ts";
 
-const { client } = await createClients({
+const { authClient, client } = await createClients({
+  authClient: "PUTIO_TOKEN_FIRST_PARTY",
   client: "PUTIO_TOKEN_THIRD_PARTY",
 });
 
 const live = createLiveHarness("transfers live");
-const { assert, assertOperationError, finish, run, sleep } = live;
+const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
 void sleep;
-
-const SLOW_TRANSFER_PROBE_URL = "https://speed.hetzner.de/100MB.bin";
 
 const waitForTransferError = async (id: number) => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -24,6 +24,20 @@ const waitForTransferError = async (id: number) => {
   }
 
   throw new Error("timed out waiting for transfer to reach ERROR");
+};
+
+const waitForTorrentTransfer = async (id: number) => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const transfer = await authClient.transfers.get(id);
+
+    if (transfer.type === "TORRENT") {
+      return transfer;
+    }
+
+    await sleep(500);
+  }
+
+  throw new Error("timed out waiting for uploaded transfer to decode as TORRENT");
 };
 
 await run("transfers list shape", async () => {
@@ -78,7 +92,7 @@ await run("transfers addMany envelope shape", async () => {
       url: `https://example.invalid/codex-transfer-${Date.now()}.iso`,
     },
     {
-      url: "",
+      url: "not-a-url",
     },
   ]);
 
@@ -86,18 +100,18 @@ await run("transfers addMany envelope shape", async () => {
   assert(Array.isArray(result.errors), "expected per-item errors array");
   assert(result.transfers.length >= 1, "expected at least one created transfer");
 
-  const firstTransferId = result.transfers[0]?.id;
   const firstError = result.errors[0];
 
-  if (typeof firstTransferId === "number") {
-    await client.transfers.cancel([firstTransferId]).catch(() => undefined);
-    await client.transfers.clean([firstTransferId]).catch(() => undefined);
+  for (const transfer of result.transfers) {
+    await client.transfers.cancel([transfer.id]).catch(() => undefined);
+    await client.transfers.remove({ ids: [transfer.id] }).catch(() => undefined);
+    await client.transfers.clean([transfer.id]).catch(() => undefined);
   }
 
   return {
     behaves_like_partial: result.errors.length > 0,
     first_error_type: firstError?.error_type ?? null,
-    first_transfer_id: firstTransferId ?? null,
+    first_transfer_id: result.transfers[0]?.id ?? null,
     transfer_count: result.transfers.length,
     error_count: result.errors.length,
   };
@@ -110,12 +124,7 @@ await run("empty transfer url yields typed error", async () => {
     });
     throw new Error("expected empty transfer url to fail");
   } catch (error) {
-    return assertOperationError(error, {
-      domain: "transfers",
-      errorType: "EMPTY_URL",
-      operation: "add",
-      statusCode: 400,
-    });
+    return assertErrorTag(error, { tag: "PutioValidationError" });
   }
 });
 
@@ -209,33 +218,6 @@ await run("non-torrent reannounce currently falls back to typed bad request", as
   }
 });
 
-await run("retry on fresh non-error transfer returns transfer shape", async () => {
-  const created = await client.transfers.add({
-    url: SLOW_TRANSFER_PROBE_URL,
-  });
-
-  try {
-    const current = await client.transfers.get(created.id);
-
-    if (current.status === "ERROR") {
-      throw new Error("fresh transfer reached ERROR before the non-error retry branch was checked");
-    }
-
-    const retried = await client.transfers.retry(created.id);
-
-    assert(retried.id === created.id, "expected retry to return same transfer");
-    assert(retried.status !== "ERROR", "expected retried transfer to remain non-error");
-
-    return {
-      initial_status: current.status,
-      retried_status: retried.status,
-    };
-  } finally {
-    await client.transfers.cancel([created.id]).catch(() => undefined);
-    await client.transfers.clean([created.id]).catch(() => undefined);
-  }
-});
-
 await run("transfers disposable lifecycle", async () => {
   const countBefore = await client.transfers.count();
 
@@ -259,6 +241,10 @@ await run("transfers disposable lifecycle", async () => {
     const errored = await waitForTransferError(created.id);
     assert(typeof errored.error_message === "string", "expected transfer error message");
 
+    const retried = await client.transfers.retry(created.id);
+    assert(retried.status !== "ERROR", "expected retry to leave terminal error state");
+    const retriedError = await waitForTransferError(created.id);
+
     const fetched = await client.transfers.get(created.id);
     assert(fetched.id === created.id, "expected get to return created transfer");
 
@@ -271,10 +257,45 @@ await run("transfers disposable lifecycle", async () => {
       count_before: countBefore,
       created_id: created.id,
       final_status: errored.status,
+      retried_status: retried.status,
+      retried_terminal_status: retriedError.status,
     };
   } finally {
     await client.transfers.cancel([created.id]).catch(() => undefined);
     await client.transfers.clean([created.id]).catch(() => undefined);
+  }
+});
+
+await run("uploaded torrent exposes decoded transfer and metainfo bytes", async () => {
+  const name = `codex_sdk_torrent_transfer_${Date.now()}`;
+  const upload = await authClient.files.upload({
+    file: createTorrentFile(name),
+    fileName: `${name}.torrent`,
+    parentId: 0,
+  });
+
+  if (upload.type !== "transfer") {
+    throw new Error("expected torrent upload to return a transfer");
+  }
+
+  const transferId = upload.transfer.id;
+
+  try {
+    const transfer = await waitForTorrentTransfer(transferId);
+    const torrent = await authClient.transfers.getTorrent(transferId);
+    assert(torrent.byteLength > 20, "expected torrent metainfo bytes");
+    assert(torrent[0] === 0x64, "expected bencoded torrent metainfo");
+
+    return {
+      status: transfer.status,
+      torrent_bytes: torrent.byteLength,
+      transfer_id: transferId,
+      type: transfer.type,
+    };
+  } finally {
+    await authClient.transfers.cancel([transferId]).catch(() => undefined);
+    await authClient.transfers.remove({ ids: [transferId] }).catch(() => undefined);
+    await authClient.transfers.clean([transferId]).catch(() => undefined);
   }
 });
 

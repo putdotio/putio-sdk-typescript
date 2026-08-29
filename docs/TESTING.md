@@ -168,6 +168,18 @@ safe owned MP4 fixture for media flag, URL, HLS, watch status, and start-from
 coverage. The shared-friend clone fixture is seeded from the configured
 secondary account.
 
+Branch-heavy file, event, and transfer checks create only timestamped
+`codex_sdk_*` resources. Archive fixtures are uploaded, extracted to a terminal
+state, and removed in the same test. Torrent fixtures use a unique unreachable
+`example.invalid` tracker so the suite can verify decoded torrent transfers and
+metainfo bytes before cancelling and cleaning the owned transfer. URL transfer
+fixtures cover terminal error and retry transitions separately.
+
+A successful `events.getTorrent(...)` check remains intentionally unseeded.
+Uploaded torrent transfers did not produce a deterministic owned history event
+during repeated live probes, so the suite keeps the missing-event typed error
+branch without selecting an arbitrary existing history event.
+
 Use `pnpm secrets:setup` to validate the maintainer-provided SOPS ciphertext and
 render shared live variables into `.env.local`. The live harness also accepts
 legacy local aliases when they are already exported in the shell.
@@ -188,23 +200,29 @@ Single target:
 vp pack && vp test run --config vitest.live.config.ts test/live/auth.test.ts
 ```
 
-Run explicit targets with fresh runtime tokens:
+Run explicit targets with the provisioned runtime tokens:
 
 ```bash
-pnpm test:live:fresh -- test/live/account.test.ts test/live/tunnel.test.ts
+pnpm test:live:targets -- test/live/account.test.ts test/live/tunnel.test.ts
 ```
 
-`test:live:fresh` uses the existing credential fixture to mint runtime tokens,
-runs only the named test files, and revokes the fresh first-party session before
-exiting, including when a test fails. It never writes the runtime tokens to an
-env file.
+`test:live:targets` runs only the named test files with the existing
+`PUTIO_TOKEN_FIRST_PARTY` and `PUTIO_TOKEN_THIRD_PARTY` fixtures. Live-test
+execution never calls the password-login endpoint. Refreshing tokens remains a
+separate, deliberate bootstrap operation.
+
+`pnpm bootstrap:tokens` performs that bootstrap once and writes the resulting
+tokens to the ignored, owner-readable `.env.live-tokens` cache. Live commands
+load that cache before `.env.local`, so routine runs reuse the same sessions.
+If the cached sessions expire, run `pnpm bootstrap:tokens -- --refresh` to
+replace them deliberately; bootstrap refuses to replace the cache otherwise.
 
 An unattended runner with a scoped age identity can run a command without
 materializing secrets:
 
 ```bash
 sops exec-env --same-process "$PUTIO_SDK_TYPESCRIPT_SOPS_FILE" \
-  'pnpm test:live:fresh -- test/live/account.test.ts test/live/tunnel.test.ts'
+  'pnpm test:live:targets -- test/live/account.test.ts test/live/tunnel.test.ts'
 ```
 
 Run `pnpm secrets:setup` once per worktree with
@@ -215,7 +233,7 @@ highest priority.
 
 ```bash
 pnpm secrets:setup        # one-time per worktree
-pnpm bootstrap:tokens     # mints fresh tokens
+pnpm bootstrap:tokens     # mints and caches tokens once
 pnpm bootstrap:live-fixtures
 pnpm test:live            # runs the broader live suite against pre-existing tokens
 pnpm secrets:clean        # before `git worktree remove`

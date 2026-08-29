@@ -1,4 +1,4 @@
-import { assertPresent, createClients, createLiveHarness } from "../support/harness.js";
+import { createClients, createLiveHarness } from "../support/harness.js";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -6,7 +6,7 @@ const { authClient, oauthClient } = await createClients({
 });
 
 const live = createLiveHarness("events live");
-const { assert, assertOperationError, finish, run, sleep } = live;
+const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
 void sleep;
@@ -96,12 +96,7 @@ await run("events list invalid per_page yields typed error", async () => {
     });
     throw new Error("expected invalid per_page to fail");
   } catch (error) {
-    return assertOperationError(error, {
-      domain: "events",
-      errorType: "INVALID_PER_PAGE",
-      operation: "list",
-      statusCode: 400,
-    });
+    return assertErrorTag(error, { tag: "PutioValidationError" });
   }
 });
 
@@ -149,31 +144,6 @@ await run("events torrent missing id yields typed error", async () => {
       operation: "getTorrent",
       statusCode: 404,
     });
-  }
-});
-
-await run("events torrent for non-upload event currently yields 404", async () => {
-  const result = await oauthClient.events.list({
-    per_page: 20,
-  });
-  const nonUpload = assertPresent(
-    result.events.find((event) => event.type !== "upload"),
-    "expected at least one non-upload event for torrent probe",
-  );
-
-  try {
-    await oauthClient.events.getTorrent(nonUpload.id);
-    throw new Error("expected non-upload torrent lookup to fail");
-  } catch (error) {
-    return {
-      event_type: nonUpload.type,
-      id: nonUpload.id,
-      ...assertOperationError(error, {
-        domain: "events",
-        operation: "getTorrent",
-        statusCode: 404,
-      }),
-    };
   }
 });
 

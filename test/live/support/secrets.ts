@@ -65,7 +65,11 @@ const loadPackageEnvFile = (): void => {
   packageEnvLoaded = true;
 
   const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-  loadEnvFiles([join(packageRoot, ".env.local"), join(packageRoot, ".env")]);
+  loadEnvFiles([
+    join(packageRoot, ".env.live-tokens"),
+    join(packageRoot, ".env.local"),
+    join(packageRoot, ".env"),
+  ]);
 };
 
 export const requireSecret = <TKey extends RequiredSecretKey>(key: TKey): string => {

@@ -4,6 +4,7 @@ import {
   createLiveHarness,
   isFileUploadFileResult,
 } from "../support/harness.js";
+import { createStoredZipFile } from "../support/binary-fixtures.ts";
 import { requireOwnedVideoFixture } from "../support/media.ts";
 
 const { authClient, client } = await createClients({
@@ -17,15 +18,18 @@ const { assert, assertOperationError, finish, run, sleep } = live;
 void assertOperationError;
 void sleep;
 
-const getArchiveCandidate = async () => {
-  const search = await client.files.search({
-    per_page: 20,
-    query: "zip",
-  });
+const waitForExtractionTerminalState = async (id: number) => {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const extraction = (await client.files.listExtractions()).find((item) => item.id === id);
 
-  return (
-    search.files.find((file) => file.file_type === "ARCHIVE" && file.is_shared === false) ?? null
-  );
+    if (extraction?.status === "EXTRACTED" || extraction?.status === "ERROR") {
+      return extraction;
+    }
+
+    await sleep(1_000);
+  }
+
+  throw new Error(`timed out waiting for extraction ${id} to reach a terminal state`);
 };
 
 await run("files list extractions shape", async () => {
@@ -107,16 +111,17 @@ await run("files start_from roundtrip semantics", async () => {
 
 await run("files next-file natural ordering with disposable fixtures", async () => {
   const created: Array<{ readonly id: number; readonly name: string }> = [];
+  const suffix = Date.now();
   const folder = await authClient.files.createFolder({
-    name: `codex_sdk_next_file_${Date.now()}`,
+    name: `codex_sdk_next_file_${suffix}`,
     parent_id: 0,
   });
 
   try {
     for (const name of [
-      `codex_sdk_episode_1_${Date.now()}.txt`,
-      `codex_sdk_episode_10_${Date.now()}.txt`,
-      `codex_sdk_episode_2_${Date.now()}.txt`,
+      `codex_sdk_episode_1_${suffix}.txt`,
+      `codex_sdk_episode_10_${suffix}.txt`,
+      `codex_sdk_episode_2_${suffix}.txt`,
     ]) {
       const upload = await authClient.files.upload({
         file: new File(["sdk next-file probe\n"], name, {
@@ -141,7 +146,12 @@ await run("files next-file natural ordering with disposable fixtures", async () 
       "expected episode 2 fixture",
     );
 
-    const next = await client.files.findNext(episode1.id, "FILE");
+    let next = await client.files.findNext(episode1.id, "FILE");
+
+    for (let attempt = 0; next.id !== episode2.id && attempt < 10; attempt += 1) {
+      await sleep(500);
+      next = await client.files.findNext(episode1.id, "FILE");
+    }
 
     assert(next.id === episode2.id, "expected natural ordering to skip episode 10");
 
@@ -157,31 +167,44 @@ await run("files next-file natural ordering with disposable fixtures", async () 
   }
 });
 
-await run("files extract and cleanup", async () => {
-  const archive = await getArchiveCandidate();
-
-  if (!archive) {
-    throw new Error("expected owned archive candidate");
-  }
-
-  const created = await client.files.extract({
-    ids: [archive.id],
+await run("files owned archive extraction reaches terminal success", async () => {
+  const name = `codex_sdk_extract_${Date.now()}.zip`;
+  const upload = await authClient.files.upload({
+    file: createStoredZipFile(name),
+    fileName: name,
+    parentId: 0,
   });
 
-  assert(Array.isArray(created), "expected extraction result array");
-
-  const listed = await client.files.listExtractions();
-  const createdIds = created.map((item) => item.id);
-
-  for (const extractionId of createdIds) {
-    await client.files.deleteExtraction(extractionId);
+  if (!isFileUploadFileResult(upload)) {
+    throw new Error("expected archive upload to return a file");
   }
 
-  return {
-    archive_id: archive.id,
-    created_count: created.length,
-    listed_match_count: listed.filter((item) => createdIds.includes(item.id)).length,
-  };
+  const extractionIds: number[] = [];
+  const extractedFileIds: number[] = [];
+
+  try {
+    const created = await client.files.extract({ ids: [upload.file.id] });
+    assert(created.length === 1, "expected one extraction task");
+    const extraction = assertPresent(created[0], "expected extraction task");
+    extractionIds.push(extraction.id);
+
+    const terminal = await waitForExtractionTerminalState(extraction.id);
+    assert(terminal.status === "EXTRACTED", "expected extraction to succeed");
+    extractedFileIds.push(...terminal.files);
+
+    return {
+      archive_id: upload.file.id,
+      extracted_file_count: terminal.files.length,
+      final_status: terminal.status,
+    };
+  } finally {
+    for (const extractionId of extractionIds) {
+      await client.files.deleteExtraction(extractionId).catch(() => undefined);
+    }
+    await authClient.files
+      .delete([upload.file.id, ...extractedFileIds], { skipTrash: true })
+      .catch(() => undefined);
+  }
 });
 
 await run("files mp4 status on folder yields typed not-file", async () => {

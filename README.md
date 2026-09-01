@@ -109,6 +109,8 @@ Password-reset requests can provide the reset page that the backend should place
 Existing callers can continue to pass only the email address:
 
 ```ts
+await sdk.auth.forgotPassword("user@example.com");
+
 await sdk.auth.forgotPassword("user@example.com", {
   resetUrl: "https://auth.put.io/reset-password?next=%2Ffiles",
 });

@@ -105,6 +105,18 @@ The exchange uses a form-encoded `POST` and never sends a configured bearer toke
 failures are exposed as `OAuthAuthorizationCodeExchangeError`; client secrets and codes are not
 included in validation errors.
 
+Password-reset requests can provide the reset page that the backend should place in the email.
+Existing callers can continue to pass only the email address:
+
+```ts
+await sdk.auth.forgotPassword("user@example.com", {
+  resetUrl: "https://auth.put.io/reset-password?next=%2Ffiles",
+});
+```
+
+The backend validates this URL before using it and falls back to its default reset page when the
+option is omitted.
+
 ## Utilities
 
 Shared formatting, URL, and error-localization helpers are available from the utilities subpath:

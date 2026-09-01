@@ -97,6 +97,7 @@ exports[`sdk root entry > exports the expected top-level public surface 1`] = `
   "FilesSearchQuerySchema",
   "FolderTypeSchema",
   "ForgotPasswordErrorSpec",
+  "ForgotPasswordOptionsSchema",
   "FriendBaseSchema",
   "FriendInviteJoinedUserSchema",
   "FriendInviteJoinedUserStatusSchema",

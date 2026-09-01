@@ -23,7 +23,7 @@ vi.mock("../domains/auth.js", async () => {
     clients: vi.fn(() => Effect.succeed([{ id: 1, name: "cli" }])),
     exchangeOAuthAuthorizationCode: vi.fn((input) => Effect.succeed(`exchange:${input.code}`)),
     exists: vi.fn((key, value) => Effect.succeed(key === "username" && value === "sdk-user")),
-    forgotPassword: vi.fn((mail) => Effect.succeed({ mail, status: "OK" })),
+    forgotPassword: vi.fn((mail, options) => Effect.succeed({ mail, options, status: "OK" })),
     generateTOTP: vi.fn(() =>
       Effect.succeed({
         secret: "secret",
@@ -547,6 +547,16 @@ describe("sdk promise client adapters", () => {
     expect(await client.auth.exists("username", "sdk-user")).toBe(true);
     expect(await client.auth.forgotPassword("a@put.io")).toEqual({
       mail: "a@put.io",
+      options: undefined,
+      status: "OK",
+    });
+    expect(
+      await client.auth.forgotPassword("a@put.io", {
+        resetUrl: "https://auth.put.io/reset-password?next=%2Ffiles",
+      }),
+    ).toEqual({
+      mail: "a@put.io",
+      options: { resetUrl: "https://auth.put.io/reset-password?next=%2Ffiles" },
       status: "OK",
     });
     expect(await client.auth.getCode({ appId: 8993 })).toMatchObject({ code: "CODE-8993" });

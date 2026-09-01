@@ -233,9 +233,27 @@ describe("auth domain", () => {
 
     expect(
       await runSdkEffect(forgotPassword("sdk@put.io"), (request) => {
-        expect(getFormBody(request).get("mail")).toBe("sdk@put.io");
+        const body = getFormBody(request);
+        expect(body.get("mail")).toBe("sdk@put.io");
+        expect(body.has("reset_url")).toBe(false);
         return jsonResponse({ status: "OK" });
       }),
+    ).toEqual({ status: "OK" });
+
+    expect(
+      await runSdkEffect(
+        forgotPassword("sdk@put.io", {
+          resetUrl: "https://auth-staging.put.io/reset-password?next=%2Ffiles%2F99",
+        }),
+        (request) => {
+          const body = getFormBody(request);
+          expect(body.get("mail")).toBe("sdk@put.io");
+          expect(body.get("reset_url")).toBe(
+            "https://auth-staging.put.io/reset-password?next=%2Ffiles%2F99",
+          );
+          return jsonResponse({ status: "OK" });
+        },
+      ),
     ).toEqual({ status: "OK" });
 
     expect(
@@ -457,6 +475,15 @@ describe("auth domain", () => {
       runSdkExit(getFamilyInvite(""), handler),
       runSdkExit(getFriendInvite(""), handler),
       runSdkExit(forgotPassword(""), handler),
+      runSdkExit(forgotPassword("sdk@put.io", { resetUrl: "" }), handler),
+      runSdkExit(
+        forgotPassword("sdk@put.io", {
+          resetUrl: "https://auth.put.io/reset-password",
+          // @ts-expect-error JavaScript callers can provide unknown request properties.
+          unexpected: true,
+        }),
+        handler,
+      ),
       runSdkExit(resetPassword("", sensitivePassword), handler),
       runSdkExit(getCode({ appId: 0 }), handler),
       runSdkExit(checkCodeMatch(""), handler),

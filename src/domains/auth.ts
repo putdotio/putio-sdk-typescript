@@ -184,6 +184,13 @@ const AuthResetPasswordInputSchema = Schema.Struct({
   key: NonEmptyStringSchema,
   password: NonEmptyStringSchema,
 });
+export const ForgotPasswordOptionsSchema = Schema.Struct({
+  resetUrl: Schema.optional(NonEmptyStringSchema),
+});
+const AuthForgotPasswordInputSchema = Schema.Struct({
+  mail: NonEmptyStringSchema,
+  options: Schema.optional(ForgotPasswordOptionsSchema),
+});
 const AuthGetCodeInputSchema = Schema.Struct({
   appId: AuthClientIdSchema,
   clientName: Schema.optional(NonEmptyStringSchema),
@@ -200,6 +207,7 @@ export type VerifyTOTPResponse = Schema.Schema.Type<typeof VerifyTOTPResponseSch
 export type RegisterInput = Schema.Schema.Type<typeof RegisterInputSchema>;
 export type LoginInput = Schema.Schema.Type<typeof LoginInputSchema>;
 export type AuthGetCodeInput = Schema.Schema.Type<typeof AuthGetCodeInputSchema>;
+export type ForgotPasswordOptions = Schema.Schema.Type<typeof ForgotPasswordOptionsSchema>;
 export type OAuthAuthorizationCodeExchangeInput = Schema.Schema.Type<
   typeof OAuthAuthorizationCodeExchangeInputSchema
 >;
@@ -566,12 +574,13 @@ export const getFriendInvite = (
   ).pipe(withOperationErrors(FriendInviteLookupErrorSpec));
 export const forgotPassword = (
   mail: string,
+  options?: ForgotPasswordOptions,
 ): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
   ForgotPasswordError,
   PutioSdkContext
 > =>
-  decodeAuthInput("forgotPassword", NonEmptyStringSchema, mail, (decodedMail) =>
+  decodeAuthInput("forgotPassword", AuthForgotPasswordInputSchema, { mail, options }, (input) =>
     requestJson(OkResponseSchema, {
       auth: {
         type: "none",
@@ -579,7 +588,8 @@ export const forgotPassword = (
       body: {
         type: "form",
         value: {
-          mail: decodedMail,
+          mail: input.mail,
+          ...(input.options?.resetUrl === undefined ? {} : { reset_url: input.options.resetUrl }),
         },
       },
       method: "POST",

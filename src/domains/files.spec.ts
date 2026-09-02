@@ -172,6 +172,85 @@ describe("files domain", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("fetches the served HLS master playlist as text", async () => {
+    const master = [
+      "#EXTM3U",
+      '#EXT-X-STREAM-INF:BANDWIDTH=2376462,CODECS="avc1.42c01e,mp4a.40.2",VIDEO-RANGE=PQ',
+      "https://api.put.io/hls/playlist/abc/index-v1-a1.m3u8?oauth_token=token-123",
+    ].join("\n");
+
+    const playlist = await runSdkEffect(
+      files.getHlsMasterPlaylist(42, {
+        maxSubtitleCount: 2,
+        playOriginal: false,
+        subtitleLanguages: ["en", "tr"],
+      }),
+      (request) => {
+        expect(request.method).toBe("GET");
+        expect(request.url).toBe(
+          "https://api.put.io/v2/files/42/hls/media.m3u8?max_subtitle_count=2&original=0&subtitle_languages=en%2Ctr",
+        );
+        expect(request.headers.get("accept")).toContain("mpegurl");
+        expect(request.headers.get("authorization")).toBe("Token token-123");
+
+        return new Response(master, {
+          headers: { "content-type": "application/vnd.apple.mpegurl" },
+          status: 200,
+        });
+      },
+      { accessToken: "token-123" },
+    );
+
+    expect(playlist).toBe(master);
+
+    expect(
+      await runSdkEffect(
+        files.getHlsMasterPlaylist(42, { playOriginal: true }),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/files/42/hls/media.m3u8?original=1");
+          return new Response("#EXTM3U", { status: 200 });
+        },
+        { accessToken: "token-123" },
+      ),
+    ).toBe("#EXTM3U");
+
+    const invalidMedia = expectFailure(
+      await runSdkExit(
+        files.getHlsMasterPlaylist(42, { playOriginal: true }),
+        () =>
+          jsonResponse(
+            {
+              error_id: null,
+              error_message: "File is not suitable for HLS",
+              error_type: "INVALID_MEDIA",
+              error_uri: "http://api.put.io/v2/docs",
+              extra: {},
+              status: "ERROR",
+              status_code: 400,
+            },
+            { status: 400 },
+          ),
+        { accessToken: "token-123" },
+      ),
+    );
+
+    expect(invalidMedia).toMatchObject({
+      _tag: "PutioOperationError",
+      domain: "files",
+      operation: "hlsMasterPlaylist",
+      status: 400,
+    });
+    expect(invalidMedia).toHaveProperty("body.error_type", "INVALID_MEDIA");
+
+    expect(
+      expectFailure(
+        await runSdkExit(files.getHlsMasterPlaylist(0), () => emptyResponse(), {
+          accessToken: "token-123",
+        }),
+      ),
+    ).toBeInstanceOf(PutioValidationError);
+  });
+
   it("rejects invalid folder sort settings before transport", async () => {
     let requestCount = 0;
     const handler = () => {
@@ -433,6 +512,40 @@ describe("files domain", () => {
 
     expect(file.stream_url).toBe("https://api.put.io/stream.m3u8");
     expect(file.mp4_stream_url).toBe("https://api.put.io/mp4.m3u8");
+
+    const matroska = await runSdkEffect(
+      files.getFile({ id: 10, query: { media_info: 1 } }),
+      () =>
+        jsonResponse({
+          file: {
+            ...baseFile,
+            id: 10,
+            media_info: {
+              format: { bit_rate: 4832574, duration: 10571.008, name: "matroska" },
+              mime_type: "video/x-matroska",
+              playback_issues: ["malformed_sei"],
+              streams: [
+                {
+                  codec_name: "hevc",
+                  codec_type: "video",
+                  height: 804,
+                  level: 123,
+                  profile: "Main 10",
+                  rfc6381_codec: null,
+                  width: 1920,
+                },
+                { channels: 6, codec_name: "eac3", codec_type: "audio", rfc6381_codec: null },
+                { codec_name: "subrip", codec_type: "subtitle", rfc6381_codec: null },
+              ],
+            },
+          },
+          status: "OK",
+        }),
+      { accessToken: "token-123" },
+    );
+
+    expect(matroska.media_info?.playback_issues).toEqual(["malformed_sei"]);
+    expect(matroska.media_info?.streams?.[0]?.rfc6381_codec).toBeNull();
     expect(file.content_type_and_codecs).toContain("codecs");
     expect(file.media_info?.mime_type).toBe("video/mp4");
     expect(file.video_metadata?.width).toBe(1280);

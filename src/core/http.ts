@@ -260,7 +260,9 @@ const makeRequest = (url: string, options: PutioRequestOptions, authorization?: 
     const headers = new Headers(options.headers);
 
     const body = options.body ?? { type: "none" as const };
-    headers.set("accept", "application/json");
+    if (!headers.has("accept")) {
+      headers.set("accept", "application/json");
+    }
 
     if (authorization) {
       headers.set("authorization", authorization);
@@ -341,6 +343,11 @@ export const requestArrayBuffer = (
         : decodeFailure(response, response.headers).pipe(Effect.flatMap(Effect.fail)),
     ),
   );
+
+export const requestText = (
+  options: PutioRequestOptions,
+): Effect.Effect<string, PutioSdkError, PutioSdkContext> =>
+  requestArrayBuffer(options).pipe(Effect.map((bytes) => new TextDecoder().decode(bytes)));
 
 export const requestVoid = (
   options: PutioRequestOptions,

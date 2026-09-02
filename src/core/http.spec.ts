@@ -20,6 +20,7 @@ import {
   type PutioHttpRequest,
   PutioSdkConfig,
   requestArrayBuffer,
+  requestText,
   requestJson,
   requestVoid,
   selectJsonField,
@@ -337,6 +338,25 @@ describe("sdk core http", () => {
     );
 
     expect(Array.from(result)).toEqual([1, 2, 3]);
+  });
+
+  it("returns text for non-JSON responses and keeps a caller-supplied accept header", async () => {
+    const result = await Effect.runPromise(
+      provideSdkTest(
+        requestText({
+          method: "GET",
+          path: "/v2/playlist.m3u8",
+          auth: { type: "none" },
+          headers: { accept: "application/vnd.apple.mpegurl" },
+        }),
+        (request) => {
+          expect(request.headers.get("accept")).toBe("application/vnd.apple.mpegurl");
+          return new Response("#EXTM3U\n#EXT-X-VERSION:3\n", { status: 200 });
+        },
+      ),
+    );
+
+    expect(result).toBe("#EXTM3U\n#EXT-X-VERSION:3\n");
   });
 
   it("preserves typed response body read failures", async () => {

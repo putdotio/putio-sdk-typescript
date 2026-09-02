@@ -316,6 +316,13 @@ const playlistUrl = await sdk.files.getHlsStreamUrl(fileId, {
 
 const vlcPlaylistUrl = await sdk.files.getXspfPlaylistUrl(fileId);
 
+// The master playlist put.io would serve, for inspecting the selected
+// variant's CODECS and VIDEO-RANGE. `playOriginal` picks the original
+// file over the MP4 conversion.
+const masterPlaylist = await sdk.files.getHlsMasterPlaylist(fileId, {
+  playOriginal: false,
+});
+
 const upload = await sdk.files.upload({
   file: new File(["hello"], "hello.txt"),
   parentId: 0,

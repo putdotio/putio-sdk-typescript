@@ -15,6 +15,7 @@ import {
   buildPutioUrl,
   encodePathSegment,
   requestJson,
+  requestText,
   requestVoid,
   selectJsonField,
   type PutioSdkConfigShape,
@@ -88,13 +89,16 @@ export const FileMediaInfoStreamSchema = Schema.Struct({
   codec_type: Schema.optional(Schema.String),
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   level: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-  profile: Schema.optional(Schema.String),
-  rfc6381_codec: Schema.optional(Schema.String),
+  profile: Schema.optional(Schema.NullOr(Schema.String)),
+  // put.io only derives an RFC 6381 codec string for MP4-family containers;
+  // Matroska and other streams report null.
+  rfc6381_codec: Schema.optional(Schema.NullOr(Schema.String)),
   width: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
 export const FileMediaInfoSchema = Schema.Struct({
   format: Schema.optional(Schema.NullOr(FileMediaInfoFormatSchema)),
   mime_type: Schema.optional(Schema.NullOr(Schema.String)),
+  playback_issues: Schema.optional(Schema.Array(Schema.String)),
   streams: Schema.optional(Schema.Array(FileMediaInfoStreamSchema)),
 });
 export const FileBaseSchema = Schema.Struct({
@@ -431,6 +435,13 @@ const FileHlsStreamUrlOptionsSchema = Schema.Struct({
     Schema.Array(NonEmptyStringSchema).check(Schema.isMinLength(1)),
   ),
 });
+const FileHlsMasterPlaylistOptionsSchema = Schema.Struct({
+  maxSubtitleCount: Schema.optional(PositiveIntegerSchema),
+  playOriginal: Schema.optional(Schema.Boolean),
+  subtitleLanguages: Schema.optional(
+    Schema.Array(NonEmptyStringSchema).check(Schema.isMinLength(1)),
+  ),
+});
 const FileXspfPlaylistUrlOptionsSchema = Schema.Struct({
   oauthToken: Schema.optional(NonEmptyStringSchema),
 });
@@ -504,6 +515,9 @@ export type FileApiMp4DownloadUrlOptions = FileDirectAccessOptions & {
   readonly convert?: boolean;
   readonly name?: string;
 };
+export type FileHlsMasterPlaylistOptions = Schema.Schema.Type<
+  typeof FileHlsMasterPlaylistOptionsSchema
+>;
 export type FileHlsStreamUrlOptions = {
   readonly maxSubtitleCount?: number;
   readonly oauthToken?: string;
@@ -593,6 +607,19 @@ export const GetFileErrorSpec = definePutioOperationErrorSpec({
   knownErrors: [
     { statusCode: 404 as const },
     { errorType: "invalid_scope", statusCode: 401 as const },
+  ],
+});
+export const GetHlsMasterPlaylistErrorSpec = definePutioOperationErrorSpec({
+  domain: "files",
+  operation: "hlsMasterPlaylist",
+  knownErrors: [
+    { errorType: "INVALID_MEDIA", statusCode: 400 as const },
+    { errorType: "MP4_NOT_FOUND", statusCode: 400 as const },
+    { errorType: "MP4_NOT_READY", statusCode: 400 as const },
+    { statusCode: 400 as const },
+    { statusCode: 402 as const },
+    { statusCode: 404 as const },
+    { errorType: "FILE_NOT_READY", statusCode: 503 as const },
   ],
 });
 export const GetFileChildErrorSpec = definePutioOperationErrorSpec({
@@ -759,6 +786,7 @@ export const FileUploadErrorSpec = definePutioOperationErrorSpec({
 export type QueryFilesError = PutioOperationFailure<typeof QueryFilesErrorSpec>;
 export type ContinueFilesError = PutioOperationFailure<typeof ContinueFilesErrorSpec>;
 export type GetFileError = PutioOperationFailure<typeof GetFileErrorSpec>;
+export type GetHlsMasterPlaylistError = PutioOperationFailure<typeof GetHlsMasterPlaylistErrorSpec>;
 export type GetFileChildError = PutioOperationFailure<typeof GetFileChildErrorSpec>;
 export type CopyFileError = PutioOperationFailure<typeof CopyFileErrorSpec>;
 export type TouchFilesError = PutioOperationFailure<typeof TouchFilesErrorSpec>;
@@ -1416,6 +1444,39 @@ export const getHlsStreamUrl = (
         ),
       ),
   );
+/**
+ * Fetches the HLS master playlist the player would load, so callers can
+ * inspect the served variant's CODECS, VIDEO-RANGE, and rendition set without
+ * handling the tokenized URL. `playOriginal` selects the original file over
+ * the MP4 conversion.
+ */
+export const getHlsMasterPlaylist = (
+  fileId: number,
+  options: FileHlsMasterPlaylistOptions = {},
+): Effect.Effect<string, GetHlsMasterPlaylistError | PutioValidationError, PutioSdkContext> =>
+  decodeAndRun(
+    Schema.Struct({
+      fileId: PositiveFileIdSchema,
+      options: FileHlsMasterPlaylistOptionsSchema,
+    }),
+    { fileId, options },
+    (decoded) =>
+      requestText({
+        headers: { accept: "application/vnd.apple.mpegurl, application/x-mpegURL, */*" },
+        method: "GET",
+        path: `/v2/files/${encodePathSegment(decoded.fileId)}/hls/media.m3u8`,
+        query: {
+          max_subtitle_count: decoded.options.maxSubtitleCount,
+          original:
+            typeof decoded.options.playOriginal === "boolean"
+              ? decoded.options.playOriginal
+                ? 1
+                : 0
+              : undefined,
+          subtitle_languages: joinCsv(decoded.options.subtitleLanguages),
+        },
+      }),
+  ).pipe(withOperationErrors(GetHlsMasterPlaylistErrorSpec));
 export const getXspfPlaylistUrl = (
   fileId: number,
   options: FileXspfPlaylistUrlOptions = {},

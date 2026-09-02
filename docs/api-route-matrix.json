@@ -107,6 +107,14 @@
     {
       "classification": "sdk",
       "method": "GET",
+      "operation": "files.getHlsMasterPlaylist",
+      "path": "/v2/files/:fileId/hls/media.m3u8",
+      "rationale": "The files client fetches the served HLS master playlist so consumers can inspect the variant the player would load.",
+      "source": "putio/hls/api.py:45"
+    },
+    {
+      "classification": "sdk",
+      "method": "GET",
       "operation": "files.getXspfPlaylistUrl",
       "path": "/v2/files/:fileId/xspf",
       "rationale": "The files client exposes a tokenized URL for the backend XSPF playlist used by first-party VLC handoff.",

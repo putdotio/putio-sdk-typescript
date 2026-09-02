@@ -251,6 +251,44 @@ describe("files domain", () => {
     ).toBeInstanceOf(PutioValidationError);
   });
 
+  it("accepts the virtual sharing tree ids for list and get, and still rejects -1", async () => {
+    const sharedRoot = await runSdkEffect(
+      files.queryFiles(files.SHARED_WITH_YOU_ROOT_ID),
+      (request) => {
+        expect(request.url).toBe("https://api.put.io/v2/files/list?parent_id=-2");
+        return jsonResponse({
+          cursor: null,
+          files: [{ ...baseFile, file_type: "FOLDER", id: -7000, name: "sharer", parent_id: -2 }],
+          parent: { ...baseFile, file_type: "FOLDER", id: -2, name: "Items shared with you" },
+          status: "OK",
+        });
+      },
+      { accessToken: "token-123" },
+    );
+    expect(sharedRoot.files[0]?.id).toBe(-7000);
+
+    const sharerFolder = await runSdkEffect(
+      files.getFile({ id: -7000 }),
+      (request) => {
+        expect(request.url).toBe("https://api.put.io/v2/files/-7000");
+        return jsonResponse({
+          file: { ...baseFile, file_type: "FOLDER", id: -7000, name: "sharer" },
+          status: "OK",
+        });
+      },
+      { accessToken: "token-123" },
+    );
+    expect(sharerFolder.id).toBe(-7000);
+
+    for (const effect of [files.queryFiles(-1), files.getFile({ id: -1 })]) {
+      expect(
+        expectFailure(
+          await runSdkExit(effect, () => emptyResponse(), { accessToken: "token-123" }),
+        ),
+      ).toBeInstanceOf(PutioValidationError);
+    }
+  });
+
   it("rejects invalid folder sort settings before transport", async () => {
     let requestCount = 0;
     const handler = () => {

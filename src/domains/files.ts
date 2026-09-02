@@ -29,6 +29,15 @@ import {
 } from "../core/validation.js";
 const RequestedFlag = Schema.Literal(1);
 const NonNegativeFileIdSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+// Readable file ids: real ids plus the virtual sharing tree put.io serves
+// from the same routes (-2 is the "shared with you" root, ids below it are
+// per-sharer folders). -1 is not a file and stays rejected.
+export const SHARED_WITH_YOU_ROOT_ID = -2;
+const ReadableFileIdSchema = Schema.Int.check(
+  Schema.makeFilter((id: number) => id >= 0 || id <= SHARED_WITH_YOU_ROOT_ID, {
+    expected: "a file id that is non-negative or a virtual sharing id (-2 or lower)",
+  }),
+);
 const PositiveFileIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
 export const FileTypeSchema = Schema.Literals([
   "FOLDER",
@@ -205,7 +214,7 @@ const FilesSearchEnvelopeSchema = Schema.Struct({
   total: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
 const FilesListInputSchema = Schema.Struct({
-  parent: Schema.Union([NonNegativeFileIdSchema, Schema.Literal("friends")]),
+  parent: Schema.Union([ReadableFileIdSchema, Schema.Literal("friends")]),
   query: FilesListQuerySchema,
 });
 const FilesContinueInputSchema = Schema.Struct({
@@ -215,7 +224,7 @@ const FilesContinueInputSchema = Schema.Struct({
   }),
 });
 const FileGetInputSchema = Schema.Struct({
-  id: NonNegativeFileIdSchema,
+  id: ReadableFileIdSchema,
   query: Schema.optional(FileQuerySchema),
 });
 const FilesSearchContinueInputSchema = Schema.Struct({

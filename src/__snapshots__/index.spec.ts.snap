@@ -241,6 +241,7 @@ exports[`sdk root entry > exports the expected top-level public surface 1`] = `
   "RssFeedItemSucceededSchema",
   "RssFeedParamsSchema",
   "RssFeedSchema",
+  "SHARED_WITH_YOU_ROOT_ID",
   "SaveAccountSettingsErrorSpec",
   "SaveAccountSettingsPayloadSchema",
   "SearchFilesErrorSpec",

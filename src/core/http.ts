@@ -78,30 +78,27 @@ export const makePutioFetchClient = (
   fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
 ): PutioHttpClientShape => ({
   execute: (request) =>
-    Effect.tryPromise({
-      try: async (signal) => {
+    Effect.suspend(() => {
+      const controller = new AbortController();
+      const read = <A>(body: () => Promise<A>) =>
+        Effect.tryPromise({ try: body, catch: mapTransportError }).pipe(
+          Effect.onInterrupt(() => Effect.sync(() => controller.abort())),
+        );
+
+      return read(async () => {
         const response = await fetchImplementation(request.url, {
           body: request.body,
           headers: request.headers,
           method: request.method,
-          signal,
+          signal: controller.signal,
         });
 
         return {
-          arrayBuffer: Effect.tryPromise({
-            try: () => response.arrayBuffer(),
-            catch: mapTransportError,
-          }),
+          arrayBuffer: read(() => response.arrayBuffer()),
           headers: response.headers,
           json: isSuccessStatus(response.status)
-            ? Effect.tryPromise({
-                try: () => response.json(),
-                catch: mapTransportError,
-              })
-            : Effect.tryPromise({
-                try: () => response.text(),
-                catch: mapTransportError,
-              }).pipe(
+            ? read(() => response.json())
+            : read(() => response.text()).pipe(
                 Effect.flatMap((text) =>
                   Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(text).pipe(
                     Effect.mapError(() =>
@@ -118,8 +115,7 @@ export const makePutioFetchClient = (
               ),
           status: response.status,
         };
-      },
-      catch: mapTransportError,
+      });
     }),
 });
 

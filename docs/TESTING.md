@@ -87,6 +87,7 @@ The compatibility layer proves:
 - Node can import and execute the public ESM entrypoints at runtime
 - browser bundlers can bundle the package and run it in Chromium, Firefox, and WebKit
 - Bun can install the packed SDK and import the public ESM entrypoints at runtime
+- native fetch body reads abort on Effect interruption, using a disposable local HTTP server for JSON, binary, and error bodies
 - internal package paths remain fenced by the `exports` map through the package checks
 
 The local suite focuses on the shared runtime in `src/core`.

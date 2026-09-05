@@ -191,6 +191,10 @@ Effect is the canonical typed surface. The Promise client is an adapter for envi
 - Promise client: rotates or clears credentials synchronously with `setAccessToken(...)`; each operation snapshots the token active when invoked without recreating its runtime
 - Promise client: owns a managed Effect runtime and exposes `dispose()` for explicit teardown
 
+Interrupting an Effect during fetch or response-body consumption aborts the underlying
+fetch request, including JSON and binary reads. Successful reads do not abort the
+request.
+
 If you create a long-lived Promise client in a script, test harness, or server integration, call `await sdk.dispose()` during teardown.
 
 ## Namespace Surface

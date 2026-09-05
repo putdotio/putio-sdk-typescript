@@ -148,7 +148,7 @@ const closeServer = (server: Server) =>
     });
   });
 
-const runBrowserTarget = async (browserName: BrowserName, url: string) => {
+const runBrowserTarget = async (browserName: BrowserName, url: string, httpUrl: string) => {
   const browser = await launchBrowser(browserName);
   const page = await browser.newPage();
   const pageErrors: Array<string> = [];
@@ -157,7 +157,9 @@ const runBrowserTarget = async (browserName: BrowserName, url: string) => {
     pageErrors.push(error.message);
   });
   page.on("console", (message) => {
-    if (message.type() === "error") {
+    const expectedHttpFailure =
+      message.location().url === `${httpUrl}/error` && message.text().includes("429");
+    if (message.type() === "error" && !expectedHttpFailure) {
       pageErrors.push(message.text());
     }
   });
@@ -254,6 +256,7 @@ declare global {
 
 const run = async () => {
   await runHttpCompatibility();
+  await runHttpCancellationCompatibility(${JSON.stringify(context.httpUrl)});
   const promiseClient = createPutioSdkPromiseClient({
     accessToken: "test-token",
   });
@@ -311,7 +314,7 @@ run().catch((error: unknown) => {
     staticServer = await serveDirectory(join(context.workspace, "dist"));
 
     for (const browserName of browserNamesFromEnvironment()) {
-      await runBrowserTarget(browserName, staticServer.url);
+      await runBrowserTarget(browserName, staticServer.url, context.httpUrl);
     }
   } finally {
     if (staticServer) {

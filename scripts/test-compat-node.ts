@@ -282,6 +282,7 @@ const effectAuthHost = await Effect.runPromise(
 );
 
 await runHttpCompatibility();
+  await runHttpCancellationCompatibility(${JSON.stringify(context.httpUrl)});
 
 console.log(
   JSON.stringify({

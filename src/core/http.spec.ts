@@ -131,6 +131,79 @@ describe("sdk core http", () => {
     expect(observedSignal?.aborted).toBe(true);
   });
 
+  it.each(["json", "arrayBuffer", "error"] as const)(
+    "aborts fetch while reading the %s body",
+    async (kind) => {
+      const started = Promise.withResolvers<void>();
+      let observedSignal: AbortSignal | undefined;
+      const client = makePutioFetchClient(async (_input, init) => {
+        observedSignal = init?.signal ?? undefined;
+        class PendingResponse extends Response {
+          override json() {
+            started.resolve();
+            return super.json();
+          }
+          override arrayBuffer() {
+            started.resolve();
+            return super.arrayBuffer();
+          }
+          override text() {
+            started.resolve();
+            return super.text();
+          }
+        }
+        return new PendingResponse(
+          new ReadableStream({
+            start(controller) {
+              observedSignal?.addEventListener(
+                "abort",
+                () => controller.error(observedSignal?.reason),
+                { once: true },
+              );
+            },
+          }),
+          { status: kind === "error" ? 429 : 200 },
+        );
+      });
+      const fiber = Effect.runFork(
+        client
+          .execute({ headers: new Headers(), method: "GET", url: "https://example.invalid/test" })
+          .pipe(
+            Effect.flatMap((response) =>
+              kind === "arrayBuffer" ? response.arrayBuffer : response.json,
+            ),
+          ),
+      );
+      await started.promise;
+      expect(observedSignal?.aborted).toBe(false);
+      await Effect.runPromise(Fiber.interrupt(fiber));
+      expect(observedSignal?.aborted).toBe(true);
+    },
+  );
+
+  it.each(["json", "arrayBuffer"] as const)(
+    "does not abort successful %s reads or reuse request controllers",
+    async (kind) => {
+      const signals: Array<AbortSignal> = [];
+      const client = makePutioFetchClient(async (_input, init) => {
+        if (init?.signal) signals.push(init.signal);
+        return Response.json({ status: "OK" });
+      });
+      const request = client.execute({
+        headers: new Headers(),
+        method: "GET",
+        url: "https://example.invalid/test",
+      });
+      for (let index = 0; index < 2; index++) {
+        const response = await Effect.runPromise(request);
+        expect(signals[index]?.aborted).toBe(false);
+        await Effect.runPromise(kind === "json" ? response.json : response.arrayBuffer);
+        expect(signals[index]?.aborted).toBe(false);
+      }
+      expect(signals[0]).not.toBe(signals[1]);
+    },
+  );
+
   it("builds URLs and skips nullish query values", () => {
     expect(
       buildPutioUrl("https://api.put.io", "/v2/files/list", {

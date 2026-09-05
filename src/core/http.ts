@@ -6,6 +6,7 @@ import {
   DEFAULT_PUTIO_WEB_APP_URL,
 } from "./defaults.js";
 import {
+  fallbackPutioErrorEnvelope,
   makeResponseError,
   mapConfigurationError,
   mapDecodeErrorToValidationError,
@@ -92,10 +93,29 @@ export const makePutioFetchClient = (
             catch: mapTransportError,
           }),
           headers: response.headers,
-          json: Effect.tryPromise({
-            try: () => response.json(),
-            catch: mapTransportError,
-          }),
+          json: isSuccessStatus(response.status)
+            ? Effect.tryPromise({
+                try: () => response.json(),
+                catch: mapTransportError,
+              })
+            : Effect.tryPromise({
+                try: () => response.text(),
+                catch: mapTransportError,
+              }).pipe(
+                Effect.flatMap((text) =>
+                  Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(text).pipe(
+                    Effect.mapError(() =>
+                      makeResponseError(
+                        response.status,
+                        response.headers,
+                        fallbackPutioErrorEnvelope(response.status),
+                        // Native JSON errors can quote response contents in their message.
+                        new SyntaxError("The HTTP error response body is not valid JSON"),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           status: response.status,
         };
       },

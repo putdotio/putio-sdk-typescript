@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { httpCompatibilitySource } from "./compat-http.ts";
+
 import { createCompatWorkspace, getRootPackageVersion, run, writeJson } from "./compat-support.ts";
 
 const main = async () => {
@@ -24,7 +26,8 @@ const main = async () => {
     });
     await writeFile(
       join(sourceDirectory, "main.ts"),
-      `import { Effect } from "effect";
+      `${httpCompatibilitySource}
+import { Effect } from "effect";
 import { createPutioSdkEffectClient, createPutioSdkPromiseClient } from "@putdotio/sdk";
 import { toHumanFileSize } from "@putdotio/sdk/utilities";
 
@@ -55,6 +58,8 @@ const effectAuthHost = await Effect.runPromise(
     ).host,
   ),
 );
+
+await runHttpCompatibility();
 
 console.log(
   JSON.stringify({

@@ -322,6 +322,73 @@ describe("sdk core http", () => {
     }
   });
 
+  it.each([401, 403, 429, 502])(
+    "retains HTTP metadata for invalid error bodies (%i)",
+    async (status) => {
+      for (const body of ["<html>private response</html>", "", "{invalid"]) {
+        const client = makePutioFetchClient(
+          async () =>
+            new Response(body, {
+              status,
+              headers: { "retry-after": "60", "x-ratelimit-id": "test-limit" },
+            }),
+        );
+        const error = expectFailure(
+          await Effect.runPromiseExit(
+            requestJson(OkResponseSchema, {
+              method: "GET",
+              path: "/test",
+              auth: { type: "none" },
+            }).pipe(
+              Effect.provideService(PutioHttpClient, client),
+              Effect.provide(makePutioSdkLayer({})),
+            ),
+          ),
+        );
+        expect(error).toMatchObject({
+          _tag:
+            status === 429
+              ? "PutioRateLimitError"
+              : status === 502
+                ? "PutioApiError"
+                : "PutioAuthError",
+          status,
+          body: { status_code: status },
+          cause: expect.any(SyntaxError),
+        });
+        expect(JSON.stringify(error)).not.toContain("private response");
+        if (status === 429) expect(error).toMatchObject({ retryAfter: "60", id: "test-limit" });
+      }
+    },
+  );
+
+  it.each([new TypeError("body connection lost"), new SyntaxError("body source failed")])(
+    "preserves genuine error body I/O failures: %s",
+    async (cause) => {
+      const client = makePutioFetchClient(
+        async () =>
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.error(cause);
+              },
+            }),
+            { status: 429 },
+          ),
+      );
+      const error = expectFailure(
+        await Effect.runPromiseExit(
+          requestVoid({ method: "GET", path: "/test", auth: { type: "none" } }).pipe(
+            Effect.provideService(PutioHttpClient, client),
+            Effect.provide(makePutioSdkLayer({})),
+          ),
+        ),
+      );
+      expect(error).toBeInstanceOf(PutioTransportError);
+      expect(error).toHaveProperty("cause", cause);
+    },
+  );
+
   it("returns array buffers for binary responses", async () => {
     const result = await Effect.runPromise(
       provideSdkTest(

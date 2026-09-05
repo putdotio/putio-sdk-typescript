@@ -247,6 +247,11 @@ The package compatibility gate installs the packed tarball into external consume
 
 Promise consumers receive tagged SDK error objects:
 
+The fetch transport retains HTTP status and rate-limit headers when an error
+response contains empty or invalid JSON. These errors include a sanitized parsing
+`cause`; response contents are not included in that cause. Failures while reading
+the body remain transport errors, including errors from custom HTTP clients.
+
 Backend error bodies preserve `status`, `status_code`, `error_type`, `error_message`,
 `error_uri`, nullable `error_id`, and structured `extra` metadata. The legacy
 `details` field remains available for compatibility, but current backend errors use

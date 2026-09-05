@@ -5,6 +5,8 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { chromium, firefox, webkit } from "playwright";
 import { build } from "vite";
 
+import { httpCompatibilitySource } from "./compat-http.ts";
+
 import { createCompatWorkspace, getRootPackageVersion, run, writeJson } from "./compat-support.ts";
 
 type BrowserName = "chromium" | "firefox" | "webkit";
@@ -231,7 +233,8 @@ const main = async () => {
     );
     await writeFile(
       join(sourceDirectory, "main.ts"),
-      `import { Effect } from "effect";
+      `${httpCompatibilitySource}
+import { Effect } from "effect";
 import { createPutioSdkEffectClient, createPutioSdkPromiseClient } from "@putdotio/sdk";
 import { toHumanFileSize } from "@putdotio/sdk/utilities";
 
@@ -250,6 +253,7 @@ declare global {
 }
 
 const run = async () => {
+  await runHttpCompatibility();
   const promiseClient = createPutioSdkPromiseClient({
     accessToken: "test-token",
   });

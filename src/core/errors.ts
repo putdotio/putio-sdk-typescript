@@ -202,6 +202,7 @@ export class PutioValidationError extends Data.TaggedError("PutioValidationError
 const PutioResponseErrorFields = {
   status: Schema.Int,
   body: PutioErrorEnvelopeSchema,
+  cause: Schema.optional(Schema.Defect()),
 };
 
 export class PutioApiError extends Schema.TaggedError<PutioApiError>()("PutioApiError", {
@@ -355,20 +356,22 @@ export const makeResponseError = (
   status: number,
   headers: Headers,
   body: PutioErrorEnvelope,
+  cause?: unknown,
 ): PutioSdkError => {
   if (status === 429) {
     return new PutioRateLimitError({
       status,
       body,
       ...responseRateLimitHeaders(headers),
+      cause,
     });
   }
 
   if (status === 401 || status === 403) {
-    return new PutioAuthError({ status, body });
+    return new PutioAuthError({ status, body, cause });
   }
 
-  return new PutioApiError({ status, body });
+  return new PutioApiError({ status, body, cause });
 };
 
 export const parseErrorBody = (status: number, json: unknown) =>

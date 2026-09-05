@@ -351,6 +351,8 @@ inventory.
 
 When requesting `media_info`, stream `level` values preserve FFmpeg's `-99`
 sentinel for an unknown codec level. Known levels remain nonnegative integers.
+Stream `codec_name` can be `null` when the codec was not identified, including
+subtitle streams.
 
 Named-child lookup avoids listing an entire folder and preserves the same query-conditioned fields as
 `files.get`:

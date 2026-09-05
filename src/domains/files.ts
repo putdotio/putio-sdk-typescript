@@ -94,7 +94,8 @@ export const FileMediaInfoFormatSchema = Schema.Struct({
 });
 export const FileMediaInfoStreamSchema = Schema.Struct({
   channels: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-  codec_name: Schema.optional(Schema.String),
+  // Streams whose codec was not identified can carry a null name.
+  codec_name: Schema.optional(Schema.NullOr(Schema.String)),
   codec_type: Schema.optional(Schema.String),
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   // FFmpeg reports an unknown codec level as -99, including MJPEG streams.

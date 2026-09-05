@@ -36,6 +36,18 @@ const baseFile = {
 };
 
 describe("files domain", () => {
+  it("preserves a null codec name in subtitle media info", async () => {
+    const stream = { codec_type: "subtitle", codec_name: null };
+    const file = await runSdkEffect(
+      files.getFile({ id: 9, query: { media_info: 1 } }),
+      () =>
+        jsonResponse({ file: { ...baseFile, media_info: { streams: [stream] } }, status: "OK" }),
+      { accessToken: "token-123" },
+    );
+
+    expect(file.media_info?.streams).toEqual([stream]);
+  });
+
   it.each([-99, 0, 123])("preserves media stream level %s", async (level) => {
     const stream = { codec_name: "mjpeg", codec_type: "video", level };
     const file = await runSdkEffect(

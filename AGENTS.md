@@ -40,7 +40,7 @@ missing or stale.
 
 ## Repo-Specific Guidance
 
-- Treat `@putdotio/sdk` as a new public package, not a compatibility wrapper around `putio-js`.
+- Treat `@putdotio/sdk` as a standalone public package; do not carry `putio-js` compatibility shapes into its surface.
 - Keep the public surface domain-first and Effect-first.
 - Validate external data at the boundary with schemas and keep typed failures explicit.
 - Prefer feature/domain modules over layering by technical concern.
@@ -48,17 +48,16 @@ missing or stale.
 - Prefer `vp` for toolchain and package-manager operations; use `vp run <script>` for custom package scripts.
 - Keep public package boundaries explicit and open-source-safe.
 - Use typed parsing and real checks; change thresholds only with explicit approval.
+- Finish edits, `vp run verify`, and fixes without pausing; ask before publishing and before live writes that are not reversible.
+- Done means `vp run verify` passed and, when real API behavior matters, the relevant `test:live` target ran or the gap is reported.
 - Update docs when the public surface, verification workflow, or repo shape changes.
 - `CLAUDE.md` should remain a symlink to this file.
 
-## Learning More About Effect
+## Effect
 
-This repository uses the Effect TypeScript library.
-
-Before writing any Effect code, read `node_modules/effect/AGENTS.md` completely
-and follow its links when required. If that guide does not cover an API or
-concept, search `node_modules/effect/src` for the installed implementation and
-types.
+This repository uses the Effect TypeScript library. The installed version's own
+guide is `node_modules/effect/AGENTS.md`; consult it for the APIs the change
+touches, and search `node_modules/effect/src` for anything it does not cover.
 
 ## Testing
 

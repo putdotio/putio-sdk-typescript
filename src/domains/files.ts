@@ -97,7 +97,10 @@ export const FileMediaInfoStreamSchema = Schema.Struct({
   codec_name: Schema.optional(Schema.String),
   codec_type: Schema.optional(Schema.String),
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-  level: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+  // FFmpeg reports an unknown codec level as -99, including MJPEG streams.
+  level: Schema.optional(
+    Schema.Union([Schema.Literal(-99), Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))]),
+  ),
   profile: Schema.optional(Schema.NullOr(Schema.String)),
   // put.io only derives an RFC 6381 codec string for MP4-family containers;
   // Matroska and other streams report null.

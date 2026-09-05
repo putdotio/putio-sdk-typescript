@@ -349,6 +349,9 @@ inventory.
 
 ## File Lookup and Mutations
 
+When requesting `media_info`, stream `level` values preserve FFmpeg's `-99`
+sentinel for an unknown codec level. Known levels remain nonnegative integers.
+
 Named-child lookup avoids listing an entire folder and preserves the same query-conditioned fields as
 `files.get`:
 

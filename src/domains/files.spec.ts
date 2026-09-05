@@ -36,6 +36,29 @@ const baseFile = {
 };
 
 describe("files domain", () => {
+  it.each([-99, 0, 123])("preserves media stream level %s", async (level) => {
+    const stream = { codec_name: "mjpeg", codec_type: "video", level };
+    const file = await runSdkEffect(
+      files.getFile({ id: 9, query: { media_info: 1 } }),
+      () =>
+        jsonResponse({ file: { ...baseFile, media_info: { streams: [stream] } }, status: "OK" }),
+      { accessToken: "token-123" },
+    );
+
+    expect(file.media_info?.streams).toEqual([stream]);
+  });
+
+  it.each([-1, 1.5, "-99", null])("rejects invalid media stream level %s", async (level) => {
+    const exit = await runSdkExit(
+      files.getFile({ id: 9, query: { media_info: 1 } }),
+      () =>
+        jsonResponse({ file: { ...baseFile, media_info: { streams: [{ level }] } }, status: "OK" }),
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(exit)).toBeInstanceOf(PutioValidationError);
+  });
+
   it("gets a named child with query-conditioned fields", async () => {
     await expect(
       runSdkEffect(

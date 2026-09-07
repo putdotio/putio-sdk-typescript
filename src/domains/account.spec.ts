@@ -24,6 +24,7 @@ const accountSettings = {
   callback_url: null,
   dark_theme: true,
   default_download_folder: 0,
+  diagnostics_enabled: false,
   dont_autoselect_subtitles: false,
   fluid_layout: true,
   hide_subtitles: false,
@@ -32,11 +33,13 @@ const accountSettings = {
   locale: "en",
   login_mails_enabled: true,
   next_episode: true,
+  product_analytics_enabled: true,
   pushover_token: null,
   show_optimistic_usage: false,
   sort_by: "NAME_ASC",
   start_from: true,
   subtitle_languages: ["en", null],
+  support_widget_enabled: false,
   theater_mode: false,
   theme: "dark" as const,
   transfer_sort_by: null,
@@ -197,14 +200,19 @@ describe("account domain", () => {
     );
 
     expect(settings.locale).toBe("en");
+    expect(settings.diagnostics_enabled).toBe(false);
+    expect(settings.product_analytics_enabled).toBe(true);
+    expect(settings.support_widget_enabled).toBe(false);
 
     const result = await runSdkEffect(
       saveAccountSettings({
+        diagnostics_enabled: false,
         username: "sdk-user",
       }),
       (request) => {
         expect(request.url).toBe("https://api.put.io/v2/account/settings");
         expect(getJsonBody(request)).toEqual({
+          diagnostics_enabled: false,
           username: "sdk-user",
         });
 

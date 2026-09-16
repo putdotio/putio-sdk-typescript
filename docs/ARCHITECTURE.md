@@ -101,8 +101,4 @@ Overload-specific Promise signatures remain explicit adapters; mixed Effect/pure
 
 ## Verification Model
 
-Use three layers:
-
-1. static checks: lint, format, typecheck, package build
-2. live tests in `test/live`
-3. source verification against backend, current frontend consumers, and archived `putio-js`
+See [Testing](./TESTING.md#sdk-verification-strategy) for the verification layers and commands.

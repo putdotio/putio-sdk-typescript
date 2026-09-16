@@ -4,7 +4,7 @@
 
 Every merge to `main` should already be releasable.
 
-GitHub Actions owns releases for this repo. Verification and compatibility jobs run on Blacksmith; the npm publish job stays on GitHub-hosted Ubuntu because npm Trusted Publishing rejects self-hosted runners.
+GitHub Actions owns releases for this repo through [ci.yml](../.github/workflows/ci.yml). All jobs use GitHub-hosted runners; the npm publish job must stay GitHub-hosted because npm Trusted Publishing rejects self-hosted runners.
 
 The pipeline runs these release steps on `main`:
 

@@ -158,24 +158,14 @@ const serviceProgram = Effect.gen(function* () {
 `makePutioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed transport.
 Use `makePutioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioHttpClient` service when you want to supply custom transport.
 
-## Side-By-Side Usage
+## Client Shapes
 
-Both client styles expose the same domain surface. The Promise client also exposes
-`setAccessToken(...)` for token rotation, `dispose()` for runtime teardown, and
-`files.createUploadFormData(...)` for pure FormData construction.
+Both client styles expose the same domain surface:
 
 ```ts
 promiseClient.files.list(0, { per_page: 20 });
 effectClient.files.list(0, { per_page: 20 });
-
-promiseClient.setAccessToken(refreshedAccessToken);
-promiseClient.setAccessToken(undefined);
 ```
-
-Choose the Promise client when you want standard async functions.
-Choose the Effect client when you want the canonical typed error channel and Effect-native composition.
-
-## Client Shapes
 
 | Client                                | Use it for                                        |
 | ------------------------------------- | ------------------------------------------------- |
@@ -189,7 +179,7 @@ Effect is the canonical typed surface. The Promise client is an adapter for envi
 - Effect client: keeps errors in the Effect error channel with operation-specific typing
 - Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`
 - Promise client: rotates or clears credentials synchronously with `setAccessToken(...)`; each operation snapshots the token active when invoked without recreating its runtime
-- Promise client: owns a managed Effect runtime and exposes `dispose()` for explicit teardown
+- Promise client: owns a managed Effect runtime and exposes `dispose()` for explicit teardown, plus `files.createUploadFormData(...)` for pure FormData construction
 
 Interrupting an Effect during fetch or response-body consumption aborts the underlying
 fetch request, including JSON and binary reads. Successful reads do not abort the
@@ -249,8 +239,6 @@ The package compatibility gate installs the packed tarball into external consume
 
 ## Error Handling
 
-Promise consumers receive tagged SDK error objects:
-
 The fetch transport retains HTTP status and rate-limit headers when an error
 response contains empty or invalid JSON. These errors include a sanitized parsing
 `cause`; response contents are not included in that cause. Failures while reading
@@ -260,6 +248,8 @@ Backend error bodies preserve `status`, `status_code`, `error_type`, `error_mess
 `error_uri`, nullable `error_id`, and structured `extra` metadata. The legacy
 `details` field remains available for compatibility, but current backend errors use
 `extra`; `details` is planned for removal in the next major release.
+
+Promise consumers receive tagged SDK error objects:
 
 ```ts
 import {

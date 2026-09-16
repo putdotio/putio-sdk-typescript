@@ -26,7 +26,7 @@ Live tests execute the built SDK from `dist/**`, so direct live targets should a
 
 ## Local Checks
 
-Default test runs intentionally exclude `test/live/**`.
+Default test runs intentionally exclude `test/live/**`; the `scripts` block in [package.json](../package.json) defines every command.
 
 Run:
 
@@ -48,7 +48,7 @@ vp run test:compat
 ```
 
 `lint:unused` runs Knip against source, tests, live tests, scripts, and config files to detect unused files, dependencies, and exports.
-`lint:unused:prod` packs the package, then runs Knip's production-only graph with ignored build output visible. Knip's explicit entry and project patterns keep that analysis limited to the package, tests, scripts, and root config rather than unrelated ignored files.
+`lint:unused:prod` packs the package, then runs Knip's production-only graph with ignored build output visible.
 `lint:package` packs the package and runs `publint` plus Are The Types Wrong against the published ESM entrypoints.
 `vp run verify` blocks on both Knip graphs, runs `lint:package`, and executes the covered unit suite once; CI runs the same command. Knip governs source reachability and dependency usage, while package checks and explicit API/type tests govern intentional public exports.
 
@@ -90,33 +90,18 @@ The compatibility layer proves:
 - native fetch body reads abort on Effect interruption, using a disposable local HTTP server for JSON, binary, and error bodies
 - internal package paths remain fenced by the `exports` map through the package checks
 
-The local suite focuses on the shared runtime in `src/core`.
-Unit coverage now includes all production code under `src/**`, including:
-
-- `src/core/*`
-- `src/domains/*`
-- `src/utilities/*`
-- barrel entrypoints such as `src/index.ts` and `src/utilities.ts`
-
-`vp run verify` enforces the repo coverage floor through the unit suite only.
-Live tests stay separate on purpose:
-
-- they stay outside the coverage report
-- CI coverage gates only the unit suite
-- they exist to sanity-check real API behavior before releases and deeper changes
+Unit coverage counts all production code under `src/**`, including the barrel entrypoints.
+`vp run verify` enforces the coverage floor from [vite.config.ts](../vite.config.ts) through the unit suite only.
+Live tests stay outside the coverage report; they exist to sanity-check real API behavior before releases and deeper changes.
 
 ## Live Environment
 
-Default local env files, loaded in order:
+Env files load in this order, and exported environment variables keep highest priority:
 
 - direct process environment
-- `.env.live-tokens`
-- `.env.local`
-- `.env`
-
-Example env file:
-
-- `.env.example`
+- `.env.live-tokens` (the ignored `0600` token cache written by `pnpm bootstrap:tokens`)
+- `.env.local` (rendered by `pnpm secrets:setup`)
+- `.env` (copy [.env.example](../.env.example) when using your own live credentials)
 
 Bootstrap-first variables:
 
@@ -178,9 +163,11 @@ Uploaded torrents did not create a predictable history event. The suite tests
 the missing-event result from `events.getTorrent(...)` and leaves existing
 account history alone.
 
-Use `pnpm secrets:setup` to validate the maintainer-provided SOPS ciphertext and
-render shared live variables into `.env.local`. The live harness also accepts
-legacy local aliases when they are already exported in the shell.
+`pnpm secrets:setup` validates the maintainer-provided SOPS ciphertext named by
+`PUTIO_SDK_TYPESCRIPT_SOPS_FILE` and renders shared live variables into a `0600`,
+gitignored `.env.local` file. It requires SOPS 3.10 or newer and an authorized age
+identity; run it once per worktree. The live harness also accepts legacy local
+aliases when they are already exported in the shell.
 
 Keep token values out of command output, docs, comments, and commits.
 
@@ -209,9 +196,8 @@ pnpm test:live:targets -- test/live/account.test.ts test/live/tunnel.test.ts
 login. It rejects `auth-credentials`, `family`, `friend-invites`, `friends`,
 `podcast`, and `sharing` because those targets bootstrap account credentials.
 
-`pnpm bootstrap:tokens` writes new tokens to the ignored `0600`
-`.env.live-tokens` cache. Live commands load it before `.env.local`. Bootstrap
-refuses to replace the cache unless you pass `--refresh`.
+`pnpm bootstrap:tokens` writes new tokens to the `.env.live-tokens` cache and
+refuses to replace an existing cache unless the `--refresh` flag is passed.
 
 An unattended runner with a scoped age identity can run a command without
 materializing secrets:
@@ -221,11 +207,7 @@ sops exec-env --same-process "$PUTIO_SDK_TYPESCRIPT_SOPS_FILE" \
   'pnpm test:live:targets -- test/live/account.test.ts test/live/tunnel.test.ts'
 ```
 
-Run `pnpm secrets:setup` once per worktree with
-`PUTIO_SDK_TYPESCRIPT_SOPS_FILE` pointing to the supplied ciphertext. The
-materialized file is `0600` and gitignored. Live commands load
-`.env.live-tokens`, `.env.local`, and `.env` in that order. Exported environment
-variables keep highest priority.
+Typical maintainer sequence:
 
 ```bash
 pnpm secrets:setup        # one-time per worktree
@@ -234,10 +216,6 @@ pnpm bootstrap:live-fixtures
 pnpm test:live            # runs the broader live suite against pre-existing tokens
 pnpm secrets:clean        # before `git worktree remove`
 ```
-
-`secrets:setup` requires SOPS 3.10 or newer and an authorized age identity. You can
-copy `.env.example` manually when using your own live credentials, and unit
-tests do not require live credentials.
 
 `bootstrap:live-fixtures` validates and seeds the live fixtures that are safe to
 prepare through the public SDK. It establishes the secondary friendship/shared
@@ -298,6 +276,7 @@ Those stay source-backed or sandbox-only until we have a sacrificial account spe
 | `friend-invites`   | friend invitation management                                         |
 | `sharing`          | friend shares and public shares                                      |
 | `payment`          | plans, vouchers, and payment flows                                   |
+| `podcast`          | podcast feed links                                                   |
 | `trash`            | trash management                                                     |
 | `zips`             | zip creation and lookup                                              |
 | `family`           | family members and invites                                           |

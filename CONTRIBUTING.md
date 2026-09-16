@@ -4,15 +4,10 @@ Thanks for contributing to `@putdotio/sdk`.
 
 ## Setup
 
-Install dependencies with Vite+:
+Install dependencies with Vite+, then install the stock Vite+ hook wiring for this clone:
 
 ```bash
 vp install
-```
-
-Then install the stock Vite+ hook wiring for this clone:
-
-```bash
 vp config
 ```
 
@@ -24,61 +19,27 @@ Run the full repo guardrail before opening or updating a pull request:
 vp run verify
 ```
 
-That command runs formatting, linting, package build, package-surface checks, unit tests, and coverage using the same repo-local entrypoint CI relies on.
+That command runs formatting, linting, package build, package-surface checks (`lint:package`), unit tests, and coverage using the same repo-local entrypoint CI relies on.
 
 The coverage guardrail is unit-only and counts all production files under `src/**`.
 Live tests are separate confidence checks outside the coverage threshold.
-Package-surface verification runs inside `vp run verify` through `lint:package`.
 
 ## Live Verification
 
-Live verification is opt-in and uses the real put.io API.
-
-Start with the example env file:
+Live verification is opt-in and uses the real put.io API. Use it for backend sanity checks, release confidence, or stateful flows that unit tests cannot prove.
 
 ```bash
-cp .env.example .env
-```
-
-Run the full live suite:
-
-```bash
+cp .env.example .env   # or render maintainer-provided secrets with `pnpm secrets:setup`
 vp run test:live
 ```
 
-Run the package-surface checks:
-
-```bash
-vp run lint:package
-```
-
-The package-surface checks do not require live credentials. Use live tests when you need backend sanity checks, release confidence, or verification for stateful flows that unit tests cannot prove.
-
-Bootstrap runtime tokens from the rendered live credentials:
-
-```bash
-pnpm secrets:setup        # validates SOPS ciphertext and materializes .env.local
-pnpm bootstrap:tokens     # mints fresh first/third-party tokens against the live API
-```
-
-`secrets:setup` requires SOPS 3.10 or newer, an authorized age identity, and
-`PUTIO_SDK_TYPESCRIPT_SOPS_FILE` pointing to the maintainer-provided ciphertext.
-Run `pnpm secrets:clean` before tearing down the worktree.
-
-For single-target commands, safety rules, and fixture expectations, see [Testing](./docs/TESTING.md).
+Credential rendering, token bootstrap, single-target commands, safety rules, and fixture expectations are in [Testing](./docs/TESTING.md#live-environment).
 
 ## Development Notes
 
 - Prefer `vp` for repo commands.
-- Treat `@putdotio/sdk` as a new public package, not a compatibility wrapper around `putio-js`.
-- Keep the public surface domain-first and Effect-first.
-- Put end-user usage in [Overview](./README.md). Put deeper contributor and architecture notes in `docs/*`.
-
-Useful references:
-
-- [Architecture](./docs/ARCHITECTURE.md)
-- [Testing](./docs/TESTING.md)
-- [Distribution](./docs/DISTRIBUTION.md)
+- Follow the [Design Rules](./README.md#design-rules): `@putdotio/sdk` is a new public package, not a compatibility wrapper around `putio-js`, and its surface stays domain-first and Effect-first.
+- Put end-user usage in [Overview](./README.md). Put deeper contributor and architecture notes in `docs/*`: [Architecture](./docs/ARCHITECTURE.md), [Testing](./docs/TESTING.md), [Distribution](./docs/DISTRIBUTION.md).
 
 ## Pull Requests
 

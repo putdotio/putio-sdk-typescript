@@ -8,12 +8,12 @@
 
 ## Start Here
 
-- [Overview](./README.md) — consumer-facing usage; keep it that way and put repo-operator detail in `docs/*`
+- [Overview](./README.md): consumer-facing usage; keep it that way and put repo-operator detail in `docs/*`
 - [Architecture](./docs/ARCHITECTURE.md)
-- [Testing](./docs/TESTING.md) — local checks, compatibility gate, live suite, and credential handling
+- [Testing](./docs/TESTING.md): local checks, compatibility gate, live suite, and credential handling
 - [Distribution](./docs/DISTRIBUTION.md)
-- [API Coverage](./docs/API-COVERAGE.md) — endpoint completeness contract and the route matrix
-- [Migrating to v11](./docs/MIGRATING_V11.md) — removed public contracts and their replacements
+- [API Coverage](./docs/API-COVERAGE.md): endpoint completeness contract and the route matrix
+- [Migrating to v11](./docs/MIGRATING_V11.md): removed public contracts and their replacements
 
 ## Commands
 

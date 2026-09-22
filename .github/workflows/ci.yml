@@ -29,7 +29,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Vite+
-        uses: ./.github/actions/setup-vp
+        uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
         with:
           node-version-file: ".node-version"
           cache: true
@@ -75,7 +75,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Vite+
-        uses: ./.github/actions/setup-vp
+        uses: voidzero-dev/setup-vp@3754dd7dbdb32bd8f6d28b6043de13ad3a75f21f # v1.21.1
         with:
           node-version-file: ".node-version"
           cache: true
@@ -121,78 +121,12 @@ jobs:
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]')
-    name: Release SDK
     needs:
       - verify
       - compatibility
-    runs-on: ubuntu-latest # npm Trusted Publishing rejects self-hosted runners
-    timeout-minutes: 20
-    concurrency:
-      group: release-${{ github.repository }}-main
-      cancel-in-progress: false
-    environment:
-      name: release
-      deployment: false
     permissions:
       contents: read
       id-token: write
-
-    steps:
-      - name: Create release bot token
-        id: release-bot
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ vars.PUTIO_RELEASE_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.PUTIO_RELEASE_BOT_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
-      - name: Resolve release bot identity
-        id: release-bot-identity
-        env:
-          GH_TOKEN: ${{ steps.release-bot.outputs.token }}
-          APP_SLUG: ${{ steps.release-bot.outputs.app-slug }}
-        run: |
-          set -euo pipefail
-          user_id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
-          if [[ ! "$user_id" =~ ^[0-9]+$ ]]; then
-            echo "failed to resolve numeric bot user id for ${APP_SLUG}[bot]" >&2
-            exit 1
-          fi
-          echo "user-id=${user_id}" >> "$GITHUB_OUTPUT"
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Set up Vite+
-        uses: ./.github/actions/setup-vp
-        with:
-          node-version-file: ".node-version"
-          cache: false
-
-      - name: Install dependencies
-        run: vp install
-
-      - name: Configure release bot remote
-        run: git remote set-url origin "https://x-access-token:${RELEASE_BOT_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-        env:
-          RELEASE_BOT_TOKEN: ${{ steps.release-bot.outputs.token }}
-
-      - name: Release package
-        uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0
-        with:
-          extra_plugins: |
-            @semantic-release/commit-analyzer@13.0.1
-            @semantic-release/release-notes-generator@14.1.1
-            @semantic-release/npm@13.1.5
-            @semantic-release/github@12.0.8
-            @semantic-release/git@10.0.1
-            conventional-changelog-conventionalcommits@9.3.1
-        env:
-          GITHUB_TOKEN: ${{ steps.release-bot.outputs.token }}
-          GIT_AUTHOR_NAME: ${{ steps.release-bot.outputs.app-slug }}[bot]
-          GIT_AUTHOR_EMAIL: ${{ steps.release-bot-identity.outputs.user-id }}+${{ steps.release-bot.outputs.app-slug }}[bot]@users.noreply.github.com
-          GIT_COMMITTER_NAME: ${{ steps.release-bot.outputs.app-slug }}[bot]
-          GIT_COMMITTER_EMAIL: ${{ steps.release-bot-identity.outputs.user-id }}+${{ steps.release-bot.outputs.app-slug }}[bot]@users.noreply.github.com
+    uses: putdotio/.github/.github/workflows/frontend-release-npm.yml@6694b278a64e6884b6518176dd2b008774ca6979 # v1.0.1
+    secrets:
+      PUTIO_RELEASE_BOT_PRIVATE_KEY: ${{ secrets.PUTIO_RELEASE_BOT_PRIVATE_KEY }}

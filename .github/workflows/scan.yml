@@ -1,0 +1,19 @@
+name: Scan
+
+on:
+  pull_request:
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: scan-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    permissions:
+      contents: read
+    uses: putdotio/.github/.github/workflows/frontend-scan.yml@6694b278a64e6884b6518176dd2b008774ca6979 # v1.0.1

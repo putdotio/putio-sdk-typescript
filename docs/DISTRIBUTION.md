@@ -15,7 +15,7 @@ The pipeline runs these release steps on `main`:
 
 The workflow uses `.releaserc.json` as the release source of truth. The shared workflow pins the release action by commit and every plugin by exact version, so the secret-bearing release job does not fetch unversioned semantic-release plugins.
 
-The release job calls the shared [`frontend-release-npm.yml`](https://github.com/putdotio/.github/blob/main/frontend/README.md) workflow from `putdotio/.github`, pinned to a tagged commit; the semantic-release action and plugin pins live there.
+The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github/blob/main/frontend/README.md) from `putdotio/.github`, pinned to a tagged commit; the semantic-release action and plugin pins live there. [`scan.yml`](../.github/workflows/scan.yml) calls the shared frontend scan workflow from the same repository: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch.
 
 The release lane:
 

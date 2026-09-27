@@ -4,18 +4,9 @@
 
 Every merge to `main` should already be releasable.
 
-GitHub Actions owns releases for this repo through [ci.yml](../.github/workflows/ci.yml). All jobs use GitHub-hosted runners; the npm publish job stays GitHub-hosted because npm Trusted Publishing supports GitHub-hosted runners only.
+GitHub Actions owns releases through [ci.yml](../.github/workflows/ci.yml). On `main`, the `release` job runs after `verify` and the compatibility matrix pass. All jobs use GitHub-hosted runners because npm Trusted Publishing supports only those.
 
-The pipeline runs these release steps on `main`:
-
-1. `vp install`
-2. `vp run verify` (includes `lint:package`)
-3. compatibility matrix for Node, Chromium, Firefox, WebKit, and Bun, plus the aggregate `Compatibility result` job
-4. run `semantic-release` through the release action
-
-The workflow uses `.releaserc.json` as the release source of truth. The shared workflow pins the release action by commit and every plugin by exact version, so the secret-bearing release job does not fetch unversioned semantic-release plugins.
-
-The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a tagged commit; the semantic-release action and plugin pins live there. [`scan.yml`](../.github/workflows/scan.yml) calls the shared frontend scan workflow from the same repository: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch.
+The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a tagged commit. That workflow pins the semantic-release action by commit and every plugin by exact version, so the secret-bearing job never fetches unversioned plugins. [`.releaserc.json`](../.releaserc.json) is the release configuration. [`scan.yml`](../.github/workflows/scan.yml) calls the shared frontend scan workflow: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch.
 
 The release lane:
 
@@ -43,9 +34,7 @@ During the `@semantic-release/npm` publish step, npm detects the GitHub OIDC ide
 
 Release GitHub writes use `putio-releaser` through `PUTIO_RELEASE_BOT_CLIENT_ID` and `PUTIO_RELEASE_BOT_PRIVATE_KEY`.
 
-The workflow keeps dependency caches only on secretless verify jobs. The secret-bearing release job runs a fresh `vp install` with package-manager caching disabled before publishing to npm.
-
-The release bot token is minted only after dependencies are installed.
+Dependency caches stay on the secretless verify jobs. The release job installs fresh with caching disabled and mints the release bot token only after install.
 
 Public-repo branch policy may still allow trusted put.io team members to push directly to `main`, but it should block outsiders, force-pushes, and branch deletes where GitHub plan support allows. Release tag policy restricts `v*` tag creation, update, and deletion to `putio-releaser` and org admins.
 

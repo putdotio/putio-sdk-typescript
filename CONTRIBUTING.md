@@ -19,10 +19,7 @@ Run the full repo guardrail before opening or updating a pull request:
 vp run verify
 ```
 
-That command runs formatting, linting, package build, package-surface checks (`lint:package`), unit tests, and coverage using the same repo-local entrypoint CI relies on.
-
-The coverage guardrail is unit-only and counts all production files under `src/**`.
-Live tests are separate confidence checks outside the coverage threshold.
+CI runs the same command. [Testing](./docs/TESTING.md#local-checks) lists what it covers; live tests stay outside the coverage threshold.
 
 ## Live Verification
 
@@ -37,13 +34,11 @@ Credential rendering, token bootstrap, single-target commands, safety rules, and
 
 ## Development Notes
 
-- Prefer `vp` for repo commands.
-- Follow the [Design Rules](./README.md#design-rules): `@putdotio/sdk` is a new public package, not a compatibility wrapper around `putio-js`, and its surface stays domain-first and Effect-first.
-- Put end-user usage in [Overview](./README.md). Put deeper contributor and architecture notes in `docs/*`: [Architecture](./docs/ARCHITECTURE.md), [Testing](./docs/TESTING.md), [Distribution](./docs/DISTRIBUTION.md).
+- Follow the [Design Rules](./README.md#design-rules): `@putdotio/sdk` is a standalone public package, not a compatibility wrapper around `putio-js`, and its surface stays domain-first and Effect-first.
+- Keep [README](./README.md) for end-user usage; contributor and architecture notes go in `docs/*`.
 
 ## Pull Requests
 
-- Keep changes focused and explicit.
 - Add or update tests when behavior changes.
 - Update docs when the public surface, contributor workflow, or verification model changes.
-- Prefer follow-up pull requests over mixing unrelated cleanup into one batch.
+- Keep unrelated cleanup in follow-up pull requests.

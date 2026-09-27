@@ -1,9 +1,5 @@
 # SDK Overview
 
-## Goal
-
-Explain the actual `@putdotio/sdk` package shape for humans and agents.
-
 ## System View
 
 ```mermaid
@@ -34,31 +30,11 @@ graph LR
 
 ## Namespace Layout
 
-The source currently lives in:
+- `src/core/*.ts`: shared runtime, transport, defaults, and client composition
+- `src/domains/*.ts`: domain namespaces
+- `src/utilities/*.ts`: opt-in helpers exported from `@putdotio/sdk/utilities`
 
-- `src/core/*.ts` for shared runtime, transport, defaults, and client composition
-- `src/domains/*.ts` for domain namespaces
-- `src/utilities/*.ts` for opt-in helper utilities exported from `@putdotio/sdk/utilities`
-
-The current package layout is:
-
-```mermaid
-graph TD
-  SDK["src"] --> Core["core"]
-  SDK --> Domains["domains"]
-  SDK --> Utilities["utilities"]
-  Core --> Http["http"]
-  Core --> Client["client"]
-  Core --> Errors["errors"]
-  Utilities --> Urls["file-url-provider"]
-  Utilities --> Localized["localized-error"]
-  Domains --> Account["account"]
-  Domains --> Files["files"]
-  Domains --> Transfers["transfers"]
-  Domains --> Sharing["sharing"]
-```
-
-This split is the stable default unless a domain grows large enough to earn its own subfolder.
+A domain stays one file until it grows large enough to earn its own subfolder.
 
 ## Direct Access and Upload
 
@@ -91,13 +67,6 @@ Both clients are assembled from one typed operation tree. The Promise client ada
 Every canonical-tree operation is classified as validated, input-free, or pure. Module initialization rejects an unclassified leaf, so a new request operation must explicitly acknowledge the boundary rule before it can join either public client. Validation remains owned by the domain operation, before transport serialization.
 Operations derived through the generic Promise adapter also check the declared Effect/non-Effect return kind at call time. Explicit overload and schema adapters invoke their typed domain operations directly. The Effect client preserves canonical domain-function identity and relies on the classification helpers' compile-time return-kind constraint; it does not wrap calls with that runtime check.
 Overload-specific Promise signatures remain explicit adapters; mixed Effect/pure overloads are unsupported.
-
-## What This Package Is Not
-
-- not a `putio-js` compatibility wrapper
-- not an axios-era helper bag
-- not a UI-localized error layer
-- not a progress-task runtime for uploads
 
 ## Verification Model
 

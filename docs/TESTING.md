@@ -2,64 +2,29 @@
 
 ## SDK Verification Strategy
 
-The SDK needs more than local typechecks. We want confidence in:
+Typechecks alone do not prove backend-aligned request and response shapes, parameter-conditioned fields, or the runtime behavior of the built client. Verification has three layers:
 
-- backend-aligned request and response shapes
-- conditional fields that only appear for certain params or scopes
-- runtime behavior of the actual SDK client, not just raw curl calls
-- safe live verification without damaging shared accounts
-
-Use four layers of verification:
-
-1. source verification
-2. runtime shape verification
-3. controlled mutation verification
-4. SDK live verification through the Vitest live suite
-
-The live verification layer lives in:
-
-- `test/live/*.test.ts`
-- `test/live/domains/*.ts`
-- `test/live/support/*`
-
-Live tests execute the built SDK from `dist/**`, so direct live targets should always run after `vp pack`.
+1. deterministic unit tests with coverage, including sanitized public contract fixtures
+2. packed-package compatibility checks
+3. an opt-in live suite against the real API, with safe mutations only
 
 ## Local Checks
 
-Default test runs intentionally exclude `test/live/**`; the `scripts` block in [package.json](../package.json) defines every command.
+The `scripts` block in [package.json](../package.json) defines every command. `vp run verify` is the gate and CI runs the same command:
 
-Run:
+- `vp check .`
+- `lint:package`: packs the package and runs `publint` plus Are The Types Wrong against the published ESM entrypoints
+- `knip` over source, tests, live tests, scripts, and config; then `knip --production` over the packed graph. Knip governs reachability and dependency usage; package checks and explicit API/type tests govern intentional public exports
+- `validate:routes:packed` against [api-route-matrix.json](./api-route-matrix.json)
+- the unit suite once, with coverage
 
-```bash
-vp install
-vp check .
-vp pack
-vp test
-vp test --coverage
-```
-
-Additional package and cleanup checks:
-
-```bash
-vp run lint:unused
-vp run lint:unused:prod
-vp run lint:package
-vp run test:compat
-```
-
-`lint:unused` runs Knip against source, tests, live tests, scripts, and config files to detect unused files, dependencies, and exports.
-`lint:unused:prod` packs the package, then runs Knip's production-only graph with ignored build output visible.
-`lint:package` packs the package and runs `publint` plus Are The Types Wrong against the published ESM entrypoints.
-`vp run verify` blocks on both Knip graphs, runs `lint:package`, and executes the covered unit suite once; CI runs the same command. Knip governs source reachability and dependency usage, while package checks and explicit API/type tests govern intentional public exports.
-
-The deterministic suite also replays sanitized public contract fixtures from
-`test/fixtures/public-contracts.ts`. They pin representative unauthenticated and
-authenticated form requests, query serialization, JSON response decoding, and
-binary response handling without credentials or private backend evidence.
+`vp run test` excludes `test/live/**`. The deterministic suite replays sanitized fixtures from
+`test/fixtures/public-contracts.ts` to pin unauthenticated and authenticated form requests, query
+serialization, JSON decoding, and binary responses without credentials or private backend evidence.
 
 ## Runtime Compatibility Checks
 
-Compatibility checks are package-consumer smoke tests, not live API tests. They pack the SDK, install the tarball into throwaway external projects, and verify the public ESM entrypoints from outside the repo.
+Compatibility checks pack the SDK, install the tarball into throwaway external projects, and exercise the public ESM entrypoints from outside the repo. They do not call the live API.
 
 Run all compatibility checks:
 
@@ -90,9 +55,7 @@ The compatibility layer proves:
 - native fetch body reads abort on Effect interruption, using a disposable local HTTP server for JSON, binary, and error bodies
 - internal package paths remain fenced by the `exports` map through the package checks
 
-Unit coverage counts all production code under `src/**`, including the barrel entrypoints.
-`vp run verify` enforces the coverage floor from [vite.config.ts](../vite.config.ts) through the unit suite only.
-Live tests stay outside the coverage report; they exist to sanity-check real API behavior before releases and deeper changes.
+Unit coverage counts all production code under `src/**`, including the barrel entrypoints, against the floor in [vite.config.ts](../vite.config.ts). Live tests stay outside the coverage report.
 
 ## Live Environment
 
@@ -103,38 +66,13 @@ Env files load in this order, and exported environment variables keep highest pr
 - `.env.local` (rendered by `pnpm secrets:setup`)
 - `.env` (copy [.env.example](../.env.example) when using your own live credentials)
 
-Bootstrap-first variables:
-
-- `PUTIO_TEST_USERNAME`
-- `PUTIO_TEST_PASSWORD`
-- `PUTIO_CLIENT_ID_FIRST_PARTY`
-- `PUTIO_CLIENT_SECRET_FIRST_PARTY`
-
-Credential-fixture variables:
-
-- `PUTIO_TEST_TOTP_REFERENCE`
-- `PUTIO_TEST_TOTP`
-- `PUTIO_TEST_SECONDARY_USERNAME`
-- `PUTIO_TEST_SECONDARY_PASSWORD`
-- `PUTIO_TEST_SECONDARY_TOTP_REFERENCE`
-- `PUTIO_TEST_SECONDARY_TOTP`
-- `PUTIO_CLIENT_ID_THIRD_PARTY`
+The `RequiredSecretKey` and `OptionalSecretKey` types in [test/live/support/secrets.ts](../test/live/support/secrets.ts) name every variable the harness reads; [.env.example](../.env.example) groups them by bootstrap credentials, runtime tokens, and role-specific fixtures.
 
 The secondary-account variables are required for live targets that need durable
 friendship or invite fixtures, including `friends`, `sharing`,
 `friend-invites`, and `family`. The secondary account must have unused
 pre-seeded friend and family invite codes for the positive public lookup tests;
 the live suite does not mint reusable invite codes during routine verification.
-
-Optional direct runtime variables:
-
-- `PUTIO_TOKEN_FIRST_PARTY`
-- `PUTIO_TOKEN_THIRD_PARTY`
-- `PUTIO_CLIENT_ID`
-- `PUTIO_LIVE_OWNED_VIDEO_FILE_ID`
-- `PUTIO_LIVE_RSS_SOURCE_URL`
-- `PUTIO_TOKEN_PAYMENT_OWNER`
-- `PUTIO_TOKEN_PAYMENT_SUB_ACCOUNT`
 
 `PUTIO_LIVE_OWNED_VIDEO_FILE_ID` can pin media live tests to an explicit safe,
 owned, unshared MP4 fixture. If it is unset, the live harness only accepts
@@ -172,6 +110,8 @@ aliases when they are already exported in the shell.
 Keep token values out of command output, docs, comments, and commits.
 
 ## Live Commands
+
+Live tests execute the built SDK from `dist/**`, so direct live targets must run after `vp pack`.
 
 Full live suite:
 
@@ -246,7 +186,7 @@ Allowed for live automatic verification:
 - config read/write roundtrips with cleanup
 - disposable OAuth app resources if the script also deletes them
 
-Keep these checks sandbox-only until a sacrificial account exists:
+Keep these out of live verification until a sacrificial account exists:
 
 - password reset
 - 2FA enable or disable
@@ -254,31 +194,11 @@ Keep these checks sandbox-only until a sacrificial account exists:
 - revoke-all sessions
 - anything that can lock out or materially alter the account
 
-Those stay source-backed or sandbox-only until we have a sacrificial account specifically for destructive auth checks.
-
 ## Live Targets
 
-| Target             | Domain coverage                                                      |
-| ------------------ | -------------------------------------------------------------------- |
-| `auth`             | auth flows, token validation, grants                                 |
-| `auth-credentials` | credentialed first-party login, 2FA, and third-party token bootstrap |
-| `oauth`            | OAuth app management                                                 |
-| `account`          | account info, settings, confirmations                                |
-| `config`           | app-owned JSON config storage                                        |
-| `files`            | core file listing, search, and mutations                             |
-| `file-direct`      | direct file URLs, XSPF playlists, and upload                         |
-| `file-tasks`       | extractions, watch status, MP4 tasks                                 |
-| `transfers`        | transfer orchestration                                               |
-| `events`           | event history                                                        |
-| `download-links`   | download-link bundles                                                |
-| `rss`              | RSS feeds                                                            |
-| `friends`          | friends graph and friend requests                                    |
-| `friend-invites`   | friend invitation management                                         |
-| `sharing`          | friend shares and public shares                                      |
-| `payment`          | plans, vouchers, and payment flows                                   |
-| `podcast`          | podcast feed links                                                   |
-| `trash`            | trash management                                                     |
-| `zips`             | zip creation and lookup                                              |
-| `family`           | family members and invites                                           |
-| `ifttt`            | IFTTT integration                                                    |
-| `tunnel`           | tunnel routes                                                        |
+Each `test/live/<target>.test.ts` is one target, named after the SDK namespace it covers. Targets whose scope the name does not show:
+
+- `auth-credentials`: credentialed first-party login, 2FA, and third-party token bootstrap
+- `file-direct`: direct file URLs, XSPF playlists, and upload
+- `file-tasks`: extractions, watch status, and MP4 tasks
+- `events`: history events

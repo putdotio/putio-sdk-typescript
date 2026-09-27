@@ -21,8 +21,6 @@
 
 ## Installation
 
-Install with npm:
-
 ```bash
 npm install @putdotio/sdk
 ```
@@ -30,7 +28,6 @@ npm install @putdotio/sdk
 ## Quick Start
 
 `userAccessToken` in these examples is an already-issued user token from your app or auth flow.
-The SDK itself can be constructed without a token.
 
 ```ts
 import { createPutioSdkPromiseClient } from "@putdotio/sdk";
@@ -44,7 +41,9 @@ const account = await sdk.account.getInfo({
 });
 ```
 
-The SDK can also be created without a default token:
+## Authentication
+
+The client can be created without a token, for flows that obtain or check one:
 
 ```ts
 const sdk = createPutioSdkPromiseClient();
@@ -58,24 +57,6 @@ const login = await sdk.auth.login({
   username,
 });
 ```
-
-## App-Specific Passwords
-
-Create and manage passwords for apps that use put.io basic authentication:
-
-```ts
-const created = await sdk.account.appSpecificPasswords.create({
-  note: "Media server",
-});
-
-savePasswordSecurely(created.password);
-
-const passwords = await sdk.account.appSpecificPasswords.list();
-await sdk.account.appSpecificPasswords.delete(created.id);
-await sdk.account.appSpecificPasswords.deleteAll();
-```
-
-The plaintext `password` is returned only by `create`. List results contain metadata instead, including a nullable `last_used_at` timestamp and a null or masked `ip_address`. The Effect client exposes the same namespace with typed errors in its Effect channel.
 
 Long-lived Promise clients can replace or clear their token without recreating the client:
 
@@ -104,6 +85,24 @@ const accessToken = await sdk.auth.exchangeAuthorizationCode({
 The exchange uses a form-encoded `POST` and never sends a configured bearer token. Known OAuth
 failures are exposed as `OAuthAuthorizationCodeExchangeError`; client secrets and codes are not
 included in validation errors.
+
+## App-Specific Passwords
+
+Create and manage passwords for apps that use put.io basic authentication:
+
+```ts
+const created = await sdk.account.appSpecificPasswords.create({
+  note: "Media server",
+});
+
+savePasswordSecurely(created.password);
+
+const passwords = await sdk.account.appSpecificPasswords.list();
+await sdk.account.appSpecificPasswords.delete(created.id);
+await sdk.account.appSpecificPasswords.deleteAll();
+```
+
+The plaintext `password` is returned only by `create`. List results contain metadata instead, including a nullable `last_used_at` timestamp and a null or masked `ip_address`.
 
 ## Utilities
 
@@ -174,18 +173,14 @@ effectClient.files.list(0, { per_page: 20 });
 
 Effect is the canonical typed surface. The Promise client is an adapter for environments that want standard async functions.
 
-- SDK creation does not require an access token
-- Authenticated endpoints need a token through client config or the Effect layer config
 - Effect client: keeps errors in the Effect error channel with operation-specific typing
 - Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`
-- Promise client: rotates or clears credentials synchronously with `setAccessToken(...)`; each operation snapshots the token active when invoked without recreating its runtime
-- Promise client: owns a managed Effect runtime and exposes `dispose()` for explicit teardown, plus `files.createUploadFormData(...)` for pure FormData construction
+- Promise client: owns a managed Effect runtime; call `await sdk.dispose()` when tearing down a long-lived client in a script, test harness, or server
+- Promise client: `files.createUploadFormData(...)` builds upload FormData without a request
 
 Interrupting an Effect during fetch or response-body consumption aborts the underlying
 fetch request, including JSON and binary reads. Successful reads do not abort the
 request.
-
-If you create a long-lived Promise client in a script, test harness, or server integration, call `await sdk.dispose()` during teardown.
 
 ## Namespace Surface
 
@@ -235,7 +230,7 @@ For upload flows, the host should also provide file-compatible inputs such as `F
 
 If a target runtime is missing these APIs, provide them with host-level polyfills or adapters instead of patching the SDK surface.
 
-The package compatibility gate installs the packed tarball into external consumers and runs strict Node type/runtime checks, bundled browser checks in Chromium, Firefox, and WebKit, and a Bun runtime import check.
+CI installs the packed package into external Node, Bun, and bundled Chromium, Firefox, and WebKit consumers on every change.
 
 ## Error Handling
 
@@ -332,10 +327,8 @@ Upload targets `upload.put.io` internally because `api.put.io/v2/files/upload` i
 
 ## Endpoint Coverage
 
-The TypeScript SDK mirrors the supported public put.io API surface. The current audit outcome,
-scope, exclusions, and refresh contract are documented in [API Coverage](docs/API-COVERAGE.md).
-The portable route matrix is public evidence for selected decisions, not a published backend
-inventory.
+The TypeScript SDK mirrors the supported public put.io API surface. Scope, exclusions, and the
+latest audit are in [API Coverage](docs/API-COVERAGE.md).
 
 ## File Lookup and Mutations
 

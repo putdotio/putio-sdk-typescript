@@ -17,6 +17,10 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # Vite+ bundles its own Vitest; these must match it exactly, so they move with vite-plus.
+      - dependency-name: vitest
+      - dependency-name: "@vitest/*"
     cooldown:
       default-days: 1
     groups:

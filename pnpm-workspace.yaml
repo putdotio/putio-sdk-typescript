@@ -6,9 +6,9 @@ allowBuilds:
   msgpackr-extract: true
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@1.0.0
-  vitest: 5.0.1
+  vitest: 5.0.2
   vite-plus: 1.0.0
-  "@vitest/coverage-v8": 5.0.1
+  "@vitest/coverage-v8": 5.0.2
 peerDependencyRules:
   allowAny:
     - vite

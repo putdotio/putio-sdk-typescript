@@ -16,4 +16,4 @@ jobs:
   scan:
     permissions:
       contents: read
-    uses: putdotio/.github/.github/workflows/frontend-scan.yml@6694b278a64e6884b6518176dd2b008774ca6979 # v1.0.1
+    uses: putdotio/.github/.github/workflows/frontend-scan.yml@8240b79dee9e0933c757bca249c82daa698d9c47 # v1.0.2

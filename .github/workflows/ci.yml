@@ -129,6 +129,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: putdotio/.github/.github/workflows/frontend-release-npm.yml@6694b278a64e6884b6518176dd2b008774ca6979 # v1.0.1
+    uses: putdotio/.github/.github/workflows/frontend-release-npm.yml@8240b79dee9e0933c757bca249c82daa698d9c47 # v1.0.2
     secrets:
       PUTIO_RELEASE_BOT_PRIVATE_KEY: ${{ secrets.PUTIO_RELEASE_BOT_PRIVATE_KEY }}

@@ -11,7 +11,7 @@ const DISPOSABLE_ICON_BYTES = Uint8Array.from(
   ),
 );
 
-describe.sequential("oauth live", () => {
+describe("oauth live", () => {
   const { authClient } = createLiveTokenClients();
 
   test("oauth apps query succeeds", async () => {

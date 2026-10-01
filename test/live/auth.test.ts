@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test } from "vite-plus/test";
 
 import { createLiveTokenClients, type LiveTokenClients } from "./support/helpers.js";
 
-describe.sequential("auth live", () => {
+describe("auth live", () => {
   let clients: LiveTokenClients;
 
   beforeAll(() => {

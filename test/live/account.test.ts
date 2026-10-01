@@ -2,7 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 
 import { createLiveTokenClients } from "./support/helpers.js";
 
-describe.sequential("account live", () => {
+describe("account live", () => {
   const clients = createLiveTokenClients();
 
   test("account info returns the expected conditional fields", async () => {

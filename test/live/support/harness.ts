@@ -207,7 +207,7 @@ export const assertErrorTag = (
 
 export const createLiveHarness = (_label: string): LiveHarness => {
   const run = async (name: string, fn: () => LiveDetails | Promise<LiveDetails>) => {
-    test.sequential(name, async () => {
+    test(name, async () => {
       await fn();
     });
   };

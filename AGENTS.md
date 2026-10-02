@@ -13,7 +13,7 @@
 - [Testing](./docs/TESTING.md): local checks, compatibility gate, live suite, and credential handling
 - [Distribution](./docs/DISTRIBUTION.md)
 - [API Coverage](./docs/API-COVERAGE.md): endpoint completeness contract and the route matrix
-- [Migrating to v12](./docs/MIGRATING_V12.md): `downloadToken` rename on media URL helpers
+- [Migrating to v12](./docs/MIGRATING_V12.md): required `downloadToken` media URLs and the `FileUrlProvider` renames
 - [Migrating to v11](./docs/MIGRATING_V11.md): removed public contracts and their replacements
 
 ## Commands

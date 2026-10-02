@@ -110,14 +110,14 @@ Shared formatting, URL, and error-localization helpers are available from the ut
 
 ```ts
 import {
-  FileURLProvider,
+  FileUrlProvider,
   secondsToReadableDuration,
   toHumanFileSize,
 } from "@putdotio/sdk/utilities";
 ```
 
 ```ts
-const urls = new FileURLProvider({ baseUrl: "https://api.put.io", downloadToken });
+const urls = new FileUrlProvider({ baseUrl: "https://api.put.io", downloadToken });
 const size = toHumanFileSize(1_572_864);
 const duration = secondsToReadableDuration(444);
 ```
@@ -457,7 +457,7 @@ export const useFiles = (parentId: number) =>
 
 ## Docs
 
-- [Migrating to v12](./docs/MIGRATING_V12.md) for the `downloadToken` rename on media URL helpers
+- [Migrating to v12](./docs/MIGRATING_V12.md) for required `downloadToken` media URLs and the `FileUrlProvider` renames
 - [Migrating to v11](./docs/MIGRATING_V11.md) for the removed Coinbase and file-search contracts
 - [Architecture](./docs/ARCHITECTURE.md) for package shape and boundaries
 - [Testing](./docs/TESTING.md) for local and live verification

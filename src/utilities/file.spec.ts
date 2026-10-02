@@ -3,7 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { getFileRenderType } from "./file-render-type.js";
 import { toHumanFileSize } from "./file-size.js";
-import { FileURLProvider } from "./file-url-provider.js";
+import { FileUrlProvider } from "./file-url-provider.js";
 
 const baseFile = {
   content_type: "unknown",
@@ -106,33 +106,33 @@ describe("utility file", () => {
   });
 
   it("builds file access urls", () => {
-    const provider = new FileURLProvider({
+    const provider = new FileUrlProvider({
       baseUrl: "https://api.example.com",
       downloadToken: "test-token",
     });
-    const providerWithVersionedUrl = new FileURLProvider({
+    const providerWithVersionedUrl = new FileUrlProvider({
       baseUrl: "https://api.example.com/v2",
       downloadToken: "test-token",
     });
     expect(provider.apiUrl).toBe("https://api.example.com/v2");
     expect(provider.downloadToken).toBe("test-token");
     expect(
-      () => new FileURLProvider({ baseUrl: "https://api.example.com", downloadToken: "" }),
+      () => new FileUrlProvider({ baseUrl: "https://api.example.com", downloadToken: "" }),
     ).toThrow(PutioValidationError);
     expect(
       // @ts-expect-error JavaScript callers can omit the download token.
-      () => new FileURLProvider({ baseUrl: "https://api.example.com" }),
+      () => new FileUrlProvider({ baseUrl: "https://api.example.com" }),
     ).toThrow(PutioValidationError);
     expect(providerWithVersionedUrl.baseUrl).toBe("https://api.example.com");
-    expect(provider.getDownloadURL(123)).toBe(
+    expect(provider.getDownloadUrl(123)).toBe(
       "https://api.example.com/v2/files/123/download?oauth_token=test-token",
     );
-    expect(provider.getDownloadURL({ ...baseFile, file_type: "FOLDER" })).toBeNull();
-    expect(provider.getDownloadURL({ ...baseFile, file_type: "VIDEO" })).toBe(
+    expect(provider.getDownloadUrl({ ...baseFile, file_type: "FOLDER" })).toBeNull();
+    expect(provider.getDownloadUrl({ ...baseFile, file_type: "VIDEO" })).toBe(
       "https://api.example.com/v2/files/1/download?oauth_token=test-token",
     );
     expect(
-      provider.getHLSStreamURL(
+      provider.getHlsStreamUrl(
         {
           ...baseFile,
           content_type: "video/mp4",
@@ -148,14 +148,14 @@ describe("utility file", () => {
       "https://api.example.com/v2/files/1/hls/media.m3u8?max_subtitle_count=2&oauth_token=test-token&original=1&subtitle_languages=en%2Ces",
     );
     expect(
-      provider.getHLSStreamURL({
+      provider.getHlsStreamUrl({
         ...baseFile,
         content_type: "audio/mpeg",
         file_type: "AUDIO",
       }),
     ).toBeNull();
     expect(
-      provider.getMP4DownloadURL({
+      provider.getMp4DownloadUrl({
         ...baseFile,
         content_type: "video/mp4",
         file_type: "VIDEO",
@@ -163,7 +163,7 @@ describe("utility file", () => {
       }),
     ).toBe("https://api.example.com/v2/files/1/mp4/download?oauth_token=test-token");
     expect(
-      provider.getMP4DownloadURL({
+      provider.getMp4DownloadUrl({
         ...baseFile,
         content_type: "video/mp4",
         file_type: "VIDEO",
@@ -171,7 +171,7 @@ describe("utility file", () => {
       }),
     ).toBeNull();
     expect(
-      provider.getMP4StreamURL({
+      provider.getMp4StreamUrl({
         ...baseFile,
         content_type: "video/mp4",
         file_type: "VIDEO",
@@ -179,34 +179,34 @@ describe("utility file", () => {
       }),
     ).toBe("https://api.example.com/v2/files/1/mp4/stream?oauth_token=test-token");
     expect(
-      provider.getMP4StreamURL({
+      provider.getMp4StreamUrl({
         ...baseFile,
         content_type: "audio/mpeg",
         file_type: "AUDIO",
       }),
     ).toBeNull();
     expect(
-      provider.getStreamURL({
+      provider.getStreamUrl({
         ...baseFile,
         content_type: "audio/mpeg",
         file_type: "AUDIO",
       }),
     ).toBe("https://api.example.com/v2/files/1/stream.mp3?oauth_token=test-token");
     expect(
-      provider.getStreamURL({
+      provider.getStreamUrl({
         ...baseFile,
         content_type: "video/mp4",
         file_type: "VIDEO",
       }),
     ).toBe("https://api.example.com/v2/files/1/stream?oauth_token=test-token");
-    expect(provider.getStreamURL(baseFile)).toBeNull();
+    expect(provider.getStreamUrl(baseFile)).toBeNull();
     expect(
-      provider.getXSPFURL({
+      provider.getXspfUrl({
         ...baseFile,
         content_type: "video/mp4",
         file_type: "VIDEO",
       }),
     ).toBe("https://api.example.com/v2/files/1/xspf?oauth_token=test-token");
-    expect(provider.getXSPFURL(baseFile)).toBeNull();
+    expect(provider.getXspfUrl(baseFile)).toBeNull();
   });
 });

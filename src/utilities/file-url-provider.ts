@@ -12,20 +12,20 @@ export type FileUrlProviderInput = Pick<
   "content_type" | "extension" | "file_type" | "id" | "is_mp4_available"
 >;
 
-const FileURLProviderOptionsSchema = Schema.Struct({
+const FileUrlProviderOptionsSchema = Schema.Struct({
   baseUrl: NonEmptyStringSchema,
   downloadToken: NonEmptyStringSchema,
 });
 
-export type FileURLProviderOptions = {
+export type FileUrlProviderOptions = {
   /** The put.io API origin, with or without the trailing `/v2`. */
   readonly baseUrl: string;
   /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
   readonly downloadToken: string;
 };
 
-const decodeOptions = (options: FileURLProviderOptions): FileURLProviderOptions => {
-  const decoded = Schema.decodeUnknownResult(FileURLProviderOptionsSchema, {
+const decodeOptions = (options: FileUrlProviderOptions): FileUrlProviderOptions => {
+  const decoded = Schema.decodeUnknownResult(FileUrlProviderOptionsSchema, {
     onExcessProperty: "error",
   })(options);
   if (Result.isFailure(decoded)) {
@@ -39,7 +39,7 @@ const normalizeApiBaseUrl = (apiUrl: string): string =>
 
 const isVideoFile = (file: FileRenderTypeInput): boolean => getFileRenderType(file) === "video";
 
-export class FileURLProvider {
+export class FileUrlProvider {
   readonly apiUrl: string;
 
   /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
@@ -47,14 +47,14 @@ export class FileURLProvider {
 
   readonly baseUrl: string;
 
-  constructor(options: FileURLProviderOptions) {
+  constructor(options: FileUrlProviderOptions) {
     const { baseUrl, downloadToken } = decodeOptions(options);
     this.baseUrl = normalizeApiBaseUrl(baseUrl);
     this.apiUrl = `${this.baseUrl}/v2`;
     this.downloadToken = downloadToken;
   }
 
-  getDownloadURL(fileOrFileId: FileUrlProviderInput | number): string | null {
+  getDownloadUrl(fileOrFileId: FileUrlProviderInput | number): string | null {
     if (typeof fileOrFileId === "number") {
       return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(fileOrFileId)}/download`, {
         oauth_token: this.downloadToken,
@@ -70,7 +70,7 @@ export class FileURLProvider {
     });
   }
 
-  getHLSStreamURL(
+  getHlsStreamUrl(
     file: FileUrlProviderInput,
     params: {
       readonly maxSubtitleCount?: number;
@@ -90,7 +90,7 @@ export class FileURLProvider {
     });
   }
 
-  getMP4DownloadURL(file: FileUrlProviderInput): string | null {
+  getMp4DownloadUrl(file: FileUrlProviderInput): string | null {
     if (!isVideoFile(file) || !file.is_mp4_available) {
       return null;
     }
@@ -100,7 +100,7 @@ export class FileURLProvider {
     });
   }
 
-  getMP4StreamURL(file: FileUrlProviderInput): string | null {
+  getMp4StreamUrl(file: FileUrlProviderInput): string | null {
     if (!isVideoFile(file) || !file.is_mp4_available) {
       return null;
     }
@@ -110,7 +110,7 @@ export class FileURLProvider {
     });
   }
 
-  getStreamURL(file: FileUrlProviderInput): string | null {
+  getStreamUrl(file: FileUrlProviderInput): string | null {
     switch (getFileRenderType(file)) {
       case "audio":
         return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(file.id)}/stream.mp3`, {
@@ -125,7 +125,7 @@ export class FileURLProvider {
     }
   }
 
-  getXSPFURL(file: FileUrlProviderInput): string | null {
+  getXspfUrl(file: FileUrlProviderInput): string | null {
     if (!isVideoFile(file)) {
       return null;
     }

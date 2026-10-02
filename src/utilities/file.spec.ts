@@ -1,3 +1,4 @@
+import { PutioValidationError } from "../core/errors.js";
 import { describe, expect, it } from "vite-plus/test";
 
 import { getFileRenderType } from "./file-render-type.js";
@@ -105,14 +106,23 @@ describe("utility file", () => {
   });
 
   it("builds file access urls", () => {
-    const provider = new FileURLProvider("https://api.example.com", "test-token");
-    const providerWithVersionedUrl = new FileURLProvider(
-      "https://api.example.com/v2",
-      "test-token",
-    );
+    const provider = new FileURLProvider({
+      baseUrl: "https://api.example.com",
+      downloadToken: "test-token",
+    });
+    const providerWithVersionedUrl = new FileURLProvider({
+      baseUrl: "https://api.example.com/v2",
+      downloadToken: "test-token",
+    });
     expect(provider.apiURL).toBe("https://api.example.com/v2");
     expect(provider.downloadToken).toBe("test-token");
-    expect(() => new FileURLProvider("https://api.example.com", "")).toThrow(TypeError);
+    expect(
+      () => new FileURLProvider({ baseUrl: "https://api.example.com", downloadToken: "" }),
+    ).toThrow(PutioValidationError);
+    expect(
+      // @ts-expect-error JavaScript callers can omit the download token.
+      () => new FileURLProvider({ baseUrl: "https://api.example.com" }),
+    ).toThrow(PutioValidationError);
     expect(providerWithVersionedUrl.baseURL).toBe("https://api.example.com");
     expect(provider.getDownloadURL(123)).toBe(
       "https://api.example.com/v2/files/123/download?oauth_token=test-token",

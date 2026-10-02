@@ -1,12 +1,38 @@
+import { Result, Schema } from "effect";
+
+import { mapDecodeErrorToValidationError } from "../core/errors.js";
 import { joinCsv } from "../core/forms.js";
 import { buildPutioUrl, encodePathSegment } from "../core/http.js";
 import type { FileBroad } from "../domains/files.js";
+import { NonEmptyStringSchema } from "../core/validation.js";
 import { getFileRenderType, type FileRenderTypeInput } from "./file-render-type.js";
 
 export type FileUrlProviderInput = Pick<
   FileBroad,
   "content_type" | "extension" | "file_type" | "id" | "is_mp4_available"
 >;
+
+const FileURLProviderOptionsSchema = Schema.Struct({
+  baseUrl: NonEmptyStringSchema,
+  downloadToken: NonEmptyStringSchema,
+});
+
+export type FileURLProviderOptions = {
+  /** The put.io API origin, with or without the trailing `/v2`. */
+  readonly baseUrl: string;
+  /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
+  readonly downloadToken: string;
+};
+
+const decodeOptions = (options: FileURLProviderOptions): FileURLProviderOptions => {
+  const decoded = Schema.decodeUnknownResult(FileURLProviderOptionsSchema, {
+    onExcessProperty: "error",
+  })(options);
+  if (Result.isFailure(decoded)) {
+    throw mapDecodeErrorToValidationError(decoded.failure);
+  }
+  return decoded.success;
+};
 
 const normalizeApiBaseUrl = (apiURL: string): string =>
   apiURL.endsWith("/v2") ? apiURL.slice(0, -3) : apiURL;
@@ -21,11 +47,9 @@ export class FileURLProvider {
 
   readonly baseURL: string;
 
-  constructor(apiURL: string, downloadToken: string) {
-    if (typeof downloadToken !== "string" || downloadToken.length === 0) {
-      throw new TypeError("FileURLProvider requires the account download token");
-    }
-    this.baseURL = normalizeApiBaseUrl(apiURL);
+  constructor(options: FileURLProviderOptions) {
+    const { baseUrl, downloadToken } = decodeOptions(options);
+    this.baseURL = normalizeApiBaseUrl(baseUrl);
     this.apiURL = `${this.baseURL}/v2`;
     this.downloadToken = downloadToken;
   }

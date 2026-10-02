@@ -18,8 +18,9 @@ Renamed:
   `buildFileHlsStreamUrl`, `buildFileXspfPlaylistUrl`, and the `files.getApiDownloadUrl`,
   `files.getApiContentUrl`, `files.getApiMp4DownloadUrl`, `files.getHlsStreamUrl`, and
   `files.getXspfPlaylistUrl` client methods
-- `FileURLProvider#token` to `FileURLProvider#downloadToken`; the constructor's second argument is
-  the download token and throws a `TypeError` when empty
+- `FileURLProvider` takes one `{ baseUrl, downloadToken }` options object instead of positional
+  arguments, and `FileURLProvider#token` is now `FileURLProvider#downloadToken`. Missing or empty
+  options throw a `PutioValidationError`.
 
 Unchanged: `files.upload` and `files.createUploadRequest` keep `oauthToken`, because upload needs
 the full OAuth token.
@@ -36,4 +37,16 @@ After:
 ```ts
 const { download_token: downloadToken } = await sdk.account.getInfo({ download_token: 1 });
 const url = await sdk.files.getHlsStreamUrl(fileId, { downloadToken });
+```
+
+`FileURLProvider` before:
+
+```ts
+const urls = new FileURLProvider("https://api.put.io", accessToken);
+```
+
+After:
+
+```ts
+const urls = new FileURLProvider({ baseUrl: "https://api.put.io", downloadToken });
 ```

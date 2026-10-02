@@ -117,7 +117,7 @@ import {
 ```
 
 ```ts
-const urls = new FileURLProvider("https://api.put.io", downloadToken);
+const urls = new FileURLProvider({ baseUrl: "https://api.put.io", downloadToken });
 const size = toHumanFileSize(1_572_864);
 const duration = secondsToReadableDuration(444);
 ```

@@ -354,7 +354,7 @@ describe("files domain", () => {
     expect(
       files.buildFileApiDownloadUrl("https://api.put.io", 42, {
         name: "hello world.mp4",
-        oauthToken: "token-123",
+        downloadToken: "token-123",
         useTunnel: false,
       }),
     ).toBe(
@@ -363,7 +363,7 @@ describe("files domain", () => {
 
     expect(
       files.buildFileApiContentUrl("https://api.put.io", 42, {
-        oauthToken: "token-123",
+        downloadToken: "token-123",
       }),
     ).toBe("https://api.put.io/v2/files/42/stream?oauth_token=token-123");
 
@@ -371,7 +371,7 @@ describe("files domain", () => {
       files.buildFileApiMp4DownloadUrl("https://api.put.io", 42, {
         convert: true,
         name: "hello world.mp4",
-        oauthToken: "token-123",
+        downloadToken: "token-123",
         useTunnel: false,
       }),
     ).toBe(
@@ -381,7 +381,7 @@ describe("files domain", () => {
     expect(
       files.buildFileHlsStreamUrl("https://api.put.io", 42, {
         maxSubtitleCount: 2,
-        oauthToken: "token-123",
+        downloadToken: "token-123",
         playOriginal: false,
         subtitleLanguages: ["en", "tr"],
       }),
@@ -391,7 +391,7 @@ describe("files domain", () => {
 
     expect(
       files.buildFileXspfPlaylistUrl("https://api.put.io", 42, {
-        oauthToken: "token-123",
+        downloadToken: "token-123",
       }),
     ).toBe("https://api.put.io/v2/files/42/xspf?oauth_token=token-123");
 
@@ -432,6 +432,13 @@ describe("files domain", () => {
         baseUrl: "https://api.put.io",
       }),
     ).toBe("https://api.put.io/v2/files/42/hls/media.m3u8?oauth_token=token-123");
+
+    expect(
+      await runConfigEffect(files.getHlsStreamUrl(42, { downloadToken: "download-123" }), {
+        accessToken: "token-123",
+        baseUrl: "https://api.put.io",
+      }),
+    ).toBe("https://api.put.io/v2/files/42/hls/media.m3u8?oauth_token=download-123");
 
     expect(
       await runConfigEffect(files.getXspfPlaylistUrl(42), {
@@ -494,11 +501,11 @@ describe("files domain", () => {
       runConfigExit(files.getHlsStreamUrl(42, { subtitleLanguages: [] }), {
         accessToken: "token-123",
       }),
-      runConfigExit(files.getHlsStreamUrl(42, { oauthToken: "" }), {
+      runConfigExit(files.getHlsStreamUrl(42, { downloadToken: "" }), {
         accessToken: "token-123",
       }),
       runConfigExit(files.getXspfPlaylistUrl(0), { accessToken: "token-123" }),
-      runConfigExit(files.getXspfPlaylistUrl(42, { oauthToken: "" }), {
+      runConfigExit(files.getXspfPlaylistUrl(42, { downloadToken: "" }), {
         accessToken: "token-123",
       }),
     ]);

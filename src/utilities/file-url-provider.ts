@@ -16,20 +16,21 @@ const isVideoFile = (file: FileRenderTypeInput): boolean => getFileRenderType(fi
 export class FileURLProvider {
   readonly apiURL: string;
 
-  readonly token: string;
+  /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
+  readonly downloadToken: string;
 
   readonly baseURL: string;
 
-  constructor(apiURL: string, token: string) {
+  constructor(apiURL: string, downloadToken: string) {
     this.baseURL = normalizeApiBaseUrl(apiURL);
     this.apiURL = `${this.baseURL}/v2`;
-    this.token = token;
+    this.downloadToken = downloadToken;
   }
 
   getDownloadURL(fileOrFileId: FileUrlProviderInput | number): string | null {
     if (typeof fileOrFileId === "number") {
       return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(fileOrFileId)}/download`, {
-        oauth_token: this.token,
+        oauth_token: this.downloadToken,
       });
     }
 
@@ -38,7 +39,7 @@ export class FileURLProvider {
     }
 
     return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(fileOrFileId.id)}/download`, {
-      oauth_token: this.token,
+      oauth_token: this.downloadToken,
     });
   }
 
@@ -56,7 +57,7 @@ export class FileURLProvider {
 
     return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/hls/media.m3u8`, {
       max_subtitle_count: params.maxSubtitleCount,
-      oauth_token: this.token,
+      oauth_token: this.downloadToken,
       original: params.playOriginal ? 1 : undefined,
       subtitle_languages: joinCsv(params.subtitleLanguages),
     });
@@ -68,7 +69,7 @@ export class FileURLProvider {
     }
 
     return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/mp4/download`, {
-      oauth_token: this.token,
+      oauth_token: this.downloadToken,
     });
   }
 
@@ -78,7 +79,7 @@ export class FileURLProvider {
     }
 
     return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/mp4/stream`, {
-      oauth_token: this.token,
+      oauth_token: this.downloadToken,
     });
   }
 
@@ -86,11 +87,11 @@ export class FileURLProvider {
     switch (getFileRenderType(file)) {
       case "audio":
         return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/stream.mp3`, {
-          oauth_token: this.token,
+          oauth_token: this.downloadToken,
         });
       case "video":
         return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/stream`, {
-          oauth_token: this.token,
+          oauth_token: this.downloadToken,
         });
       default:
         return null;
@@ -103,7 +104,7 @@ export class FileURLProvider {
     }
 
     return buildPutioUrl(this.baseURL, `/v2/files/${encodePathSegment(file.id)}/xspf`, {
-      oauth_token: this.token,
+      oauth_token: this.downloadToken,
     });
   }
 }

@@ -1,4 +1,5 @@
-import { PutioConfigurationError, PutioValidationError } from "../core/errors.js";
+import { Exit } from "effect";
+import { PutioValidationError } from "../core/errors.js";
 import { describe, expect, it } from "vite-plus/test";
 
 import * as files from "./files.js";
@@ -395,57 +396,28 @@ describe("files domain", () => {
       }),
     ).toBe("https://api.put.io/v2/files/42/xspf?oauth_token=token-123");
 
-    expect(
-      await runConfigEffect(files.getApiDownloadUrl(42), {
-        accessToken: "token-123",
-        baseUrl: "https://api.put.io",
-      }),
-    ).toBe("https://api.put.io/v2/files/42/download?oauth_token=token-123");
-
-    expect(
-      await runConfigEffect(
-        files.getApiContentUrl(42, {
-          useTunnel: false,
-        }),
-        {
-          accessToken: "token-123",
-          baseUrl: "https://api.put.io",
-        },
+    const accessTokenConfig = { accessToken: "token-123", baseUrl: "https://api.put.io" };
+    const downloadToken = "download-123";
+    const configBackedUrls = await Promise.all([
+      runConfigEffect(files.getApiDownloadUrl(42, { downloadToken }), accessTokenConfig),
+      runConfigEffect(
+        files.getApiContentUrl(42, { downloadToken, useTunnel: false }),
+        accessTokenConfig,
       ),
-    ).toBe("https://api.put.io/v2/files/42/stream?notunnel=1&oauth_token=token-123");
-
-    expect(
-      await runConfigEffect(
-        files.getApiMp4DownloadUrl(42, {
-          convert: true,
-        }),
-        {
-          accessToken: "token-123",
-          baseUrl: "https://api.put.io",
-        },
+      runConfigEffect(
+        files.getApiMp4DownloadUrl(42, { convert: true, downloadToken }),
+        accessTokenConfig,
       ),
-    ).toBe("https://api.put.io/v2/files/42/mp4/download?convert=1&oauth_token=token-123");
-
-    expect(
-      await runConfigEffect(files.getHlsStreamUrl(42), {
-        accessToken: "token-123",
-        baseUrl: "https://api.put.io",
-      }),
-    ).toBe("https://api.put.io/v2/files/42/hls/media.m3u8?oauth_token=token-123");
-
-    expect(
-      await runConfigEffect(files.getHlsStreamUrl(42, { downloadToken: "download-123" }), {
-        accessToken: "token-123",
-        baseUrl: "https://api.put.io",
-      }),
-    ).toBe("https://api.put.io/v2/files/42/hls/media.m3u8?oauth_token=download-123");
-
-    expect(
-      await runConfigEffect(files.getXspfPlaylistUrl(42), {
-        accessToken: "token-123",
-        baseUrl: "https://api.put.io",
-      }),
-    ).toBe("https://api.put.io/v2/files/42/xspf?oauth_token=token-123");
+      runConfigEffect(files.getHlsStreamUrl(42, { downloadToken }), accessTokenConfig),
+      runConfigEffect(files.getXspfPlaylistUrl(42, { downloadToken }), accessTokenConfig),
+    ]);
+    expect(configBackedUrls).toEqual([
+      "https://api.put.io/v2/files/42/download?oauth_token=download-123",
+      "https://api.put.io/v2/files/42/stream?notunnel=1&oauth_token=download-123",
+      "https://api.put.io/v2/files/42/mp4/download?convert=1&oauth_token=download-123",
+      "https://api.put.io/v2/files/42/hls/media.m3u8?oauth_token=download-123",
+      "https://api.put.io/v2/files/42/xspf?oauth_token=download-123",
+    ]);
 
     const uploadRequest = await runConfigEffect(
       files.createFileUploadRequest({
@@ -464,19 +436,33 @@ describe("files domain", () => {
     expect(uploadRequest.body.get("filename")).toBe("hello.txt");
     expect(uploadRequest.body.get("parent_id")).toBe("7");
 
-    const missingTokenExit = await runConfigExit(files.getApiDownloadUrl(42));
-    const missingTokenError = expectFailure(missingTokenExit);
-    expect(missingTokenError).toBeInstanceOf(PutioConfigurationError);
+    // Media URLs leave the app, so a missing download token must never fall back to accessToken.
+    const missingDownloadToken = await Promise.all([
+      // @ts-expect-error JavaScript callers can omit the download token.
+      runConfigExit(files.getApiDownloadUrl(42, {}), accessTokenConfig),
+      // @ts-expect-error JavaScript callers can omit the download token.
+      runConfigExit(files.getApiContentUrl(42, {}), accessTokenConfig),
+      // @ts-expect-error JavaScript callers can omit the download token.
+      runConfigExit(files.getApiMp4DownloadUrl(42, { convert: true }), accessTokenConfig),
+      // @ts-expect-error JavaScript callers can omit the download token.
+      runConfigExit(files.getHlsStreamUrl(42, {}), accessTokenConfig),
+      // @ts-expect-error JavaScript callers can omit the download token.
+      runConfigExit(files.getXspfPlaylistUrl(42, {}), accessTokenConfig),
+    ]);
+    for (const exit of missingDownloadToken) {
+      expect(Exit.isSuccess(exit) ? exit.value : "").not.toContain("token-123");
+      expect(expectFailure(exit)).toBeInstanceOf(PutioValidationError);
+    }
 
     const invalidDirectAccess = await Promise.all([
-      runConfigExit(files.getApiDownloadUrl(0), { accessToken: "token-123" }),
-      runConfigExit(files.getApiDownloadUrl(42, { name: "" }), {
+      runConfigExit(files.getApiDownloadUrl(0, { downloadToken }), { accessToken: "token-123" }),
+      runConfigExit(files.getApiDownloadUrl(42, { downloadToken, name: "" }), {
         accessToken: "token-123",
       }),
-      runConfigExit(files.getApiContentUrl(0), { accessToken: "token-123" }),
+      runConfigExit(files.getApiContentUrl(0, { downloadToken }), { accessToken: "token-123" }),
       runConfigExit(
         // @ts-expect-error JavaScript callers can supply invalid boolean options.
-        files.getApiContentUrl(42, { useTunnel: "yes" }),
+        files.getApiContentUrl(42, { downloadToken, useTunnel: "yes" }),
         { accessToken: "token-123" },
       ),
       runConfigExit(
@@ -486,25 +472,25 @@ describe("files domain", () => {
       ),
       runConfigExit(
         // @ts-expect-error JavaScript callers can supply excess option properties.
-        files.getApiContentUrl(42, { unexpected: true }),
+        files.getApiContentUrl(42, { downloadToken, unexpected: true }),
         { accessToken: "token-123" },
       ),
-      runConfigExit(files.getApiMp4DownloadUrl(0), { accessToken: "token-123" }),
+      runConfigExit(files.getApiMp4DownloadUrl(0, { downloadToken }), { accessToken: "token-123" }),
       runConfigExit(
         // @ts-expect-error JavaScript callers can supply invalid boolean options.
-        files.getApiMp4DownloadUrl(42, { convert: "yes" }),
+        files.getApiMp4DownloadUrl(42, { convert: "yes", downloadToken }),
         { accessToken: "token-123" },
       ),
-      runConfigExit(files.getHlsStreamUrl(42, { maxSubtitleCount: 0 }), {
+      runConfigExit(files.getHlsStreamUrl(42, { downloadToken, maxSubtitleCount: 0 }), {
         accessToken: "token-123",
       }),
-      runConfigExit(files.getHlsStreamUrl(42, { subtitleLanguages: [] }), {
+      runConfigExit(files.getHlsStreamUrl(42, { downloadToken, subtitleLanguages: [] }), {
         accessToken: "token-123",
       }),
       runConfigExit(files.getHlsStreamUrl(42, { downloadToken: "" }), {
         accessToken: "token-123",
       }),
-      runConfigExit(files.getXspfPlaylistUrl(0), { accessToken: "token-123" }),
+      runConfigExit(files.getXspfPlaylistUrl(0, { downloadToken }), { accessToken: "token-123" }),
       runConfigExit(files.getXspfPlaylistUrl(42, { downloadToken: "" }), {
         accessToken: "token-123",
       }),

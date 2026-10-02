@@ -22,6 +22,9 @@ export class FileURLProvider {
   readonly baseURL: string;
 
   constructor(apiURL: string, downloadToken: string) {
+    if (typeof downloadToken !== "string" || downloadToken.length === 0) {
+      throw new TypeError("FileURLProvider requires the account download token");
+    }
     this.baseURL = normalizeApiBaseUrl(apiURL);
     this.apiURL = `${this.baseURL}/v2`;
     this.downloadToken = downloadToken;

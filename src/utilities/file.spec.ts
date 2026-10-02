@@ -112,6 +112,7 @@ describe("utility file", () => {
     );
     expect(provider.apiURL).toBe("https://api.example.com/v2");
     expect(provider.downloadToken).toBe("test-token");
+    expect(() => new FileURLProvider("https://api.example.com", "")).toThrow(TypeError);
     expect(providerWithVersionedUrl.baseURL).toBe("https://api.example.com");
     expect(provider.getDownloadURL(123)).toBe(
       "https://api.example.com/v2/files/123/download?oauth_token=test-token",

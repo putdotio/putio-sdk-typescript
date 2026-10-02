@@ -244,9 +244,11 @@ const compilePromiseAuthorizationCodeExchange = async () => {
 void compilePromiseAuthorizationCodeExchange;
 const promiseAuthHost = new URL(promiseAuthUrl).host;
 promiseClient.setAccessToken("test-auth-token");
-const xspfPlaylistUrl = await promiseClient.files.getXspfPlaylistUrl(7);
-if (new URL(xspfPlaylistUrl).searchParams.get("oauth_token") !== "test-auth-token") {
-  throw new Error("Promise access-token replacement did not reach the XSPF playlist URL");
+const xspfPlaylistUrl = await promiseClient.files.getXspfPlaylistUrl(7, {
+  downloadToken: "test-download-token",
+});
+if (new URL(xspfPlaylistUrl).searchParams.get("oauth_token") !== "test-download-token") {
+  throw new Error("XSPF playlist URL did not carry the download token");
 }
 const uploadRequest = await promiseClient.files.createUploadRequest({
   file: new Blob(["hello from node"]),
@@ -264,7 +266,7 @@ void effectClient.auth.exchangeAuthorizationCode(exchangeInput);
 void effectClient.files.getChild({ name: "source.txt", parentId: 0 });
 void effectClient.files.copy(copyInput);
 void effectClient.files.canWrite(7);
-void effectClient.files.getXspfPlaylistUrl(7);
+void effectClient.files.getXspfPlaylistUrl(7, { downloadToken: "test-download-token" });
 void effectClient.files.touch(touchInput);
 void effectClient.transfers.getTorrent(7);
 void effectClient.transfers.addTrackers(trackersInput);
@@ -296,7 +298,7 @@ console.log(
     uploadTokenUpdated: true,
     utility: toHumanFileSize(1_572_864),
     unknownAppSpecificPasswordError,
-    xspfTokenUpdated: true,
+    xspfDownloadToken: true,
   }),
 );
 `,

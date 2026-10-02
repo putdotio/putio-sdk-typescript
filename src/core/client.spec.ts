@@ -220,20 +220,20 @@ describe("sdk client factories", () => {
     expect(await client.transfers.stopRecording(1)).toEqual({ status: "OK" });
     expect(Array.from(await client.events.getTorrent(1))).toEqual([1, 2, 3]);
 
-    expect(await client.files.getApiDownloadUrl(42)).toBe(
-      "https://api.put.io/v2/files/42/download?oauth_token=token-123",
+    expect(await client.files.getApiDownloadUrl(42, { downloadToken: "download-123" })).toBe(
+      "https://api.put.io/v2/files/42/download?oauth_token=download-123",
     );
-    expect(await client.files.getApiContentUrl(42)).toBe(
-      "https://api.put.io/v2/files/42/stream?oauth_token=token-123",
+    expect(await client.files.getApiContentUrl(42, { downloadToken: "download-123" })).toBe(
+      "https://api.put.io/v2/files/42/stream?oauth_token=download-123",
     );
-    expect(await client.files.getApiMp4DownloadUrl(42)).toBe(
-      "https://api.put.io/v2/files/42/mp4/download?oauth_token=token-123",
+    expect(await client.files.getApiMp4DownloadUrl(42, { downloadToken: "download-123" })).toBe(
+      "https://api.put.io/v2/files/42/mp4/download?oauth_token=download-123",
     );
-    expect(await client.files.getHlsStreamUrl(42)).toBe(
-      "https://api.put.io/v2/files/42/hls/media.m3u8?oauth_token=token-123",
+    expect(await client.files.getHlsStreamUrl(42, { downloadToken: "download-123" })).toBe(
+      "https://api.put.io/v2/files/42/hls/media.m3u8?oauth_token=download-123",
     );
-    expect(await client.files.getXspfPlaylistUrl(42)).toBe(
-      "https://api.put.io/v2/files/42/xspf?oauth_token=token-123",
+    expect(await client.files.getXspfPlaylistUrl(42, { downloadToken: "download-123" })).toBe(
+      "https://api.put.io/v2/files/42/xspf?oauth_token=download-123",
     );
     expect(
       await client.files.createUploadRequest({

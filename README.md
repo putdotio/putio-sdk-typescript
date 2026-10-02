@@ -304,8 +304,8 @@ const handled = Effect.gen(function* () {
 
 `files` exposes both JSON contracts and direct route helpers. Media URLs leave your app (players,
 casting receivers, shared links, logs), so sign them with the account download token, which only
-grants file access, instead of the OAuth token. The helpers fall back to `accessToken` when
-`downloadToken` is omitted.
+grants file access, instead of the OAuth token. `downloadToken` is required; the helpers never
+fall back to the client's `accessToken`.
 
 ```ts
 const { download_token: downloadToken } = await sdk.account.getInfo({ download_token: 1 });

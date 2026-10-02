@@ -454,7 +454,7 @@ export const useFiles = (parentId: number) =>
 - [Architecture](./docs/ARCHITECTURE.md) for package shape and boundaries
 - [Testing](./docs/TESTING.md) for local and live verification
 - [Distribution](./docs/DISTRIBUTION.md) for release automation
-- [Security](./SECURITY.md) for private-first vulnerability disclosure
+- [Security policy](https://github.com/putdotio/.github/blob/main/SECURITY.md) for private vulnerability reports; fixes target the latest published release and `main`
 
 ## Contributing
 

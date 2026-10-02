@@ -114,7 +114,7 @@ describe("utility file", () => {
       baseUrl: "https://api.example.com/v2",
       downloadToken: "test-token",
     });
-    expect(provider.apiURL).toBe("https://api.example.com/v2");
+    expect(provider.apiUrl).toBe("https://api.example.com/v2");
     expect(provider.downloadToken).toBe("test-token");
     expect(
       () => new FileURLProvider({ baseUrl: "https://api.example.com", downloadToken: "" }),
@@ -123,7 +123,7 @@ describe("utility file", () => {
       // @ts-expect-error JavaScript callers can omit the download token.
       () => new FileURLProvider({ baseUrl: "https://api.example.com" }),
     ).toThrow(PutioValidationError);
-    expect(providerWithVersionedUrl.baseURL).toBe("https://api.example.com");
+    expect(providerWithVersionedUrl.baseUrl).toBe("https://api.example.com");
     expect(provider.getDownloadURL(123)).toBe(
       "https://api.example.com/v2/files/123/download?oauth_token=test-token",
     );

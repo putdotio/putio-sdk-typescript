@@ -428,7 +428,7 @@ const FileUploadOptionsSchema = Schema.Struct({
   oauthToken: Schema.optional(NonEmptyStringSchema),
 });
 const FileDirectAccessOptionsSchema = Schema.Struct({
-  oauthToken: Schema.optional(NonEmptyStringSchema),
+  downloadToken: NonEmptyStringSchema,
   useTunnel: Schema.optional(Schema.Boolean),
 });
 const FileApiDownloadUrlOptionsSchema = FileDirectAccessOptionsSchema.pipe(
@@ -442,7 +442,7 @@ const FileApiMp4DownloadUrlOptionsSchema = FileDirectAccessOptionsSchema.pipe(
 );
 const FileHlsStreamUrlOptionsSchema = Schema.Struct({
   maxSubtitleCount: Schema.optional(PositiveIntegerSchema),
-  oauthToken: Schema.optional(NonEmptyStringSchema),
+  downloadToken: NonEmptyStringSchema,
   playOriginal: Schema.optional(Schema.Boolean),
   subtitleLanguages: Schema.optional(
     Schema.Array(NonEmptyStringSchema).check(Schema.isMinLength(1)),
@@ -456,7 +456,7 @@ const FileHlsMasterPlaylistOptionsSchema = Schema.Struct({
   ),
 });
 const FileXspfPlaylistUrlOptionsSchema = Schema.Struct({
-  oauthToken: Schema.optional(NonEmptyStringSchema),
+  downloadToken: NonEmptyStringSchema,
 });
 const FilesNextFileSchema = Schema.Struct({
   id: Schema.Int,
@@ -518,7 +518,8 @@ export type FileUploadResult =
       readonly transfer: FileUploadTransfer;
     };
 export type FileDirectAccessOptions = {
-  readonly oauthToken?: string;
+  /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
+  readonly downloadToken: string;
   readonly useTunnel?: boolean;
 };
 export type FileApiDownloadUrlOptions = FileDirectAccessOptions & {
@@ -533,12 +534,14 @@ export type FileHlsMasterPlaylistOptions = Schema.Schema.Type<
 >;
 export type FileHlsStreamUrlOptions = {
   readonly maxSubtitleCount?: number;
-  readonly oauthToken?: string;
+  /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
+  readonly downloadToken: string;
   readonly playOriginal?: boolean;
   readonly subtitleLanguages?: ReadonlyArray<string>;
 };
 export type FileXspfPlaylistUrlOptions = {
-  readonly oauthToken?: string;
+  /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
+  readonly downloadToken: string;
 };
 export type FileUploadInput = {
   readonly file: Blob;
@@ -882,30 +885,34 @@ const useTunnelToQuery = (useTunnel?: boolean) =>
       }
     : {};
 const resolveRouteContext = (
-  oauthToken?: string,
+  token?: string,
 ): Effect.Effect<
   {
     readonly config: PutioSdkConfigShape;
-    readonly oauthToken: string;
+    readonly token: string;
   },
   PutioSdkError,
   PutioSdkConfig
 > =>
   Effect.gen(function* () {
     const config = yield* PutioSdkConfig;
-    const resolvedOauthToken = oauthToken ?? config.accessToken;
-    if (resolvedOauthToken) {
+    const resolvedToken = token ?? config.accessToken;
+    if (resolvedToken) {
       return {
         config,
-        oauthToken: resolvedOauthToken,
+        token: resolvedToken,
       };
     }
     return yield* Effect.fail(
       mapConfigurationError(
-        "This helper requires an oauth token, but neither an override nor PutioSdkConfig.accessToken was provided",
+        "This helper requires a token, but neither an override nor PutioSdkConfig.accessToken was provided",
       ),
     );
   });
+const resolveApiBaseUrl: Effect.Effect<string, never, PutioSdkConfig> = Effect.gen(function* () {
+  const config = yield* PutioSdkConfig;
+  return config.baseUrl ?? "https://api.put.io";
+});
 const normalizeFileName = (name: string) => encodeURIComponent(name);
 const toUploadResult = (value: FileUploadEnvelope): FileUploadResult => {
   if (value.file) {
@@ -927,7 +934,7 @@ const toUploadResult = (value: FileUploadEnvelope): FileUploadResult => {
 export const buildFileApiDownloadUrl = (
   baseUrl: string | URL,
   fileId: number,
-  options: FileApiDownloadUrlOptions = {},
+  options: FileApiDownloadUrlOptions,
 ): string =>
   buildPutioUrl(
     baseUrl,
@@ -936,22 +943,22 @@ export const buildFileApiDownloadUrl = (
       : `/v2/files/${encodePathSegment(fileId)}/download`,
     {
       ...useTunnelToQuery(options.useTunnel),
-      oauth_token: options.oauthToken,
+      oauth_token: options.downloadToken,
     },
   );
 export const buildFileApiContentUrl = (
   baseUrl: string | URL,
   fileId: number,
-  options: FileDirectAccessOptions = {},
+  options: FileDirectAccessOptions,
 ): string =>
   buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/stream`, {
     ...useTunnelToQuery(options.useTunnel),
-    oauth_token: options.oauthToken,
+    oauth_token: options.downloadToken,
   });
 export const buildFileApiMp4DownloadUrl = (
   baseUrl: string | URL,
   fileId: number,
-  options: FileApiMp4DownloadUrlOptions = {},
+  options: FileApiMp4DownloadUrlOptions,
 ): string =>
   buildPutioUrl(
     baseUrl,
@@ -961,17 +968,17 @@ export const buildFileApiMp4DownloadUrl = (
     {
       ...useTunnelToQuery(options.useTunnel),
       convert: options.convert ? 1 : undefined,
-      oauth_token: options.oauthToken,
+      oauth_token: options.downloadToken,
     },
   );
 export const buildFileHlsStreamUrl = (
   baseUrl: string | URL,
   fileId: number,
-  options: FileHlsStreamUrlOptions = {},
+  options: FileHlsStreamUrlOptions,
 ): string =>
   buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/hls/media.m3u8`, {
     max_subtitle_count: options.maxSubtitleCount,
-    oauth_token: options.oauthToken,
+    oauth_token: options.downloadToken,
     original:
       typeof options.playOriginal === "boolean" ? (options.playOriginal ? 1 : 0) : undefined,
     subtitle_languages: joinCsv(options.subtitleLanguages),
@@ -979,10 +986,10 @@ export const buildFileHlsStreamUrl = (
 export const buildFileXspfPlaylistUrl = (
   baseUrl: string | URL,
   fileId: number,
-  options: FileXspfPlaylistUrlOptions = {},
+  options: FileXspfPlaylistUrlOptions,
 ): string =>
   buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/xspf`, {
-    oauth_token: options.oauthToken,
+    oauth_token: options.downloadToken,
   });
 export const createFileUploadFormData = (input: FileUploadInput): FormData => {
   const formData = new FormData();
@@ -1379,7 +1386,7 @@ export const getDownloadUrl = (
   ).pipe(selectJsonField("url"), withOperationErrors(DownloadUrlErrorSpec));
 export const getApiDownloadUrl = (
   fileId: number,
-  options: FileApiDownloadUrlOptions = {},
+  options: FileApiDownloadUrlOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
   decodeAndRun(
     Schema.Struct({
@@ -1388,18 +1395,13 @@ export const getApiDownloadUrl = (
     }),
     { fileId, options },
     (decoded) =>
-      resolveRouteContext(decoded.options.oauthToken).pipe(
-        Effect.map(({ config, oauthToken }) =>
-          buildFileApiDownloadUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
-            ...decoded.options,
-            oauthToken,
-          }),
-        ),
+      resolveApiBaseUrl.pipe(
+        Effect.map((baseUrl) => buildFileApiDownloadUrl(baseUrl, decoded.fileId, decoded.options)),
       ),
   );
 export const getApiContentUrl = (
   fileId: number,
-  options: FileDirectAccessOptions = {},
+  options: FileDirectAccessOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
   decodeAndRun(
     Schema.Struct({
@@ -1408,18 +1410,13 @@ export const getApiContentUrl = (
     }),
     { fileId, options },
     (decoded) =>
-      resolveRouteContext(decoded.options.oauthToken).pipe(
-        Effect.map(({ config, oauthToken }) =>
-          buildFileApiContentUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
-            ...decoded.options,
-            oauthToken,
-          }),
-        ),
+      resolveApiBaseUrl.pipe(
+        Effect.map((baseUrl) => buildFileApiContentUrl(baseUrl, decoded.fileId, decoded.options)),
       ),
   );
 export const getApiMp4DownloadUrl = (
   fileId: number,
-  options: FileApiMp4DownloadUrlOptions = {},
+  options: FileApiMp4DownloadUrlOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
   decodeAndRun(
     Schema.Struct({
@@ -1428,18 +1425,15 @@ export const getApiMp4DownloadUrl = (
     }),
     { fileId, options },
     (decoded) =>
-      resolveRouteContext(decoded.options.oauthToken).pipe(
-        Effect.map(({ config, oauthToken }) =>
-          buildFileApiMp4DownloadUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
-            ...decoded.options,
-            oauthToken,
-          }),
+      resolveApiBaseUrl.pipe(
+        Effect.map((baseUrl) =>
+          buildFileApiMp4DownloadUrl(baseUrl, decoded.fileId, decoded.options),
         ),
       ),
   );
 export const getHlsStreamUrl = (
   fileId: number,
-  options: FileHlsStreamUrlOptions = {},
+  options: FileHlsStreamUrlOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
   decodeAndRun(
     Schema.Struct({
@@ -1448,13 +1442,8 @@ export const getHlsStreamUrl = (
     }),
     { fileId, options },
     (decoded) =>
-      resolveRouteContext(decoded.options.oauthToken).pipe(
-        Effect.map(({ config, oauthToken }) =>
-          buildFileHlsStreamUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
-            ...decoded.options,
-            oauthToken,
-          }),
-        ),
+      resolveApiBaseUrl.pipe(
+        Effect.map((baseUrl) => buildFileHlsStreamUrl(baseUrl, decoded.fileId, decoded.options)),
       ),
   );
 /**
@@ -1492,7 +1481,7 @@ export const getHlsMasterPlaylist = (
   ).pipe(withOperationErrors(GetHlsMasterPlaylistErrorSpec));
 export const getXspfPlaylistUrl = (
   fileId: number,
-  options: FileXspfPlaylistUrlOptions = {},
+  options: FileXspfPlaylistUrlOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
   decodeAndRun(
     Schema.Struct({
@@ -1501,12 +1490,8 @@ export const getXspfPlaylistUrl = (
     }),
     { fileId, options },
     (decoded) =>
-      resolveRouteContext(decoded.options.oauthToken).pipe(
-        Effect.map(({ config, oauthToken }) =>
-          buildFileXspfPlaylistUrl(config.baseUrl ?? "https://api.put.io", decoded.fileId, {
-            oauthToken,
-          }),
-        ),
+      resolveApiBaseUrl.pipe(
+        Effect.map((baseUrl) => buildFileXspfPlaylistUrl(baseUrl, decoded.fileId, decoded.options)),
       ),
   );
 export const listFileSubtitles = (
@@ -1717,11 +1702,11 @@ export const createFileUploadRequest = (
     { input, options },
     (decoded) =>
       resolveRouteContext(decoded.options.oauthToken).pipe(
-        Effect.map(({ config, oauthToken }) => ({
+        Effect.map(({ config, token }) => ({
           body: createFileUploadFormData(decoded.input),
           method: "POST" as const,
           url: buildPutioUrl(config.uploadBaseUrl ?? "https://upload.put.io", "/v2/files/upload", {
-            oauth_token: oauthToken,
+            oauth_token: token,
           }),
         })),
       ),
@@ -1737,7 +1722,7 @@ export const uploadFile = (
     { input, options },
     (decoded) =>
       resolveRouteContext(decoded.options.oauthToken).pipe(
-        Effect.flatMap(({ config, oauthToken }) =>
+        Effect.flatMap(({ config, token }) =>
           requestJson(FileUploadEnvelopeSchema, {
             auth: {
               type: "none",
@@ -1750,7 +1735,7 @@ export const uploadFile = (
             method: "POST",
             path: "/v2/files/upload",
             query: {
-              oauth_token: oauthToken,
+              oauth_token: token,
             },
           }),
         ),

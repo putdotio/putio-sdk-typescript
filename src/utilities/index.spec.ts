@@ -5,7 +5,7 @@ import * as utilities from "./index.js";
 describe("utility index", () => {
   it("exports the known utility surface", () => {
     expect(utilities).toMatchObject({
-      FileURLProvider: expect.any(Function),
+      FileUrlProvider: expect.any(Function),
       LocalizedError: expect.any(Function),
       createLocalizeError: expect.any(Function),
       daysDiff: expect.any(Function),

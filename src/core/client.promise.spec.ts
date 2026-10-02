@@ -663,14 +663,20 @@ describe("sdk promise client adapters", () => {
       name: "child",
     });
     expect(await client.files.getDownloadUrl(4)).toBe("https://download.put.io/4");
-    expect(await client.files.getApiDownloadUrl(4)).toBe("https://api.put.io/files/4/download");
-    expect(await client.files.getApiContentUrl(4)).toBe("https://api.put.io/files/4/stream");
-    expect(await client.files.getApiMp4DownloadUrl(4)).toBe(
+    expect(await client.files.getApiDownloadUrl(4, { downloadToken: "download-123" })).toBe(
+      "https://api.put.io/files/4/download",
+    );
+    expect(await client.files.getApiContentUrl(4, { downloadToken: "download-123" })).toBe(
+      "https://api.put.io/files/4/stream",
+    );
+    expect(await client.files.getApiMp4DownloadUrl(4, { downloadToken: "download-123" })).toBe(
       "https://api.put.io/files/4/mp4/download",
     );
-    expect(await client.files.getHlsStreamUrl(4)).toBe("https://api.put.io/files/4/hls/media.m3u8");
+    expect(await client.files.getHlsStreamUrl(4, { downloadToken: "download-123" })).toBe(
+      "https://api.put.io/files/4/hls/media.m3u8",
+    );
     expect(await client.files.getHlsMasterPlaylist(4)).toBe("#EXTM3U\n#file:4");
-    expect(await client.files.getXspfPlaylistUrl(4)).toBe(
+    expect(await client.files.getXspfPlaylistUrl(4, { downloadToken: "download-123" })).toBe(
       "https://api.put.io/v2/files/4/xspf?oauth_token=token-123",
     );
     expect(await client.files.getStartFrom(4)).toBe(4);

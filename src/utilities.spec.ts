@@ -5,7 +5,7 @@ import * as utilities from "./utilities.js";
 describe("utilities subpath entry", () => {
   it("re-exports the utility namespace", () => {
     expect(utilities).toMatchObject({
-      FileURLProvider: expect.any(Function),
+      FileUrlProvider: expect.any(Function),
       LocalizedError: expect.any(Function),
       createLocalizeError: expect.any(Function),
       getFileRenderType: expect.any(Function),

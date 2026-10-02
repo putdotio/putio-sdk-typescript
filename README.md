@@ -110,13 +110,14 @@ Shared formatting, URL, and error-localization helpers are available from the ut
 
 ```ts
 import {
-  FileURLProvider,
+  FileUrlProvider,
   secondsToReadableDuration,
   toHumanFileSize,
 } from "@putdotio/sdk/utilities";
 ```
 
 ```ts
+const urls = new FileUrlProvider({ baseUrl: "https://api.put.io", downloadToken });
 const size = toHumanFileSize(1_572_864);
 const duration = secondsToReadableDuration(444);
 ```
@@ -301,14 +302,20 @@ const handled = Effect.gen(function* () {
 
 ## Direct File Access
 
-`files` exposes both JSON contracts and direct route helpers:
+`files` exposes both JSON contracts and direct route helpers. Media URLs leave your app (players,
+casting receivers, shared links, logs), so sign them with the account download token, which only
+grants file access, instead of the OAuth token. `downloadToken` is required; the helpers never
+fall back to the client's `accessToken`.
 
 ```ts
+const { download_token: downloadToken } = await sdk.account.getInfo({ download_token: 1 });
+
 const playlistUrl = await sdk.files.getHlsStreamUrl(fileId, {
+  downloadToken,
   maxSubtitleCount: 1,
 });
 
-const vlcPlaylistUrl = await sdk.files.getXspfPlaylistUrl(fileId);
+const vlcPlaylistUrl = await sdk.files.getXspfPlaylistUrl(fileId, { downloadToken });
 
 // The master playlist put.io would serve, for inspecting the selected
 // variant's CODECS and VIDEO-RANGE. `playOriginal` picks the original
@@ -450,6 +457,7 @@ export const useFiles = (parentId: number) =>
 
 ## Docs
 
+- [Migrating to v12](./docs/MIGRATING_V12.md) for required `downloadToken` media URLs and the `FileUrlProvider` renames
 - [Migrating to v11](./docs/MIGRATING_V11.md) for the removed Coinbase and file-search contracts
 - [Architecture](./docs/ARCHITECTURE.md) for package shape and boundaries
 - [Testing](./docs/TESTING.md) for local and live verification

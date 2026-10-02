@@ -11,6 +11,8 @@ const { assert, assertOperationError, finish, run, sleep } = live;
 void assertOperationError;
 void sleep;
 
+const { download_token: downloadToken } = await client.account.getInfo({ download_token: 1 });
+
 const createDisposableTextFile = async (label: string) => {
   const name = `putio-typescript-sdk-${label}-${Date.now()}.txt`;
   const upload = await client.files.upload({
@@ -32,7 +34,7 @@ await run("files api download url redirects", async () => {
   const file = await createDisposableTextFile("download_redirect");
 
   try {
-    const url = await client.files.getApiDownloadUrl(file.id);
+    const url = await client.files.getApiDownloadUrl(file.id, { downloadToken });
     const response = await fetch(url, {
       redirect: "manual",
     });
@@ -55,7 +57,7 @@ await run("files api content url redirects", async () => {
   const file = await createDisposableTextFile("content_redirect");
 
   try {
-    const url = await client.files.getApiContentUrl(file.id);
+    const url = await client.files.getApiContentUrl(file.id, { downloadToken });
     const response = await fetch(url, {
       redirect: "manual",
     });
@@ -102,6 +104,7 @@ await run("files api mp4 download url redirects for owned video", async () => {
   });
 
   const url = await client.files.getApiMp4DownloadUrl(video.id, {
+    downloadToken,
     name: "putio-typescript-sdk-live.mp4",
   });
   const response = await fetch(url, {
@@ -121,6 +124,7 @@ await run("files hls url is tokenized", async () => {
   const video = await requireOwnedVideoFixture(client);
 
   const url = await client.files.getHlsStreamUrl(video.id, {
+    downloadToken,
     maxSubtitleCount: 1,
   });
 
@@ -136,7 +140,7 @@ await run("files hls url is tokenized", async () => {
 
 await run("files XSPF playlist is fetchable for owned video", async () => {
   const video = await requireOwnedVideoFixture(client);
-  const url = await client.files.getXspfPlaylistUrl(video.id);
+  const url = await client.files.getXspfPlaylistUrl(video.id, { downloadToken });
   const response = await fetch(url);
   const body = await response.text();
 

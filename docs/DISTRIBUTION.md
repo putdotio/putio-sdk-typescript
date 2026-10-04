@@ -6,7 +6,7 @@ Every merge to `main` should already be releasable.
 
 GitHub Actions owns releases through [ci.yml](../.github/workflows/ci.yml). On `main`, the `release` job runs after `verify` and the compatibility matrix pass. All jobs use GitHub-hosted runners because npm Trusted Publishing supports only those.
 
-The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a reviewed commit SHA. That workflow pins the semantic-release action by commit and every plugin by exact version, so the secret-bearing job never fetches unversioned plugins. [`.releaserc.json`](../.releaserc.json) is the release configuration. [`scan.yml`](../.github/workflows/scan.yml) calls the shared frontend scan workflow: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch.
+The release job calls the [shared frontend release workflow](https://github.com/putdotio/.github) from `putdotio/.github`, pinned to a reviewed commit SHA. That workflow pins the semantic-release action by commit and every plugin by exact version, so the secret-bearing job never fetches unversioned plugins. [`.releaserc.json`](../.releaserc.json) is the release configuration. [`scan.yml`](../.github/workflows/scan.yml) calls the shared frontend scan workflow: Gitleaks, TruffleHog, Actionlint, and Zizmor on pull requests, weekly, and on manual dispatch. [`links.yml`](../.github/workflows/links.yml) calls the shared offline Markdown link and anchor check on pull requests and `main`.
 
 The release lane:
 

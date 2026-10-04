@@ -22,8 +22,8 @@ The release job declares the protected GitHub Environment named `release`.
 
 Environment entries:
 
-- secrets: `PUTIO_RELEASE_BOT_PRIVATE_KEY`
-- variables: `PUTIO_RELEASE_BOT_CLIENT_ID`
+- secrets: `PUTIO_CI_APP_PRIVATE_KEY`
+- variables: `PUTIO_CI_APP_CLIENT_ID`
 - approval: none; releases are continuous after the `main` gate passes
 - refs: release branch/tag policy constrains what can publish
 - deployment records: disabled with `deployment: false` because this is package publishing, not an app deploy
@@ -32,11 +32,11 @@ The npm package uses Trusted Publishing from GitHub Actions. On npm, configure o
 
 During the `@semantic-release/npm` publish step, npm detects the GitHub OIDC identity, mints short-lived publish credentials, and publishes provenance for the release job. The package repository metadata points at `putdotio/putio-sdk-typescript` so npm can match the OIDC publisher identity.
 
-Release GitHub writes use `putio-releaser` through `PUTIO_RELEASE_BOT_CLIENT_ID` and `PUTIO_RELEASE_BOT_PRIVATE_KEY`.
+Release GitHub writes use `putio-ci` through `PUTIO_CI_APP_CLIENT_ID` and `PUTIO_CI_APP_PRIVATE_KEY`.
 
 Dependency caches stay on the secretless verify jobs. The release job installs fresh with caching disabled and mints the release bot token only after install.
 
-Public-repo branch policy may still allow trusted put.io team members to push directly to `main`, but it should block outsiders, force-pushes, and branch deletes where GitHub plan support allows. Release tag policy restricts `v*` tag creation, update, and deletion to `putio-releaser` and org admins.
+Public-repo branch policy may still allow trusted put.io team members to push directly to `main`, but it should block outsiders, force-pushes, and branch deletes where GitHub plan support allows. Release tag policy restricts `v*` tag creation, update, and deletion to `putio-ci` and org admins.
 
 ## Local Checks
 

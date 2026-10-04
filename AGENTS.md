@@ -3,7 +3,7 @@
 ## Repo
 
 - Single-package TypeScript repo for `@putdotio/sdk`, the canonical put.io API client; put.io's own apps and `putio-cli` install it from npm
-- Build and test workflow uses Vite+; prefer `vp` for toolchain and package-manager operations and `vp run <script>` for custom package scripts. `vp` is the `vite-plus` devDependency; without a global install, run it as `pnpm exec vp`
+- Build and test workflow uses Vite+; prefer `vp` for toolchain and package-manager operations and `vp run <script>` for custom package scripts. `vp` is the `vite-plus` devDependency; without a global install, run `pnpm install` first, then call it as `pnpm exec vp`
 - Main areas: `src/*`, `test/live/*`, `docs/*`, `scripts/*`
 
 ## Start Here
@@ -43,13 +43,13 @@ generated artifacts before teardown.
 
 - Docs only: `vp check .`; no runtime proof.
 - Source, schema, or error-mapping change: `vp run verify`. It enforces the 90% coverage floor in [vite.config.ts](./vite.config.ts); cover new code instead of lowering the floor.
-- Exports, entrypoints, or packaging: also `vp run test:compat`. CI runs it as a Node, browser, and Bun matrix.
+- Exports, entrypoints, or packaging: also `vp run test:compat`. Locally it needs `bun` on `PATH` and, once, `vp run test:compat:browser:install`; CI runs it as a Node, browser, and Bun matrix.
 - Endpoint behavior the sanitized fixtures cannot prove: the matching live target, such as `pnpm test:live:targets -- test/live/files.test.ts`; target rules are in [Testing](./docs/TESTING.md#live-commands). Report a live gap you could not run.
 
 ## Hazards
 
 - Live targets run against shared, real put.io accounts. Stay inside the [safety rules](./docs/TESTING.md#safety-rules): read-only calls and reversible mutations that clean up; never password reset, 2FA changes, account destroy, or revoke-all sessions.
-- `.env.local` and `.env.live-tokens` hold live tokens; keep their values out of output, docs, and commits.
+- `.env`, `.env.local`, and `.env.live-tokens` hold live credentials and tokens; keep their values out of output, docs, and commits.
 
 ## Delivery
 

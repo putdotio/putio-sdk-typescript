@@ -53,7 +53,7 @@ generated artifacts before teardown.
 
 ## Delivery
 
-Pull requests squash-merge to `main`. A push to `main` runs `verify` and the compatibility matrix, then semantic-release publishes `@putdotio/sdk` to npm and creates the GitHub release when the commits since the last release include `feat`, `fix`, `perf`, or a breaking change; `docs`, `chore`, `test`, and `ci` publish nothing. The squashed commit's type is the version decision, and npm never accepts a published version number again. Release wiring: [Distribution](./docs/DISTRIBUTION.md).
+Pull requests squash-merge to `main`. A push to `main` runs `verify` and the compatibility matrix, then semantic-release publishes `@putdotio/sdk` to npm and creates the GitHub release when the commits since the last release include `feat`, `fix`, `perf`, a revert, or a breaking change; `docs`, `chore`, `test`, and `ci` publish nothing. The squashed commit's type is the version decision, and npm never accepts a published version number again. Release wiring: [Distribution](./docs/DISTRIBUTION.md).
 
 ## Effect
 

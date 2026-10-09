@@ -268,6 +268,17 @@ describe("account domain", () => {
     expect(twoFactorResult).toEqual({ status: "OK" });
   });
 
+  it("reads account settings without support_widget_enabled", async () => {
+    const { support_widget_enabled: _retired, ...settingsWithoutSupportWidget } = accountSettings;
+    const settings = await runSdkEffect(
+      getAccountSettings(),
+      () => jsonResponse({ settings: settingsWithoutSupportWidget, status: "OK" }),
+      { accessToken: "token-123" },
+    );
+
+    expect(settings.support_widget_enabled).toBeUndefined();
+  });
+
   it("rejects invalid account request inputs before transport", async () => {
     let requestCount = 0;
     const handler = () => {

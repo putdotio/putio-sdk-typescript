@@ -28,8 +28,7 @@ const AccountSettingsFields = {
   callback_url: Schema.NullOr(Schema.String),
   dark_theme: Schema.Boolean,
   default_download_folder: Schema.Int,
-  // Cross-client privacy controls. The backend is retiring support_widget_enabled
-  // (putdotio/putio#4841), so responses may omit it.
+  // Cross-client privacy controls.
   diagnostics_enabled: Schema.Boolean,
   dont_autoselect_subtitles: Schema.Boolean,
   fluid_layout: Schema.Boolean,
@@ -45,7 +44,6 @@ const AccountSettingsFields = {
   sort_by: Schema.String,
   start_from: Schema.Boolean,
   subtitle_languages: Schema.Array(Schema.NullOr(Schema.String)).check(Schema.isMaxLength(2)),
-  support_widget_enabled: Schema.optional(Schema.Boolean),
   theater_mode: Schema.Boolean,
   theme: Schema.Literals(["dark", "light", "auto"]),
   transfer_sort_by: Schema.NullOr(Schema.String),
@@ -141,7 +139,6 @@ const AccountSettingsPatchFields = {
   sort_by: Schema.optional(AccountSettingsFields.sort_by),
   start_from: Schema.optional(AccountSettingsFields.start_from),
   subtitle_languages: Schema.optional(AccountSettingsFields.subtitle_languages),
-  support_widget_enabled: AccountSettingsFields.support_widget_enabled,
   theater_mode: Schema.optional(AccountSettingsFields.theater_mode),
   theme: Schema.optional(AccountSettingsFields.theme),
   transfer_sort_by: Schema.optional(AccountSettingsFields.transfer_sort_by),

@@ -202,7 +202,7 @@ describe("account domain", () => {
     expect(settings.locale).toBe("en");
     expect(settings.diagnostics_enabled).toBe(false);
     expect(settings.product_analytics_enabled).toBe(true);
-    expect(settings.support_widget_enabled).toBe(false);
+    expect(settings).not.toHaveProperty("support_widget_enabled");
 
     const result = await runSdkEffect(
       saveAccountSettings({

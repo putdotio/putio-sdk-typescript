@@ -18,13 +18,3 @@ peerDependencyRules:
     vitest: "*"
 minimumReleaseAgeExclude:
   - effect@4.0.0
-  - "@voidzero-dev/vite-plus-core@1.0.0"
-  - "@voidzero-dev/vite-plus-darwin-arm64@1.0.0"
-  - "@voidzero-dev/vite-plus-darwin-x64@1.0.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-gnu@1.0.0"
-  - "@voidzero-dev/vite-plus-linux-arm64-musl@1.0.0"
-  - "@voidzero-dev/vite-plus-linux-x64-gnu@1.0.0"
-  - "@voidzero-dev/vite-plus-linux-x64-musl@1.0.0"
-  - "@voidzero-dev/vite-plus-win32-arm64-msvc@1.0.0"
-  - "@voidzero-dev/vite-plus-win32-x64-msvc@1.0.0"
-  - vite-plus@1.0.0

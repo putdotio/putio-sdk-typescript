@@ -167,6 +167,7 @@ export const RegisterInputSchema = Schema.Struct({
   mail: NonEmptyStringSchema,
   password: NonEmptyStringSchema,
   plan_name: Schema.optional(NonEmptyStringSchema),
+  product_analytics_enabled: Schema.optional(Schema.Boolean),
   username: NonEmptyStringSchema,
   voucher_code: Schema.optional(NonEmptyStringSchema),
 });
@@ -218,6 +219,7 @@ export const RegisterErrorSpec = definePutioOperationErrorSpec({
   knownErrors: [
     { errorType: "INVALID_USERNAME", statusCode: 400 as const },
     { errorType: "INVALID_MAIL", statusCode: 400 as const },
+    { errorType: "INVALID_VALUE", statusCode: 400 as const },
     { errorType: "REDEEMED_VOUCHER_CODE", statusCode: 400 as const },
     { errorType: "USERNAME_EXISTS", statusCode: 400 as const },
     { errorType: "MAIL_EXISTS", statusCode: 400 as const },

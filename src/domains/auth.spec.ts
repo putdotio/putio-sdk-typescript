@@ -411,6 +411,30 @@ describe("auth domain", () => {
     });
   });
 
+  it("sends the registration analytics choice as the literal strings the API accepts", async () => {
+    const sentValue = async (productAnalyticsEnabled?: boolean) => {
+      let value: string | null = null;
+      await runSdkEffect(
+        register({
+          client_id: 42,
+          mail: "sdk@put.io",
+          password: "secret",
+          product_analytics_enabled: productAnalyticsEnabled,
+          username: "sdk",
+        }),
+        (request) => {
+          value = getFormBody(request).get("product_analytics_enabled");
+          return jsonResponse({ access_token: "registered", status: "OK" });
+        },
+      );
+      return value;
+    };
+
+    expect(await sentValue(true)).toBe("true");
+    expect(await sentValue(false)).toBe("false");
+    expect(await sentValue(undefined)).toBeNull();
+  });
+
   it("rejects invalid auth inputs before transport without exposing credentials", async () => {
     let requestCount = 0;
     const handler = () => {

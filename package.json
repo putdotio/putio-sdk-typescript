@@ -62,7 +62,7 @@
     "verify": "vp check . && vp run lint:package && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests"
   },
   "dependencies": {
-    "effect": "4.0.0"
+    "effect": "4.0.4"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
@@ -79,5 +79,5 @@
   "engines": {
     "node": ">=24.19.0"
   },
-  "packageManager": "pnpm@12.4.2"
+  "packageManager": "pnpm@12.13.0"
 }

@@ -19,7 +19,7 @@ Run the full repo guardrail before opening or updating a pull request:
 vp run verify
 ```
 
-CI runs the same command. [Testing](./docs/TESTING.md#local-checks) lists what it covers; live tests stay outside the coverage threshold.
+CI runs the same command. [Testing](./docs/testing.md#local-checks) lists what it covers; live tests stay outside the coverage threshold.
 
 ## Live Verification
 
@@ -30,7 +30,7 @@ cp .env.example .env   # or render maintainer-provided secrets with `pnpm secret
 vp run test:live
 ```
 
-Credential rendering, token bootstrap, single-target commands, safety rules, and fixture expectations are in [Testing](./docs/TESTING.md#live-environment).
+Credential rendering, token bootstrap, single-target commands, safety rules, and fixture expectations are in [Testing](./docs/testing.md#live-environment).
 
 ## Development Notes
 

@@ -70,4 +70,4 @@ Overload-specific Promise signatures remain explicit adapters; mixed Effect/pure
 
 ## Verification Model
 
-See [Testing](./TESTING.md#sdk-verification-strategy) for the verification layers and commands.
+See [Testing](./testing.md#sdk-verification-strategy) for the verification layers and commands.

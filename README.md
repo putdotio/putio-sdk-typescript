@@ -335,7 +335,7 @@ Upload targets `upload.put.io` internally because `api.put.io/v2/files/upload` i
 ## Endpoint Coverage
 
 The TypeScript SDK mirrors the supported public put.io API surface. Scope, exclusions, and the
-latest audit are in [API Coverage](docs/API-COVERAGE.md).
+latest audit are in [API Coverage](docs/api-coverage.md).
 
 ## File Lookup and Mutations
 
@@ -457,11 +457,11 @@ export const useFiles = (parentId: number) =>
 
 ## Docs
 
-- [Migrating to v12](./docs/MIGRATING_V12.md) for required `downloadToken` media URLs and the `FileUrlProvider` renames
-- [Migrating to v11](./docs/MIGRATING_V11.md) for the removed Coinbase and file-search contracts
-- [Architecture](./docs/ARCHITECTURE.md) for package shape and boundaries
-- [Testing](./docs/TESTING.md) for local and live verification
-- [Distribution](./docs/DISTRIBUTION.md) for release automation
+- [Migrating to v12](./docs/migrating-v12.md) for required `downloadToken` media URLs and the `FileUrlProvider` renames
+- [Migrating to v11](./docs/migrating-v11.md) for the removed Coinbase and file-search contracts
+- [Architecture](./docs/architecture.md) for package shape and boundaries
+- [Testing](./docs/testing.md) for local and live verification
+- [Distribution](./docs/distribution.md) for release automation
 - [Security policy](https://github.com/putdotio/.github/blob/main/SECURITY.md) for private vulnerability reports; fixes target the latest published release and `main`
 
 ## Contributing

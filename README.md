@@ -242,8 +242,7 @@ the body remain transport errors, including errors from custom HTTP clients.
 
 Backend error bodies preserve `status`, `status_code`, `error_type`, `error_message`,
 `error_uri`, nullable `error_id`, and structured `extra` metadata. The legacy
-`details` field remains available for compatibility, but current backend errors use
-`extra`; `details` is planned for removal in the next major release.
+`details` field is still parsed, but current backend errors use `extra`.
 
 Promise consumers receive tagged SDK error objects:
 
@@ -431,7 +430,7 @@ export const useAccountInfo = () =>
   });
 ```
 
-The Effect client also works well when you want the canonical typed API:
+The Effect client works the same way:
 
 ```ts
 import { useQuery } from "@tanstack/react-query";

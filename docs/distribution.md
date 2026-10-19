@@ -36,7 +36,7 @@ Release GitHub writes use `putio-ci` through `PUTIO_CI_APP_CLIENT_ID` and `PUTIO
 
 Dependency caches stay on the secretless verify jobs. The release job installs fresh with caching disabled and mints the release bot token only after install.
 
-Public-repo branch policy may still allow trusted put.io team members to push directly to `main`, but it should block outsiders, force-pushes, and branch deletes where GitHub plan support allows. Release tag policy restricts `v*` tag creation, update, and deletion to `putio-ci` and org admins.
+Release tag policy restricts `v*` tag creation, update, and deletion to `putio-ci` and org admins.
 
 ## Local Checks
 

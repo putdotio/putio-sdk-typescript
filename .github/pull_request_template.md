@@ -13,5 +13,4 @@ API. Add one-line bullets only for risks the aid doesn't show. -->
 
 ## Notes
 
-- Risks, rollout notes, or follow-up work
-- If not applicable, write `N/A`
+<!-- Risks, rollout notes, or follow-up work. Delete this section if there are none. -->

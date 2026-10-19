@@ -97,7 +97,7 @@ Each test removes its archive, extracted files, or transfer before it exits.
 Torrent fixtures use an unreachable `example.invalid` tracker. URL fixtures
 cover the terminal error and retry states.
 
-Uploaded torrents did not create a predictable history event. The suite tests
+Uploaded torrents do not create a predictable history event. The suite tests
 the missing-event result from `events.getTorrent(...)` and leaves existing
 account history alone.
 

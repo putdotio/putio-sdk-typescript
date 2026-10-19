@@ -1,7 +1,5 @@
 # Contributing
 
-Thanks for contributing to `@putdotio/sdk`.
-
 ## Setup
 
 Install dependencies with Vite+, then install the stock Vite+ hook wiring for this clone:

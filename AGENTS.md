@@ -37,7 +37,7 @@ generated artifacts before teardown.
 - Validate external data at the boundary with schemas and keep typed failures explicit.
 - Prefer feature/domain modules over layering by technical concern.
 - Keep public package boundaries explicit and open-source-safe; `lint:package` inside `vp run verify` is the publication safety net for tarball metadata, public types, and ESM entrypoints.
-- Update docs when the public surface, verification workflow, or repo shape changes; breaking changes get a `docs/MIGRATING_V*.md` entry.
+- Update docs when the public surface, verification workflow, or repo shape changes; breaking changes get a `docs/migrating-v*.md` entry.
 
 ## Proof
 

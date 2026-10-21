@@ -1,6 +1,7 @@
-import { Effect, Predicate } from "effect";
+import { Effect, Predicate, Schema } from "effect";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
+import { publicContractFixtures } from "../../test/fixtures/public-contracts.js";
 import * as sdk from "../index.js";
 import {
   PutioSdk,
@@ -271,6 +272,62 @@ describe("sdk client factories", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(9);
+  });
+
+  it("routes the Promise client's typed overload wrappers through their operations", async () => {
+    const requests: Array<string> = [];
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? new URL(input)
+          : input instanceof URL
+            ? input
+            : new URL(input.url);
+      requests.push(`${url.pathname}${url.search}`);
+
+      switch (url.pathname) {
+        case "/v2/files/9":
+        case "/v2/files/7/child":
+          return json(publicContractFixtures.fileCopy.response);
+        case "/v2/config":
+          return json({ status: "OK", config: { theme: "dark" } });
+        case "/v2/config/theme":
+          return json({ status: "OK", value: "dark" });
+        default:
+          return json({ error_type: "invalid_scope", status_code: 401 }, 401);
+      }
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
+
+    await expect(client.files.get({ id: 9 })).resolves.toMatchObject({ id: 10 });
+    await expect(
+      client.files.getChild({ name: "Fixture Copy", parentId: 7 }),
+    ).resolves.toMatchObject({ name: "Fixture Copy", parent_id: 7 });
+    await expect(client.config.getKeyWith("theme", Schema.String)).resolves.toBe("dark");
+    await expect(client.config.readWith(Schema.Struct({ theme: Schema.String }))).resolves.toEqual({
+      theme: "dark",
+    });
+    await expect(client.account.getInfo({ download_token: 1 })).rejects.toMatchObject({
+      _tag: "PutioAuthError",
+      status: 401,
+    });
+
+    expect(requests).toEqual([
+      "/v2/files/9",
+      "/v2/files/7/child?name=Fixture+Copy",
+      "/v2/config/theme",
+      "/v2/config",
+      "/v2/account/info?download_token=1",
+    ]);
+
+    await client.dispose();
   });
 
   it("updates the Promise access token before and after runtime creation", async () => {

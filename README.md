@@ -58,7 +58,7 @@ const login = await sdk.auth.login({
 });
 ```
 
-Server-side callers can add `headers` that every request sends. Per-request headers win, and an `authorization` entry is ignored: request `auth` alone decides credentials.
+Server-side callers can add `headers` that every API request the SDK sends carries. Per-request headers win, and an `authorization` entry in config headers is ignored.
 
 ```ts
 const sdk = createPutioSdkPromiseClient({

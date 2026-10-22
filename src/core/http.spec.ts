@@ -298,6 +298,33 @@ describe("sdk core http", () => {
     expect(result).toEqual({ status: "OK" });
   });
 
+  it("sends configured headers under request headers and the sdk authorization", async () => {
+    await Effect.runPromise(
+      provideSdkTest(
+        requestVoid({
+          method: "POST",
+          path: "/v2/test",
+          headers: { "x-request-id": "request" },
+        }),
+        (request) => {
+          expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
+          expect(request.headers.get("x-request-id")).toBe("request");
+          expect(request.headers.get("authorization")).toBe("Token token-123");
+
+          return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+        },
+        {
+          accessToken: "token-123",
+          headers: {
+            authorization: "Token spoofed",
+            "x-forwarded-for": "203.0.113.7",
+            "x-request-id": "config",
+          },
+        },
+      ),
+    );
+  });
+
   it("fails fast when a config-token request has no configured access token", async () => {
     const exit = await Effect.runPromiseExit(
       provideSdkTest(

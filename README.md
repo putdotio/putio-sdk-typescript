@@ -58,6 +58,14 @@ const login = await sdk.auth.login({
 });
 ```
 
+Server-side callers can add `headers` that every request sends. Per-request headers and the SDK's own `authorization` take precedence:
+
+```ts
+const sdk = createPutioSdkPromiseClient({
+  headers: { "x-forwarded-for": viewerIp },
+});
+```
+
 Long-lived Promise clients can replace or clear their token without recreating the client:
 
 ```ts

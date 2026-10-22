@@ -289,6 +289,9 @@ const provideSdk = async <A, E>(
 const snapshotUrl = (value: string | URL | undefined): string | URL | undefined =>
   typeof value === "string" || value === undefined ? value : new URL(value.href);
 
+const snapshotHeaders = (value: HeadersInit | undefined): HeadersInit | undefined =>
+  value === undefined ? undefined : [...new Headers(value)];
+
 type PromiseOperation<T> = T extends (...args: infer Args) => infer Result
   ? Result extends Effect.Effect<infer Success, infer _Error, infer _Requirements>
     ? (...args: Args) => Promise<Success>
@@ -712,11 +715,13 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
   const normalizedConfig = makePutioSdkConfig({
     ...initialConfig,
     baseUrl: snapshotUrl(initialConfig.baseUrl),
+    headers: snapshotHeaders(initialConfig.headers),
     uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
     webAppUrl: snapshotUrl(initialConfig.webAppUrl),
   });
   const runtimeConfig: PutioSdkPromiseRuntimeConfig = {
     baseUrl: normalizedConfig.baseUrl,
+    headers: normalizedConfig.headers,
     uploadBaseUrl: normalizedConfig.uploadBaseUrl,
     webAppUrl: normalizedConfig.webAppUrl,
   };

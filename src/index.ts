@@ -35,6 +35,7 @@ export * from "./domains/ifttt.js";
 export * from "./domains/oauth.js";
 export * from "./domains/payment.js";
 export * from "./domains/podcast.js";
+export * from "./domains/rate-limits.js";
 export * from "./domains/rss.js";
 export * from "./domains/sharing.js";
 export * from "./domains/trash.js";

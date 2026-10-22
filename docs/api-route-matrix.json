@@ -215,6 +215,14 @@
       "path": "/v2/transfers/remove",
       "rationale": "The transfers client exposes filtered or selected transfer removal directly.",
       "source": "putio/api2/transfers.py:669"
+    },
+    {
+      "classification": "sdk",
+      "method": "DELETE",
+      "operation": "rateLimits.removeBan",
+      "path": "/v2/ban/:exceedingId",
+      "rationale": "Browsers lift a captcha-needed IP rate limit with the 429's X-RateLimit-ID and a reCAPTCHA token.",
+      "source": "putio/ratelimit/api.py:23"
     }
   ],
   "version": 1

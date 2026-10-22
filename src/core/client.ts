@@ -213,6 +213,7 @@ import {
   retryTransfer,
   stopTransferRecording,
 } from "../domains/transfers.js";
+import { removeRateLimitBan } from "../domains/rate-limits.js";
 import { listTunnelRoutes } from "../domains/tunnel.js";
 import { cancelZip, createZip, getZip, listZips } from "../domains/zips.js";
 import { mapConfigurationError } from "./errors.js";
@@ -629,6 +630,9 @@ const sharedOperationTree = {
       getInfo: validated(getPaymentVoucherInfo),
       redeem: validated(redeemPaymentVoucher),
     },
+  },
+  rateLimits: {
+    removeBan: validated(removeRateLimitBan),
   },
   rss: {
     clearLogs: validated(clearRssFeedLogs),

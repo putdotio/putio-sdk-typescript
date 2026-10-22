@@ -283,6 +283,14 @@ try {
 }
 ```
 
+A rate limit with `error.action === "captcha-needed"` can be lifted from the limited visitor's browser with a solved reCAPTCHA token:
+
+```ts
+if (isPutioRateLimitError(error) && error.action === "captcha-needed" && error.id) {
+  await sdk.rateLimits.removeBan({ captchaToken, id: error.id });
+}
+```
+
 Effect consumers keep errors in the typed error channel instead of throwing:
 
 ```ts

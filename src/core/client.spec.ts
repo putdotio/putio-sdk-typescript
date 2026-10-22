@@ -127,6 +127,26 @@ describe("sdk client factories", () => {
     expect(client.zips.list).toBeTypeOf("function");
   });
 
+  it("sends a snapshot of the configured headers from the Promise client", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
+        new Response(JSON.stringify({ status: "OK" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const headers = new Headers({ "x-forwarded-for": "203.0.113.7" });
+    const client = createPutioSdkPromiseClient({ accessToken: "token-123", headers });
+    headers.set("x-forwarded-for", "198.51.100.1");
+
+    await client.events.clear();
+
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("x-forwarded-for")).toBe(
+      "203.0.113.7",
+    );
+  });
+
   it("keeps the Promise client aligned with the Effect client domain surface", () => {
     const effectPaths = collectFunctionPaths(createPutioSdkEffectClient());
     const promisePaths = collectFunctionPaths(createPutioSdkPromiseClient());

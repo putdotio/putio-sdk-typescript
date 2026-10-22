@@ -25,6 +25,7 @@ export type PutioPathSegment = string | number | boolean;
 export interface PutioSdkConfigShape {
   readonly accessToken?: string;
   readonly baseUrl?: string | URL;
+  readonly headers?: HeadersInit;
   readonly uploadBaseUrl?: string | URL;
   readonly webAppUrl?: string | URL;
 }
@@ -60,6 +61,7 @@ export type PutioSdkContext = PutioSdkConfig | PutioHttpClient;
 export const makePutioSdkConfig = (config: PutioSdkConfigShape): PutioSdkConfigShape => ({
   accessToken: config.accessToken,
   baseUrl: config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
+  headers: config.headers,
   uploadBaseUrl: config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
   webAppUrl: config.webAppUrl ?? DEFAULT_PUTIO_WEB_APP_URL,
 });
@@ -271,9 +273,15 @@ const withBody = (body: PutioRequestBody): Effect.Effect<BodyInit | undefined, P
   }
 };
 
-const makeRequest = (url: string, options: PutioRequestOptions, authorization?: string) =>
+const makeRequest = (
+  url: string,
+  options: PutioRequestOptions,
+  configHeaders: HeadersInit | undefined,
+  authorization?: string,
+) =>
   Effect.gen(function* () {
-    const headers = new Headers(options.headers);
+    const headers = new Headers(configHeaders);
+    new Headers(options.headers).forEach((value, name) => headers.set(name, value));
 
     const body = options.body ?? { type: "none" as const };
     if (!headers.has("accept")) {
@@ -310,7 +318,7 @@ const executeRequest = (options: PutioRequestOptions) =>
         ),
       catch: mapUrlBuildError,
     });
-    const request = yield* makeRequest(url, options, authorization);
+    const request = yield* makeRequest(url, options, config.headers, authorization);
 
     return yield* httpClient.execute(request);
   });

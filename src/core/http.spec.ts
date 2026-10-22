@@ -325,6 +325,21 @@ describe("sdk core http", () => {
     );
   });
 
+  it("never sends a configured authorization header on unauthenticated requests", async () => {
+    await Effect.runPromise(
+      provideSdkTest(
+        requestVoid({ method: "POST", path: "/v2/test", auth: { type: "none" } }),
+        (request) => {
+          expect(request.headers.has("authorization")).toBe(false);
+          expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
+
+          return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+        },
+        { headers: { authorization: "Token leaked", "x-forwarded-for": "203.0.113.7" } },
+      ),
+    );
+  });
+
   it("fails fast when a config-token request has no configured access token", async () => {
     const exit = await Effect.runPromiseExit(
       provideSdkTest(

@@ -281,6 +281,8 @@ const makeRequest = (
 ) =>
   Effect.gen(function* () {
     const headers = new Headers(configHeaders);
+    // `auth` alone decides credentials, including `none`.
+    headers.delete("authorization");
     new Headers(options.headers).forEach((value, name) => headers.set(name, value));
 
     const body = options.body ?? { type: "none" as const };

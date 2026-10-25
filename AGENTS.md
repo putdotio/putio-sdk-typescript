@@ -9,8 +9,6 @@ package. put.io's own apps and `putio-cli` install it from npm. Code lives in
   or transport change, or touching API coverage.
 - [Testing](./docs/testing.md): before running live tests or changing
   fixtures, credentials, or the compatibility checks.
-- [Distribution](./docs/distribution.md): before touching `ci.yml`,
-  `.releaserc.json`, or the `release` Environment.
 
 ## Commands
 
@@ -63,10 +61,17 @@ removes the env files and `vp run clean` removes generated artifacts.
 
 ## Delivery
 
-Pull requests squash-merge to `main`, and every merge can publish to npm. The
-squashed commit's type decides the release (see
-[Distribution](./docs/distribution.md)); npm never accepts a published version
-number again.
+Pull requests squash-merge to `main`; the `release` job in
+[ci.yml](./.github/workflows/ci.yml) publishes `@putdotio/sdk` to npm when
+[`.releaserc.json`](./.releaserc.json) says the commits release.
+
+- The squashed commit's type decides the version, and npm never accepts a
+  published version number again.
+- npm Trusted Publishing names workflow `ci.yml` and Environment `release`.
+  Renaming either breaks publishing until a maintainer updates the npm
+  package settings.
+- `package.json` `repository` must keep pointing at
+  `putdotio/putio-sdk-typescript`; npm matches it against the trusted publisher.
 
 ## Effect
 

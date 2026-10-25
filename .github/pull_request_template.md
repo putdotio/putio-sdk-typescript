@@ -8,9 +8,9 @@ API. Add one-line bullets only for risks the aid doesn't show. -->
 ## Verification
 
 - [ ] `vp run verify`
-- Additional targeted checks (`vp run test:live`, `vp run test:compat`, single-target live commands):
+- Targeted checks (`vp run test:compat`, `vp run test:live`, single live targets):
   -
 
 ## Notes
 
-<!-- Risks, rollout notes, or follow-up work. Delete this section if there are none. -->
+<!-- Risks, rollout, or follow-up work. Delete this section if there are none. -->

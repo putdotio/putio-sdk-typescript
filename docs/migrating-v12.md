@@ -11,9 +11,9 @@ The `files.get*Url` methods no longer fall back to `PutioSdkConfig.accessToken`:
 parameter on the wire stays `oauth_token`.
 
 Media URLs leave the app: players, casting receivers, copied links, and logs all see them. Sign
-them with the account download token from `getAccountInfo({ download_token: 1 })`. It is accepted
-by the file download, stream, MP4, HLS, subtitle, and XSPF routes and rejected by account, file
-listing, and transfer routes, so a leaked URL does not hand out full account access.
+them with the account download token from `account.getInfo({ download_token: 1 })`. File
+download, stream, MP4, HLS, subtitle, and XSPF routes accept it; account, file listing, and
+transfer routes reject it, so a leaked URL does not grant full account access.
 
 Upload is unchanged: `files.upload` and `files.createUploadRequest` keep `oauthToken`, because
 upload needs the full OAuth token.

@@ -18,7 +18,7 @@ selected cryptocurrency provider.
 ## File-search type filter
 
 The backend file-search route accepts `query` and `per_page`; it does not apply a `type` filter.
-Version 11 therefore removes `type` from `FilesSearchQuery` and stops serializing it.
+Version 11 removes `type` from `FilesSearchQuery` and stops serializing it.
 
 Before:
 
@@ -38,11 +38,11 @@ await sdk.files.search({
 });
 ```
 
-Consumers may narrow the returned page for presentation, but that does not produce a
-server-filtered total or cursor. A complete type-filtered search requires backend support.
+Filtering the returned page client-side does not give a server-filtered total or cursor; a
+complete type-filtered search needs backend support.
 
 ## Upgrade checklist
 
-1. Remove Coinbase charge calls and choose a provider returned by the payment APIs.
+1. Remove Coinbase charge calls and choose a provider the payment APIs return.
 2. Remove `type` from file-search inputs.
-3. Recompile against the packed v11 package to catch stale methods, types, and exports.
+3. Recompile against the v11 package to catch stale methods, types, and exports.

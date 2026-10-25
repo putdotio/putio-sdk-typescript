@@ -44,10 +44,10 @@ jobs:
       - name: Verify repository
         run: vp run verify
 
-      - uses: putdotio/.github/.github/actions/links@32b9f2f9ac2b6b17b2be6b111ec495e079384b4c # v2.3.1
+      - uses: putdotio/.github/.github/actions/links@0299a68cb84725497b4349c6131aeec45c9611a5 # v2.3.2
 
       - if: ${{ !cancelled() }}
-        uses: putdotio/.github/.github/actions/scan@32b9f2f9ac2b6b17b2be6b111ec495e079384b4c # v2.3.1
+        uses: putdotio/.github/.github/actions/scan@0299a68cb84725497b4349c6131aeec45c9611a5 # v2.3.2
 
   compatibility:
     if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
@@ -136,6 +136,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: putdotio/.github/.github/workflows/frontend-release-npm.yml@32b9f2f9ac2b6b17b2be6b111ec495e079384b4c # v2.3.1
+    uses: putdotio/.github/.github/workflows/frontend-release-npm.yml@0299a68cb84725497b4349c6131aeec45c9611a5 # v2.3.2
     secrets:
       PUTIO_CI_APP_PRIVATE_KEY: ${{ secrets.PUTIO_CI_APP_PRIVATE_KEY }}

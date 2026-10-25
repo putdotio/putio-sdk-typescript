@@ -33,7 +33,7 @@ removes the env files and `vp run clean` removes generated artifacts.
 - Keep the core fetch-native and portable across standard Web APIs.
 - Keep package boundaries explicit and open-source-safe; `lint:package` inside
   `vp run verify` checks tarball metadata, public types, and ESM entrypoints.
-- A breaking change gets a `docs/migrating-v*.md` entry.
+- A breaking change says what callers must change in its commit body; release notes carry it.
 
 ## Proof
 

@@ -443,8 +443,7 @@ export const useFiles = (parentId: number) =>
 
 ## Docs
 
-- [Migrating to v12](./docs/migrating-v12.md): required `downloadToken` media URLs and the `FileUrlProvider` renames
-- [Migrating to v11](./docs/migrating-v11.md): removed Coinbase and file-search contracts
+- [Releases](https://github.com/putdotio/putio-sdk-typescript/releases): what changed in each version, breaking changes included
 - [Contributing](./CONTRIBUTING.md): setup, checks, and live tests
 - [Security policy](https://github.com/putdotio/.github/blob/main/SECURITY.md): private vulnerability reports
 

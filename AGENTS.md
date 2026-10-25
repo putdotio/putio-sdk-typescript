@@ -5,10 +5,6 @@ package. put.io's own apps and `putio-cli` install it from npm. Code lives in
 `src/`, live tests in `test/live/`, and tooling in `scripts/`.
 
 - [README](./README.md): consumer usage. Keep repo-operator detail out of it.
-- [Architecture](./docs/architecture.md): before adding a domain, operation,
-  or transport change, or touching API coverage.
-- [Testing](./docs/testing.md): before running live tests or changing
-  fixtures, credentials, or the compatibility checks.
 
 ## Commands
 
@@ -48,14 +44,16 @@ removes the env files and `vp run clean` removes generated artifacts.
 - Exports, entrypoints, or packaging: also `vp run test:compat`. Locally it
   needs `bun` on `PATH` and, once, `vp run test:compat:browser:install`.
 - Endpoint behavior the sanitized fixtures cannot prove: the matching live
-  target, such as `pnpm test:live:targets -- test/live/files.test.ts` (see
-  [Live Commands](./docs/testing.md#live-commands)). Report a live gap you
-  could not run.
+  target, such as `pnpm test:live:targets -- test/live/files.test.ts`. Report
+  a live gap you could not run.
 
 ## Hazards
 
 - Live targets run against shared, real put.io accounts. Stay inside the
-  [safety rules](./docs/testing.md#safety-rules).
+  [live-test safety rules](./CONTRIBUTING.md#live-tests).
+- The backend route inventory and private route classifications stay out of
+  this public repo; `docs/api-route-matrix.json` holds only public-safe
+  evidence.
 - `.env`, `.env.local`, and `.env.live-tokens` hold live credentials and
   tokens; keep their values out of output, docs, and commits.
 

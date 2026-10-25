@@ -319,8 +319,9 @@ Upload goes to `upload.put.io`, because `api.put.io/v2/files/upload` is only a r
 
 ## Endpoint Coverage
 
-The SDK covers the supported public put.io API surface. Scope and exclusions are in
-[Architecture](./docs/architecture.md#api-coverage).
+The SDK covers the supported public put.io API surface. It leaves out admin,
+private, and service-to-service routes, browser page and callback routes, and
+aliases of routes it already covers.
 
 ## File Lookup and Mutations
 

@@ -18,8 +18,7 @@ vp run test:compat
 ```
 
 `verify` is the pull request gate; CI runs it and the compatibility matrix on
-every pull request. [Testing](./docs/testing.md) covers what each layer
-proves.
+every pull request.
 
 ## Live Tests
 
@@ -31,8 +30,15 @@ cp .env.example .env   # or render maintainer secrets with `pnpm secrets:setup`
 vp run test:live
 ```
 
-Credentials, single targets, and safety rules:
-[Testing](./docs/testing.md#live-environment).
+[.env.example](./.env.example) names the variables. The live accounts are
+shared and real:
+
+- Use read-only calls, reversible probe mutations, and roundtrips that clean
+  up after themselves.
+- Never add password reset, 2FA changes, account destroy, revoke-all sessions,
+  or anything else that can lock out or materially alter the account.
+- `bootstrap:live-fixtures --seed-invite-codes` spends the secondary account's
+  invite quota; use it only when the codes run out.
 
 ## Pull Requests
 

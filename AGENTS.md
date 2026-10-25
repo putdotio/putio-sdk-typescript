@@ -9,9 +9,8 @@ package. put.io's own apps and `putio-cli` install it from npm. Code lives in
 ## Commands
 
 [package.json](./package.json) `scripts` defines every command. Run Vite+
-through the pinned devDependency: `pnpm exec vp` after `pnpm install`. Use
-`vp run <script>` for package scripts. The gate is `vp run verify`; CI runs the
-same command. `vp run test` excludes `test/live/**`.
+through the pinned devDependency: `pnpm exec vp` after `pnpm install`. The gate
+is `vp run verify`.
 
 ## Worktrees
 
@@ -31,8 +30,7 @@ removes the env files and `vp run clean` removes generated artifacts.
   parameter-conditioned responses explicitly, and keep typed failures
   explicit.
 - Keep the core fetch-native and portable across standard Web APIs.
-- Keep package boundaries explicit and open-source-safe; `lint:package` inside
-  `vp run verify` checks tarball metadata, public types, and ESM entrypoints.
+- Keep package boundaries explicit and open-source-safe.
 - A breaking change says what callers must change in its commit body; release notes carry it.
 
 ## Proof

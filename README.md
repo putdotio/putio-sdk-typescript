@@ -168,12 +168,7 @@ Use `makePutioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioH
 
 ## Client Shapes
 
-Both client styles expose the same domain surface:
-
-```ts
-promiseClient.files.list(0, { per_page: 20 });
-effectClient.files.list(0, { per_page: 20 });
-```
+Both client styles expose the same domain surface.
 
 | Client                                | Use it for                                        |
 | ------------------------------------- | ------------------------------------------------- |
@@ -185,11 +180,8 @@ Effect is the canonical typed surface; the Promise client adapts it to standard 
 - Effect client: keeps errors in the Effect error channel with operation-specific typing.
 - Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`.
 - Promise client: owns a managed Effect runtime; call `await sdk.dispose()` when tearing down a long-lived client.
-- Promise client: `files.createUploadFormData(...)` builds upload FormData without a request.
 
-Interrupting an Effect during fetch or response-body consumption aborts the underlying
-fetch request, including JSON and binary reads. Successful reads do not abort the
-request.
+Interrupting an Effect during fetch or body reads aborts the underlying request.
 
 ## Namespaces
 
@@ -213,14 +205,8 @@ polyfills or adapters instead of patching the SDK surface.
 
 ## Error Handling
 
-The fetch transport retains HTTP status and rate-limit headers when an error
-response contains empty or invalid JSON. These errors include a sanitized parsing
-`cause`; response contents are not included in that cause. Failures while reading
-the body remain transport errors, including errors from custom HTTP clients.
-
-Backend error bodies preserve `status`, `status_code`, `error_type`, `error_message`,
-`error_uri`, nullable `error_id`, and structured `extra` metadata. The legacy
-`details` field is still parsed, but current backend errors use `extra`.
+Backend error bodies parse into `PutioErrorEnvelopeSchema` in
+[src/core/errors.ts](./src/core/errors.ts); current backend errors carry metadata in `extra`.
 
 Promise consumers receive tagged SDK error objects:
 
@@ -315,8 +301,6 @@ const upload = await sdk.files.upload({
 });
 ```
 
-Upload goes to `upload.put.io`, because `api.put.io/v2/files/upload` is only a redirect shim.
-
 ## Endpoint Coverage
 
 The SDK covers the supported public put.io API surface. It leaves out admin,
@@ -324,11 +308,6 @@ private, and service-to-service routes, browser page and callback routes, and
 aliases of routes it already covers.
 
 ## File Lookup and Mutations
-
-When requesting `media_info`, stream `level` values preserve FFmpeg's `-99`
-sentinel for an unknown codec level. Known levels remain nonnegative integers.
-Stream `codec_name` can be `null` when the codec was not identified, including
-subtitle streams.
 
 Named-child lookup avoids listing an entire folder and preserves the same query-conditioned fields as
 `files.get`:
@@ -362,8 +341,7 @@ await sdk.transfers.addTrackers({
 });
 ```
 
-`getTorrent` rejects for magnet-backed or non-torrent transfers. Remove accepts exactly one selector,
-preventing an ambiguous mix of IDs and filters:
+`getTorrent` rejects for magnet-backed or non-torrent transfers. `remove` takes exactly one selector:
 
 ```ts
 await sdk.transfers.remove({ ids: [transferId] });
@@ -395,12 +373,9 @@ const { links, token } = await sdk.podcast.getLinks({
 });
 ```
 
-`links` is a partial map keyed by `all`, `audio`, `video`, and `mp4`; check that a requested
-link is present.
-
 ## TanStack Query
 
-The Promise client plugs into TanStack Query directly:
+The Promise client plugs into TanStack Query directly; wrap Effect programs in `Effect.runPromise`:
 
 ```ts
 import { useQuery } from "@tanstack/react-query";
@@ -414,30 +389,6 @@ export const useAccountInfo = () =>
   useQuery({
     queryKey: ["account", "info"],
     queryFn: () => sdk.account.getInfo({ download_token: 1 }),
-  });
-```
-
-The Effect client works the same way:
-
-```ts
-import { useQuery } from "@tanstack/react-query";
-import { Effect } from "effect";
-import { PutioSdk, makePutioSdkLiveClientLayer } from "@putdotio/sdk";
-
-const sdkLayer = makePutioSdkLiveClientLayer({
-  accessToken: token,
-});
-
-export const useFiles = (parentId: number) =>
-  useQuery({
-    queryKey: ["files", parentId],
-    queryFn: () =>
-      Effect.runPromise(
-        Effect.gen(function* () {
-          const sdk = yield* PutioSdk;
-          return yield* sdk.files.list(parentId, { per_page: 50 });
-        }).pipe(Effect.provide(sdkLayer)),
-      ),
   });
 ```
 

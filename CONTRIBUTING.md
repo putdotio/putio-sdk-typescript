@@ -17,8 +17,7 @@ vp run verify
 vp run test:compat
 ```
 
-`verify` is the pull request gate; CI runs it and the compatibility matrix on
-every pull request.
+CI runs both on every pull request.
 
 ## Live Tests
 
@@ -42,7 +41,4 @@ shared and real:
 
 ## Pull Requests
 
-- Follow the [rules](./AGENTS.md#rules) for the public surface.
-- Add or update tests when behavior changes.
-- Update docs when the public surface, contributor workflow, or checks change.
-- Keep unrelated cleanup in follow-up pull requests.
+Follow the [rules](./AGENTS.md#rules) for the public surface.

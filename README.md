@@ -1,6 +1,6 @@
 <div align="center">
   <p>
-    <img src="https://static.put.io/images/putio-boncuk.png" width="72">
+    <img src="https://static.put.io/images/putio-boncuk.png" width="72" alt="put.io boncuk">
   </p>
 
   <h1>putio-sdk-typescript</h1>
@@ -9,7 +9,7 @@
     TypeScript SDK for the <a href="https://api.put.io/v2/docs">put.io API</a>
   </p>
   <p>
-    Domain-first, schema-validated at the boundary, and designed for all runtimes.
+    Domain-first, schema-validated at the boundary, and built on standard Web APIs.
   </p>
 
   <p>
@@ -180,53 +180,26 @@ effectClient.files.list(0, { per_page: 20 });
 | `createPutioSdkPromiseClient(config)` | React apps, scripts, server handlers, React Query |
 | `createPutioSdkEffectClient()`        | Effect-native workflows and service composition   |
 
-Effect is the canonical typed surface. The Promise client is an adapter for environments that want standard async functions.
+Effect is the canonical typed surface; the Promise client adapts it to standard async functions.
 
-- Effect client: keeps errors in the Effect error channel with operation-specific typing
-- Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`
-- Promise client: owns a managed Effect runtime; call `await sdk.dispose()` when tearing down a long-lived client in a script, test harness, or server
-- Promise client: `files.createUploadFormData(...)` builds upload FormData without a request
+- Effect client: keeps errors in the Effect error channel with operation-specific typing.
+- Promise client: throws tagged SDK error objects such as `PutioOperationError`, `PutioApiError`, and `PutioRateLimitError`.
+- Promise client: owns a managed Effect runtime; call `await sdk.dispose()` when tearing down a long-lived client.
+- Promise client: `files.createUploadFormData(...)` builds upload FormData without a request.
 
 Interrupting an Effect during fetch or response-body consumption aborts the underlying
 fetch request, including JSON and binary reads. Successful reads do not abort the
 request.
 
-## Namespace Surface
+## Namespaces
 
-| Namespace       | Purpose                                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------------ |
-| `account`       | account info, settings, subtitle languages, app-specific passwords, confirmations, clear/destroy |
-| `auth`          | token validation, login flows, device/OOB helpers, two-factor flows                              |
-| `config`        | app-owned JSON config storage                                                                    |
-| `downloadLinks` | download-link bundles                                                                            |
-| `events`        | history events and event torrent payloads                                                        |
-| `family`        | family members and invites                                                                       |
-| `files`         | file listing, search, move/delete/extract, MP4, direct access URLs, upload                       |
-| `friendInvites` | friend invitation management                                                                     |
-| `friends`       | friend graph and requests                                                                        |
-| `ifttt`         | IFTTT integration endpoints                                                                      |
-| `oauth`         | OAuth app management                                                                             |
-| `payment`       | plans, vouchers, payment flows, payment history                                                  |
-| `podcast`       | podcast feed links for folders and media types                                                   |
-| `rss`           | RSS feed management                                                                              |
-| `sharing`       | friend shares, public shares, clone flows                                                        |
-| `transfers`     | transfer list, add/retry/cancel/clean flows                                                      |
-| `trash`         | trash listing, restore, delete, empty                                                            |
-| `tunnel`        | route listing                                                                                    |
-| `utilities`     | file URLs, localized errors, and shared formatting helpers                                       |
-| `zips`          | zip creation and lookup                                                                          |
-
-## Design Rules
-
-- schema-first contracts at every external boundary
-- typed errors are first-class
-- parameter-conditioned responses are modeled explicitly
-- no compatibility namespace shims in the public API
-- fetch-native core with runtime-portable Web APIs
+Both clients expose the namespaces of `sharedOperationTree` in
+[src/core/client.ts](./src/core/client.ts), such as `account`, `files`, `transfers`, and
+`sharing`. Helpers live in the [utilities subpath](#utilities), not on the client.
 
 ## Runtime Requirements
 
-The package is designed around standard Web APIs. Host runtimes should provide:
+Host runtimes must provide:
 
 - `fetch`
 - `Request`, `Response`, and `Headers`
@@ -235,11 +208,8 @@ The package is designed around standard Web APIs. Host runtimes should provide:
 - `FormData`
 - `btoa` for username/password auth flows such as `auth.login(...)`
 
-For upload flows, the host should also provide file-compatible inputs such as `File` or `Blob`.
-
-If a target runtime is missing these APIs, provide them with host-level polyfills or adapters instead of patching the SDK surface.
-
-CI installs the packed package into external Node, Bun, and bundled Chromium, Firefox, and WebKit consumers on every change.
+Upload flows also need file inputs such as `File` or `Blob`. Fill missing APIs with host-level
+polyfills or adapters instead of patching the SDK surface.
 
 ## Error Handling
 
@@ -345,12 +315,12 @@ const upload = await sdk.files.upload({
 });
 ```
 
-Upload targets `upload.put.io` internally because `api.put.io/v2/files/upload` is only a redirect shim.
+Upload goes to `upload.put.io`, because `api.put.io/v2/files/upload` is only a redirect shim.
 
 ## Endpoint Coverage
 
-The TypeScript SDK mirrors the supported public put.io API surface. Scope, exclusions, and the
-latest audit are in [API Coverage](docs/api-coverage.md).
+The SDK covers the supported public put.io API surface. Scope and exclusions are in
+[Architecture](./docs/architecture.md#api-coverage).
 
 ## File Lookup and Mutations
 
@@ -424,8 +394,8 @@ const { links, token } = await sdk.podcast.getLinks({
 });
 ```
 
-`links` is a partial map keyed by `all`, `audio`, `video`, and `mp4`, so consumers should
-check whether a requested link is present.
+`links` is a partial map keyed by `all`, `audio`, `video`, and `mp4`; check that a requested
+link is present.
 
 ## TanStack Query
 
@@ -472,16 +442,10 @@ export const useFiles = (parentId: number) =>
 
 ## Docs
 
-- [Migrating to v12](./docs/migrating-v12.md) for required `downloadToken` media URLs and the `FileUrlProvider` renames
-- [Migrating to v11](./docs/migrating-v11.md) for the removed Coinbase and file-search contracts
-- [Architecture](./docs/architecture.md) for package shape and boundaries
-- [Testing](./docs/testing.md) for local and live verification
-- [Distribution](./docs/distribution.md) for release automation
-- [Security policy](https://github.com/putdotio/.github/blob/main/SECURITY.md) for private vulnerability reports; fixes target the latest published release and `main`
-
-## Contributing
-
-Contributor setup, validation, and live-test workflow live in [Contributing](./CONTRIBUTING.md).
+- [Migrating to v12](./docs/migrating-v12.md): required `downloadToken` media URLs and the `FileUrlProvider` renames
+- [Migrating to v11](./docs/migrating-v11.md): removed Coinbase and file-search contracts
+- [Contributing](./CONTRIBUTING.md): setup, checks, and live tests
+- [Security policy](https://github.com/putdotio/.github/blob/main/SECURITY.md): private vulnerability reports
 
 ## License
 

@@ -2,41 +2,41 @@
 
 ## Setup
 
-Install dependencies with Vite+, then install the stock Vite+ hook wiring for this clone:
-
 ```bash
 vp install
 vp config
 ```
 
-## Validation
+`vp config` installs the Git hooks in `.vite-hooks/`. Without a global Vite+,
+run `pnpm install` first and call it as `pnpm exec vp`.
 
-Run the full repo guardrail before opening or updating a pull request:
+## Checks
 
 ```bash
 vp run verify
+vp run test:compat
 ```
 
-CI runs the same command. [Testing](./docs/testing.md#local-checks) lists what it covers; live tests stay outside the coverage threshold.
+`verify` is the pull request gate; CI runs it and the compatibility matrix on
+every pull request. [Testing](./docs/testing.md) covers what each layer
+proves.
 
-## Live Verification
+## Live Tests
 
-Live verification is opt-in and uses the real put.io API. Use it for backend sanity checks, release confidence, or stateful flows that unit tests cannot prove.
+Live tests are opt-in and call the real put.io API. Use them for behavior the
+fixtures cannot prove.
 
 ```bash
-cp .env.example .env   # or render maintainer-provided secrets with `pnpm secrets:setup`
+cp .env.example .env   # or render maintainer secrets with `pnpm secrets:setup`
 vp run test:live
 ```
 
-Credential rendering, token bootstrap, single-target commands, safety rules, and fixture expectations are in [Testing](./docs/testing.md#live-environment).
-
-## Development Notes
-
-- Follow the [Design Rules](./README.md#design-rules): `@putdotio/sdk` is a standalone public package, not a compatibility wrapper around `putio-js`, and its surface stays domain-first and Effect-first.
-- Keep [README](./README.md) for end-user usage; contributor and architecture notes go in `docs/*`.
+Credentials, single targets, and safety rules:
+[Testing](./docs/testing.md#live-environment).
 
 ## Pull Requests
 
+- Follow the [rules](./AGENTS.md#rules) for the public surface.
 - Add or update tests when behavior changes.
-- Update docs when the public surface, contributor workflow, or verification model changes.
+- Update docs when the public surface, contributor workflow, or checks change.
 - Keep unrelated cleanup in follow-up pull requests.

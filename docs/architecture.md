@@ -1,7 +1,5 @@
 # Architecture
 
-## System View
-
 ```mermaid
 graph LR
   Consumer["consumer app or script"] --> Promise["Promise client"]
@@ -9,65 +7,67 @@ graph LR
   Promise --> Operations["canonical operation tree"]
   EffectClient --> Operations
   Operations --> Domains["domain namespaces"]
-  Domains --> Http["shared http/runtime"]
+  Domains --> Http["shared HTTP runtime"]
   Domains --> Errors["typed error model"]
   Domains --> Schemas["Schema contracts"]
   Http --> API["put.io API"]
-  Domains --> Live["live verification harnesses"]
 ```
 
-## Components
+## Where Code Goes
 
-| Component           | Responsibility                                                 |
-| ------------------- | -------------------------------------------------------------- |
-| Promise client      | ergonomic app-facing entrypoint with managed runtime ownership |
-| Effect client       | Effect-native entrypoint and service for workflows             |
-| Domain namespaces   | grouped API operations by domain                               |
-| Utilities subpath   | file URLs, localized errors, and shared formatting helpers     |
-| Shared HTTP runtime | fetch-native transport, auth resolution, base URLs             |
-| Error model         | transport, validation, and operation-aware failures            |
-| Live verification   | runtime verification against real put.io accounts              |
+- `src/core/*.ts`: shared runtime, fetch transport, auth, defaults, errors, and
+  client composition.
+- `src/domains/*.ts`: one file per domain namespace. Split a domain into a
+  subfolder only once it grows too large for one file.
+- `src/utilities/*.ts`: opt-in helpers exported from `@putdotio/sdk/utilities`.
 
-## Namespace Layout
+## Clients
 
-- `src/core/*.ts`: shared runtime, transport, defaults, and client composition
-- `src/domains/*.ts`: domain namespaces
-- `src/utilities/*.ts`: opt-in helpers exported from `@putdotio/sdk/utilities`
+Both clients come from one typed operation tree, `sharedOperationTree` in
+[src/core/client.ts](../src/core/client.ts). The Effect client is also a
+`PutioSdk` service layer. The Promise client runs its Effect operations through
+one managed runtime per instance, which `dispose()` tears down. Lifecycle
+methods, token replacement, overload-specific signatures, and pure helpers
+stay explicit adapters; mixed Effect/pure overloads are unsupported.
 
-A domain stays one file until it grows large enough to earn its own subfolder.
+Every operation in the tree is classified as validated, input-free, or pure.
+Module initialization throws on an unclassified leaf, so a new request
+operation must declare its boundary rule before it joins either client. The
+domain operation owns validation, before transport serialization.
 
-## Direct Access and Upload
+Operations derived through the generic Promise adapter check the declared
+Effect or non-Effect return kind at call time. The Effect client keeps
+canonical function identity and relies on the compile-time return-kind
+constraint instead.
 
-The `files` namespace owns both:
+## Files
 
-- JSON operations like `files.get(...)`, `files.list(...)`, `files.extract(...)`
-- direct route helpers like `files.getApiDownloadUrl(...)`, `files.getApiContentUrl(...)`, `files.getHlsStreamUrl(...)`, `files.getHlsMasterPlaylist(...)`, and `files.getXspfPlaylistUrl(...)`
-- upload helpers like `files.createUploadRequest(...)` and `files.upload(...)`
+The `files` namespace holds three kinds of operation on purpose:
 
-That split is deliberate:
+- JSON methods, such as `files.list(...)`, are schema-shaped.
+- Direct route helpers, such as `files.getHlsStreamUrl(...)`, are
+  transport-shaped and return URLs.
+- Upload helpers, such as `files.upload(...)`, go through `upload.put.io`,
+  because `api.put.io/v2/files/upload` is only a redirect shim.
 
-- route helpers are transport-shaped
-- JSON methods are schema-shaped
-- upload is special because it goes through `upload.put.io`
+## API Coverage
 
-## Runtime Model
+Endpoint completeness means every supported, user-facing public API capability
+has a typed SDK operation, a canonical equivalent, or a direct-route URL
+helper. Coverage includes authenticated JSON operations, public registration
+and OAuth operations meant for API consumers, and direct content routes that
+consumers reach through SDK-generated URLs.
 
-| Concern      | Choice                                               |
-| ------------ | ---------------------------------------------------- |
-| Core runtime | `effect`                                             |
-| Transport    | SDK-owned `PutioHttpClient` service over `fetch`     |
-| Validation   | `Schema`                                             |
-| Auth         | config token, explicit token, basic auth, or no-auth |
-| Portability  | standard Web APIs first                              |
+It excludes:
 
-The Effect client is available as both a factory value and a `PutioSdk` service layer for workflows that prefer dependency injection.
-`makePutioSdkLiveClientLayer(...)` composes the SDK service, SDK config, and fetch-backed transport for the normal live boundary.
-Both clients are assembled from one typed operation tree. The Promise client adapts its Effect operations through one managed runtime per client instance, while keeping lifecycle methods, token replacement, overload-specific signatures, and pure helpers explicit. It exposes `dispose()` so host applications can tear the runtime down explicitly.
+- admin, private, restricted, secret-key, and service-to-service routes
+- browser page, callback, and form-post routes
+- legacy aliases when the SDK exposes the canonical replacement
+- transport aliases when one safer method reaches the same handler and contract
 
-Every canonical-tree operation is classified as validated, input-free, or pure. Module initialization rejects an unclassified leaf, so a new request operation must explicitly acknowledge the boundary rule before it can join either public client. Validation remains owned by the domain operation, before transport serialization.
-Operations derived through the generic Promise adapter also check the declared Effect/non-Effect return kind at call time. Explicit overload and schema adapters invoke their typed domain operations directly. The Effect client preserves canonical domain-function identity and relies on the classification helpers' compile-time return-kind constraint; it does not wrap calls with that runtime check.
-Overload-specific Promise signatures remain explicit adapters; mixed Effect/pure overloads are unsupported.
-
-## Verification Model
-
-See [Testing](./testing.md#sdk-verification-strategy) for the verification layers and commands.
+The backend route inventory and private route classifications stay outside
+this repository. [`api-route-matrix.json`](./api-route-matrix.json) holds only
+public-safe evidence for selected contract decisions; `vp run verify` checks
+each named operation on both clients. Nothing detects new backend routes
+automatically: repeat the comparison when a public backend route changes or a
+first-party consumer needs an unmodeled capability.

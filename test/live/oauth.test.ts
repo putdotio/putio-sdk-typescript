@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { createLiveTokenClients } from "./support/helpers.js";
+import { assertPresent, createLiveTokenClients } from "./support/harness.js";
+import { readOptionalSecret } from "./support/secrets.js";
 
 const DISPOSABLE_CALLBACK = "https://example.com/putio-typescript-sdk-live/oauth/callback";
 const DISPOSABLE_WEBSITE = "https://example.com/putio-typescript-sdk-live/oauth";
@@ -15,33 +16,20 @@ const DISPOSABLE_ICON_BYTES = Uint8Array.from(
 describe("oauth live", () => {
   const { authClient } = createLiveTokenClients();
 
-  test("oauth apps query succeeds", async () => {
-    const apps = await authClient.oauth.query();
-
-    expect(Array.isArray(apps)).toBe(true);
-  });
-
-  test("popular apps payload is normalized", async () => {
+  test("popular apps report icon presence", async () => {
     const apps = await authClient.oauth.getPopularApps();
 
-    expect(Array.isArray(apps)).toBe(true);
     expect(apps.every((app) => app.has_icon !== null)).toBe(true);
   });
 
   test("oauth app detail succeeds for the configured app", async () => {
     const apps = await authClient.oauth.query();
+    const configuredClientId = Number(readOptionalSecret("PUTIO_CLIENT_ID"));
 
-    const configuredClientId = process.env.PUTIO_CLIENT_ID
-      ? Number(process.env.PUTIO_CLIENT_ID)
-      : NaN;
-
-    const ownedAppId = apps.find((app) => app.id === configuredClientId)?.id ?? apps[0]?.id;
-
-    if (ownedAppId === undefined) {
-      expect(apps.length).toBe(0);
-
-      return;
-    }
+    const ownedAppId = assertPresent(
+      apps.find((app) => app.id === configuredClientId)?.id ?? apps[0]?.id,
+      "expected at least one owned oauth app",
+    );
 
     const app = await authClient.oauth.get(ownedAppId, { edit: true });
 

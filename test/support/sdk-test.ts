@@ -1,10 +1,10 @@
-import { Cause, Effect, Exit, Layer, Predicate, Schema } from "effect";
+import { Cause, Effect, Exit, Predicate, Schema } from "effect";
 
 import { PutioTransportError } from "../../src/core/errors.js";
 import {
   PutioHttpClient,
   PutioSdkConfig,
-  normalizePutioSdkOptions,
+  putioSdkLayer,
   type PutioHttpClientService,
   type PutioHttpRequest,
   type PutioSdkOptions,
@@ -65,9 +65,6 @@ const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientService
   },
 });
 
-const putioSdkTestLayer = (config: PutioSdkOptions) =>
-  Layer.succeed(PutioSdkConfig, normalizePutioSdkOptions(config));
-
 const provideSdkTest = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
   handler: MockRequestHandler,
@@ -75,7 +72,7 @@ const provideSdkTest = <A, E>(
 ) =>
   effect.pipe(
     Effect.provideService(PutioHttpClient, makeMockHttpClient(handler)),
-    Effect.provide(putioSdkTestLayer(config)),
+    Effect.provide(putioSdkLayer(config)),
   );
 
 export const runSdkEffect = <A, E>(
@@ -93,12 +90,12 @@ export const runSdkExit = <A, E>(
 export const runConfigEffect = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkConfig>,
   config: PutioSdkOptions = {},
-) => Effect.runPromise(effect.pipe(Effect.provide(putioSdkTestLayer(config))));
+) => Effect.runPromise(effect.pipe(Effect.provide(putioSdkLayer(config))));
 
 export const runConfigExit = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkConfig>,
   config: PutioSdkOptions = {},
-) => Effect.runPromiseExit(effect.pipe(Effect.provide(putioSdkTestLayer(config))));
+) => Effect.runPromiseExit(effect.pipe(Effect.provide(putioSdkLayer(config))));
 
 export const getAuthorizationHeader = (request: PutioHttpRequest) =>
   request.headers.get("authorization") ?? undefined;

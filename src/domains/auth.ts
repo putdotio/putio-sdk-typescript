@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { DEFAULT_PUTIO_WEB_APP_URL } from "../core/defaults.js";
 import {
   PutioApiError,
   PutioValidationError,
@@ -85,11 +86,9 @@ export const AuthorizationCodeSchema = Schema.Struct({
   qr_code_url: Schema.String,
 });
 
-const AuthorizationCodeEnvelopeSchema = Schema.Struct({
-  code: Schema.String,
-  qr_code_url: Schema.String,
-  status: Schema.Literal("OK"),
-});
+const AuthorizationCodeEnvelopeSchema = AuthorizationCodeSchema.pipe(
+  Schema.fieldsAssign({ status: Schema.Literal("OK") }),
+);
 
 const CodeMatchEnvelopeSchema = Schema.Struct({
   oauth_token: Schema.NullOr(Schema.String),
@@ -152,23 +151,18 @@ const ExistsEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
 });
 
-const ResetPasswordEnvelopeSchema = Schema.Struct({
+const AccessTokenEnvelopeSchema = Schema.Struct({
   access_token: Schema.String,
   status: Schema.Literal("OK"),
 });
 
-const GenerateTOTPEnvelopeSchema = Schema.Struct({
-  recovery_codes: TwoFactorRecoveryCodesSchema,
-  secret: Schema.String,
-  status: Schema.Literal("OK"),
-  uri: Schema.String,
-});
+const GenerateTOTPEnvelopeSchema = GenerateTOTPResponseSchema.pipe(
+  Schema.fieldsAssign({ status: Schema.Literal("OK") }),
+);
 
-const VerifyTOTPEnvelopeSchema = Schema.Struct({
-  status: Schema.Literal("OK"),
-  token: Schema.String,
-  user_id: Schema.Int,
-});
+const VerifyTOTPEnvelopeSchema = VerifyTOTPResponseSchema.pipe(
+  Schema.fieldsAssign({ status: Schema.Literal("OK") }),
+);
 
 const RecoveryCodesEnvelopeSchema = Schema.Struct({
   recovery_codes: TwoFactorRecoveryCodesSchema,
@@ -465,7 +459,7 @@ export const buildAuthLoginUrl = (options: {
   readonly clientName?: string;
   readonly webAppUrl?: string | URL;
 }) =>
-  buildPutioUrl(options.webAppUrl ?? "https://app.put.io", "/authenticate", {
+  buildPutioUrl(options.webAppUrl ?? DEFAULT_PUTIO_WEB_APP_URL, "/authenticate", {
     client_id: options.clientId,
     client_name: options.clientName,
     isolated: 1,
@@ -560,7 +554,7 @@ export const register = (
   PutioSdkContext
 > =>
   decodeAuthInput("register", RegisterInputSchema, input, (decodedInput) =>
-    requestJson(ResetPasswordEnvelopeSchema, {
+    requestJson(AccessTokenEnvelopeSchema, {
       auth: {
         type: "none",
       },
@@ -696,7 +690,7 @@ export const resetPassword = (
     AuthResetPasswordInputSchema,
     { key, password },
     (decodedInput) =>
-      requestJson(ResetPasswordEnvelopeSchema, {
+      requestJson(AccessTokenEnvelopeSchema, {
         auth: {
           type: "none",
         },
@@ -842,11 +836,7 @@ export const generateTOTP = (): Effect.Effect<
     method: "POST",
     path: "/v2/two_factor/generate/totp",
   }).pipe(
-    Effect.map(({ recovery_codes, secret, uri }) => ({
-      recovery_codes,
-      secret,
-      uri,
-    })),
+    selectJsonFields("recovery_codes", "secret", "uri"),
     withOperationErrors(GenerateTOTPErrorSpec),
   );
 
@@ -874,12 +864,7 @@ export const verifyTOTP = (
         query: {
           oauth_token: decodedInput.twoFactorScopedToken,
         },
-      }).pipe(
-        Effect.map(({ token, user_id }) => ({
-          token,
-          user_id,
-        })),
-      ),
+      }).pipe(selectJsonFields("token", "user_id")),
   ).pipe(withOperationErrors(VerifyTOTPErrorSpec));
 
 export const getRecoveryCodes = (): Effect.Effect<

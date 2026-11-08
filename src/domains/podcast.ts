@@ -1,7 +1,8 @@
 import { Effect, Schema } from "effect";
+import { decodeAndRun } from "../core/validation.js";
 
 import { joinCsv } from "../core/forms.js";
-import { mapDecodeErrorToValidationError, type PutioSdkError } from "../core/errors.js";
+import { type PutioSdkError } from "../core/errors.js";
 import { requestJson, selectJsonFields, type PutioSdkContext } from "../core/http.js";
 
 export const PodcastLinkTypeSchema = Schema.Literals(["all", "audio", "video", "mp4"]);
@@ -38,17 +39,13 @@ export type PodcastLinksResponse = Pick<
 export const getPodcastLinks = (
   input: PodcastGetLinksInput,
 ): Effect.Effect<PodcastLinksResponse, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PodcastGetLinksInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(PodcastLinksEnvelopeSchema, {
-        method: "GET",
-        path: "/v2/podcast/links",
-        query: {
-          parent_id: decodedInput.parentId,
-          type: decodedInput.types ? joinCsv(decodedInput.types) : undefined,
-        },
-      }),
-    ),
-    selectJsonFields("links", "token"),
-  );
+  decodeAndRun(PodcastGetLinksInputSchema, input, (decodedInput) =>
+    requestJson(PodcastLinksEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/podcast/links",
+      query: {
+        parent_id: decodedInput.parentId,
+        type: decodedInput.types ? joinCsv(decodedInput.types) : undefined,
+      },
+    }),
+  ).pipe(selectJsonFields("links", "token"));

@@ -1,5 +1,7 @@
-import { Cause, Effect, Exit, Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { describe, expect, it } from "vite-plus/test";
+
+import { expectFailure } from "../../test/support/sdk-test.js";
 
 import {
   PutioApiError,
@@ -19,20 +21,6 @@ import {
   responseRateLimitHeaders,
   withOperationErrors,
 } from "./errors.js";
-
-const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
-  if (Exit.isSuccess(exit)) {
-    throw new Error("Expected the effect to fail.");
-  }
-
-  const failure = exit.cause.reasons.find(Cause.isFailReason);
-
-  if (!failure) {
-    throw Cause.squash(exit.cause);
-  }
-
-  return failure.error;
-};
 
 describe("sdk core errors", () => {
   it("builds a fallback error envelope from the status code", () => {
@@ -226,21 +214,17 @@ describe("sdk core errors", () => {
       ),
     );
 
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      const error = expectFailure(exit);
-      expect(error).toBeInstanceOf(PutioOperationError);
-      expect(isPutioOperationError(error)).toBe(true);
-      expect(error).toMatchObject({
-        domain: "files",
-        operation: "move",
-        reason: {
-          kind: "error_type",
-          errorType: "FILE_LOST",
-        },
-      });
-    }
+    const error = expectFailure(exit);
+    expect(error).toBeInstanceOf(PutioOperationError);
+    expect(isPutioOperationError(error)).toBe(true);
+    expect(error).toMatchObject({
+      domain: "files",
+      operation: "move",
+      reason: {
+        kind: "error_type",
+        errorType: "FILE_LOST",
+      },
+    });
   });
 
   it("requires both error_type and status_code when a contract declares both", async () => {
@@ -261,84 +245,38 @@ describe("sdk core errors", () => {
 
     const exit = await Effect.runPromiseExit(withOperationErrors(Effect.fail(originalError), spec));
 
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      expect(expectFailure(exit)).toBe(originalError);
-    }
+    expect(expectFailure(exit)).toBe(originalError);
   });
 
-  it("supports pipe-friendly operation error wrapping", async () => {
+  it("wraps matched auth errors by status code in the pipeable form", async () => {
     const spec = definePutioOperationErrorSpec({
       domain: "files",
       operation: "delete",
-      knownErrors: [{ statusCode: 404 }] as const,
+      knownErrors: [{ statusCode: 403 }] as const,
     });
 
     const exit = await Effect.runPromiseExit(
       Effect.fail(
-        new PutioApiError({
-          status: 404,
+        new PutioAuthError({
+          status: 403,
           body: {
-            error_message: "Not found",
-            status_code: 404,
+            error_message: "Forbidden",
+            status_code: 403,
           },
         }),
       ).pipe(withOperationErrors(spec)),
     );
 
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      const error = expectFailure(exit);
-      expect(error).toBeInstanceOf(PutioOperationError);
-      expect(error).toMatchObject({
-        domain: "files",
-        operation: "delete",
-        reason: {
-          kind: "status_code",
-          statusCode: 404,
-        },
-      });
-    }
-  });
-
-  it("wraps matched API errors in a typed operation error by status code", async () => {
-    const spec = definePutioOperationErrorSpec({
-      domain: "download-links",
-      operation: "create",
-      knownErrors: [{ statusCode: 404 }] as const,
+    const error = expectFailure(exit);
+    expect(error).toBeInstanceOf(PutioOperationError);
+    expect(error).toMatchObject({
+      domain: "files",
+      operation: "delete",
+      reason: {
+        kind: "status_code",
+        statusCode: 403,
+      },
     });
-
-    const exit = await Effect.runPromiseExit(
-      withOperationErrors(
-        Effect.fail(
-          new PutioAuthError({
-            status: 404,
-            body: {
-              error_message: "Not found",
-              status_code: 404,
-            },
-          }),
-        ),
-        spec,
-      ),
-    );
-
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      const error = expectFailure(exit);
-      expect(error).toBeInstanceOf(PutioOperationError);
-      expect(error).toMatchObject({
-        domain: "download-links",
-        operation: "create",
-        reason: {
-          kind: "status_code",
-          statusCode: 404,
-        },
-      });
-    }
   });
 
   it("leaves non-matchable errors alone", async () => {
@@ -354,10 +292,6 @@ describe("sdk core errors", () => {
       withOperationErrors(Effect.fail(transportError), spec),
     );
 
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      expect(expectFailure(exit)).toBe(transportError);
-    }
+    expect(expectFailure(exit)).toBe(transportError);
   });
 });

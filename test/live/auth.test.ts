@@ -1,14 +1,10 @@
-import { beforeAll, describe, expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 
 import { PutioOperationError } from "../../dist/index.js";
-import { createLiveTokenClients, type LiveTokenClients } from "./support/helpers.js";
+import { createLiveTokenClients } from "./support/harness.js";
 
 describe("auth live", () => {
-  let clients: LiveTokenClients;
-
-  beforeAll(() => {
-    clients = createLiveTokenClients();
-  });
+  const clients = createLiveTokenClients();
 
   test("oauth token validates", async () => {
     const validation = await clients.oauthClient.auth.validateToken(clients.tokens.thirdPartyToken);
@@ -24,16 +20,9 @@ describe("auth live", () => {
     expect(validation.user_id).toBeGreaterThan(0);
   });
 
-  test("restricted grants list succeeds for the first-party token", async () => {
-    const grants = await clients.authClient.auth.grants();
-
-    expect(Array.isArray(grants)).toBe(true);
-  });
-
-  test("restricted clients list succeeds for the first-party token", async () => {
-    const clientsList = await clients.authClient.auth.clients();
-
-    expect(Array.isArray(clientsList)).toBe(true);
+  test("restricted grants and clients lists decode for the first-party token", async () => {
+    await clients.authClient.auth.grants();
+    await clients.authClient.auth.clients();
   });
 
   test("restricted grants reject the third-party token with a typed operation error", async () => {

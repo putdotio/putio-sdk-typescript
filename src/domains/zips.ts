@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
-import { PositiveIntegerSchema, decodeAndRun, cursorSelectionSchema } from "../core/validation.js";
+import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
@@ -67,17 +67,24 @@ export type ZipCreateResponse = Schema.Schema.Type<typeof ZipCreateEnvelopeSchem
 
 export type ZipInfo = Schema.Schema.Type<typeof ZipInfoSchema>;
 
-const CreateZipInputSchema = cursorSelectionSchema("file_ids", "exclude_ids", {});
+const CreateZipInputSchema = Schema.Struct({
+  cursor: Schema.optional(NonEmptyStringSchema),
+  exclude_ids: Schema.optional(Schema.Array(PositiveIntegerSchema)),
+  file_ids: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
+}).check(
+  Schema.makeFilter((input) => input.cursor !== undefined || input.file_ids !== undefined, {
+    expected: "a non-empty cursor or file ID selection",
+  }),
+);
 
 export type CreateZipInput = Schema.Schema.Type<typeof CreateZipInputSchema>;
 
-const FilesReadScopeError = { errorType: "invalid_scope", statusCode: 401 as const };
-const FilesWriteScopeError = { errorType: "invalid_scope", statusCode: 401 as const };
+const RestrictedScopeError = { errorType: "invalid_scope", statusCode: 401 as const };
 
 export const ListZipsErrorSpec = definePutioOperationErrorSpec({
   domain: "zips",
   operation: "list",
-  knownErrors: [FilesReadScopeError],
+  knownErrors: [RestrictedScopeError],
 });
 
 export const CreateZipErrorSpec = definePutioOperationErrorSpec({
@@ -85,7 +92,7 @@ export const CreateZipErrorSpec = definePutioOperationErrorSpec({
   operation: "create",
   knownErrors: [
     { errorType: "ZIP_TOTAL_SIZE_EXCEEDED", statusCode: 403 as const },
-    FilesWriteScopeError,
+    RestrictedScopeError,
     { statusCode: 400 as const },
     { statusCode: 403 as const },
   ],
@@ -97,7 +104,7 @@ export const GetZipErrorSpec = definePutioOperationErrorSpec({
   knownErrors: [
     { errorType: "LINK_EXPIRED", statusCode: 410 as const },
     { errorType: "ERROR_IN_ZIP", statusCode: 500 as const },
-    FilesReadScopeError,
+    RestrictedScopeError,
     { statusCode: 403 as const },
     { statusCode: 410 as const },
     { statusCode: 500 as const },
@@ -109,7 +116,7 @@ export const CancelZipErrorSpec = definePutioOperationErrorSpec({
   operation: "cancel",
   knownErrors: [
     { errorType: "LINK_EXPIRED", statusCode: 410 as const },
-    FilesWriteScopeError,
+    RestrictedScopeError,
     { statusCode: 403 as const },
     { statusCode: 410 as const },
   ],
@@ -140,13 +147,11 @@ export const createZip = (
     requestJson(ZipCreateEnvelopeSchema, {
       body: {
         type: "form",
-        value: {
-          ...toCursorSelectionForm({
-            cursor: decodedInput.cursor,
-            excludeIds: decodedInput.exclude_ids,
-            ids: decodedInput.file_ids,
-          }),
-        },
+        value: toCursorSelectionForm({
+          cursor: decodedInput.cursor,
+          excludeIds: decodedInput.exclude_ids,
+          ids: decodedInput.file_ids,
+        }),
       },
       method: "POST",
       path: "/v2/zips/create",

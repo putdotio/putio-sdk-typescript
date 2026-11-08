@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 const encoder = new TextEncoder();
 
-const concatBytes = (...parts: ReadonlyArray<Uint8Array>): Uint8Array => {
+const concatBytes = (...parts: ReadonlyArray<Uint8Array>): Uint8Array<ArrayBuffer> => {
   const result = new Uint8Array(parts.reduce((length, part) => length + part.byteLength, 0));
   let offset = 0;
 
@@ -13,8 +13,6 @@ const concatBytes = (...parts: ReadonlyArray<Uint8Array>): Uint8Array => {
 
   return result;
 };
-
-const encodeText = (value: string): Uint8Array => encoder.encode(value);
 
 const crc32 = (value: Uint8Array): number => {
   let crc = 0xffffffff;
@@ -38,8 +36,8 @@ const zipHeader = (length: number, write: (view: DataView) => void): Uint8Array 
 };
 
 export const createStoredZipFile = (name: string): File => {
-  const entryName = encodeText("fixture.txt");
-  const contents = encodeText("put.io SDK live archive fixture\n");
+  const entryName = encoder.encode("fixture.txt");
+  const contents = encoder.encode("put.io SDK live archive fixture\n");
   const checksum = crc32(contents);
 
   const localHeader = zipHeader(30, (view) => {
@@ -78,23 +76,23 @@ export const createStoredZipFile = (name: string): File => {
 };
 
 export const createTorrentFile = (name: string): File => {
-  const payload = encodeText("put.io SDK live torrent fixture\n");
+  const payload = encoder.encode("put.io SDK live torrent fixture\n");
   const pieceHash = new Uint8Array(createHash("sha1").update(payload).digest());
   const payloadName = `${name}.txt`;
 
   const info = concatBytes(
-    encodeText(`d6:lengthi${payload.byteLength}e4:name${payloadName.length}:${payloadName}`),
-    encodeText(`12:piece lengthi16384e6:pieces20:`),
+    encoder.encode(`d6:lengthi${payload.byteLength}e4:name${payloadName.length}:${payloadName}`),
+    encoder.encode(`12:piece lengthi16384e6:pieces20:`),
     pieceHash,
-    encodeText("e"),
+    encoder.encode("e"),
   );
 
   const announce = `https://example.invalid/${name}`;
 
   const torrent = concatBytes(
-    encodeText(`d8:announce${announce.length}:${announce}4:info`),
+    encoder.encode(`d8:announce${announce.length}:${announce}4:info`),
     info,
-    encodeText("e"),
+    encoder.encode("e"),
   );
 
   return new File([torrent], `${name}.torrent`, { type: "application/x-bittorrent" });

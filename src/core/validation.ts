@@ -15,6 +15,10 @@ export const decodeAndRun = <S extends Schema.Top, I, A, E, R>(
     Effect.flatMap(run),
   );
 
+type CursorSelectionFields = {
+  readonly cursor?: string;
+} & Readonly<Record<string, ReadonlyArray<number> | string | undefined>>;
+
 export const cursorSelectionSchema = <
   const TIdsField extends string,
   const TExcludeIdsField extends string,
@@ -30,7 +34,8 @@ export const cursorSelectionSchema = <
     [idsField]: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
     ...fields,
   }).check(
-    Schema.makeFilter((input) => input.cursor !== undefined || input[idsField] !== undefined, {
-      expected: "a non-empty cursor or file ID selection",
-    }),
+    Schema.makeFilter(
+      (input: CursorSelectionFields) => input.cursor !== undefined || input[idsField] !== undefined,
+      { expected: "a non-empty cursor or file ID selection" },
+    ),
   );

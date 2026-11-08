@@ -1,93 +1,15 @@
 import { Schema } from "effect";
 
-import type { PutioSdkPromiseClient } from "../../../dist/index.js";
-import { bootstrapFirstPartyTokenWithCredentials } from "./bootstrap.ts";
-import {
-  readCredentialFixture,
-  readFirstPartyClientCredentials,
-  readSecondaryCredentialFixture,
-} from "./secrets.ts";
-
-type LiveFriend = {
-  readonly has_shared_files: boolean;
-  readonly name: string;
-};
-
-type LiveFriendBase = {
-  readonly name: string;
-};
-
-type LiveFile = {
-  readonly file_type: string;
-  readonly id: number;
-  readonly name: string;
-};
-
-type LiveFileUploadResult =
-  | {
-      readonly file: LiveFile;
-      readonly type: "file";
-    }
-  | {
-      readonly type: string;
-    };
-
-type LiveFileListResponse = {
-  readonly cursor: string | null;
-  readonly files: ReadonlyArray<LiveFile>;
-};
-
-type LiveFriendsClient = {
-  readonly files: {
-    readonly continue: (
-      cursor: string,
-      query?: {
-        readonly per_page?: number;
-      },
-    ) => Promise<LiveFileListResponse>;
-    readonly createFolder: (input: {
-      readonly name: string;
-      readonly parent_id: number;
-    }) => Promise<LiveFile>;
-    readonly list: (
-      parentId: number,
-      query?: {
-        readonly per_page?: number;
-      },
-    ) => Promise<LiveFileListResponse>;
-    readonly upload: (input: {
-      readonly file: File;
-      readonly fileName: string;
-      readonly parentId: number;
-    }) => Promise<LiveFileUploadResult>;
-  };
-  readonly friends: {
-    readonly approve: PutioSdkPromiseClient["friends"]["approve"];
-    readonly list: () => Promise<{
-      readonly friends: ReadonlyArray<LiveFriend>;
-    }>;
-    readonly listSentRequests: () => Promise<ReadonlyArray<LiveFriendBase>>;
-    readonly listWaitingRequests: () => Promise<ReadonlyArray<LiveFriendBase>>;
-    readonly sendRequest: PutioSdkPromiseClient["friends"]["sendRequest"];
-    readonly sharedFolder: (username: string) => Promise<LiveFile | null>;
-  };
-  readonly sharing: {
-    readonly shareFiles: PutioSdkPromiseClient["sharing"]["shareFiles"];
-  };
-};
-
-type SecondaryClientFactory = (config?: {
-  readonly accessToken?: string;
-}) => Promise<LiveFriendsClient>;
+import type { FileCore, Friend, PutioSdkPromiseClient } from "../../../dist/index.js";
+import { getSecondaryClient } from "./bootstrap.ts";
+import { readCredentialFixture, readSecondaryCredentialFixture } from "./secrets.ts";
 
 const SHARED_FRIEND_FIXTURE_FOLDER_NAME = "putio-typescript-sdk-shared-friend-fixture";
 const SHARED_FRIEND_FIXTURE_FILE_NAME = "putio-typescript-sdk-shared-friend-fixture.txt";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-let secondaryClientPromise: Promise<LiveFriendsClient> | null = null;
-
-const hasName = (rows: ReadonlyArray<LiveFriendBase>, username: string): boolean =>
+const hasName = (rows: ReadonlyArray<{ readonly name: string }>, username: string): boolean =>
   rows.some((row) => row.name === username);
 
 const shareFilesBadRequestFields = {
@@ -110,57 +32,21 @@ const AlreadySharedErrorSchema = Schema.Union([
 
 const isAlreadySharedError = Schema.is(AlreadySharedErrorSchema);
 
-const readSecondaryFriendFixture = () => {
-  const primary = readCredentialFixture();
-  const secondary = readSecondaryCredentialFixture();
-
-  if (!secondary) {
-    throw new Error(
-      "Missing secondary live account fixture. Set PUTIO_TEST_SECONDARY_USERNAME and PUTIO_TEST_SECONDARY_PASSWORD, then run pnpm secrets:setup/bootstrap as needed before friend/share live tests.",
-    );
-  }
-
-  return {
-    primaryUsername: primary.username,
-    secondary,
-    secondaryUsername: secondary.username,
-  };
-};
-
-const getSecondaryClient = (createClient: SecondaryClientFactory): Promise<LiveFriendsClient> => {
-  secondaryClientPromise ??= bootstrapFirstPartyTokenWithCredentials(
-    readSecondaryFriendFixture().secondary,
-    readFirstPartyClientCredentials(),
-  ).then((token) =>
-    createClient({
-      accessToken: token.accessToken,
-    }),
-  );
-
-  return secondaryClientPromise;
-};
-
-export const findLiveFriend = async (
-  client: LiveFriendsClient,
-  predicate: (friend: LiveFriend) => boolean = () => true,
-): Promise<LiveFriend | null> => {
-  const { friends } = await client.friends.list();
-
-  return friends.find(predicate) ?? null;
-};
+const readFriendUsernames = () => ({
+  primaryUsername: readCredentialFixture().username,
+  secondaryUsername: readSecondaryCredentialFixture().username,
+});
 
 const waitForLiveFriend = async (
-  client: LiveFriendsClient,
+  client: PutioSdkPromiseClient,
   username: string,
-  predicate: (friend: LiveFriend) => boolean = () => true,
-): Promise<LiveFriend | null> => {
+  predicate: (friend: Friend) => boolean = () => true,
+): Promise<Friend | null> => {
   const deadline = Date.now() + 15_000;
 
   while (Date.now() < deadline) {
-    const friend = await findLiveFriend(
-      client,
-      (candidate) => candidate.name === username && predicate(candidate),
-    );
+    const { friends } = await client.friends.list();
+    const friend = friends.find((candidate) => candidate.name === username && predicate(candidate));
 
     if (friend) {
       return friend;
@@ -173,11 +59,11 @@ const waitForLiveFriend = async (
 };
 
 const approvePendingFriendship = async (
-  primaryClient: LiveFriendsClient,
-  secondaryClient: LiveFriendsClient,
+  primaryClient: PutioSdkPromiseClient,
+  secondaryClient: PutioSdkPromiseClient,
   primaryUsername: string,
   secondaryUsername: string,
-): Promise<boolean> => {
+): Promise<void> => {
   const [primaryWaiting, secondaryWaiting] = await Promise.all([
     primaryClient.friends.listWaitingRequests(),
     secondaryClient.friends.listWaitingRequests(),
@@ -185,35 +71,22 @@ const approvePendingFriendship = async (
 
   if (hasName(primaryWaiting, secondaryUsername)) {
     await primaryClient.friends.approve(secondaryUsername);
-
-    return true;
-  }
-
-  if (hasName(secondaryWaiting, primaryUsername)) {
+  } else if (hasName(secondaryWaiting, primaryUsername)) {
     await secondaryClient.friends.approve(primaryUsername);
-
-    return true;
   }
-
-  return false;
 };
 
-export const requireLiveFriend = async (
-  primaryClient: LiveFriendsClient,
-  createClient: SecondaryClientFactory,
-): Promise<LiveFriend> => {
-  const { primaryUsername, secondaryUsername } = readSecondaryFriendFixture();
+export const requireLiveFriend = async (primaryClient: PutioSdkPromiseClient): Promise<Friend> => {
+  const { primaryUsername, secondaryUsername } = readFriendUsernames();
 
-  const existing = await findLiveFriend(
-    primaryClient,
-    (candidate) => candidate.name === secondaryUsername,
-  );
+  const { friends } = await primaryClient.friends.list();
+  const existing = friends.find((candidate) => candidate.name === secondaryUsername);
 
   if (existing) {
     return existing;
   }
 
-  const secondaryClient = await getSecondaryClient(createClient);
+  const secondaryClient = await getSecondaryClient();
   await approvePendingFriendship(
     primaryClient,
     secondaryClient,
@@ -247,85 +120,16 @@ export const requireLiveFriend = async (
   return friend;
 };
 
-const findOrCreateSecondarySharedFolder = async (
-  secondaryClient: LiveFriendsClient,
-): Promise<LiveFile> => {
-  let page = await secondaryClient.files.list(0, {
-    per_page: 100,
-  });
-
-  while (true) {
-    const existing = page.files.find(
-      (file) => file.file_type === "FOLDER" && file.name === SHARED_FRIEND_FIXTURE_FOLDER_NAME,
-    );
-
-    if (existing) {
-      return existing;
-    }
-
-    if (!page.cursor) {
-      return secondaryClient.files.createFolder({
-        name: SHARED_FRIEND_FIXTURE_FOLDER_NAME,
-        parent_id: 0,
-      });
-    }
-
-    page = await secondaryClient.files.continue(page.cursor, {
-      per_page: 100,
-    });
-  }
-};
-
-const ensureSecondarySharedFile = async (
-  secondaryClient: LiveFriendsClient,
+const findChild = async (
+  client: PutioSdkPromiseClient,
   parentId: number,
-): Promise<void> => {
-  let listing = await secondaryClient.files.list(parentId, {
-    per_page: 100,
-  });
+  predicate: (file: FileCore) => boolean,
+): Promise<FileCore | null> => {
+  let page: { readonly cursor: string | null; readonly files: ReadonlyArray<FileCore> } =
+    await client.files.list(parentId, { per_page: 100 });
 
   while (true) {
-    const existing = listing.files.find(
-      (file) => file.file_type !== "FOLDER" && file.name === SHARED_FRIEND_FIXTURE_FILE_NAME,
-    );
-
-    if (existing) {
-      return;
-    }
-
-    if (!listing.cursor) {
-      break;
-    }
-
-    listing = await secondaryClient.files.continue(listing.cursor, {
-      per_page: 100,
-    });
-  }
-
-  const upload = await secondaryClient.files.upload({
-    file: new File(["sdk shared friend fixture\n"], SHARED_FRIEND_FIXTURE_FILE_NAME, {
-      type: "text/plain",
-    }),
-    fileName: SHARED_FRIEND_FIXTURE_FILE_NAME,
-    parentId,
-  });
-
-  if (upload.type !== "file") {
-    throw new Error("expected secondary shared fixture upload to return a file");
-  }
-};
-
-const findChildByName = async (
-  client: LiveFriendsClient,
-  parentId: number,
-  name: string,
-): Promise<LiveFile | null> => {
-  let page = await client.files.list(parentId, {
-    per_page: 100,
-  });
-
-  while (true) {
-    const existing = page.files.find((file) => file.name === name);
+    const existing = page.files.find(predicate);
 
     if (existing) {
       return existing;
@@ -335,39 +139,74 @@ const findChildByName = async (
       return null;
     }
 
-    page = await client.files.continue(page.cursor, {
-      per_page: 100,
-    });
+    page = await client.files.continue(page.cursor, { per_page: 100 });
   }
 };
 
+const ensureSecondarySharedFixture = async (
+  secondaryClient: PutioSdkPromiseClient,
+): Promise<FileCore> => {
+  const folder =
+    (await findChild(
+      secondaryClient,
+      0,
+      (file) => file.file_type === "FOLDER" && file.name === SHARED_FRIEND_FIXTURE_FOLDER_NAME,
+    )) ??
+    (await secondaryClient.files.createFolder({
+      name: SHARED_FRIEND_FIXTURE_FOLDER_NAME,
+      parent_id: 0,
+    }));
+
+  const file = await findChild(
+    secondaryClient,
+    folder.id,
+    (child) => child.file_type !== "FOLDER" && child.name === SHARED_FRIEND_FIXTURE_FILE_NAME,
+  );
+
+  if (!file) {
+    const upload = await secondaryClient.files.upload({
+      file: new File(["sdk shared friend fixture\n"], SHARED_FRIEND_FIXTURE_FILE_NAME, {
+        type: "text/plain",
+      }),
+      fileName: SHARED_FRIEND_FIXTURE_FILE_NAME,
+      parentId: folder.id,
+    });
+
+    if (upload.type !== "file") {
+      throw new Error("expected secondary shared fixture upload to return a file");
+    }
+  }
+
+  return folder;
+};
+
 const waitForPrimarySharedFixture = async (
-  primaryClient: LiveFriendsClient,
+  primaryClient: PutioSdkPromiseClient,
   secondaryUsername: string,
 ): Promise<void> => {
   const deadline = Date.now() + 15_000;
 
   while (Date.now() < deadline) {
-    const primarySharedRoot = await primaryClient.friends.sharedFolder(secondaryUsername);
+    const sharedRoot = await primaryClient.friends.sharedFolder(secondaryUsername);
 
-    if (primarySharedRoot) {
-      const sharedFolder = await findChildByName(
+    const sharedFolder =
+      sharedRoot &&
+      (await findChild(
         primaryClient,
-        primarySharedRoot.id,
-        SHARED_FRIEND_FIXTURE_FOLDER_NAME,
-      );
+        sharedRoot.id,
+        (file) => file.name === SHARED_FRIEND_FIXTURE_FOLDER_NAME,
+      ));
 
-      if (sharedFolder) {
-        const sharedFile = await findChildByName(
-          primaryClient,
-          sharedFolder.id,
-          SHARED_FRIEND_FIXTURE_FILE_NAME,
-        );
+    const sharedFile =
+      sharedFolder &&
+      (await findChild(
+        primaryClient,
+        sharedFolder.id,
+        (file) => file.name === SHARED_FRIEND_FIXTURE_FILE_NAME,
+      ));
 
-        if (sharedFile) {
-          return;
-        }
-      }
+    if (sharedFile) {
+      return;
     }
 
     await sleep(1_000);
@@ -379,15 +218,13 @@ const waitForPrimarySharedFixture = async (
 };
 
 export const requireLiveFriendWithSharedFiles = async (
-  primaryClient: LiveFriendsClient,
-  createClient: SecondaryClientFactory,
-): Promise<LiveFriend> => {
-  const { primaryUsername, secondaryUsername } = readSecondaryFriendFixture();
-  const _friend = await requireLiveFriend(primaryClient, createClient);
+  primaryClient: PutioSdkPromiseClient,
+): Promise<Friend> => {
+  const { primaryUsername, secondaryUsername } = readFriendUsernames();
+  await requireLiveFriend(primaryClient);
 
-  const secondaryClient = await getSecondaryClient(createClient);
-  const sharedFolder = await findOrCreateSecondarySharedFolder(secondaryClient);
-  await ensureSecondarySharedFile(secondaryClient, sharedFolder.id);
+  const secondaryClient = await getSecondaryClient();
+  const sharedFolder = await ensureSecondarySharedFixture(secondaryClient);
 
   try {
     await secondaryClient.sharing.shareFiles({
@@ -401,8 +238,6 @@ export const requireLiveFriendWithSharedFiles = async (
     if (!isAlreadySharedError(error)) {
       throw error;
     }
-
-    await waitForPrimarySharedFixture(primaryClient, secondaryUsername);
   }
 
   await waitForPrimarySharedFixture(primaryClient, secondaryUsername);

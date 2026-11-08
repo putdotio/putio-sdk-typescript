@@ -458,9 +458,9 @@ describe("supporting domain boundaries", () => {
       ),
     );
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
 
     let fullConfigRequestCount = 0;
 
@@ -644,9 +644,9 @@ describe("supporting domain boundaries", () => {
       runSdkExit(events.getEventTorrent(0), handler),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -673,9 +673,9 @@ describe("supporting domain boundaries", () => {
       runSdkExit(downloadLinks.getDownloadLinks(0), handler),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -921,9 +921,9 @@ describe("supporting domain boundaries", () => {
       ),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -1031,6 +1031,7 @@ describe("supporting domain boundaries", () => {
       runSdkExit(
         ifttt.sendIftttEvent({
           eventType: "custom_event",
+          // @ts-expect-error JavaScript callers can provide non-JSON ingredient values.
           ingredients: { created_at: new Date() },
         }),
         handler,
@@ -1046,9 +1047,9 @@ describe("supporting domain boundaries", () => {
       ),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 

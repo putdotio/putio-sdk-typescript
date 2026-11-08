@@ -296,9 +296,16 @@ describe("payment domain", () => {
       ),
     ).toBe(true);
 
-    await runSdkEffect(payment.stopPaymentSubscription(), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
+    await runSdkEffect(
+      payment.stopPaymentSubscription(),
+      (request) => {
+        expect(request.method).toBe("POST");
+        expect(new URL(request.url).pathname).toBe("/v2/payment/stop_subscription");
+
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
 
     expect(
       await runSdkEffect(
@@ -446,9 +453,9 @@ describe("payment domain", () => {
       runSdkExit(payment.createOpenNodeCharge(""), handler),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 

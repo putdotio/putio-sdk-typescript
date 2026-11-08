@@ -1,9 +1,8 @@
 import { Effect, Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
-import { PositiveIntegerSchema, cursorSelectionSchema } from "../core/validation.js";
+import { PositiveIntegerSchema, cursorSelectionSchema, decodeAndRun } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
-  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
@@ -99,34 +98,23 @@ export const createDownloadLinks = (
   CreateDownloadLinksError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(DownloadLinksCreateInputSchema, { onExcessProperty: "error" })(
-    input,
-  ).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(DownloadLinksCreateEnvelopeSchema, {
-        body: {
-          type: "form",
-          value: toCursorSelectionForm(decodedInput),
-        },
-        method: "POST",
-        path: "/v2/download_links/create",
-      }),
-    ),
-    selectJsonFields("id"),
-    withOperationErrors(CreateDownloadLinksErrorSpec),
-  );
+  decodeAndRun(DownloadLinksCreateInputSchema, input, (decodedInput) =>
+    requestJson(DownloadLinksCreateEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: toCursorSelectionForm(decodedInput),
+      },
+      method: "POST",
+      path: "/v2/download_links/create",
+    }),
+  ).pipe(selectJsonFields("id"), withOperationErrors(CreateDownloadLinksErrorSpec));
 
 export const getDownloadLinks = (
   id: number,
 ): Effect.Effect<DownloadLinksInfo, GetDownloadLinksError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestJson(DownloadLinksInfoSchema, {
-        method: "GET",
-        path: `/v2/download_links/${encodePathSegment(decodedId)}`,
-      }),
-    ),
-    withOperationErrors(GetDownloadLinksErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, id, (decodedId) =>
+    requestJson(DownloadLinksInfoSchema, {
+      method: "GET",
+      path: `/v2/download_links/${encodePathSegment(decodedId)}`,
+    }),
+  ).pipe(withOperationErrors(GetDownloadLinksErrorSpec));

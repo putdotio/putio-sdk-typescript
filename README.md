@@ -94,24 +94,6 @@ The exchange uses a form-encoded `POST` and never sends a configured bearer toke
 failures are exposed as `OAuthAuthorizationCodeExchangeError`; client secrets and codes are not
 included in validation errors.
 
-## App-Specific Passwords
-
-Create and manage passwords for apps that use put.io basic authentication:
-
-```ts
-const created = await sdk.account.appSpecificPasswords.create({
-  note: "Media server",
-});
-
-savePasswordSecurely(created.password);
-
-const passwords = await sdk.account.appSpecificPasswords.list();
-await sdk.account.appSpecificPasswords.delete(created.id);
-await sdk.account.appSpecificPasswords.deleteAll();
-```
-
-The plaintext `password` is returned only by `create`. List results contain metadata instead, including a nullable `last_used_at` timestamp and a null or masked `ip_address`.
-
 ## Utilities
 
 Shared formatting, URL, and error-localization helpers are available from the utilities subpath:
@@ -166,7 +148,7 @@ const serviceProgram = Effect.gen(function* () {
 `putioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed transport.
 Use `putioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioHttpClient` service when you want to supply custom transport.
 
-## Client Shapes
+## Clients
 
 Both client styles expose the same domain surface.
 
@@ -288,9 +270,6 @@ const playlistUrl = await sdk.files.getHlsStreamUrl(fileId, {
 
 const vlcPlaylistUrl = await sdk.files.getXspfPlaylistUrl(fileId, { downloadToken });
 
-// The master playlist put.io would serve, for inspecting the selected
-// variant's CODECS and VIDEO-RANGE. `playOriginal` picks the original
-// file over the MP4 conversion.
 const masterPlaylist = await sdk.files.getHlsMasterPlaylist(fileId, {
   playOriginal: false,
 });
@@ -306,72 +285,6 @@ const upload = await sdk.files.upload({
 The SDK covers the supported public put.io API surface. It leaves out admin,
 private, and service-to-service routes, browser page and callback routes, and
 aliases of routes it already covers.
-
-## File Lookup and Mutations
-
-Named-child lookup avoids listing an entire folder and preserves the same query-conditioned fields as
-`files.get`:
-
-```ts
-const child = await sdk.files.getChild({
-  parentId: folderId,
-  name: "movie.mp4",
-  query: { stream_url: 1 },
-});
-
-await sdk.files.touch({ fileIds: [child.id], updatedAt: new Date() });
-const copy = await sdk.files.copy({ fileId: child.id, parentId: 0, name: "movie copy.mp4" });
-const writableUserId = await sdk.files.canWrite(copy.id);
-```
-
-`canWrite` resolves the user ID returned by the backend when the file is writable. A non-writable,
-missing, or payment-gated file rejects with the corresponding typed SDK error rather than returning
-`false`.
-
-## Transfer Torrent Operations
-
-Torrent-backed transfers expose their original metainfo bytes and tracker mutation:
-
-```ts
-const torrent = await sdk.transfers.getTorrent(transferId);
-
-await sdk.transfers.addTrackers({
-  transferId,
-  trackers: ["udp://tracker.example:80", "https://tracker.example/announce"],
-});
-```
-
-`getTorrent` rejects for magnet-backed or non-torrent transfers. `remove` takes exactly one selector:
-
-```ts
-await sdk.transfers.remove({ ids: [transferId] });
-await sdk.transfers.remove({ filter: "completed" });
-```
-
-## Folder Sort and Podcast Feeds
-
-Folder sort settings persist per folder and apply to subsequent file listings:
-
-```ts
-await sdk.files.setSort({
-  fileId: folderId,
-  sortBy: "MODIFIED_DESC",
-});
-
-await sdk.files.resetSortSettings();
-```
-
-`resetSortSettings()` clears the saved sort setting for every folder, including the root folder.
-
-Podcast links can target a folder and an explicit non-empty selection of feed types. Omit
-`types` to request the API defaults:
-
-```ts
-const { links, token } = await sdk.podcast.getLinks({
-  parentId: folderId,
-  types: ["audio", "mp4"],
-});
-```
 
 ## TanStack Query
 

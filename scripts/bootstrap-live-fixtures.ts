@@ -1,18 +1,10 @@
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 
-import { Option, Predicate, Schema } from "effect";
+import { Option, Schema } from "effect";
 
-import { bootstrapFirstPartyTokenWithCredentials } from "../test/live/support/bootstrap.ts";
-import { requireLiveFriendWithSharedFiles } from "../test/live/support/friends.ts";
 import { requireOwnedVideoFixture } from "../test/live/support/media.ts";
-import {
-  readFirstPartyClientCredentials,
-  readLiveTokens,
-  readOptionalSecret,
-  readSecondaryCredentialFixture,
-} from "../test/live/support/secrets.ts";
-
-import type { PutioSdkOptions, PutioSdkPromiseClient } from "../dist/index.js";
+import { readLiveTokens, readOptionalSecret } from "../test/live/support/secrets.ts";
 
 type FixtureCheckStatus = "blocked" | "not_checked" | "passed";
 
@@ -26,11 +18,10 @@ type FixtureCheck = {
   readonly status: FixtureCheckStatus;
 };
 
-const packageDir = new URL("..", import.meta.url);
 const seedInviteCodes = process.argv.includes("--seed-invite-codes");
 
 const buildResult = spawnSync("vp", ["pack"], {
-  cwd: packageDir,
+  cwd: new URL("..", import.meta.url),
   stdio: "inherit",
 });
 
@@ -38,10 +29,9 @@ if (buildResult.status !== 0) {
   process.exit(buildResult.status ?? 1);
 }
 
-const { createPutioSdkPromiseClient } = await import("../dist/index.js");
-
-const createClient = (config: PutioSdkOptions = {}): PutioSdkPromiseClient =>
-  createPutioSdkPromiseClient(config);
+const { createPutioSdkPromiseClient: createClient } = await import("../dist/index.js");
+const { getSecondaryClient } = await import("../test/live/support/bootstrap.ts");
+const { requireLiveFriendWithSharedFiles } = await import("../test/live/support/friends.ts");
 
 const checks: FixtureCheck[] = [];
 
@@ -58,6 +48,15 @@ const TypedErrorSummarySchema = Schema.Struct({
 });
 
 const decodeTypedErrorSummary = Schema.decodeUnknownOption(TypedErrorSummarySchema);
+
+const isSubAccountPaymentRejection = Schema.is(
+  Schema.Struct({
+    _tag: Schema.Literal("PutioOperationError"),
+    domain: Schema.Literal("payment"),
+    operation: Schema.Literal("previewChangePlan"),
+    reason: Schema.Struct({ errorType: Schema.Literal("PAYMENT_SUB_ACCOUNT_NOT_ALLOWED") }),
+  }),
+);
 
 const errorMessage = (cause: unknown): string => {
   const summary = decodeTypedErrorSummary(cause);
@@ -85,27 +84,9 @@ const errorMessage = (cause: unknown): string => {
   return String(cause);
 };
 
-const assertCondition = (condition: boolean, message: string): void => {
-  if (!condition) {
-    throw new Error(message);
-  }
-};
-
-const runCheck = async (name: string, fn: () => Promise<FixtureDetails | void>): Promise<void> => {
+const runCheck = async (name: string, fn: () => Promise<FixtureDetails>): Promise<void> => {
   try {
-    const details = await fn();
-    checks.push(
-      details === undefined
-        ? {
-            name,
-            status: "passed",
-          }
-        : {
-            details,
-            name,
-            status: "passed",
-          },
-    );
+    checks.push({ details: await fn(), name, status: "passed" });
   } catch (error) {
     checks.push({
       details: {
@@ -133,33 +114,8 @@ const primaryClient = createClient({
 
 const publicClient = createClient();
 
-let secondaryClientPromise: Promise<PutioSdkPromiseClient> | null = null;
-
-const getSecondaryClient = async (): Promise<PutioSdkPromiseClient> => {
-  const secondaryFixture = readSecondaryCredentialFixture();
-
-  if (!secondaryFixture) {
-    throw new Error(
-      "Missing PUTIO_TEST_SECONDARY_USERNAME / PUTIO_TEST_SECONDARY_PASSWORD for secondary account fixture.",
-    );
-  }
-
-  secondaryClientPromise ??= bootstrapFirstPartyTokenWithCredentials(
-    secondaryFixture,
-    readFirstPartyClientCredentials(),
-  ).then((token) =>
-    createClient({
-      accessToken: token.accessToken,
-    }),
-  );
-
-  return secondaryClientPromise;
-};
-
 await runCheck("friend/share secondary fixture", async () => {
-  const friend = await requireLiveFriendWithSharedFiles(primaryClient, async (config = {}) =>
-    createClient(config),
-  );
+  const friend = await requireLiveFriendWithSharedFiles(primaryClient);
 
   return {
     friend: friend.name,
@@ -257,10 +213,10 @@ await runCheck("rss source fixture", async () => {
 });
 
 await runCheck("payment owner fixture", async () => {
-  const ownerToken = readOptionalSecret("PUTIO_TOKEN_PAYMENT_OWNER") ?? tokens.firstPartyToken;
+  const ownerToken = readOptionalSecret("PUTIO_TOKEN_PAYMENT_OWNER");
 
   const ownerClient = createClient({
-    accessToken: ownerToken,
+    accessToken: ownerToken ?? tokens.firstPartyToken,
   });
 
   const [account, payment] = await Promise.all([
@@ -268,20 +224,12 @@ await runCheck("payment owner fixture", async () => {
     ownerClient.payment.getInfo(),
   ]);
 
-  assertCondition(
-    !account.is_sub_account,
-    "Payment owner token must not belong to a family sub-account.",
-  );
-  assertCondition(
-    payment.plan?.type === "onetime",
-    "Payment owner fixture must be prepaid/onetime.",
-  );
+  assert(!account.is_sub_account, "Payment owner token must not belong to a family sub-account.");
+  assert(payment.plan?.type === "onetime", "Payment owner fixture must be prepaid/onetime.");
 
   return {
     plan_code: payment.plan?.code,
-    token_source: readOptionalSecret("PUTIO_TOKEN_PAYMENT_OWNER")
-      ? "PUTIO_TOKEN_PAYMENT_OWNER"
-      : "PUTIO_TOKEN_FIRST_PARTY",
+    token_source: ownerToken ? "PUTIO_TOKEN_PAYMENT_OWNER" : "PUTIO_TOKEN_FIRST_PARTY",
   };
 });
 
@@ -298,34 +246,21 @@ await runCheck("payment sub-account fixture", async () => {
 
   const account = await subAccountClient.account.getInfo({});
 
-  assertCondition(
-    account.is_sub_account,
-    "Payment sub-account token must belong to a family sub-account.",
+  assert(account.is_sub_account, "Payment sub-account token must belong to a family sub-account.");
+
+  const failure = await subAccountClient.payment.changePlan
+    .preview({ payment_type: "credit-card", plan_path: "1TB_365_once" })
+    .then(
+      () => {
+        throw new Error("Expected sub-account payment preview to fail.");
+      },
+      (cause: unknown) => cause,
+    );
+
+  assert(
+    isSubAccountPaymentRejection(failure),
+    `Expected payment previewChangePlan PAYMENT_SUB_ACCOUNT_NOT_ALLOWED, got ${errorMessage(failure)}`,
   );
-
-  try {
-    await subAccountClient.payment.changePlan.preview({
-      payment_type: "credit-card",
-      plan_path: "1TB_365_once",
-    });
-    throw new Error("Expected sub-account payment preview to fail.");
-  } catch (error) {
-    const summary = Option.getOrThrowWith(decodeTypedErrorSummary(error), () => error);
-
-    assertCondition(
-      Predicate.isTagged(summary, "PutioOperationError"),
-      "Expected PutioOperationError.",
-    );
-    assertCondition(summary.domain === "payment", "Expected payment domain.");
-    assertCondition(
-      summary.operation === "previewChangePlan",
-      "Expected previewChangePlan operation.",
-    );
-    assertCondition(
-      summary.reason?.errorType === "PAYMENT_SUB_ACCOUNT_NOT_ALLOWED",
-      "Expected PAYMENT_SUB_ACCOUNT_NOT_ALLOWED.",
-    );
-  }
 
   return {
     is_sub_account: account.is_sub_account,

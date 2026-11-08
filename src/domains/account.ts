@@ -1,8 +1,8 @@
 import { Effect, Schema } from "effect";
+import { decodeAndRun } from "../core/validation.js";
 import {
   PutioValidationError,
   definePutioOperationErrorSpec,
-  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
   type PutioSdkError,
@@ -269,17 +269,12 @@ export type AccountInfoResponseFor<TQuery extends AccountInfoQuery> = AccountInf
       }
     : {});
 
-const missingFieldError = (field: string) =>
-  new PutioValidationError({
-    cause: `Expected put.io to include "${field}" because it was requested`,
-  });
-
 const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
-  Effect.fail(missingFieldError(field));
-
-const widenValidationError = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | PutioValidationError, R> => effect;
+  Effect.fail(
+    new PutioValidationError({
+      cause: `Expected put.io to include "${field}" because it was requested`,
+    }),
+  );
 
 const mapSensitiveAccountDecodeError = (operation: "destroy" | "saveSettings") => () =>
   new PutioValidationError({
@@ -295,7 +290,7 @@ const ensureAccountInfoFields = (
   query: AccountInfoQuery,
 ): Effect.Effect<AccountInfoBroad, PutioSdkError | PutioValidationError, PutioSdkContext> =>
   Effect.gen(function* () {
-    const info = yield* widenValidationError(effect);
+    const info = yield* effect;
 
     if (query.download_token === 1 && info.download_token === undefined) {
       return yield* failMissingField("download_token");
@@ -416,20 +411,15 @@ export function getAccountInfo(
   query: AccountInfoQuery,
 ): Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext>;
 export function getAccountInfo(query: AccountInfoQuery = {}) {
-  return Schema.decodeUnknownEffect(AccountInfoQuerySchema, {
-    onExcessProperty: "error",
-  })(query).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedQuery) => {
-      const effect = requestJson(AccountInfoEnvelopeSchema, {
-        method: "GET",
-        path: "/v2/account/info",
-        query: decodedQuery,
-      }).pipe(selectJsonField("info"));
+  return decodeAndRun(AccountInfoQuerySchema, query, (decodedQuery) => {
+    const effect = requestJson(AccountInfoEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/account/info",
+      query: decodedQuery,
+    }).pipe(selectJsonField("info"));
 
-      return ensureAccountInfoFields(effect, decodedQuery);
-    }),
-  );
+    return ensureAccountInfoFields(effect, decodedQuery);
+  });
 }
 
 export const getAccountSettings = (): Effect.Effect<
@@ -479,20 +469,15 @@ export const saveAccountSettings = (
 export const clearAccount = (
   options: AccountClearOptions,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(AccountClearOptionsSchema, {
-    onExcessProperty: "error",
-  })(options).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedOptions) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value: decodedOptions,
-        },
-        method: "POST",
-        path: "/v2/account/clear",
-      }),
-    ),
+  decodeAndRun(AccountClearOptionsSchema, options, (decodedOptions) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: decodedOptions,
+      },
+      method: "POST",
+      path: "/v2/account/clear",
+    }),
   );
 
 export const destroyAccount = (
@@ -517,19 +502,14 @@ export const destroyAccount = (
 export const listAccountConfirmations = (
   subject?: AccountConfirmation["subject"],
 ): Effect.Effect<ReadonlyArray<AccountConfirmation>, AccountConfirmationsError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(Schema.UndefinedOr(AccountConfirmationSubjectSchema))(subject).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedSubject) =>
-      requestJson(AccountConfirmationsEnvelopeSchema, {
-        method: "GET",
-        path: "/v2/account/confirmation/list",
-        query: decodedSubject
-          ? {
-              type: decodedSubject,
-            }
-          : undefined,
-      }),
-    ),
-    selectJsonField("confirmations"),
-    withOperationErrors(AccountConfirmationsErrorSpec),
-  );
+  decodeAndRun(Schema.UndefinedOr(AccountConfirmationSubjectSchema), subject, (decodedSubject) =>
+    requestJson(AccountConfirmationsEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/account/confirmation/list",
+      query: decodedSubject
+        ? {
+            type: decodedSubject,
+          }
+        : undefined,
+    }),
+  ).pipe(selectJsonField("confirmations"), withOperationErrors(AccountConfirmationsErrorSpec));

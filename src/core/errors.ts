@@ -61,16 +61,10 @@ export interface PutioOperationErrorSpec<
   readonly knownErrors: TContracts;
 }
 
-type OperationContractOf<TSpec extends PutioOperationErrorSpec> = Extract<
-  TSpec["knownErrors"][number],
+type KnownOperationContractOf<TContracts extends ReadonlyArray<PutioKnownErrorContract>> = Extract<
+  TContracts[number],
   PutioKnownOperationErrorContract
 >;
-
-type OperationContractOfParts<
-  TDomain extends string,
-  TOperation extends string,
-  TContracts extends ReadonlyArray<PutioKnownErrorContract>,
-> = OperationContractOf<PutioOperationErrorSpec<TDomain, TOperation, TContracts>>;
 
 type PutioOperationErrorReason<TContract extends PutioKnownErrorContract> = TContract extends {
   readonly errorType: infer TType extends string;
@@ -172,6 +166,15 @@ export class PutioValidationError extends Data.TaggedError("PutioValidationError
   readonly cause: unknown;
 }> {}
 
+const RateLimitHeaderFields = {
+  action: Schema.optional(Schema.String),
+  id: Schema.optional(Schema.String),
+  limit: Schema.optional(Schema.String),
+  remaining: Schema.optional(Schema.String),
+  retryAfter: Schema.optional(Schema.String),
+  reset: Schema.optional(Schema.String),
+};
+
 const PutioResponseErrorFields = {
   status: Schema.Int,
   body: PutioErrorEnvelopeSchema,
@@ -188,15 +191,7 @@ export class PutioAuthError extends Schema.TaggedError<PutioAuthError>()("PutioA
 
 export class PutioRateLimitError extends Schema.TaggedError<PutioRateLimitError>()(
   "PutioRateLimitError",
-  {
-    ...PutioResponseErrorFields,
-    action: Schema.optional(Schema.String),
-    id: Schema.optional(Schema.String),
-    limit: Schema.optional(Schema.String),
-    remaining: Schema.optional(Schema.String),
-    retryAfter: Schema.optional(Schema.String),
-    reset: Schema.optional(Schema.String),
-  },
+  { ...PutioResponseErrorFields, ...RateLimitHeaderFields },
 ) {}
 
 export class PutioOperationError<
@@ -220,16 +215,14 @@ export type PutioSdkError =
   | PutioAuthError
   | PutioRateLimitError;
 
-export type PutioUnhandledSdkError =
-  | PutioConfigurationError
-  | PutioTransportError
-  | PutioValidationError
-  | PutioApiError
-  | PutioAuthError
-  | PutioRateLimitError;
+export type PutioUnhandledSdkError = PutioSdkError;
 
 export type PutioOperationErrorFromSpec<TSpec extends PutioOperationErrorSpec> =
-  PutioOperationError<TSpec["domain"], TSpec["operation"], OperationContractOf<TSpec>>;
+  PutioOperationError<
+    TSpec["domain"],
+    TSpec["operation"],
+    KnownOperationContractOf<TSpec["knownErrors"]>
+  >;
 
 export type PutioOperationFailure<TSpec extends PutioOperationErrorSpec> =
   | PutioUnhandledSdkError
@@ -273,12 +266,7 @@ const isPutioRateLimitErrorValue = Schema.is(
   Schema.Struct({
     _tag: Schema.Literal("PutioRateLimitError"),
     ...responseErrorFields,
-    action: Schema.optional(Schema.String),
-    id: Schema.optional(Schema.String),
-    limit: Schema.optional(Schema.String),
-    remaining: Schema.optional(Schema.String),
-    retryAfter: Schema.optional(Schema.String),
-    reset: Schema.optional(Schema.String),
+    ...RateLimitHeaderFields,
   }),
 );
 
@@ -368,12 +356,7 @@ export const withOperationErrors: {
     effect: Effect.Effect<A, E, R>,
   ) => Effect.Effect<
     A,
-    | E
-    | PutioOperationError<
-        TDomain,
-        TOperation,
-        OperationContractOfParts<TDomain, TOperation, TContracts>
-      >,
+    E | PutioOperationError<TDomain, TOperation, KnownOperationContractOf<TContracts>>,
     R
   >;
   <
@@ -388,12 +371,7 @@ export const withOperationErrors: {
     spec: PutioOperationErrorSpec<TDomain, TOperation, TContracts>,
   ): Effect.Effect<
     A,
-    | E
-    | PutioOperationError<
-        TDomain,
-        TOperation,
-        OperationContractOfParts<TDomain, TOperation, TContracts>
-      >,
+    E | PutioOperationError<TDomain, TOperation, KnownOperationContractOf<TContracts>>,
     R
   >;
 } = dual(

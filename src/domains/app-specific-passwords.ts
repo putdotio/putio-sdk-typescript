@@ -1,9 +1,9 @@
 import { Effect, Schema } from "effect";
+import { decodeAndRun } from "../core/validation.js";
 
 import {
   PutioErrorEnvelopeSchema,
   definePutioOperationErrorSpec,
-  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
@@ -156,20 +156,16 @@ export const createAppSpecificPassword = (
   CreateAppSpecificPasswordError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(CreateAppSpecificPasswordInputSchema, {
-    onExcessProperty: "error",
-  })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(CreateAppSpecificPasswordEnvelopeSchema, {
-        body: {
-          type: "form",
-          value: decodedInput,
-        },
-        method: "POST",
-        path: "/v2/app_specific_password/create",
-      }),
-    ),
+  decodeAndRun(CreateAppSpecificPasswordInputSchema, input, (decodedInput) =>
+    requestJson(CreateAppSpecificPasswordEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: decodedInput,
+      },
+      method: "POST",
+      path: "/v2/app_specific_password/create",
+    }),
+  ).pipe(
     selectJsonFields("created_at", "id", "ip_address", "last_used_at", "note", "password"),
     withOperationErrors(CreateAppSpecificPasswordErrorSpec),
   );
@@ -187,17 +183,12 @@ export const listAppSpecificPasswords = (): Effect.Effect<
 export const deleteAppSpecificPassword = (
   id: number,
 ): Effect.Effect<void, DeleteAppSpecificPasswordError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(AppSpecificPasswordIdSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestJson(OkResponseSchema, {
-        method: "POST",
-        path: `/v2/app_specific_password/${encodePathSegment(decodedId)}/delete`,
-      }),
-    ),
-    Effect.asVoid,
-    withOperationErrors(DeleteAppSpecificPasswordErrorSpec),
-  );
+  decodeAndRun(AppSpecificPasswordIdSchema, id, (decodedId) =>
+    requestJson(OkResponseSchema, {
+      method: "POST",
+      path: `/v2/app_specific_password/${encodePathSegment(decodedId)}/delete`,
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(DeleteAppSpecificPasswordErrorSpec));
 
 export const deleteAllAppSpecificPasswords = (): Effect.Effect<
   void,

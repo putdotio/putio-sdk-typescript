@@ -1,11 +1,10 @@
 import { Effect, Schema } from "effect";
 import {
   definePutioOperationErrorSpec,
-  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { NonEmptyStringSchema } from "../core/validation.js";
+import { NonEmptyStringSchema, decodeAndRun } from "../core/validation.js";
 import {
   OkResponseSchema,
   encodePathSegment,
@@ -160,29 +159,19 @@ export const createFamilyInvite = (): Effect.Effect<
 export const removeFamilyMember = (
   username: string,
 ): Effect.Effect<void, RemoveFamilyMemberError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(NonEmptyStringSchema)(username).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedUsername) =>
-      requestJson(OkResponseSchema, {
-        method: "DELETE",
-        path: `/v2/family/sub_account/${encodePathSegment(decodedUsername)}`,
-      }),
-    ),
-    Effect.asVoid,
-    withOperationErrors(RemoveFamilyMemberErrorSpec),
-  );
+  decodeAndRun(NonEmptyStringSchema, username, (decodedUsername) =>
+    requestJson(OkResponseSchema, {
+      method: "DELETE",
+      path: `/v2/family/sub_account/${encodePathSegment(decodedUsername)}`,
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(RemoveFamilyMemberErrorSpec));
 
 export const joinFamily = (
   inviteCode: string,
 ): Effect.Effect<void, JoinFamilyError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(NonEmptyStringSchema)(inviteCode).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInviteCode) =>
-      requestJson(OkResponseSchema, {
-        method: "POST",
-        path: `/v2/family/join/${encodePathSegment(decodedInviteCode)}`,
-      }),
-    ),
-    Effect.asVoid,
-    withOperationErrors(JoinFamilyErrorSpec),
-  );
+  decodeAndRun(NonEmptyStringSchema, inviteCode, (decodedInviteCode) =>
+    requestJson(OkResponseSchema, {
+      method: "POST",
+      path: `/v2/family/join/${encodePathSegment(decodedInviteCode)}`,
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(JoinFamilyErrorSpec));

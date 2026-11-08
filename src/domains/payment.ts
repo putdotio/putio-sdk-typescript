@@ -7,6 +7,7 @@ import {
 } from "../core/errors.js";
 import {
   OkResponseSchema,
+  encodePathSegment,
   requestJson,
   selectJsonField,
   type PutioSdkContext,
@@ -704,7 +705,7 @@ export const previewPaymentChangePlan = (
   decodeAndRun(PaymentChangePlanPreviewInputSchema, input, (decodedInput) =>
     requestJson(PaymentChangePlanPreviewSchema, {
       method: "GET",
-      path: `/v2/payment/change_plan/${encodeURIComponent(decodedInput.plan_path)}`,
+      path: `/v2/payment/change_plan/${encodePathSegment(decodedInput.plan_path)}`,
       query: {
         coupon_code: decodedInput.coupon_code,
         payment_type: decodedInput.payment_type,
@@ -725,7 +726,7 @@ export const submitPaymentChangePlan = (
         },
       },
       method: "POST",
-      path: `/v2/payment/change_plan/${encodeURIComponent(decodedInput.plan_path)}`,
+      path: `/v2/payment/change_plan/${encodePathSegment(decodedInput.plan_path)}`,
       query: {
         coupon_code: decodedInput.coupon_code,
       },
@@ -738,7 +739,7 @@ export const confirmFastspringOrder = (
   decodeAndRun(NonEmptyStringSchema, reference, (decodedReference) =>
     requestJson(PaymentFastspringConfirmEnvelopeSchema, {
       method: "GET",
-      path: `/v2/payment/fs-confirm/${encodeURIComponent(decodedReference)}`,
+      path: `/v2/payment/fs-confirm/${encodePathSegment(decodedReference)}`,
     }).pipe(selectJsonField("confirmed")),
   ).pipe(withOperationErrors(ConfirmFastspringOrderErrorSpec));
 
@@ -758,7 +759,7 @@ export const getPaymentVoucherInfo = (
   decodeAndRun(NonEmptyStringSchema, code, (decodedCode) =>
     requestJson(PaymentVoucherInfoSchema, {
       method: "GET",
-      path: `/v2/payment/redeem_voucher/${encodeURIComponent(decodedCode)}`,
+      path: `/v2/payment/redeem_voucher/${encodePathSegment(decodedCode)}`,
     }),
   ).pipe(withOperationErrors(GetPaymentVoucherInfoErrorSpec));
 
@@ -768,7 +769,7 @@ export const redeemPaymentVoucher = (
   decodeAndRun(NonEmptyStringSchema, code, (decodedCode) =>
     requestJson(OkResponseSchema, {
       method: "POST",
-      path: `/v2/payment/redeem_voucher/${encodeURIComponent(decodedCode)}`,
+      path: `/v2/payment/redeem_voucher/${encodePathSegment(decodedCode)}`,
     }),
   ).pipe(Effect.asVoid, withOperationErrors(RedeemPaymentVoucherErrorSpec));
 
@@ -808,7 +809,7 @@ export const getPaddleBillingInvoiceUrl = (
   decodeAndRun(PositiveIntegerSchema, paymentId, (decodedPaymentId) =>
     requestJson(PaymentPaddleBillingInvoiceEnvelopeSchema, {
       method: "GET",
-      path: `/v2/payment/methods/paddle_billing/invoice/${encodeURIComponent(decodedPaymentId)}`,
+      path: `/v2/payment/methods/paddle_billing/invoice/${encodePathSegment(decodedPaymentId)}`,
     }).pipe(selectJsonField("url")),
   ).pipe(withOperationErrors(GetPaddleBillingInvoiceUrlErrorSpec));
 
@@ -818,7 +819,7 @@ export const createPaddleBillingUpdatePaymentMethodTransaction = (
   decodeAndRun(PositiveIntegerSchema, userSubscriptionId, (decodedUserSubscriptionId) =>
     requestJson(PaymentPaddleBillingUpdatePaymentMethodEnvelopeSchema, {
       method: "GET",
-      path: `/v2/payment/methods/paddle_billing/update_payment_method/${encodeURIComponent(
+      path: `/v2/payment/methods/paddle_billing/update_payment_method/${encodePathSegment(
         decodedUserSubscriptionId,
       )}`,
     }).pipe(selectJsonField("transaction_id")),
@@ -837,8 +838,5 @@ export const createOpenNodeCharge = (
       },
       method: "POST",
       path: "/v2/payment/methods/opennode/charge",
-    }).pipe(
-      selectJsonField("opennode"),
-      Effect.map(({ checkout_url }) => checkout_url),
-    ),
+    }).pipe(selectJsonField("opennode"), selectJsonField("checkout_url")),
   ).pipe(withOperationErrors(CreateOpenNodeChargeErrorSpec));

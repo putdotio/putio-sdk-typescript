@@ -127,7 +127,7 @@ describe("account domain", () => {
       { accessToken: "token-123" },
     );
 
-    expect(fullInfo.features.beta).toBe(true);
+    expect(fullInfo.features?.beta).toBe(true);
     expect(fullInfo.user_hash).toBe("intercom-user");
     expect(fullInfo.paddle_user_id).toBe("ctm_99");
 

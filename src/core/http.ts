@@ -103,7 +103,7 @@ export const makePutioFetchClient = (
             ? read(() => response.json())
             : read(() => response.text()).pipe(
                 Effect.flatMap((text) =>
-                  Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(text).pipe(
+                  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
                     Effect.mapError(() =>
                       toPutioResponseError(
                         response.status,
@@ -196,16 +196,6 @@ const decodeFailure = (response: PutioHttpResponse, headers: Headers) =>
     Effect.map((body) => toPutioResponseError(response.status, headers, body)),
   );
 
-const toBasicAuthorization = (username: string, password: string) => {
-  if (typeof globalThis.btoa === "undefined") {
-    throw mapConfigurationError(
-      "This runtime does not provide btoa(), so Basic auth cannot be encoded safely",
-    );
-  }
-
-  return `Basic ${globalThis.btoa(`${username}:${password}`)}`;
-};
-
 const resolveAuthorization = (
   config: PutioSdkOptions,
   auth: PutioAuth | undefined,
@@ -219,7 +209,7 @@ const resolveAuthorization = (
       return Effect.succeed(`Token ${resolvedAuth.token}`);
     case "basic":
       return Effect.try({
-        try: () => toBasicAuthorization(resolvedAuth.username, resolvedAuth.password),
+        try: () => `Basic ${btoa(`${resolvedAuth.username}:${resolvedAuth.password}`)}`,
         catch: mapConfigurationError,
       });
     case "config-token":

@@ -2,33 +2,23 @@ import { createHmac } from "node:crypto";
 
 import { Schema } from "effect";
 
-import type {
-  PutioBootstrapSecrets,
-  PutioClientCredentials,
-  PutioCredentialFixture,
+import { createPutioSdkPromiseClient, type PutioSdkPromiseClient } from "../../../dist/index.js";
+import {
+  readFirstPartyClientCredentials,
+  readSecondaryCredentialFixture,
+  type PutioBootstrapSecrets,
+  type PutioClientCredentials,
+  type PutioCredentialFixture,
 } from "./secrets.ts";
 
-type PutioSdkPromiseClientFactory = typeof import("./client.ts").createPromiseClient;
+type TokenValidation = Awaited<ReturnType<PutioSdkPromiseClient["auth"]["validateToken"]>>;
 
-type PutioSdkPromiseClient = Awaited<ReturnType<PutioSdkPromiseClientFactory>>;
-
-type CreatePromiseClient = (
-  config?: Parameters<PutioSdkPromiseClientFactory>[0],
-) => Promise<PutioSdkPromiseClient>;
-
-const createSourcePromiseClient: CreatePromiseClient = async (config = {}) => {
-  const { createPromiseClient } = await import("./client.ts");
-
-  return createPromiseClient(config);
+type BootstrappedToken = {
+  readonly accessToken: string;
+  readonly scope: TokenValidation["token_scope"];
+  readonly tokenId: number | null;
+  readonly userId: number | null;
 };
-
-type TokenScope =
-  | "default"
-  | "files_download"
-  | "files_public_access"
-  | "token_validate"
-  | "two_factor"
-  | null;
 
 const CodeNotFoundErrorSchema = Schema.Struct({
   _tag: Schema.Literal("PutioOperationError"),
@@ -37,24 +27,7 @@ const CodeNotFoundErrorSchema = Schema.Struct({
   }),
 });
 
-export type BootstrappedToken = {
-  readonly accessToken: string;
-  readonly scope: TokenScope;
-  readonly tokenId: number | null;
-  readonly userId: number | null;
-};
-
-export type OAuthAppIdentity = {
-  readonly id: number;
-  readonly name: string;
-};
-
-export type BootstrappedTokens = {
-  readonly firstParty: BootstrappedToken;
-  readonly thirdParty: BootstrappedToken & {
-    readonly app: OAuthAppIdentity;
-  };
-};
+const isCodeNotFoundError = Schema.is(CodeNotFoundErrorSchema);
 
 const THIRD_PARTY_BOOTSTRAP_APP_NAME = "put.io TypeScript SDK Live App";
 const THIRD_PARTY_BOOTSTRAP_CALLBACK = "https://example.com/putio-typescript-sdk-live/callback";
@@ -107,71 +80,47 @@ const generateTotpCode = (secret: string, now = Date.now()): string => {
   return String(code).padStart(6, "0");
 };
 
-const readFreshTotp = (secrets: PutioBootstrapSecrets): string => {
-  const reference = secrets.credentials.totpReference;
-
-  if (reference) {
-    return generateTotpCode(reference);
+const readFreshTotp = (credentials: PutioCredentialFixture): string => {
+  if (credentials.totpReference) {
+    return generateTotpCode(credentials.totpReference);
   }
 
-  if (!secrets.credentials.totp) {
+  if (!credentials.totp) {
     throw new Error(
       "Missing TOTP input. Set PUTIO_TEST_TOTP or PUTIO_TEST_TOTP_REFERENCE for two-factor bootstrap flows.",
     );
   }
 
-  return secrets.credentials.totp;
+  return credentials.totp;
 };
 
-const isCodeNotFoundError = Schema.is(CodeNotFoundErrorSchema);
-
 const verifyTwoFactorToken = async (
+  sdk: PutioSdkPromiseClient,
   accessToken: string,
-  secrets: PutioBootstrapSecrets,
-  createClient: CreatePromiseClient,
+  credentials: PutioCredentialFixture,
 ): Promise<string> => {
-  const sdk = await createClient();
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 1; ; attempt += 1) {
     try {
-      const verified = await sdk.auth.twoFactor.verifyTOTP(accessToken, readFreshTotp(secrets));
+      const verified = await sdk.auth.twoFactor.verifyTOTP(accessToken, readFreshTotp(credentials));
 
       return verified.token;
     } catch (error) {
-      if (!isCodeNotFoundError(error) || attempt === 2) {
+      if (!isCodeNotFoundError(error) || attempt === 3) {
         throw error;
       }
 
       await sleep(2000);
     }
   }
-
-  throw new Error("unreachable");
 };
 
 export const bootstrapFirstPartyToken = async (
-  secrets: PutioBootstrapSecrets,
-  createClient: CreatePromiseClient = createSourcePromiseClient,
-): Promise<BootstrappedToken> => {
-  const sdk = await createClient();
-
-  return bootstrapFirstPartyTokenWithCredentials(
-    secrets.credentials,
-    secrets.firstPartyClient,
-    sdk,
-    createClient,
-  );
-};
-
-export const bootstrapFirstPartyTokenWithCredentials = async (
   credentials: PutioCredentialFixture,
-  firstPartyClient: PutioClientCredentials,
-  sdk?: PutioSdkPromiseClient,
-  createClient: CreatePromiseClient = createSourcePromiseClient,
+  firstPartyClient: PutioClientCredentials = readFirstPartyClientCredentials(),
 ): Promise<BootstrappedToken> => {
-  const resolvedSdk = sdk ?? (await createClient());
+  const sdk = createPutioSdkPromiseClient();
 
-  const loginResult = await resolvedSdk.auth.login({
+  const loginResult = await sdk.auth.login({
     clientId: firstPartyClient.clientId,
     clientSecret: firstPartyClient.clientSecret,
     password: credentials.password,
@@ -181,18 +130,11 @@ export const bootstrapFirstPartyTokenWithCredentials = async (
   let accessToken = loginResult.access_token;
 
   try {
-    let validation = await resolvedSdk.auth.validateToken(accessToken);
+    let validation = await sdk.auth.validateToken(accessToken);
 
     if (validation.token_scope === "two_factor") {
-      accessToken = await verifyTwoFactorToken(
-        accessToken,
-        {
-          credentials,
-          firstPartyClient,
-        },
-        createClient,
-      );
-      validation = await resolvedSdk.auth.validateToken(accessToken);
+      accessToken = await verifyTwoFactorToken(sdk, accessToken, credentials);
+      validation = await sdk.auth.validateToken(accessToken);
     }
 
     if (validation.result !== true) {
@@ -206,10 +148,10 @@ export const bootstrapFirstPartyTokenWithCredentials = async (
       userId: validation.user_id,
     };
   } catch (error) {
-    resolvedSdk.setAccessToken(accessToken);
+    sdk.setAccessToken(accessToken);
 
     try {
-      await resolvedSdk.auth.logout();
+      await sdk.auth.logout();
     } catch (cleanupError) {
       throw new AggregateError(
         [error, cleanupError],
@@ -221,16 +163,9 @@ export const bootstrapFirstPartyTokenWithCredentials = async (
   }
 };
 
-export const bootstrapThirdPartyToken = async (
-  firstPartyAccessToken: string,
-  appId?: string,
-  createClient: CreatePromiseClient = createSourcePromiseClient,
-): Promise<BootstrappedToken & { readonly app: OAuthAppIdentity }> => {
-  const sdk = await createClient();
-
-  const authedSdk = await createClient({
-    accessToken: firstPartyAccessToken,
-  });
+const bootstrapThirdPartyToken = async (firstPartyAccessToken: string, appId?: string) => {
+  const sdk = createPutioSdkPromiseClient();
+  const authedSdk = createPutioSdkPromiseClient({ accessToken: firstPartyAccessToken });
 
   const existingApps = await authedSdk.oauth.query();
 
@@ -250,9 +185,7 @@ export const bootstrapThirdPartyToken = async (
       })
     ).app;
 
-  const appDetail = await authedSdk.oauth.get(app.id, {
-    edit: true,
-  });
+  const appDetail = await authedSdk.oauth.get(app.id, { edit: true });
 
   const accessToken =
     appDetail.token !== null && appDetail.token.length > 0
@@ -267,30 +200,30 @@ export const bootstrapThirdPartyToken = async (
 
   return {
     accessToken,
-    app: {
-      id: app.id,
-      name: app.name,
-    },
+    app: { id: app.id, name: app.name },
     scope: validation.token_scope,
     tokenId: validation.token_id,
     userId: validation.user_id,
   };
 };
 
-export const bootstrapRuntimeTokens = async (
-  secrets: PutioBootstrapSecrets,
-  createClient: CreatePromiseClient = createSourcePromiseClient,
-): Promise<BootstrappedTokens> => {
-  const firstParty = await bootstrapFirstPartyToken(secrets, createClient);
+export const bootstrapRuntimeTokens = async (secrets: PutioBootstrapSecrets) => {
+  const firstParty = await bootstrapFirstPartyToken(secrets.credentials, secrets.firstPartyClient);
 
   const thirdParty = await bootstrapThirdPartyToken(
     firstParty.accessToken,
     secrets.thirdPartyClientId,
-    createClient,
   );
 
-  return {
-    firstParty,
-    thirdParty,
-  };
+  return { firstParty, thirdParty };
+};
+
+let secondaryClient: Promise<PutioSdkPromiseClient> | undefined;
+
+export const getSecondaryClient = (): Promise<PutioSdkPromiseClient> => {
+  secondaryClient ??= bootstrapFirstPartyToken(readSecondaryCredentialFixture()).then((token) =>
+    createPutioSdkPromiseClient({ accessToken: token.accessToken }),
+  );
+
+  return secondaryClient;
 };

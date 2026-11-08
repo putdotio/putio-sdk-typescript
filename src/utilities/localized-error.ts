@@ -59,7 +59,7 @@ export class LocalizedError extends Error {
   }
 }
 
-type StatusAndBodyError =
+export type PutioErrorWithBody =
   | PutioApiError
   | PutioAuthError
   | PutioRateLimitError
@@ -70,8 +70,6 @@ export type PutioLocalizableError = {
   readonly body: PutioErrorEnvelope;
   readonly status?: number;
 };
-
-export type PutioErrorWithBody = StatusAndBodyError;
 
 class LocalizablePutioErrorEnvelope extends Data.TaggedClass("PutioErrorEnvelope")<{
   readonly body: PutioErrorEnvelope;
@@ -151,45 +149,23 @@ export const createLocalizeError =
   ): LocalizedError => {
     const localizers = [...scopedLocalizers, ...globalLocalizers];
 
-    if (isPutioErrorWithBody(error) || isLocalizablePutioErrorEnvelope(error)) {
-      const apiError = normalizePutioError(error);
+    const apiError =
+      isPutioErrorWithBody(error) || isLocalizablePutioErrorEnvelope(error)
+        ? normalizePutioError(error)
+        : undefined;
 
-      const byErrorType = localizers.find(
+    const byErrorType =
+      apiError &&
+      localizers.find(
         (localizer): localizer is APIErrorByErrorTypeLocalizer =>
           localizer.kind === "api_error_type" && localizer.error_type === apiError.body.error_type,
       );
 
-      if (byErrorType) {
-        return new LocalizedError({
-          underlyingError: apiError,
-          ...byErrorType.localize(apiError),
-        });
-      }
-
-      const byMatchCondition = localizers.find(
-        (localizer): localizer is MatchConditionLocalizer<ScopedError> =>
-          localizer.kind === "match_condition" && localizer.match(error),
-      );
-
-      if (byMatchCondition) {
-        return new LocalizedError({
-          underlyingError: error,
-          ...byMatchCondition.localize(error),
-        });
-      }
-
-      const byStatusCode = localizers.find(
-        (localizer): localizer is APIErrorByStatusCodeLocalizer =>
-          localizer.kind === "api_status_code" &&
-          localizer.status_code === apiError.body.status_code,
-      );
-
-      if (byStatusCode) {
-        return new LocalizedError({
-          underlyingError: apiError,
-          ...byStatusCode.localize(apiError),
-        });
-      }
+    if (apiError && byErrorType) {
+      return new LocalizedError({
+        underlyingError: apiError,
+        ...byErrorType.localize(apiError),
+      });
     }
 
     const byMatchCondition = localizers.find(
@@ -201,6 +177,21 @@ export const createLocalizeError =
       return new LocalizedError({
         underlyingError: error,
         ...byMatchCondition.localize(error),
+      });
+    }
+
+    const byStatusCode =
+      apiError &&
+      localizers.find(
+        (localizer): localizer is APIErrorByStatusCodeLocalizer =>
+          localizer.kind === "api_status_code" &&
+          localizer.status_code === apiError.body.status_code,
+      );
+
+    if (apiError && byStatusCode) {
+      return new LocalizedError({
+        underlyingError: apiError,
+        ...byStatusCode.localize(apiError),
       });
     }
 

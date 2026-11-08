@@ -1,8 +1,7 @@
 import { Effect, Schema } from "effect";
-import { PositiveIntegerSchema } from "../core/validation.js";
+import { PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
-  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
@@ -243,31 +242,23 @@ export type GetEventTorrentError = PutioOperationFailure<typeof GetEventTorrentE
 export const listEvents = (
   query: EventsListQuery = {},
 ): Effect.Effect<EventsListResponse, ListEventsError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(EventsListQuerySchema, { onExcessProperty: "error" })(query).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedQuery) =>
-      requestJson(EventsListEnvelopeSchema, {
-        method: "GET",
-        path: "/v2/events/list",
-        query: decodedQuery,
-      }),
-    ),
-    withOperationErrors(ListEventsErrorSpec),
-  );
+  decodeAndRun(EventsListQuerySchema, query, (decodedQuery) =>
+    requestJson(EventsListEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/events/list",
+      query: decodedQuery,
+    }),
+  ).pipe(withOperationErrors(ListEventsErrorSpec));
 
 export const deleteEvent = (
   id: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, DeleteEventError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestJson(OkResponseSchema, {
-        method: "POST",
-        path: `/v2/events/delete/${encodePathSegment(decodedId)}`,
-      }),
-    ),
-    withOperationErrors(DeleteEventErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, id, (decodedId) =>
+    requestJson(OkResponseSchema, {
+      method: "POST",
+      path: `/v2/events/delete/${encodePathSegment(decodedId)}`,
+    }),
+  ).pipe(withOperationErrors(DeleteEventErrorSpec));
 
 export const clearEvents = (): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
@@ -282,13 +273,9 @@ export const clearEvents = (): Effect.Effect<
 export const getEventTorrent = (
   id: number,
 ): Effect.Effect<Uint8Array, GetEventTorrentError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestArrayBuffer({
-        method: "GET",
-        path: `/v2/events/${encodePathSegment(decodedId)}/torrent`,
-      }),
-    ),
-    withOperationErrors(GetEventTorrentErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, id, (decodedId) =>
+    requestArrayBuffer({
+      method: "GET",
+      path: `/v2/events/${encodePathSegment(decodedId)}/torrent`,
+    }),
+  ).pipe(withOperationErrors(GetEventTorrentErrorSpec));

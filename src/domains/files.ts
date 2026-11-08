@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
+import { DEFAULT_PUTIO_API_BASE_URL, DEFAULT_PUTIO_UPLOAD_BASE_URL } from "../core/defaults.js";
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
 import {
-  mapDecodeErrorToValidationError,
   mapConfigurationError,
   PutioValidationError,
   definePutioOperationErrorSpec,
@@ -220,14 +220,9 @@ export const FilesListEnvelopeSchema = Schema.Struct({
   total: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
 
-const FilesListContinueEnvelopeSchema = Schema.Struct({
-  breadcrumbs: Schema.optional(Schema.Array(FileBreadcrumbSchema)),
-  cursor: Schema.NullOr(Schema.String),
-  files: Schema.Array(FileBroadSchema),
-  parent: Schema.optional(Schema.NullOr(FileBroadSchema)),
-  status: Schema.Literal("OK"),
-  total: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-});
+const FilesListContinueEnvelopeSchema = FilesListEnvelopeSchema.pipe(
+  Schema.fieldsAssign({ parent: Schema.optional(Schema.NullOr(FileBroadSchema)) }),
+);
 
 const FilesSearchEnvelopeSchema = Schema.Struct({
   cursor: Schema.NullOr(Schema.String),
@@ -251,13 +246,6 @@ const FilesContinueInputSchema = Schema.Struct({
 const FileGetInputSchema = Schema.Struct({
   id: ReadableFileIdSchema,
   query: Schema.optional(FileQuerySchema),
-});
-
-const FilesSearchContinueInputSchema = Schema.Struct({
-  cursor: NonEmptyStringSchema,
-  query: Schema.Struct({
-    per_page: Schema.optional(PositiveIntegerSchema),
-  }),
 });
 
 const FileSubtitlesInputSchema = Schema.Struct({
@@ -975,17 +963,12 @@ export type FileWatchStatusError = PutioOperationFailure<typeof FileWatchStatusE
 
 export type FileUploadError = PutioOperationFailure<typeof FileUploadErrorSpec>;
 
-const missingFieldError = (field: string) =>
-  new PutioValidationError({
-    cause: `Expected put.io to include "${field}" because it was requested`,
-  });
-
 const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
-  Effect.fail(missingFieldError(field));
-
-const widenValidationError = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | PutioValidationError, R> => effect;
+  Effect.fail(
+    new PutioValidationError({
+      cause: `Expected put.io to include "${field}" because it was requested`,
+    }),
+  );
 
 const hasStreamUrl = (
   value: FileBroad,
@@ -1078,32 +1061,33 @@ const resolveRouteContext = (
     );
   });
 
-const resolveApiBaseUrl: Effect.Effect<string, never, PutioSdkConfig> = Effect.gen(function* () {
-  const config = yield* PutioSdkConfig;
+const resolveApiBaseUrl: Effect.Effect<string | URL, never, PutioSdkConfig> = Effect.gen(
+  function* () {
+    const config = yield* PutioSdkConfig;
 
-  return config.baseUrl ?? "https://api.put.io";
-});
+    return config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL;
+  },
+);
 
-const normalizeFileName = (name: string) => encodeURIComponent(name);
+const toOriginalFlag = (playOriginal: boolean | undefined) =>
+  playOriginal === undefined ? undefined : playOriginal ? 1 : 0;
 
-const toUploadResult = (value: FileUploadEnvelope): FileUploadResult => {
+const toUploadResult = (
+  value: FileUploadEnvelope,
+): Effect.Effect<FileUploadResult, PutioValidationError> => {
   if (value.file) {
-    return {
-      file: value.file,
-      type: "file",
-    };
+    return Effect.succeed({ file: value.file, type: "file" });
   }
 
   if (value.transfer) {
-    return {
-      transfer: value.transfer,
-      type: "transfer",
-    };
+    return Effect.succeed({ transfer: value.transfer, type: "transfer" });
   }
 
-  throw new PutioValidationError({
-    cause: 'Expected put.io upload response to contain either "file" or "transfer"',
-  });
+  return Effect.fail(
+    new PutioValidationError({
+      cause: 'Expected put.io upload response to contain either "file" or "transfer"',
+    }),
+  );
 };
 
 export const buildFileApiDownloadUrl = (
@@ -1114,7 +1098,7 @@ export const buildFileApiDownloadUrl = (
   buildPutioUrl(
     baseUrl,
     options.name
-      ? `/v2/files/${encodePathSegment(fileId)}/download/${normalizeFileName(options.name)}`
+      ? `/v2/files/${encodePathSegment(fileId)}/download/${encodePathSegment(options.name)}`
       : `/v2/files/${encodePathSegment(fileId)}/download`,
     {
       ...useTunnelToQuery(options.useTunnel),
@@ -1140,7 +1124,7 @@ export const buildFileApiMp4DownloadUrl = (
   buildPutioUrl(
     baseUrl,
     options.name
-      ? `/v2/files/${encodePathSegment(fileId)}/mp4/download/${normalizeFileName(options.name)}`
+      ? `/v2/files/${encodePathSegment(fileId)}/mp4/download/${encodePathSegment(options.name)}`
       : `/v2/files/${encodePathSegment(fileId)}/mp4/download`,
     {
       ...useTunnelToQuery(options.useTunnel),
@@ -1157,7 +1141,7 @@ export const buildFileHlsStreamUrl = (
   buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/hls/media.m3u8`, {
     max_subtitle_count: options.maxSubtitleCount,
     oauth_token: options.downloadToken,
-    original: options.playOriginal === undefined ? undefined : options.playOriginal ? 1 : 0,
+    original: toOriginalFlag(options.playOriginal),
     subtitle_languages: joinCsv(options.subtitleLanguages),
   });
 
@@ -1190,7 +1174,7 @@ const ensureFileQueryFields = <E>(
   query: FileQuery,
 ): Effect.Effect<FileBroad, E | PutioValidationError, PutioSdkContext> =>
   Effect.gen(function* () {
-    const file = yield* widenValidationError(effect);
+    const file = yield* effect;
 
     if (query.stream_url === 1 && !hasStreamUrl(file)) {
       return yield* failMissingField("stream_url");
@@ -1301,101 +1285,77 @@ export function getFileChild<TQuery extends FileQuery>(input: {
   PutioSdkContext
 >;
 export function getFileChild(input: FileGetChildInput) {
-  return Schema.decodeUnknownEffect(FileGetChildInputSchema, { onExcessProperty: "error" })(
-    input,
-  ).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) => {
-      const effect = requestJson(FileEnvelopeSchema, {
-        method: "GET",
-        path: `/v2/files/${encodePathSegment(decodedInput.parentId)}/child`,
-        query: {
-          ...decodedInput.query,
-          name: decodedInput.name,
-        },
-      }).pipe(selectJsonField("file"), withOperationErrors(GetFileChildErrorSpec));
+  return decodeAndRun(FileGetChildInputSchema, input, (decodedInput) => {
+    const effect = requestJson(FileEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedInput.parentId)}/child`,
+      query: {
+        ...decodedInput.query,
+        name: decodedInput.name,
+      },
+    }).pipe(selectJsonField("file"), withOperationErrors(GetFileChildErrorSpec));
 
-      return decodedInput.query === undefined
-        ? effect
-        : ensureFileQueryFields(effect, decodedInput.query);
-    }),
-  );
+    return decodedInput.query === undefined
+      ? effect
+      : ensureFileQueryFields(effect, decodedInput.query);
+  });
 }
 
 export const copyFile = (
   input: FileCopyInput,
 ): Effect.Effect<FileBroad, CopyFileError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FileCopyInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(FileEnvelopeSchema, {
-        body: {
-          type: "form",
-          value: {
-            file_id: decodedInput.fileId,
-            name: decodedInput.name,
-            parent_id: decodedInput.parentId,
-          },
+  decodeAndRun(FileCopyInputSchema, input, (decodedInput) =>
+    requestJson(FileEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          file_id: decodedInput.fileId,
+          name: decodedInput.name,
+          parent_id: decodedInput.parentId,
         },
-        method: "POST",
-        path: "/v2/files/copy",
-      }),
-    ),
-    selectJsonField("file"),
-    withOperationErrors(CopyFileErrorSpec),
-  );
+      },
+      method: "POST",
+      path: "/v2/files/copy",
+    }),
+  ).pipe(selectJsonField("file"), withOperationErrors(CopyFileErrorSpec));
 
 export const touchFiles = (
   input: FileTouchInput,
 ): Effect.Effect<void, TouchFilesError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FileTouchInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value: {
-            file_ids: joinCsv(decodedInput.fileIds),
-            updated_at: decodedInput.updatedAt?.toISOString(),
-          },
+  decodeAndRun(FileTouchInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          file_ids: joinCsv(decodedInput.fileIds),
+          updated_at: decodedInput.updatedAt?.toISOString(),
         },
-        method: "POST",
-        path: "/v2/files/touch",
-      }),
-    ),
-    Effect.asVoid,
-    withOperationErrors(TouchFilesErrorSpec),
-  );
+      },
+      method: "POST",
+      path: "/v2/files/touch",
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(TouchFilesErrorSpec));
 
 export const canWriteFile = (
   fileId: number,
 ): Effect.Effect<number, CanWriteFileError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveFileIdSchema)(fileId).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedFileId) =>
-      requestJson(FileCanWriteEnvelopeSchema, {
-        method: "GET",
-        path: `/v2/files/${encodePathSegment(decodedFileId)}/can-write`,
-      }),
-    ),
-    selectJsonField("user_id"),
-    withOperationErrors(CanWriteFileErrorSpec),
-  );
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestJson(FileCanWriteEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/can-write`,
+    }),
+  ).pipe(selectJsonField("user_id"), withOperationErrors(CanWriteFileErrorSpec));
 
 export const searchFiles = (
   query: FilesSearchQuery,
 ): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FilesSearchQuerySchema, { onExcessProperty: "error" })(query).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedQuery) =>
-      requestJson(FilesSearchEnvelopeSchema, {
-        method: "GET",
-        path: "/v2/files/search",
-        query: decodedQuery,
-      }),
-    ),
-    withOperationErrors(SearchFilesErrorSpec),
-  );
+  decodeAndRun(FilesSearchQuerySchema, query, (decodedQuery) =>
+    requestJson(FilesSearchEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/files/search",
+      query: decodedQuery,
+    }),
+  ).pipe(withOperationErrors(SearchFilesErrorSpec));
 
 export const continueSearch = (
   cursor: string,
@@ -1403,7 +1363,7 @@ export const continueSearch = (
     readonly per_page?: number;
   } = {},
 ): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
-  decodeAndRun(FilesSearchContinueInputSchema, { cursor, query }, (decodedInput) =>
+  decodeAndRun(FilesContinueInputSchema, { cursor, query }, (decodedInput) =>
     requestJson(FilesSearchEnvelopeSchema, {
       body: {
         type: "form",
@@ -1420,23 +1380,19 @@ export const continueSearch = (
 export const setFileSort = (
   input: FileSetSortInput,
 ): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FileSetSortInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value: {
-            file_id: decodedInput.fileId,
-            sort_by: decodedInput.sortBy,
-          },
+  decodeAndRun(FileSetSortInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          file_id: decodedInput.fileId,
+          sort_by: decodedInput.sortBy,
         },
-        method: "POST",
-        path: "/v2/files/set-sort-by",
-      }),
-    ),
-    Effect.asVoid,
-  );
+      },
+      method: "POST",
+      path: "/v2/files/set-sort-by",
+    }),
+  ).pipe(Effect.asVoid);
 
 export const resetFileSortSettings = (): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
@@ -1684,12 +1640,7 @@ export const getHlsMasterPlaylist = (
         path: `/v2/files/${encodePathSegment(decoded.fileId)}/hls/media.m3u8`,
         query: {
           max_subtitle_count: decoded.options.maxSubtitleCount,
-          original:
-            decoded.options.playOriginal === undefined
-              ? undefined
-              : decoded.options.playOriginal
-                ? 1
-                : 0,
+          original: toOriginalFlag(decoded.options.playOriginal),
           subtitle_languages: joinCsv(decoded.options.subtitleLanguages),
         },
       }),
@@ -1938,9 +1889,13 @@ export const createFileUploadRequest = (
         Effect.map(({ config, token }) => ({
           body: createFileUploadFormData(decoded.input),
           method: "POST" as const,
-          url: buildPutioUrl(config.uploadBaseUrl ?? "https://upload.put.io", "/v2/files/upload", {
-            oauth_token: token,
-          }),
+          url: buildPutioUrl(
+            config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
+            "/v2/files/upload",
+            {
+              oauth_token: token,
+            },
+          ),
         })),
       ),
   );
@@ -1961,7 +1916,7 @@ export const uploadFile = (
             auth: {
               type: "none",
             },
-            baseUrl: config.uploadBaseUrl ?? "https://upload.put.io",
+            baseUrl: config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
             body: {
               type: "form-data",
               value: createFileUploadFormData(decoded.input),
@@ -1974,4 +1929,4 @@ export const uploadFile = (
           }),
         ),
       ),
-  ).pipe(Effect.map(toUploadResult), withOperationErrors(FileUploadErrorSpec));
+  ).pipe(Effect.flatMap(toUploadResult), withOperationErrors(FileUploadErrorSpec));

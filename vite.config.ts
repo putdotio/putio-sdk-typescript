@@ -29,6 +29,10 @@ export default defineConfig({
       },
       { name: "uinaf", specifier: "@uinaf/oxlint-plugin-no-comments" },
     ],
+    options: {
+      typeAware: true,
+      typeCheck: true,
+    },
     rules: {
       "oxc/no-accumulating-spread": "error",
       "anti-slop/no-array-filter-map": "error",

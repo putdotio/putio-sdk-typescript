@@ -74,19 +74,18 @@ export type TrashListQuery = Schema.Schema.Type<typeof TrashListQuerySchema>;
 
 export type TrashBulkInput = Schema.Schema.Type<typeof TrashBulkInputSchema>;
 
-const RestrictedReadError = { errorType: "invalid_scope", statusCode: 401 as const };
-const RestrictedWriteError = { errorType: "invalid_scope", statusCode: 401 as const };
+const RestrictedScopeError = { errorType: "invalid_scope", statusCode: 401 as const };
 
 export const ListTrashErrorSpec = definePutioOperationErrorSpec({
   domain: "trash",
   operation: "list",
-  knownErrors: [RestrictedReadError],
+  knownErrors: [RestrictedScopeError],
 });
 
 export const ContinueTrashErrorSpec = definePutioOperationErrorSpec({
   domain: "trash",
   operation: "continue",
-  knownErrors: [RestrictedReadError, { statusCode: 400 as const }],
+  knownErrors: [RestrictedScopeError, { statusCode: 400 as const }],
 });
 
 export const RestoreTrashErrorSpec = definePutioOperationErrorSpec({
@@ -97,7 +96,7 @@ export const RestoreTrashErrorSpec = definePutioOperationErrorSpec({
     { errorType: "TRASH_LOCK_TIMEOUT", statusCode: 400 as const },
     { errorType: "TRASH_INCOMPLETE_TRASH", statusCode: 400 as const },
     { errorType: "TRASH_RESTORE_TOO_MANY_FILES", statusCode: 400 as const },
-    RestrictedWriteError,
+    RestrictedScopeError,
     { statusCode: 400 as const },
     { statusCode: 404 as const },
   ],
@@ -109,7 +108,7 @@ export const DeleteTrashErrorSpec = definePutioOperationErrorSpec({
   knownErrors: [
     { errorType: "TRASH_FILE_NOT_FOUND", statusCode: 404 as const },
     { errorType: "TRASH_LOCK_TIMEOUT", statusCode: 400 as const },
-    RestrictedWriteError,
+    RestrictedScopeError,
     { statusCode: 400 as const },
     { statusCode: 404 as const },
   ],
@@ -120,7 +119,7 @@ export const EmptyTrashErrorSpec = definePutioOperationErrorSpec({
   operation: "empty",
   knownErrors: [
     { errorType: "TRASH_LOCK_TIMEOUT", statusCode: 400 as const },
-    RestrictedWriteError,
+    RestrictedScopeError,
   ],
 });
 

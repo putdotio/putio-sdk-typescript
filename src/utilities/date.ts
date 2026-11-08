@@ -51,9 +51,9 @@ const toRelativeUnit = (secondsDelta: number) => {
   return { unit: "second" as const, value: Math.round(secondsDelta) };
 };
 
-export const ensureUTC = (date: DateInput = null): string => ensureDate(date).toISOString();
+export const ensureUTC = (date?: DateInput): string => ensureDate(date).toISOString();
 
-export const toTimeAgo = (date: DateInput = null): string => {
+export const toTimeAgo = (date?: DateInput): string => {
   if (!date) {
     return "N/A";
   }
@@ -66,7 +66,7 @@ export const toTimeAgo = (date: DateInput = null): string => {
 };
 
 export const formatDate = (
-  date: DateInput = null,
+  date?: DateInput,
   format: "LL" | Intl.DateTimeFormatOptions = "LL",
 ): string => {
   if (!date) {
@@ -95,7 +95,7 @@ export const daysDiff = (date1: DateInput, date2: DateInput): number => {
   return Math.abs(Math.round((utcDay2 - utcDay1) / (1000 * 60 * 60 * 24)));
 };
 
-export const daysDiffFromNow = (date: DateInput = null): number => {
+export const daysDiffFromNow = (date?: DateInput): number => {
   if (!date) {
     return 0;
   }

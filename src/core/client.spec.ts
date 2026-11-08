@@ -2,7 +2,6 @@ import { Effect, Predicate, Schema } from "effect";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { publicContractFixtures } from "../../test/fixtures/public-contracts.js";
-import * as sdk from "../index.js";
 import {
   PutioSdk,
   createPutioSdkEffectClient,
@@ -69,12 +68,7 @@ describe("sdk client factories", () => {
 
   it("provides the Effect client as an Effect service", async () => {
     const program = Effect.gen(function* () {
-      const client = yield* PutioSdk;
-
-      expect(client.files.list).toBeTypeOf("function");
-      expect(client.account.getInfo).toBeTypeOf("function");
-
-      return client;
+      return yield* PutioSdk;
     }).pipe(Effect.provide(makePutioSdkEffectClientLayer()));
 
     await expect(Effect.runPromise(program)).resolves.toMatchObject({
@@ -104,28 +98,6 @@ describe("sdk client factories", () => {
       accessToken: "token-123",
       baseUrl: "https://api.put.io",
     });
-  });
-
-  it("creates the Promise-based SDK client surface", () => {
-    const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
-
-    expect(client.dispose).toBeTypeOf("function");
-    expect(client.account.appSpecificPasswords.create).toBeTypeOf("function");
-    expect(client.setAccessToken).toBeTypeOf("function");
-    expect(client.account.getInfo).toBeTypeOf("function");
-    expect(client.account.listSubtitleLanguages).toBeTypeOf("function");
-    expect(client.auth.getCode).toBeTypeOf("function");
-    expect(client.auth.exchangeAuthorizationCode).toBeTypeOf("function");
-    expect(client.files.copy).toBeTypeOf("function");
-    expect(client.files.createUploadFormData).toBeTypeOf("function");
-    expect(client.files.getApiDownloadUrl).toBeTypeOf("function");
-    expect(client.files.getXspfPlaylistUrl).toBeTypeOf("function");
-    expect(client.files.setSort).toBeTypeOf("function");
-    expect(client.payment.changePlan.preview).toBeTypeOf("function");
-    expect(client.podcast.getLinks).toBeTypeOf("function");
-    expect(client.sharing.publicShares.list).toBeTypeOf("function");
-    expect(client.transfers.getTorrent).toBeTypeOf("function");
-    expect(client.zips.list).toBeTypeOf("function");
   });
 
   it("sends a snapshot of the configured headers from the Promise client", async () => {
@@ -160,13 +132,6 @@ describe("sdk client factories", () => {
       "files.createUploadFormData",
       "setAccessToken",
     ]);
-  });
-
-  it("re-exports the public SDK entrypoints", () => {
-    expect(sdk.createPutioSdkEffectClient).toBe(createPutioSdkEffectClient);
-    expect(sdk.createPutioSdkPromiseClient).toBe(createPutioSdkPromiseClient);
-    expect(sdk.DEFAULT_PUTIO_API_BASE_URL).toBe("https://api.put.io");
-    expect(sdk.buildPutioUrl("https://api.put.io", "/v2/test")).toBe("https://api.put.io/v2/test");
   });
 
   it("supports representative Promise-client workflows without live IO", async () => {

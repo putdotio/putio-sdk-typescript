@@ -5,7 +5,6 @@
     "src/utilities.ts",
     "src/**/*.spec.ts",
     "test/**/*.test.ts",
-    "test/live/domains/**/*.ts",
     "test/live/support/**/*.ts",
     "scripts/**/*.ts",
     "vitest.live.config.ts"

@@ -1,5 +1,6 @@
 import { Effect, Predicate, Schema, SchemaIssue, SchemaParser } from "effect";
-import { mapDecodeErrorToValidationError, type PutioSdkError } from "../core/errors.js";
+import { decodeAndRun } from "../core/validation.js";
+import { type PutioSdkError } from "../core/errors.js";
 import {
   OkResponseSchema,
   encodePathSegment,
@@ -325,64 +326,54 @@ export const readConfigWith = <A>(
 export const writeConfig = (
   config: PutioJsonObject,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(JsonObjectSchema)(config).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedConfig) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "json",
-          value: {
-            config: decodedConfig,
-          },
+  decodeAndRun(JsonObjectSchema, config, (decodedConfig) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "json",
+        value: {
+          config: decodedConfig,
         },
-        method: "PUT",
-        path: "/v2/config",
-      }),
-    ),
+      },
+      method: "PUT",
+      path: "/v2/config",
+    }),
   );
 
 export const getConfigKey = (
   key: string,
 ): Effect.Effect<PutioJsonValue, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigKeySchema)(key).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedKey) =>
-      requestJson(ConfigValueEnvelopeSchema, {
-        method: "GET",
-        path: `/v2/config/${encodePathSegment(decodedKey)}`,
-      }),
-    ),
-    selectJsonField("value"),
-  );
+  decodeAndRun(ConfigKeySchema, key, (decodedKey) =>
+    requestJson(ConfigValueEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/config/${encodePathSegment(decodedKey)}`,
+    }),
+  ).pipe(selectJsonField("value"));
 
 export const getConfigKeyWith = <A>(
   key: string,
   schema: Schema.ConstraintDecoder<A, never>,
 ): Effect.Effect<A, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigKeySchema)(key).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedKey) =>
-      requestJson(
-        makeConfigValueEnvelopeSchema(JsonValueResponseSchema.pipe(Schema.decodeTo(schema))),
-        {
-          method: "GET",
-          path: `/v2/config/${encodePathSegment(decodedKey)}`,
-        },
-      ),
+  decodeAndRun(ConfigKeySchema, key, (decodedKey) =>
+    requestJson(
+      makeConfigValueEnvelopeSchema(JsonValueResponseSchema.pipe(Schema.decodeTo(schema))),
+      {
+        method: "GET",
+        path: `/v2/config/${encodePathSegment(decodedKey)}`,
+      },
     ),
-    Effect.map((envelope) => envelope["value"]),
-  );
+  ).pipe(Effect.map((envelope) => envelope["value"]));
 
 export const setConfigKey = (
   key: string,
   value: PutioJsonValue,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigSetKeyInputSchema, { onExcessProperty: "error" })({
-    key,
-    value,
-  }).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
+  decodeAndRun(
+    ConfigSetKeyInputSchema,
+    {
+      key,
+      value,
+    },
+    (decodedInput) =>
       requestJson(OkResponseSchema, {
         body: {
           type: "json",
@@ -393,18 +384,14 @@ export const setConfigKey = (
         method: "PUT",
         path: `/v2/config/${encodePathSegment(decodedInput.key)}`,
       }),
-    ),
   );
 
 export const deleteConfigKey = (
   key: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigKeySchema)(key).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedKey) =>
-      requestJson(OkResponseSchema, {
-        method: "DELETE",
-        path: `/v2/config/${encodePathSegment(decodedKey)}`,
-      }),
-    ),
+  decodeAndRun(ConfigKeySchema, key, (decodedKey) =>
+    requestJson(OkResponseSchema, {
+      method: "DELETE",
+      path: `/v2/config/${encodePathSegment(decodedKey)}`,
+    }),
   );

@@ -70,6 +70,7 @@
     "@types/node": "^26.1.0",
     "@uinaf/oxlint-plugin-no-comments": "1.0.1",
     "@vitest/coverage-v8": "catalog:",
+    "fast-check": "^4.10.2",
     "knip": "^6.44.2",
     "playwright": "^1.65.0",
     "publint": "^0.3.21",

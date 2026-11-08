@@ -15,27 +15,22 @@ export const decodeAndRun = <S extends Schema.Top, I, A, E, R>(
     Effect.flatMap(run),
   );
 
-type CursorSelectionFields = {
+type CursorOrIdsSelection = {
   readonly cursor?: string;
-} & Readonly<Record<string, ReadonlyArray<number> | string | undefined>>;
+  readonly ids?: ReadonlyArray<number>;
+};
 
-export const cursorSelectionSchema = <
-  const TIdsField extends string,
-  const TExcludeIdsField extends string,
-  const TFields extends Schema.Struct.Fields,
->(
-  idsField: TIdsField,
-  excludeIdsField: TExcludeIdsField,
+export const cursorSelectionSchema = <const TFields extends Schema.Struct.Fields>(
   fields: TFields,
 ) =>
   Schema.Struct({
     cursor: Schema.optional(NonEmptyStringSchema),
-    [excludeIdsField]: Schema.optional(Schema.Array(PositiveIntegerSchema)),
-    [idsField]: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
+    excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
+    ids: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
     ...fields,
   }).check(
     Schema.makeFilter(
-      (input: CursorSelectionFields) => input.cursor !== undefined || input[idsField] !== undefined,
+      (input: CursorOrIdsSelection) => input.cursor !== undefined || input.ids !== undefined,
       { expected: "a non-empty cursor or file ID selection" },
     ),
   );

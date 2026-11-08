@@ -6,7 +6,7 @@
   <h1>putio-sdk-typescript</h1>
 
   <p>
-    TypeScript SDK for the <a href="https://api.put.io/v2/docs">put.io API</a>
+    TypeScript SDK for the <a href="https://devs.put.io/api">put.io API</a>
   </p>
   <p>
     Domain-first, schema-validated at the boundary, and built on standard Web APIs.

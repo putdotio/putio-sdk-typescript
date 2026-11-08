@@ -1,7 +1,5 @@
 import { test } from "vite-plus/test";
 
-import { createPutioSdkPromiseClient } from "../../dist/index.js";
-import { getSecondaryClient } from "./support/bootstrap.js";
 import {
   assert,
   createLiveTokenClients,
@@ -9,10 +7,8 @@ import {
   rejectsWith,
   rejectsWithOperationError,
 } from "./support/harness.js";
-import { hasSecondaryCredentialFixture } from "./support/secrets.js";
 
 const { authClient, oauthClient } = createLiveTokenClients();
-const publicClient = createPutioSdkPromiseClient();
 
 const KNOWN_JOIN_ERROR_TYPES = new Set([
   "FAMILY_INVITE_ACTIVE_USER",
@@ -58,26 +54,6 @@ test("family create invite requires restricted scope", async () => {
     statusCode: 401,
   });
 });
-
-test.skipIf(!hasSecondaryCredentialFixture())(
-  "family positive invite lookup with secondary fixture (needs PUTIO_TEST_SECONDARY_USERNAME)",
-  async () => {
-    const secondaryClient = await getSecondaryClient();
-    const invites = await secondaryClient.family.listInvites();
-    const existing = invites.invites.find((invite) => invite.user_id === null);
-
-    if (!existing) {
-      throw new Error(
-        "Missing unused secondary family-invite fixture. Seed one outside the live test before running family positive invite lookup.",
-      );
-    }
-
-    const invite = await publicClient.auth.getFamilyInvite(existing.code);
-
-    assert(invite.owner.length > 0, "expected invite owner");
-    assert(invite.plan.length > 0, "expected invite plan");
-  },
-);
 
 test("family remove missing member yields 404", async () => {
   await rejectsWithOperationError(

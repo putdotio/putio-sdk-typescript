@@ -101,6 +101,9 @@ describe("supporting domain boundaries", () => {
     const forgedPrototypeArray = ["sdk"];
     Object.setPrototypeOf(forgedPrototypeArray, forgedArrayPrototype);
     expect(() => decodeJsonValue(forgedPrototypeArray)).toThrow("Expected a JSON-compatible value");
+    const nullPrototypeArray = ["sdk"];
+    Object.setPrototypeOf(nullPrototypeArray, null);
+    expect(() => decodeJsonValue(nullPrototypeArray)).toThrow("Expected a JSON-compatible value");
     const crossRealmArray: unknown = runInNewContext(`["sdk", 1, false]`);
     expect(decodeJsonValue(crossRealmArray)).toEqual(["sdk", 1, false]);
     let getterCalls = 0;

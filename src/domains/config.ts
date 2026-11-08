@@ -37,6 +37,10 @@ const isNativePrototype = (prototype: unknown, constructorSource: string): proto
 
 const isPlainRecord = (value: unknown): value is object => {
   try {
+    if (Array.isArray(value)) {
+      return false;
+    }
+
     const prototype = Object.getPrototypeOf(value);
 
     if (prototype === null) {
@@ -96,7 +100,11 @@ const isJsonValueWithin = (
   ancestors.add(value);
 
   try {
-    if (isPlainArray(value)) {
+    if (Array.isArray(value)) {
+      if (!isPlainArray(value)) {
+        return false;
+      }
+
       const descriptors = Object.getOwnPropertyDescriptors<object>(value);
       const length = descriptors["length"]?.value;
 

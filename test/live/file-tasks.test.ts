@@ -1,5 +1,6 @@
 import { test } from "vite-plus/test";
 
+import type { FileBroad } from "../../dist/index.js";
 import { createStoredZipFile } from "./support/binary-fixtures.js";
 import {
   assert,
@@ -47,7 +48,7 @@ test("files setWatchStatus roundtrip", async () => {
 });
 
 test("files next-file natural ordering with disposable fixtures", async () => {
-  const created: Array<{ readonly id: number; readonly name: string }> = [];
+  const created: Array<FileBroad> = [];
   const suffix = Date.now();
 
   const folder = await authClient.files.createFolder({
@@ -86,11 +87,11 @@ test("files next-file natural ordering with disposable fixtures", async () => {
       "expected episode 2 fixture",
     );
 
-    let next = await client.files.findNext(episode1.id, "FILE");
+    let next = await client.files.findNext(episode1.id, episode1.file_type);
 
     for (let attempt = 0; next.id !== episode2.id && attempt < 10; attempt += 1) {
       await sleep(500);
-      next = await client.files.findNext(episode1.id, "FILE");
+      next = await client.files.findNext(episode1.id, episode1.file_type);
     }
 
     assert(next.id === episode2.id, "expected natural ordering to skip episode 10");

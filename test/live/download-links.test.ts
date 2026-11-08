@@ -99,28 +99,32 @@ const findProbeFile = async (): Promise<ProbeFile> => {
   return { cleanupIds: [upload.file.id], id: upload.file.id };
 };
 
-const createCursorProbeFiles = async () => {
-  const ids: number[] = [];
+const createCursorProbeFolder = async (): Promise<number> => {
+  const prefix = `putio-typescript-sdk-download-links-cursor-${Date.now()}`;
+  const folder = await client.files.createFolder({ name: prefix, parent_id: 0 });
 
-  for (let index = 0; index < 2; index += 1) {
-    const name = `putio-typescript-sdk-download-links-cursor-${Date.now()}-${index}.txt`;
+  try {
+    for (let index = 0; index < 2; index += 1) {
+      const name = `${prefix}-${index}.txt`;
 
-    const upload = await client.files.upload({
-      file: new File([`sdk download-links cursor probe ${index}\n`], name, {
-        type: "text/plain",
-      }),
-      fileName: name,
-      parentId: 0,
-    });
+      const upload = await client.files.upload({
+        file: new File([`sdk download-links cursor probe ${index}\n`], name, {
+          type: "text/plain",
+        }),
+        fileName: name,
+        parentId: folder.id,
+      });
 
-    if (!isFileUploadFileResult(upload)) {
-      throw new Error("expected download-links cursor probe upload to return a file");
+      if (!isFileUploadFileResult(upload)) {
+        throw new Error("expected download-links cursor probe upload to return a file");
+      }
     }
-
-    ids.push(upload.file.id);
+  } catch (error) {
+    await cleanupProbeFiles([folder.id]);
+    throw error;
   }
 
-  return ids;
+  return folder.id;
 };
 
 test("download links create and fetch", async () => {
@@ -160,15 +164,15 @@ test("download links repeated create reuses cached task id", async () => {
 });
 
 test("download links create supports cursor and exclude ids", async () => {
-  const cleanupIds = await createCursorProbeFiles();
+  const folderId = await createCursorProbeFolder();
 
   try {
-    const listing = await client.files.list(0, {
+    const listing = await client.files.list(folderId, {
       per_page: 1,
     });
 
     if (!listing.cursor || listing.files.length === 0) {
-      throw new Error("expected cursor-capable root listing");
+      throw new Error("expected cursor-capable probe folder listing");
     }
 
     const created = await client.downloadLinks.create({
@@ -179,7 +183,7 @@ test("download links create supports cursor and exclude ids", async () => {
     const result = await waitForDone(created.id);
     assert(result.links_status === "DONE", "expected cursor download links task to finish");
   } finally {
-    await client.files.delete(cleanupIds, { skipTrash: true }).catch(() => undefined);
+    await cleanupProbeFiles([folderId]);
   }
 });
 

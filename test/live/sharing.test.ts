@@ -12,10 +12,13 @@ import {
   sleep,
 } from "./support/harness.js";
 import { requireOwnedVideoFixture } from "./support/media.js";
+import { hasSecondaryCredentialFixture } from "./support/secrets.js";
 
 const { authClient, oauthClient } = createLiveTokenClients();
 
 const MISSING_ID = 2147483647;
+
+const secondaryFriendTest = test.skipIf(!hasSecondaryCredentialFixture());
 
 const deleteOwnedFile = async (id: number): Promise<void> => {
   await authClient.files.delete([id], { skipTrash: true }).catch(() => undefined);
@@ -109,92 +112,98 @@ test("sharing everyone lifecycle", async () => {
   }
 });
 
-test("sharing specific-friend lifecycle", async () => {
-  const friend = await requireLiveFriend(authClient);
+secondaryFriendTest(
+  "sharing specific-friend lifecycle (needs PUTIO_TEST_SECONDARY_USERNAME)",
+  async () => {
+    const friend = await requireLiveFriend(authClient);
 
-  const folder = await authClient.files.createFolder({
-    name: `putio-typescript-sdk-sharing-friend-${Date.now()}`,
-    parent_id: 0,
-  });
-
-  try {
-    await authClient.sharing.shareFiles({
-      ids: [folder.id],
-      target: {
-        friendNames: [friend.name],
-        type: "friends",
-      },
+    const folder = await authClient.files.createFolder({
+      name: `putio-typescript-sdk-sharing-friend-${Date.now()}`,
+      parent_id: 0,
     });
 
-    const sharedWith = await authClient.sharing.getSharedWith(folder.id);
-
-    if (sharedWith.share_type !== "friends") {
-      throw new Error("expected friend share type");
-    }
-
-    assert(sharedWith.shares.length > 0, "expected at least one friend share");
-    assert(
-      sharedWith.shares.every(
-        (share) => share.user_name.length > 0 && share.user_avatar_url.length > 0,
-      ),
-      "expected shared-with-v2 friend payload details",
-    );
-
-    await authClient.sharing.unshare({
-      fileId: folder.id,
-      shares: sharedWith.shares.map((share) => share.share_id),
-    });
-
-    const after = await authClient.sharing.listSharedFiles();
-    assert(!after.some((file) => file.id === folder.id), "expected folder to be unshared");
-  } finally {
-    await deleteOwnedFile(folder.id);
-  }
-});
-
-test("sharing child of shared parent yields typed already shared", async () => {
-  const friend = await requireLiveFriend(authClient);
-  const seed = Date.now();
-
-  const parent = await authClient.files.createFolder({
-    name: `putio-typescript-sdk-sharing-parent-${seed}`,
-    parent_id: 0,
-  });
-
-  try {
-    const child = await authClient.files.createFolder({
-      name: `putio-typescript-sdk-sharing-child-${seed}`,
-      parent_id: parent.id,
-    });
-
-    await authClient.sharing.shareFiles({
-      ids: [parent.id],
-      target: {
-        friendNames: [friend.name],
-        type: "friends",
-      },
-    });
-
-    await rejectsWithOperationError(
-      authClient.sharing.shareFiles({
-        ids: [child.id],
+    try {
+      await authClient.sharing.shareFiles({
+        ids: [folder.id],
         target: {
           friendNames: [friend.name],
           type: "friends",
         },
-      }),
-      {
-        domain: "sharing",
-        errorType: "ALREADY_SHARED",
-        operation: "shareFiles",
-        statusCode: 400,
-      },
-    );
-  } finally {
-    await authClient.sharing.unshare({ fileId: parent.id }).catch(() => undefined);
-    await deleteOwnedFile(parent.id);
-  }
-});
+      });
+
+      const sharedWith = await authClient.sharing.getSharedWith(folder.id);
+
+      if (sharedWith.share_type !== "friends") {
+        throw new Error("expected friend share type");
+      }
+
+      assert(sharedWith.shares.length > 0, "expected at least one friend share");
+      assert(
+        sharedWith.shares.every(
+          (share) => share.user_name.length > 0 && share.user_avatar_url.length > 0,
+        ),
+        "expected shared-with-v2 friend payload details",
+      );
+
+      await authClient.sharing.unshare({
+        fileId: folder.id,
+        shares: sharedWith.shares.map((share) => share.share_id),
+      });
+
+      const after = await authClient.sharing.listSharedFiles();
+      assert(!after.some((file) => file.id === folder.id), "expected folder to be unshared");
+    } finally {
+      await deleteOwnedFile(folder.id);
+    }
+  },
+);
+
+secondaryFriendTest(
+  "sharing child of shared parent yields typed already shared (needs PUTIO_TEST_SECONDARY_USERNAME)",
+  async () => {
+    const friend = await requireLiveFriend(authClient);
+    const seed = Date.now();
+
+    const parent = await authClient.files.createFolder({
+      name: `putio-typescript-sdk-sharing-parent-${seed}`,
+      parent_id: 0,
+    });
+
+    try {
+      const child = await authClient.files.createFolder({
+        name: `putio-typescript-sdk-sharing-child-${seed}`,
+        parent_id: parent.id,
+      });
+
+      await authClient.sharing.shareFiles({
+        ids: [parent.id],
+        target: {
+          friendNames: [friend.name],
+          type: "friends",
+        },
+      });
+
+      await rejectsWithOperationError(
+        authClient.sharing.shareFiles({
+          ids: [child.id],
+          target: {
+            friendNames: [friend.name],
+            type: "friends",
+          },
+        }),
+        {
+          domain: "sharing",
+          errorType: "ALREADY_SHARED",
+          operation: "shareFiles",
+          statusCode: 400,
+        },
+      );
+    } finally {
+      await authClient.sharing.unshare({ fileId: parent.id }).catch(() => undefined);
+      await deleteOwnedFile(parent.id);
+    }
+  },
+);
 
 test("sharing unshare missing file yields typed 404", async () => {
   await rejectsWithOperationError(authClient.sharing.unshare({ fileId: MISSING_ID }), {
@@ -204,10 +213,11 @@ test("sharing unshare missing file yields typed 404", async () => {
   });
 });
 
-test("sharing shared-with missing file currently yields generic 500", async () => {
-  await rejectsWithErrorTag(authClient.sharing.getSharedWith(MISSING_ID), {
-    status: 500,
-    tag: "PutioApiError",
+test("sharing shared-with missing file yields typed not found", async () => {
+  await rejectsWithOperationError(authClient.sharing.getSharedWith(MISSING_ID), {
+    domain: "sharing",
+    operation: "getSharedWith",
+    statusCode: 404,
   });
 });
 
@@ -352,12 +362,9 @@ test("sharing public share parent media flags", async () => {
   }
 });
 
-test("sharing public share root create yields typed error", async () => {
-  await rejectsWithOperationError(authClient.sharing.publicShares.create(0), {
-    domain: "sharing",
-    errorType: "PUBLIC_SHARE_FOLDER_ROOT_NOT_ALLOWED",
-    operation: "createPublicShare",
-    statusCode: 400,
+test("sharing public share root create yields typed validation error", async () => {
+  await rejectsWithErrorTag(authClient.sharing.publicShares.create(0), {
+    tag: "PutioValidationError",
   });
 });
 

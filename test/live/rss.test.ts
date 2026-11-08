@@ -7,17 +7,10 @@ const { authClient, oauthClient } = createLiveTokenClients();
 
 const MISSING_ID = 2147483647;
 
-const requireRssSourceUrl = (): string => {
-  const rssSourceUrl = readOptionalSecret("PUTIO_LIVE_RSS_SOURCE_URL");
+const RSS_SOURCE_URL =
+  readOptionalSecret("PUTIO_LIVE_RSS_SOURCE_URL") ?? "https://xkcd.com/rss.xml";
 
-  if (!rssSourceUrl) {
-    throw new Error(
-      "Missing required RSS live fixture: PUTIO_LIVE_RSS_SOURCE_URL must point to a known-good fetchable RSS feed.",
-    );
-  }
-
-  return rssSourceUrl;
-};
+const NO_MATCH_KEYWORD = "putio-typescript-sdk-no-match";
 
 test("rss list decodes for first-party and oauth tokens", async () => {
   await authClient.rss.list();
@@ -26,14 +19,13 @@ test("rss list decodes for first-party and oauth tokens", async () => {
 
 test("rss create update lifecycle", async () => {
   const seed = Date.now();
-  const rssSourceUrl = requireRssSourceUrl();
 
   const created = await authClient.rss.create({
     delete_old_files: false,
     dont_process_whole_feed: true,
-    keyword: "",
+    keyword: NO_MATCH_KEYWORD,
     parent_dir_id: 0,
-    rss_source_url: rssSourceUrl,
+    rss_source_url: RSS_SOURCE_URL,
     title: `putio-typescript-sdk rss ${seed}`,
     unwanted_keywords: "",
   });
@@ -48,17 +40,17 @@ test("rss create update lifecycle", async () => {
 
     await authClient.rss.update(created.id, {
       delete_old_files: true,
-      dont_process_whole_feed: false,
-      keyword: "typescript",
+      dont_process_whole_feed: true,
+      keyword: `${NO_MATCH_KEYWORD}-updated`,
       parent_dir_id: 0,
-      rss_source_url: rssSourceUrl,
+      rss_source_url: RSS_SOURCE_URL,
       title: updatedTitle,
       unwanted_keywords: "ignore-me",
     });
 
     const updated = await authClient.rss.get(created.id);
     assert(updated.title === updatedTitle, "expected updated title");
-    assert(updated.keyword === "typescript", "expected updated keyword");
+    assert(updated.keyword === `${NO_MATCH_KEYWORD}-updated`, "expected updated keyword");
 
     const logs = await authClient.rss.listItems(created.id);
     assert(logs.feed.id === created.id, "expected logs feed");
@@ -82,7 +74,9 @@ test("rss create update lifecycle", async () => {
 
 test("rss create is writable with oauth token", async () => {
   const created = await oauthClient.rss.create({
-    rss_source_url: requireRssSourceUrl(),
+    dont_process_whole_feed: true,
+    keyword: NO_MATCH_KEYWORD,
+    rss_source_url: RSS_SOURCE_URL,
     title: `putio-typescript-sdk oauth rss ${Date.now()}`,
   });
 
@@ -116,7 +110,7 @@ test.each([
     "update",
     () =>
       authClient.rss.update(MISSING_ID, {
-        rss_source_url: requireRssSourceUrl(),
+        rss_source_url: RSS_SOURCE_URL,
         title: "putio-typescript-sdk missing rss",
       }),
   ],

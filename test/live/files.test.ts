@@ -4,6 +4,7 @@ import {
   assert,
   assertPresent,
   createLiveTokenClients,
+  rejectsWithErrorTag,
   rejectsWithOperationError,
   sleep,
 } from "./support/harness.js";
@@ -334,12 +335,9 @@ test("missing file yields typed error", async () => {
   });
 });
 
-test("empty folder name yields typed error", async () => {
-  await rejectsWithOperationError(authClient.files.createFolder({ name: "", parent_id: 0 }), {
-    domain: "files",
-    errorType: "EMPTY_NAME",
-    operation: "createFolder",
-    statusCode: 400,
+test("empty folder name yields typed validation error", async () => {
+  await rejectsWithErrorTag(authClient.files.createFolder({ name: "", parent_id: 0 }), {
+    tag: "PutioValidationError",
   });
 });
 

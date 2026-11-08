@@ -40,53 +40,44 @@ const findProbeFile = async (
   return null;
 };
 
-const createCursorProbeFiles = async () => {
-  const ids: number[] = [];
-
-  for (let index = 0; index < 6; index += 1) {
-    const name = `putio-typescript-sdk-zip-cursor-${Date.now()}-${index}.txt`;
-
-    const upload = await authClient.files.upload({
-      file: new File([`sdk zip cursor probe ${index}\n`], name, {
-        type: "text/plain",
-      }),
-      fileName: name,
-      parentId: 0,
-    });
-
-    if (!isFileUploadFileResult(upload)) {
-      throw new Error("expected cursor zip probe upload to return a file");
-    }
-
-    ids.push(upload.file.id);
-  }
-
-  return ids;
-};
-
 const findProbeCursor = async (): Promise<{
-  readonly cleanupIds: ReadonlyArray<number>;
   readonly cursor: string;
   readonly firstFileId: number;
-} | null> => {
-  const cleanupIds = await createCursorProbeFiles();
+  readonly folderId: number;
+}> => {
+  const prefix = `putio-typescript-sdk-zip-cursor-${Date.now()}`;
+  const folder = await authClient.files.createFolder({ name: prefix, parent_id: 0 });
 
-  const listing = await authClient.files.list(0, {
-    per_page: 5,
-    total: 1,
-  });
+  try {
+    for (let index = 0; index < 6; index += 1) {
+      const name = `${prefix}-${index}.txt`;
 
-  if (listing.cursor && listing.files.length > 0) {
-    return {
-      cleanupIds,
-      cursor: listing.cursor,
-      firstFileId: listing.files[0].id,
-    };
+      const upload = await authClient.files.upload({
+        file: new File([`sdk zip cursor probe ${index}\n`], name, {
+          type: "text/plain",
+        }),
+        fileName: name,
+        parentId: folder.id,
+      });
+
+      if (!isFileUploadFileResult(upload)) {
+        throw new Error("expected cursor zip probe upload to return a file");
+      }
+    }
+
+    const listing = await authClient.files.list(folder.id, {
+      per_page: 5,
+      total: 1,
+    });
+
+    const cursor = assertPresent(listing.cursor, "expected a probe folder listing cursor");
+    const firstFile = assertPresent(listing.files[0], "expected a probe folder listing file");
+
+    return { cursor, firstFileId: firstFile.id, folderId: folder.id };
+  } catch (error) {
+    await authClient.files.delete([folder.id], { skipTrash: true }).catch(() => undefined);
+    throw error;
   }
-
-  await authClient.files.delete(cleanupIds, { skipTrash: true }).catch(() => undefined);
-
-  return null;
 };
 
 const pollZip = async (zipId: number) => {
@@ -175,10 +166,7 @@ test("zips create and complete lifecycle", async () => {
 });
 
 test("zips create with cursor and exclude_ids completes", async () => {
-  const cursorZipProbe = assertPresent(
-    await findProbeCursor(),
-    "expected a root listing cursor for cursor zip checks",
-  );
+  const cursorZipProbe = await findProbeCursor();
 
   try {
     const zipId = await authClient.zips.create({
@@ -193,7 +181,7 @@ test("zips create with cursor and exclude_ids completes", async () => {
     assert("missing_files" in info, "expected cursor zip missing_files array");
   } finally {
     await authClient.files
-      .delete(cursorZipProbe.cleanupIds, {
+      .delete([cursorZipProbe.folderId], {
         skipTrash: true,
       })
       .catch(() => undefined);

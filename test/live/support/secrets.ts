@@ -91,6 +91,10 @@ export const readCredentialFixture = (): PutioCredentialFixture => ({
   username: requireSecret("PUTIO_TEST_USERNAME"),
 });
 
+export const hasSecondaryCredentialFixture = (): boolean =>
+  readOptionalSecret("PUTIO_TEST_SECONDARY_USERNAME") !== undefined &&
+  readOptionalSecret("PUTIO_TEST_SECONDARY_PASSWORD") !== undefined;
+
 export const readSecondaryCredentialFixture = (): PutioCredentialFixture => {
   const username = readOptionalSecret("PUTIO_TEST_SECONDARY_USERNAME");
   const password = readOptionalSecret("PUTIO_TEST_SECONDARY_PASSWORD");

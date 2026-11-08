@@ -127,16 +127,16 @@ test("missing transfer cancel is idempotent", async () => {
   await client.transfers.cancel([2147483647]);
 });
 
-test("reannounce currently rejects with typed bad request", async () => {
+test("reannounce on a missing transfer yields typed not found", async () => {
   await rejectsWithOperationError(client.transfers.reannounce(2147483647), {
     domain: "transfers",
-    errorType: "BadRequest",
+    errorType: "TRANSFER_NOT_FOUND",
     operation: "reannounce",
-    statusCode: 400,
+    statusCode: 404,
   });
 });
 
-test("non-torrent reannounce currently falls back to typed bad request", async () => {
+test("non-torrent reannounce yields typed not torrent", async () => {
   const created = await client.transfers.add({
     url: `https://example.invalid/putio-typescript-sdk-transfer-${Date.now()}.iso`,
   });
@@ -144,7 +144,7 @@ test("non-torrent reannounce currently falls back to typed bad request", async (
   try {
     await rejectsWithOperationError(client.transfers.reannounce(created.id), {
       domain: "transfers",
-      errorType: "BadRequest",
+      errorType: "NOT_TORRENT",
       operation: "reannounce",
       statusCode: 400,
     });

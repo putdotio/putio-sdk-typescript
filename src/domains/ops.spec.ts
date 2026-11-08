@@ -1458,6 +1458,30 @@ describe("operational domain boundaries", () => {
       status: 400,
     });
 
+    const reannounceFailure = await runSdkExit(
+      transfers.reannounceTransfer(11),
+      () =>
+        jsonResponse(
+          {
+            error_message: "No such user download",
+            error_type: "TRANSFER_NOT_FOUND",
+            status_code: 404,
+          },
+          { status: 404 },
+        ),
+      { accessToken: "token-123" },
+    );
+
+    expect(expectFailure(reannounceFailure)).toMatchObject({
+      domain: "transfers",
+      operation: "reannounce",
+      reason: {
+        errorType: "TRANSFER_NOT_FOUND",
+        kind: "error_type",
+      },
+      status: 404,
+    });
+
     const removeFailure = await runSdkExit(
       transfers.removeTransfers({ ids: [11] }),
       () =>

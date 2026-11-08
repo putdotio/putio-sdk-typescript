@@ -2,7 +2,11 @@ import { Schema } from "effect";
 
 import type { FileCore, Friend, PutioSdkPromiseClient } from "../../../dist/index.js";
 import { getSecondaryClient } from "./bootstrap.ts";
-import { readCredentialFixture, readSecondaryCredentialFixture } from "./secrets.ts";
+import {
+  hasSecondaryCredentialFixture,
+  readCredentialFixture,
+  readSecondaryCredentialFixture,
+} from "./secrets.ts";
 
 const SHARED_FRIEND_FIXTURE_FOLDER_NAME = "putio-typescript-sdk-shared-friend-fixture";
 const SHARED_FRIEND_FIXTURE_FILE_NAME = "putio-typescript-sdk-shared-friend-fixture.txt";
@@ -76,7 +80,27 @@ const approvePendingFriendship = async (
   }
 };
 
+const requireExistingFriend = async (
+  primaryClient: PutioSdkPromiseClient,
+  predicate: (friend: Friend) => boolean,
+): Promise<Friend> => {
+  const { friends } = await primaryClient.friends.list();
+  const friend = friends.find(predicate);
+
+  if (!friend) {
+    throw new Error(
+      "Primary live account has no matching friend. Set PUTIO_TEST_SECONDARY_USERNAME and PUTIO_TEST_SECONDARY_PASSWORD to seed one.",
+    );
+  }
+
+  return friend;
+};
+
 export const requireLiveFriend = async (primaryClient: PutioSdkPromiseClient): Promise<Friend> => {
+  if (!hasSecondaryCredentialFixture()) {
+    return requireExistingFriend(primaryClient, () => true);
+  }
+
   const { primaryUsername, secondaryUsername } = readFriendUsernames();
 
   const { friends } = await primaryClient.friends.list();
@@ -220,6 +244,10 @@ const waitForPrimarySharedFixture = async (
 export const requireLiveFriendWithSharedFiles = async (
   primaryClient: PutioSdkPromiseClient,
 ): Promise<Friend> => {
+  if (!hasSecondaryCredentialFixture()) {
+    return requireExistingFriend(primaryClient, (friend) => friend.has_shared_files);
+  }
+
   const { primaryUsername, secondaryUsername } = readFriendUsernames();
   await requireLiveFriend(primaryClient);
 

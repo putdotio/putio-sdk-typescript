@@ -129,12 +129,22 @@ const absoluteUrlPattern = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
 
 const dotSegmentPattern = /^(?:\.|%2e){1,2}$/i;
 
+const parserRewrittenPattern = /[\\\p{Cc}]|^ | $/u;
+
 const normalizeApiPath = (path: string): string => {
   if (absoluteUrlPattern.test(path)) {
     throw mapConfigurationError("SDK API request paths must be relative to the configured baseUrl");
   }
 
-  if (path.split("/").some((segment) => dotSegmentPattern.test(segment))) {
+  if (parserRewrittenPattern.test(path)) {
+    throw mapDecodeErrorToValidationError(
+      "SDK API request paths must not contain backslashes, control characters, or edge spaces",
+    );
+  }
+
+  const [pathname = ""] = path.split(/[?#]/, 1);
+
+  if (pathname.split("/").some((segment) => dotSegmentPattern.test(segment))) {
     throw mapDecodeErrorToValidationError("SDK API request paths must not contain dot segments");
   }
 

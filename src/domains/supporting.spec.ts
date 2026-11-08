@@ -1,7 +1,7 @@
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
 import { Cause, Effect, Exit, Schema, SchemaIssue, SchemaParser } from "effect";
 import { runInNewContext } from "node:vm";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 
 import * as configDomain from "./config.js";
 import * as downloadLinks from "./download-links.js";
@@ -59,6 +59,14 @@ const sharedFile = {
 };
 
 describe("supporting domain boundaries", () => {
+  it("types download-link selections by field", () => {
+    expectTypeOf<downloadLinks.DownloadLinksCreateInput>().toEqualTypeOf<{
+      readonly cursor?: string;
+      readonly excludeIds?: ReadonlyArray<number>;
+      readonly ids?: ReadonlyArray<number>;
+    }>();
+  });
+
   it("covers config reads and writes", async () => {
     const decodeJsonValue = Schema.decodeUnknownSync(configDomain.JsonValueSchema);
     const decodeJsonObject = Schema.decodeUnknownSync(configDomain.JsonObjectSchema);

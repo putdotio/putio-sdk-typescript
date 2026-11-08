@@ -14,7 +14,7 @@ import {
 } from "../core/http.js";
 
 export const DownloadLinksStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
-export const DownloadLinksCreateInputSchema = cursorSelectionSchema("ids", "excludeIds", {});
+export const DownloadLinksCreateInputSchema = cursorSelectionSchema({});
 
 export const DownloadLinksPayloadSchema = Schema.Struct({
   download_links: Schema.Array(Schema.String),

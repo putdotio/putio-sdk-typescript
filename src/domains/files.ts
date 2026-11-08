@@ -459,11 +459,11 @@ const FilesMoveSelectionInputSchema = Schema.Struct({
   selection: FilesBulkSelectionSchema,
 });
 
-const FilesWatchStatusInputSchema = cursorSelectionSchema("ids", "excludeIds", {
+const FilesWatchStatusInputSchema = cursorSelectionSchema({
   watched: Schema.Boolean,
 });
 
-const FilesExtractInputSchema = cursorSelectionSchema("ids", "excludeIds", {
+const FilesExtractInputSchema = cursorSelectionSchema({
   password: Schema.optional(NonEmptyStringSchema),
 });
 

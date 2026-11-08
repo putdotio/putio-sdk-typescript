@@ -2,7 +2,6 @@ import { Effect, Schema } from "effect";
 import { DEFAULT_PUTIO_WEB_APP_URL } from "../core/defaults.js";
 import {
   PutioApiError,
-  PutioValidationError,
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
@@ -17,7 +16,11 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema } from "../core/validation.js";
+import {
+  decodeAndRunRedacted,
+  NonEmptyStringSchema,
+  PositiveIntegerSchema,
+} from "../core/validation.js";
 import { OAuthAppSchema, OAuthAppSessionSchema } from "./oauth.js";
 
 export const LoginResponseSchema = Schema.Struct({
@@ -431,26 +434,6 @@ export type RegenerateRecoveryCodesError = PutioOperationFailure<
   typeof RegenerateRecoveryCodesErrorSpec
 >;
 
-const decodeAuthInput = <S extends Schema.Top, A, E, R>(
-  operation: string,
-  schema: S,
-  input: S["Encoded"],
-  run: (decoded: S["Type"]) => Effect.Effect<A, E, R>,
-) =>
-  Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(
-      () =>
-        new PutioValidationError({
-          cause: {
-            domain: "auth",
-            operation,
-            reason: "Invalid request input",
-          },
-        }),
-    ),
-    Effect.flatMap(run),
-  );
-
 export const buildAuthLoginUrl = (options: {
   readonly clientId: string | number;
   readonly redirectUri: string;
@@ -487,8 +470,7 @@ const mapOAuthAuthorizationCodeExchangeError = (
 export const exchangeOAuthAuthorizationCode = (
   input: OAuthAuthorizationCodeExchangeInput,
 ): Effect.Effect<string, PutioSdkError | OAuthAuthorizationCodeExchangeError, PutioSdkContext> =>
-  decodeAuthInput(
-    "exchangeAuthorizationCode",
+  decodeAndRunRedacted("auth", "exchangeAuthorizationCode")(
     OAuthAuthorizationCodeExchangeInputSchema,
     input,
     (decodedInput) =>
@@ -515,7 +497,7 @@ export const exchangeOAuthAuthorizationCode = (
 export const login = (
   input: LoginInput,
 ): Effect.Effect<LoginResponse, LoginError, PutioSdkContext> =>
-  decodeAuthInput("login", LoginInputSchema, input, (decodedInput) =>
+  decodeAndRunRedacted("auth", "login")(LoginInputSchema, input, (decodedInput) =>
     requestJson(LoginResponseSchema, {
       auth: {
         type: "basic",
@@ -553,7 +535,7 @@ export const register = (
   RegisterError,
   PutioSdkContext
 > =>
-  decodeAuthInput("register", RegisterInputSchema, input, (decodedInput) =>
+  decodeAndRunRedacted("auth", "register")(RegisterInputSchema, input, (decodedInput) =>
     requestJson(AccessTokenEnvelopeSchema, {
       auth: {
         type: "none",
@@ -571,7 +553,7 @@ export const exists = (
   key: "mail" | "username",
   value: string,
 ): Effect.Effect<boolean, PutioSdkError, PutioSdkContext> =>
-  decodeAuthInput("exists", AuthExistsInputSchema, { key, value }, (decodedInput) =>
+  decodeAndRunRedacted("auth", "exists")(AuthExistsInputSchema, { key, value }, (decodedInput) =>
     requestJson(ExistsEnvelopeSchema, {
       auth: {
         type: "none",
@@ -591,7 +573,7 @@ export const getVoucher = (
   VoucherLookupError,
   PutioSdkContext
 > =>
-  decodeAuthInput("getVoucher", NonEmptyStringSchema, code, (decodedCode) =>
+  decodeAndRunRedacted("auth", "getVoucher")(NonEmptyStringSchema, code, (decodedCode) =>
     requestJson(VoucherEnvelopeSchema, {
       auth: {
         type: "none",
@@ -608,7 +590,7 @@ export const getGiftCard = (
   GiftCardLookupError,
   PutioSdkContext
 > =>
-  decodeAuthInput("getGiftCard", NonEmptyStringSchema, code, (decodedCode) =>
+  decodeAndRunRedacted("auth", "getGiftCard")(NonEmptyStringSchema, code, (decodedCode) =>
     requestJson(GiftCardEnvelopeSchema, {
       auth: {
         type: "none",
@@ -625,7 +607,7 @@ export const getFamilyInvite = (
   FamilyInviteLookupError,
   PutioSdkContext
 > =>
-  decodeAuthInput("getFamilyInvite", NonEmptyStringSchema, code, (decodedCode) =>
+  decodeAndRunRedacted("auth", "getFamilyInvite")(NonEmptyStringSchema, code, (decodedCode) =>
     requestJson(FamilyInviteEnvelopeSchema, {
       auth: {
         type: "none",
@@ -642,7 +624,7 @@ export const getFriendInvite = (
   FriendInviteLookupError,
   PutioSdkContext
 > =>
-  decodeAuthInput("getFriendInvite", NonEmptyStringSchema, code, (decodedCode) =>
+  decodeAndRunRedacted("auth", "getFriendInvite")(NonEmptyStringSchema, code, (decodedCode) =>
     requestJson(FriendInviteEnvelopeSchema, {
       auth: {
         type: "none",
@@ -659,7 +641,7 @@ export const forgotPassword = (
   ForgotPasswordError,
   PutioSdkContext
 > =>
-  decodeAuthInput("forgotPassword", NonEmptyStringSchema, mail, (decodedMail) =>
+  decodeAndRunRedacted("auth", "forgotPassword")(NonEmptyStringSchema, mail, (decodedMail) =>
     requestJson(OkResponseSchema, {
       auth: {
         type: "none",
@@ -685,8 +667,7 @@ export const resetPassword = (
   ResetPasswordError,
   PutioSdkContext
 > =>
-  decodeAuthInput(
-    "resetPassword",
+  decodeAndRunRedacted("auth", "resetPassword")(
     AuthResetPasswordInputSchema,
     { key, password },
     (decodedInput) =>
@@ -710,7 +691,7 @@ export const getCode = (
   PutioSdkError,
   PutioSdkContext
 > =>
-  decodeAuthInput("getCode", AuthGetCodeInputSchema, input, (decodedInput) =>
+  decodeAndRunRedacted("auth", "getCode")(AuthGetCodeInputSchema, input, (decodedInput) =>
     requestJson(AuthorizationCodeEnvelopeSchema, {
       auth: {
         type: "none",
@@ -727,7 +708,7 @@ export const getCode = (
 export const checkCodeMatch = (
   code: string,
 ): Effect.Effect<string | null, PutioSdkError, PutioSdkContext> =>
-  decodeAuthInput("checkCodeMatch", NonEmptyStringSchema, code, (decodedCode) =>
+  decodeAndRunRedacted("auth", "checkCodeMatch")(NonEmptyStringSchema, code, (decodedCode) =>
     requestJson(CodeMatchEnvelopeSchema, {
       auth: {
         type: "none",
@@ -740,7 +721,7 @@ export const checkCodeMatch = (
 export const linkDevice = (
   code: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OAuthAppSchema>, LinkDeviceError, PutioSdkContext> =>
-  decodeAuthInput("linkDevice", NonEmptyStringSchema, code, (decodedCode) =>
+  decodeAndRunRedacted("auth", "linkDevice")(NonEmptyStringSchema, code, (decodedCode) =>
     requestJson(LinkDeviceEnvelopeSchema, {
       body: {
         type: "form",
@@ -770,7 +751,7 @@ export const revokeApp = (
   RevokeOAuthGrantError,
   PutioSdkContext
 > =>
-  decodeAuthInput("revokeApp", PositiveIntegerSchema, id, (decodedId) =>
+  decodeAndRunRedacted("auth", "revokeApp")(PositiveIntegerSchema, id, (decodedId) =>
     requestJson(OkResponseSchema, {
       method: "POST",
       path: `/v2/oauth/grants/${encodePathSegment(decodedId)}/delete`,
@@ -794,7 +775,7 @@ export const revokeClient = (
   RevokeOAuthClientError,
   PutioSdkContext
 > =>
-  decodeAuthInput("revokeClient", PositiveIntegerSchema, id, (decodedId) =>
+  decodeAndRunRedacted("auth", "revokeClient")(PositiveIntegerSchema, id, (decodedId) =>
     requestJson(OkResponseSchema, {
       method: "POST",
       path: `/v2/oauth/clients/${encodePathSegment(decodedId)}/delete`,
@@ -814,7 +795,7 @@ export const revokeAllClients = (): Effect.Effect<
 export const validateToken = (
   token: string,
 ): Effect.Effect<ValidateTokenResponse, PutioSdkError, PutioSdkContext> =>
-  decodeAuthInput("validateToken", NonEmptyStringSchema, token, (decodedToken) =>
+  decodeAndRunRedacted("auth", "validateToken")(NonEmptyStringSchema, token, (decodedToken) =>
     requestJson(ValidateTokenResponseSchema, {
       auth: {
         type: "none",
@@ -844,8 +825,7 @@ export const verifyTOTP = (
   twoFactorScopedToken: string,
   code: string,
 ): Effect.Effect<VerifyTOTPResponse, VerifyTOTPError, PutioSdkContext> =>
-  decodeAuthInput(
-    "verifyTOTP",
+  decodeAndRunRedacted("auth", "verifyTOTP")(
     AuthVerifyTotpInputSchema,
     { code, twoFactorScopedToken },
     (decodedInput) =>

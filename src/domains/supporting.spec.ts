@@ -918,6 +918,8 @@ describe("supporting domain boundaries", () => {
 
     const failures = await Promise.all([
       runSdkExit(family.removeFamilyMember(""), invalidHandler),
+      runSdkExit(family.removeFamilyMember(".."), invalidHandler, { accessToken: "token-123" }),
+      runSdkExit(family.removeFamilyMember("."), invalidHandler, { accessToken: "token-123" }),
       runSdkExit(family.joinFamily(""), invalidHandler),
       runSdkExit(friends.searchFriends(""), invalidHandler),
       runSdkExit(friends.sendFriendRequest(""), invalidHandler),

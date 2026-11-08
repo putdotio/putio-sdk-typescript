@@ -7,20 +7,22 @@ const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat("en", {
   numeric: "always",
 });
 
-const ensureDate = (value: unknown): Date => {
+export type DateInput = Date | string | null | undefined;
+
+const ensureDate = (value: DateInput): Date => {
+  if (value === null || value === undefined) {
+    return new Date();
+  }
+
   if (value instanceof Date) {
     return value;
   }
 
-  if (typeof value === "string") {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(`${value}T00:00:00.000Z`);
-    }
-
-    return new Date(value.endsWith("Z") ? value : `${value}Z`);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T00:00:00.000Z`);
   }
 
-  return new Date();
+  return new Date(value.endsWith("Z") ? value : `${value}Z`);
 };
 
 const toRelativeUnit = (secondsDelta: number) => {
@@ -49,9 +51,9 @@ const toRelativeUnit = (secondsDelta: number) => {
   return { unit: "second" as const, value: Math.round(secondsDelta) };
 };
 
-export const ensureUTC = (date: unknown = null): string => ensureDate(date).toISOString();
+export const ensureUTC = (date?: DateInput): string => ensureDate(date).toISOString();
 
-export const toTimeAgo = (date: unknown = null): string => {
+export const toTimeAgo = (date?: DateInput): string => {
   if (!date) {
     return "N/A";
   }
@@ -59,11 +61,12 @@ export const toTimeAgo = (date: unknown = null): string => {
   const target = ensureDate(date);
   const secondsDelta = Math.round((target.getTime() - Date.now()) / 1000);
   const { unit, value } = toRelativeUnit(secondsDelta);
+
   return RELATIVE_TIME_FORMATTER.format(value, unit);
 };
 
 export const formatDate = (
-  date: unknown = null,
+  date?: DateInput,
   format: "LL" | Intl.DateTimeFormatOptions = "LL",
 ): string => {
   if (!date) {
@@ -82,7 +85,7 @@ export const formatDate = (
   }).format(normalizedDate);
 };
 
-export const daysDiff = (date1: unknown, date2: unknown): number => {
+export const daysDiff = (date1: DateInput, date2: DateInput): number => {
   const day1 = ensureDate(date1);
   const day2 = ensureDate(date2);
 
@@ -92,7 +95,7 @@ export const daysDiff = (date1: unknown, date2: unknown): number => {
   return Math.abs(Math.round((utcDay2 - utcDay1) / (1000 * 60 * 60 * 24)));
 };
 
-export const daysDiffFromNow = (date: unknown = null): number => {
+export const daysDiffFromNow = (date?: DateInput): number => {
   if (!date) {
     return 0;
   }
@@ -100,5 +103,5 @@ export const daysDiffFromNow = (date: unknown = null): number => {
   return daysDiff(date, new Date());
 };
 
-export const getUnixTimestamp = (date: unknown): number =>
+export const getUnixTimestamp = (date: DateInput): number =>
   Math.floor(ensureDate(date).getTime() / 1000);

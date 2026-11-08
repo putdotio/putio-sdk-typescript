@@ -21,6 +21,7 @@ describe("rate limit domain", () => {
           expect(request.url).toBe("https://api.put.io/v2/ban/A1B2%2FC3");
           expect(getFormBody(request).get("captcha_token")).toBe("captcha-token");
           expect(getAuthorizationHeader(request)).toBeUndefined();
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "user-token" },

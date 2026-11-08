@@ -17,7 +17,7 @@ export type FileRenderTypeInput = Pick<FileBroad, "content_type" | "extension" |
 export const getFileRenderType = (file: FileRenderTypeInput): FileRenderType => {
   const { content_type, extension, file_type } = file;
 
-  if (typeof content_type !== "string") {
+  if (content_type === null || content_type === undefined) {
     return "other";
   }
 

@@ -110,10 +110,12 @@ describe("utility file", () => {
       baseUrl: "https://api.example.com",
       downloadToken: "test-token",
     });
+
     const providerWithVersionedUrl = new FileUrlProvider({
       baseUrl: "https://api.example.com/v2",
       downloadToken: "test-token",
     });
+
     expect(provider.apiUrl).toBe("https://api.example.com/v2");
     expect(provider.downloadToken).toBe("test-token");
     expect(

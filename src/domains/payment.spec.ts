@@ -289,15 +289,23 @@ describe("payment domain", () => {
         payment.confirmFastspringOrder("ref-1"),
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/payment/fs-confirm/ref-1");
+
           return jsonResponse({ confirmed: true, status: "OK" });
         },
         { accessToken: "token-123" },
       ),
     ).toBe(true);
 
-    await runSdkEffect(payment.stopPaymentSubscription(), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
+    await runSdkEffect(
+      payment.stopPaymentSubscription(),
+      (request) => {
+        expect(request.method).toBe("POST");
+        expect(new URL(request.url).pathname).toBe("/v2/payment/stop_subscription");
+
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
 
     expect(
       await runSdkEffect(
@@ -336,6 +344,7 @@ describe("payment domain", () => {
       payment.reportPayments([1, 2]),
       (request) => {
         expect(getFormBody(request).get("payment_ids")).toBe("1,2");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -350,6 +359,7 @@ describe("payment domain", () => {
         const body = getFormBody(request);
         expect(body.get("checkout_id")).toBe("checkout-1");
         expect(body.get("product_id")).toBe("5");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -362,6 +372,7 @@ describe("payment domain", () => {
           expect(request.url).toBe(
             "https://api.put.io/v2/payment/methods/paddle_billing/invoice/123",
           );
+
           return jsonResponse({ url: "https://paddle.test/invoice.pdf" });
         },
         { accessToken: "token-123" },
@@ -375,6 +386,7 @@ describe("payment domain", () => {
           expect(request.url).toBe(
             "https://api.put.io/v2/payment/methods/paddle_billing/update_payment_method/456",
           );
+
           return jsonResponse({ transaction_id: "txn_123" });
         },
         { accessToken: "token-123" },
@@ -386,6 +398,7 @@ describe("payment domain", () => {
         payment.createOpenNodeCharge("plan/path"),
         (request) => {
           expect(getFormBody(request).get("plan_fs_path")).toBe("plan/path");
+
           return jsonResponse({
             opennode: { checkout_url: "https://checkout.opennode.com" },
             status: "OK",
@@ -398,10 +411,13 @@ describe("payment domain", () => {
 
   it("rejects invalid payment inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
+
     const failures = await Promise.all([
       // @ts-expect-error JavaScript callers can provide null instead of a query object.
       runSdkExit(payment.listPaymentHistory(null), handler),
@@ -437,9 +453,9 @@ describe("payment domain", () => {
       runSdkExit(payment.createOpenNodeCharge(""), handler),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -463,7 +479,6 @@ describe("payment domain", () => {
     const error = expectFailure(failure);
     expect(error).toBeInstanceOf(PutioOperationError);
     expect(error).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "payment",
       operation: "submitChangePlan",
       status: 410,
@@ -489,7 +504,6 @@ describe("payment domain", () => {
     const paddleBillingSubmitError = expectFailure(paddleBillingSubmitFailure);
     expect(paddleBillingSubmitError).toBeInstanceOf(PutioOperationError);
     expect(paddleBillingSubmitError).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "payment",
       operation: "submitChangePlan",
       reason: {
@@ -516,7 +530,6 @@ describe("payment domain", () => {
     const invoiceError = expectFailure(invoiceFailure);
     expect(invoiceError).toBeInstanceOf(PutioOperationError);
     expect(invoiceError).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "payment",
       operation: "getPaddleBillingInvoiceUrl",
       status: 404,
@@ -539,7 +552,6 @@ describe("payment domain", () => {
     const updateError = expectFailure(updateFailure);
     expect(updateError).toBeInstanceOf(PutioOperationError);
     expect(updateError).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "payment",
       operation: "createPaddleBillingUpdatePaymentMethodTransaction",
       status: 404,

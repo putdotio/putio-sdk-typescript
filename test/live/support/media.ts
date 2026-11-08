@@ -9,6 +9,7 @@ const SAFE_OWNED_VIDEO_FIXTURE_NAMES = new Set([
   "Mario1_507_HQ_512kb.mp4",
   "Sintel.mp4",
 ]);
+
 const SAFE_OWNED_VIDEO_FIXTURE_PREFIXES = ["putio-typescript-sdk-"];
 
 const isSafeOwnedVideoFixtureName = (name: string): boolean =>
@@ -79,6 +80,7 @@ export const requireOwnedVideoFixture = async (
     per_page: 100,
     query: "mp4",
   });
+
   const candidates = search.files.filter(
     (file) =>
       file.file_type === "VIDEO" &&

@@ -1,8 +1,8 @@
-import { Result, Schema } from "effect";
+import { Predicate, Result, Schema } from "effect";
 
 import { mapDecodeErrorToValidationError } from "../core/errors.js";
 import { joinCsv } from "../core/forms.js";
-import { buildPutioUrl, encodePathSegment } from "../core/http.js";
+import { buildPutioUrl, encodePathSegment, type PutioQuery } from "../core/http.js";
 import type { FileBroad } from "../domains/files.js";
 import { NonEmptyStringSchema } from "../core/validation.js";
 import { getFileRenderType, type FileRenderTypeInput } from "./file-render-type.js";
@@ -28,9 +28,11 @@ const decodeOptions = (options: FileUrlProviderOptions): FileUrlProviderOptions 
   const decoded = Schema.decodeUnknownResult(FileUrlProviderOptionsSchema, {
     onExcessProperty: "error",
   })(options);
+
   if (Result.isFailure(decoded)) {
     throw mapDecodeErrorToValidationError(decoded.failure);
   }
+
   return decoded.success;
 };
 
@@ -54,20 +56,20 @@ export class FileUrlProvider {
     this.downloadToken = downloadToken;
   }
 
+  #fileUrl(
+    fileId: number,
+    resource: string,
+    query: PutioQuery = { oauth_token: this.downloadToken },
+  ): string {
+    return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(fileId)}/${resource}`, query);
+  }
+
   getDownloadUrl(fileOrFileId: FileUrlProviderInput | number): string | null {
-    if (typeof fileOrFileId === "number") {
-      return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(fileOrFileId)}/download`, {
-        oauth_token: this.downloadToken,
-      });
+    if (Predicate.isNumber(fileOrFileId)) {
+      return this.#fileUrl(fileOrFileId, "download");
     }
 
-    if (fileOrFileId.file_type === "FOLDER") {
-      return null;
-    }
-
-    return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(fileOrFileId.id)}/download`, {
-      oauth_token: this.downloadToken,
-    });
+    return fileOrFileId.file_type === "FOLDER" ? null : this.#fileUrl(fileOrFileId.id, "download");
   }
 
   getHlsStreamUrl(
@@ -82,7 +84,7 @@ export class FileUrlProvider {
       return null;
     }
 
-    return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(file.id)}/hls/media.m3u8`, {
+    return this.#fileUrl(file.id, "hls/media.m3u8", {
       max_subtitle_count: params.maxSubtitleCount,
       oauth_token: this.downloadToken,
       original: params.playOriginal ? 1 : undefined,
@@ -91,47 +93,27 @@ export class FileUrlProvider {
   }
 
   getMp4DownloadUrl(file: FileUrlProviderInput): string | null {
-    if (!isVideoFile(file) || !file.is_mp4_available) {
-      return null;
-    }
-
-    return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(file.id)}/mp4/download`, {
-      oauth_token: this.downloadToken,
-    });
+    return isVideoFile(file) && file.is_mp4_available
+      ? this.#fileUrl(file.id, "mp4/download")
+      : null;
   }
 
   getMp4StreamUrl(file: FileUrlProviderInput): string | null {
-    if (!isVideoFile(file) || !file.is_mp4_available) {
-      return null;
-    }
-
-    return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(file.id)}/mp4/stream`, {
-      oauth_token: this.downloadToken,
-    });
+    return isVideoFile(file) && file.is_mp4_available ? this.#fileUrl(file.id, "mp4/stream") : null;
   }
 
   getStreamUrl(file: FileUrlProviderInput): string | null {
     switch (getFileRenderType(file)) {
       case "audio":
-        return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(file.id)}/stream.mp3`, {
-          oauth_token: this.downloadToken,
-        });
+        return this.#fileUrl(file.id, "stream.mp3");
       case "video":
-        return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(file.id)}/stream`, {
-          oauth_token: this.downloadToken,
-        });
+        return this.#fileUrl(file.id, "stream");
       default:
         return null;
     }
   }
 
   getXspfUrl(file: FileUrlProviderInput): string | null {
-    if (!isVideoFile(file)) {
-      return null;
-    }
-
-    return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(file.id)}/xspf`, {
-      oauth_token: this.downloadToken,
-    });
+    return isVideoFile(file) ? this.#fileUrl(file.id, "xspf") : null;
   }
 }

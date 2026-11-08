@@ -11,13 +11,16 @@ import * as rss from "./rss.js";
 import * as sharing from "./sharing.js";
 import { expectFailure, jsonResponse, runSdkExit } from "../../test/support/sdk-test.js";
 
-describe("request validation audit", () => {
-  it("rejects excess properties at every legacy object-decoding boundary", async () => {
+describe("request input validation", () => {
+  it("rejects excess input properties before sending a request", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
+
     const config = { accessToken: "token-123" };
 
     const failures = await Promise.all([
@@ -219,7 +222,7 @@ describe("request validation audit", () => {
       ),
     ]);
 
-    expect(failures.map(expectFailure)).toEqual(
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
       failures.map(() => expect.any(PutioValidationError)),
     );
     expect(requestCount).toBe(0);

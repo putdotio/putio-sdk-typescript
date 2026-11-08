@@ -1,6 +1,6 @@
 export const httpCompatibilitySource = `
 import { Cause as HttpCause, Effect as HttpEffect, Exit as HttpExit, Fiber as HttpFiber } from "effect";
-import { createPutioSdkEffectClient as httpSdk, makePutioFetchLayer as httpLayer, makePutioSdkLayer as httpConfig, makePutioFetchClient as httpFetch } from "@putdotio/sdk";
+import { createPutioSdkEffectClient as httpSdk, makePutioFetchLayer as httpLayer, putioSdkLayer as httpConfig, makePutioFetchClient as httpFetch } from "@putdotio/sdk";
 
 const runHttpCompatibility = async () => {
   for (const status of [401, 403, 429, 502]) {

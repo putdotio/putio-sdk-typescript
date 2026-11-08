@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
+import { Predicate, Schema } from "effect";
+
 export type CompatWorkspace = {
   readonly httpUrl: string;
   readonly root: string;
@@ -18,8 +20,16 @@ type RunOptions = {
   readonly env?: NodeJS.ProcessEnv;
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
+const DependencyVersionsSchema = Schema.Record(Schema.String, Schema.String);
+
+const RootPackageJsonSchema = Schema.fromJsonString(
+  Schema.Struct({
+    dependencies: Schema.optional(DependencyVersionsSchema),
+    devDependencies: Schema.optional(DependencyVersionsSchema),
+  }),
+);
+
+const decodeRootPackageJson = Schema.decodeUnknownSync(RootPackageJsonSchema);
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
@@ -40,6 +50,7 @@ export const run = (command: string, args: ReadonlyArray<string>, options: RunOp
     child.once("exit", (code, signal) => {
       if (code === 0) {
         resolvePromise();
+
         return;
       }
 
@@ -51,34 +62,8 @@ export const run = (command: string, args: ReadonlyArray<string>, options: RunOp
     });
   });
 
-export const writeJson = async (path: string, value: unknown) => {
+export const writeJson = async (path: string, value: Schema.Json) => {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
-};
-
-const getStringRecord = (
-  packageJson: Record<string, unknown>,
-  key: "dependencies" | "devDependencies",
-) => {
-  const value = packageJson[key];
-  const record: Record<string, string> = {};
-
-  if (value === undefined) {
-    return record;
-  }
-
-  if (!isRecord(value)) {
-    throw new Error(`package.json ${key} must be an object`);
-  }
-
-  for (const [dependencyName, version] of Object.entries(value)) {
-    if (typeof version !== "string") {
-      throw new Error(`package.json ${key}.${dependencyName} must be a string`);
-    }
-
-    record[dependencyName] = version;
-  }
-
-  return record;
 };
 
 export const getRootPackageVersion = async (
@@ -86,13 +71,7 @@ export const getRootPackageVersion = async (
   dependencyName: string,
 ) => {
   const raw = await readFile(join(repoRoot, "package.json"), "utf8");
-  const packageJson: unknown = JSON.parse(raw);
-
-  if (!isRecord(packageJson)) {
-    throw new Error("package.json must contain an object");
-  }
-
-  const version = getStringRecord(packageJson, key)[dependencyName];
+  const version = decodeRootPackageJson(raw)[key]?.[dependencyName];
 
   if (!version) {
     throw new Error(`package.json is missing ${key}.${dependencyName}`);
@@ -125,12 +104,14 @@ export const createCompatWorkspace = async (name: string): Promise<CompatWorkspa
     const timeout = setTimeout(() => response.end('"OK"}'), 10_000);
     response.once("close", () => clearTimeout(timeout));
   });
+
   await new Promise<void>((resolveListen, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolveListen);
   });
   const address = server.address();
-  if (address === null || typeof address === "string") {
+
+  if (address === null || Predicate.isString(address)) {
     server.close();
     throw new Error("Compatibility HTTP server has no TCP address");
   }

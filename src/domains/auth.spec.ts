@@ -38,10 +38,8 @@ import {
   runSdkExit,
 } from "../../test/support/sdk-test.js";
 
-const renderErrorForSecretCheck = (error: unknown): string =>
-  error instanceof Error
-    ? `${String(error)}\n${error.stack ?? ""}\n${JSON.stringify(error)}`
-    : `${String(error)}\n${JSON.stringify(error)}`;
+const renderErrorForSecretCheck = (error: Error): string =>
+  `${String(error)}\n${error.stack ?? ""}\n${JSON.stringify(error)}`;
 
 describe("auth domain", () => {
   it("builds the hosted login URL", () => {
@@ -99,13 +97,13 @@ describe("auth domain", () => {
 
     expect(denied).toBeInstanceOf(OAuthAuthorizationCodeExchangeError);
     expect(denied).toMatchObject({
-      _tag: "OAuthAuthorizationCodeExchangeError",
       code: "access_denied",
       status: 400,
     });
 
     let requestCount = 0;
     const sensitiveSecret = "highly-sensitive-client-secret";
+
     const invalid = expectFailure(
       await runSdkExit(
         exchangeOAuthAuthorizationCode({
@@ -115,6 +113,7 @@ describe("auth domain", () => {
         }),
         () => {
           requestCount += 1;
+
           return jsonResponse({ access_token: "unexpected" });
         },
       ),
@@ -186,6 +185,7 @@ describe("auth domain", () => {
           expect(request.url).toBe("https://api.put.io/v2/registration/register");
           expect(getAuthorizationHeader(request)).toBeUndefined();
           expect(getFormBody(request).get("username")).toBe("sdk");
+
           return jsonResponse({ access_token: "registered", status: "OK" });
         },
       ),
@@ -194,6 +194,7 @@ describe("auth domain", () => {
     expect(
       await runSdkEffect(exists("username", "sdk"), (request) => {
         expect(request.url).toBe("https://api.put.io/v2/registration/exists/username?value=sdk");
+
         return jsonResponse({ exists: true, status: "OK" });
       }),
     ).toBe(true);
@@ -234,6 +235,7 @@ describe("auth domain", () => {
     expect(
       await runSdkEffect(forgotPassword("sdk@put.io"), (request) => {
         expect(getFormBody(request).get("mail")).toBe("sdk@put.io");
+
         return jsonResponse({ status: "OK" });
       }),
     ).toEqual({ status: "OK" });
@@ -243,6 +245,7 @@ describe("auth domain", () => {
         const body = getFormBody(request);
         expect(body.get("key")).toBe("key-1");
         expect(body.get("password")).toBe("secret");
+
         return jsonResponse({ access_token: "reset-token", status: "OK" });
       }),
     ).toEqual({ access_token: "reset-token" });
@@ -250,6 +253,7 @@ describe("auth domain", () => {
     expect(
       await runSdkEffect(getCode({ appId: 9, clientName: "TV" }), (request) => {
         expect(request.url).toBe("https://api.put.io/v2/oauth2/oob/code?app_id=9&client_name=TV");
+
         return jsonResponse({
           code: "PUTIO1",
           qr_code_url: "https://api.put.io/qrcode/PUTIO1",
@@ -272,6 +276,7 @@ describe("auth domain", () => {
         linkDevice("PUTIO1"),
         (request) => {
           expect(getFormBody(request).get("code")).toBe("PUTIO1");
+
           return jsonResponse(authApp);
         },
         { accessToken: "token-123" },
@@ -336,6 +341,7 @@ describe("auth domain", () => {
     expect(
       await runSdkEffect(validateToken("token-123"), (request) => {
         expect(request.url).toBe("https://api.put.io/v2/oauth2/validate?oauth_token=token-123");
+
         return jsonResponse({
           result: true,
           token_id: 1,
@@ -369,6 +375,7 @@ describe("auth domain", () => {
           "https://api.put.io/v2/two_factor/verify/totp?oauth_token=temp-token",
         );
         expect(getFormBody(request).get("code")).toBe("123456");
+
         return jsonResponse({
           status: "OK",
           token: "verified-token",
@@ -424,9 +431,11 @@ describe("auth domain", () => {
         }),
         (request) => {
           value = getFormBody(request).get("product_analytics_enabled");
+
           return jsonResponse({ access_token: "registered", status: "OK" });
         },
       );
+
       return value;
     };
 
@@ -437,12 +446,16 @@ describe("auth domain", () => {
 
   it("rejects invalid auth inputs before transport without exposing credentials", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
+
     const sensitiveSecret = "sensitive-client-secret";
     const sensitivePassword = "sensitive-password";
+
     const failures = await Promise.all([
       runSdkExit(
         login({
@@ -492,7 +505,7 @@ describe("auth domain", () => {
       runSdkExit(verifyTOTP("temporary-token", ""), handler),
     ]);
 
-    const errors = failures.map(expectFailure);
+    const errors = failures.map(expectFailure<Error>);
     const renderedErrors = errors.map(renderErrorForSecretCheck).join("\n");
     expect(errors.every((error) => error instanceof PutioValidationError)).toBe(true);
     expect(renderedErrors).not.toContain(sensitiveSecret);
@@ -522,7 +535,6 @@ describe("auth domain", () => {
     const error = expectFailure(exit);
     expect(error).toBeInstanceOf(PutioOperationError);
     expect(error).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "auth",
       operation: "register",
     });

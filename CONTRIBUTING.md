@@ -17,8 +17,6 @@ vp run verify
 vp run test:compat
 ```
 
-CI runs both on every pull request.
-
 ## Live Tests
 
 Live tests are opt-in and call the real put.io API. Use them for behavior the

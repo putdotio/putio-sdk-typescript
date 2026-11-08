@@ -121,8 +121,10 @@ describe("app-specific password boundaries", () => {
 
   it("rejects invalid create and delete inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
 
@@ -131,11 +133,13 @@ describe("app-specific password boundaries", () => {
         accessToken: "token-123",
       }),
     );
+
     const longNote = expectFailure(
       await runSdkExit(createAppSpecificPassword({ note: "x".repeat(256) }), handler, {
         accessToken: "token-123",
       }),
     );
+
     const invalidId = expectFailure(
       await runSdkExit(deleteAppSpecificPassword(0), handler, {
         accessToken: "token-123",
@@ -221,6 +225,7 @@ describe("app-specific password boundaries", () => {
         (request) => {
           expect(request.method).toBe("POST");
           expect(request.url).toBe("https://api.put.io/v2/app_specific_password/42/delete");
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
@@ -233,6 +238,7 @@ describe("app-specific password boundaries", () => {
         (request) => {
           expect(request.method).toBe("POST");
           expect(request.url).toBe("https://api.put.io/v2/app_specific_password/delete_all");
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },

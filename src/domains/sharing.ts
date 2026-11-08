@@ -1,13 +1,12 @@
 import { Effect, Schema } from "effect";
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema } from "../core/validation.js";
+import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
-  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { FileBroadSchema } from "./files.js";
+import { FileBroadSchema, FilesListEnvelopeSchema } from "./files.js";
 import {
   OkResponseSchema,
   encodePathSegment,
@@ -16,17 +15,21 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
+
 export const SharingCloneStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
+
 export const SharingCloneInputSchema = Schema.Struct({
   cursor: Schema.optional(NonEmptyStringSchema),
   excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
   ids: Schema.optional(Schema.Array(PositiveIntegerSchema)),
   parentId: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
+
 const SharingCloneEnvelopeSchema = Schema.Struct({
   id: Schema.Int.check(Schema.isGreaterThan(0)),
   status: Schema.Literal("OK"),
 });
+
 export const SharingCloneInfoSchema = Schema.Union([
   Schema.Struct({
     shared_file_clone_status: Schema.Literals(["NEW", "PROCESSING", "DONE"]),
@@ -38,6 +41,7 @@ export const SharingCloneInfoSchema = Schema.Union([
     status: Schema.Literal("OK"),
   }),
 ]);
+
 export const SharedFileSchema = FileBroadSchema.pipe(
   Schema.fieldsAssign({
     shared_with: Schema.Union([
@@ -46,6 +50,7 @@ export const SharedFileSchema = FileBroadSchema.pipe(
     ]),
   }),
 );
+
 export const SharingShareInputSchema = Schema.Struct({
   cursor: Schema.optional(NonEmptyStringSchema),
   excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
@@ -60,15 +65,18 @@ export const SharingShareInputSchema = Schema.Struct({
     }),
   ]),
 });
+
 const SharedFilesEnvelopeSchema = Schema.Struct({
   shared: Schema.Array(SharedFileSchema),
   status: Schema.Literal("OK"),
 });
+
 export const SharedFileShareSchema = Schema.Struct({
   share_id: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   user_avatar_url: Schema.String,
   user_name: Schema.String,
 });
+
 export const SharedFileSharedWithSchema = Schema.Union([
   Schema.Struct({
     share_type: Schema.Literal("everyone"),
@@ -80,12 +88,14 @@ export const SharedFileSharedWithSchema = Schema.Union([
     status: Schema.optional(Schema.Literal("OK")),
   }),
 ]);
+
 export const SharingUnshareInputSchema = Schema.Struct({
   fileId: PositiveIntegerSchema,
   shares: Schema.optional(
     Schema.Array(Schema.Union([PositiveIntegerSchema, NonEmptyStringSchema])),
   ),
 });
+
 export const PublicShareSchema = Schema.Struct({
   created_at: Schema.String,
   expiration_date: Schema.String,
@@ -101,34 +111,26 @@ export const PublicShareSchema = Schema.Struct({
     name: Schema.String,
   }),
 });
+
 const PublicShareEnvelopeSchema = Schema.Struct({
   public_share: PublicShareSchema,
   status: Schema.optional(Schema.Literal("OK")),
 });
+
 const PublicSharesEnvelopeSchema = Schema.Struct({
   public_shares: Schema.Array(PublicShareSchema),
   status: Schema.optional(Schema.Literal("OK")),
 });
-const PublicShareFileListEnvelopeSchema = Schema.Struct({
-  breadcrumbs: Schema.optional(Schema.Array(Schema.Tuple([Schema.Int, Schema.String]))),
-  cursor: Schema.NullOr(Schema.String),
-  files: Schema.Array(FileBroadSchema),
-  parent: Schema.NullOr(FileBroadSchema),
-  status: Schema.Literal("OK"),
-  total: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-});
-const PublicShareFileListContinueEnvelopeSchema = Schema.Struct({
-  breadcrumbs: Schema.optional(Schema.Array(Schema.Tuple([Schema.Int, Schema.String]))),
-  cursor: Schema.NullOr(Schema.String),
-  files: Schema.Array(FileBroadSchema),
-  parent: Schema.optional(Schema.NullOr(FileBroadSchema)),
-  status: Schema.Literal("OK"),
-  total: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-});
+
+const PublicShareFileListContinueEnvelopeSchema = FilesListEnvelopeSchema.pipe(
+  Schema.fieldsAssign({ parent: Schema.optional(Schema.NullOr(FileBroadSchema)) }),
+);
+
 const PublicShareFileUrlEnvelopeSchema = Schema.Struct({
   status: Schema.optional(Schema.Literal("OK")),
   url: Schema.String,
 });
+
 export const PublicShareListQuerySchema = Schema.Struct({
   breadcrumbs: Schema.optional(Schema.Literal(1)),
   content_type: Schema.optional(Schema.String),
@@ -144,21 +146,32 @@ export const PublicShareListQuerySchema = Schema.Struct({
   total: Schema.optional(Schema.Literal(1)),
   video_metadata_parent: Schema.optional(Schema.Literal(1)),
 });
+
 const PublicShareContinueInputSchema = Schema.Struct({
   cursor: NonEmptyStringSchema,
   query: Schema.Struct({
     per_page: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
   }),
 });
+
 export type SharingCloneInput = Schema.Schema.Type<typeof SharingCloneInputSchema>;
+
 export type SharingCloneInfo = Schema.Schema.Type<typeof SharingCloneInfoSchema>;
+
 export type SharedFile = Schema.Schema.Type<typeof SharedFileSchema>;
+
 export type SharedFileShare = Schema.Schema.Type<typeof SharedFileShareSchema>;
+
 export type SharedFileSharedWith = Schema.Schema.Type<typeof SharedFileSharedWithSchema>;
+
 export type SharingShareInput = Schema.Schema.Type<typeof SharingShareInputSchema>;
+
 export type SharingUnshareInput = Schema.Schema.Type<typeof SharingUnshareInputSchema>;
+
 export type PublicShare = Schema.Schema.Type<typeof PublicShareSchema>;
+
 export type PublicShareListQuery = Schema.Schema.Type<typeof PublicShareListQuerySchema>;
+
 export const CreateSharingCloneErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "clone",
@@ -171,6 +184,7 @@ export const CreateSharingCloneErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
+
 export const GetSharingCloneInfoErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "getCloneInfo",
@@ -180,6 +194,7 @@ export const GetSharingCloneInfoErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const ShareFilesErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "shareFiles",
@@ -189,11 +204,13 @@ export const ShareFilesErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
+
 export const ListSharedFilesErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "listSharedFiles",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
+
 export const GetSharedWithErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "getSharedWith",
@@ -202,6 +219,7 @@ export const GetSharedWithErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const UnshareFileErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "unshare",
@@ -211,6 +229,7 @@ export const UnshareFileErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const CreatePublicShareErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "createPublicShare",
@@ -227,11 +246,13 @@ export const CreatePublicShareErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const ListPublicSharesErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "listPublicShares",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
+
 export const DeletePublicShareErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "deletePublicShare",
@@ -240,6 +261,7 @@ export const DeletePublicShareErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const GetPublicShareErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "getPublicShare",
@@ -249,6 +271,7 @@ export const GetPublicShareErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const ListPublicShareFilesErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "listPublicShareFiles",
@@ -258,6 +281,7 @@ export const ListPublicShareFilesErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const ContinuePublicShareFilesErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "continuePublicShareFiles",
@@ -268,6 +292,7 @@ export const ContinuePublicShareFilesErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const GetPublicShareFileUrlErrorSpec = definePutioOperationErrorSpec({
   domain: "sharing",
   operation: "getPublicShareFileUrl",
@@ -277,25 +302,40 @@ export const GetPublicShareFileUrlErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export type CreateSharingCloneError = PutioOperationFailure<typeof CreateSharingCloneErrorSpec>;
+
 export type GetSharingCloneInfoError = PutioOperationFailure<typeof GetSharingCloneInfoErrorSpec>;
+
 export type ShareFilesError = PutioOperationFailure<typeof ShareFilesErrorSpec>;
+
 export type ListSharedFilesError = PutioOperationFailure<typeof ListSharedFilesErrorSpec>;
+
 export type GetSharedWithError = PutioOperationFailure<typeof GetSharedWithErrorSpec>;
+
 export type UnshareFileError = PutioOperationFailure<typeof UnshareFileErrorSpec>;
+
 export type CreatePublicShareError = PutioOperationFailure<typeof CreatePublicShareErrorSpec>;
+
 export type ListPublicSharesError = PutioOperationFailure<typeof ListPublicSharesErrorSpec>;
+
 export type DeletePublicShareError = PutioOperationFailure<typeof DeletePublicShareErrorSpec>;
+
 export type GetPublicShareError = PutioOperationFailure<typeof GetPublicShareErrorSpec>;
+
 export type ListPublicShareFilesError = PutioOperationFailure<typeof ListPublicShareFilesErrorSpec>;
+
 export type ContinuePublicShareFilesError = PutioOperationFailure<
   typeof ContinuePublicShareFilesErrorSpec
 >;
+
 export type GetPublicShareFileUrlError = PutioOperationFailure<
   typeof GetPublicShareFileUrlErrorSpec
 >;
+
 const toShareTarget = (target: SharingShareInput["target"]): string =>
   target.type === "everyone" ? "everyone" : target.friendNames.join(",");
+
 export const cloneSharedFiles = (
   input: SharingCloneInput = {},
 ): Effect.Effect<
@@ -305,57 +345,47 @@ export const cloneSharedFiles = (
   CreateSharingCloneError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(SharingCloneInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(SharingCloneEnvelopeSchema, {
-        body: {
-          type: "form",
-          value: {
-            ...toCursorSelectionForm(decodedInput),
-            parent_id: decodedInput.parentId ?? 0,
-          },
+  decodeAndRun(SharingCloneInputSchema, input, (decodedInput) =>
+    requestJson(SharingCloneEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          ...toCursorSelectionForm(decodedInput),
+          parent_id: decodedInput.parentId ?? 0,
         },
-        method: "POST",
-        path: "/v2/sharing/clone",
-      }),
-    ),
-    selectJsonFields("id"),
-    withOperationErrors(CreateSharingCloneErrorSpec),
-  );
+      },
+      method: "POST",
+      path: "/v2/sharing/clone",
+    }),
+  ).pipe(selectJsonFields("id"), withOperationErrors(CreateSharingCloneErrorSpec));
+
 export const getSharingCloneInfo = (
   id: number,
 ): Effect.Effect<SharingCloneInfo, GetSharingCloneInfoError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestJson(SharingCloneInfoSchema, {
-        method: "GET",
-        path: `/v2/sharing/clone/${encodePathSegment(decodedId)}`,
-      }),
-    ),
-    withOperationErrors(GetSharingCloneInfoErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, id, (decodedId) =>
+    requestJson(SharingCloneInfoSchema, {
+      method: "GET",
+      path: `/v2/sharing/clone/${encodePathSegment(decodedId)}`,
+    }),
+  ).pipe(withOperationErrors(GetSharingCloneInfoErrorSpec));
+
 export const shareFiles = (
   input: SharingShareInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, ShareFilesError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(SharingShareInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value: {
-            ...toCursorSelectionForm(decodedInput),
-            friends: toShareTarget(decodedInput.target),
-          },
+  decodeAndRun(SharingShareInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          ...toCursorSelectionForm(decodedInput),
+          friends: toShareTarget(decodedInput.target),
         },
-        method: "POST",
-        path: "/v2/files/share",
-      }),
-    ),
-    withOperationErrors(ShareFilesErrorSpec),
-  );
+      },
+      method: "POST",
+      path: "/v2/files/share",
+    }),
+  ).pipe(withOperationErrors(ShareFilesErrorSpec));
+
 export const listSharedFiles = (): Effect.Effect<
   ReadonlyArray<SharedFile>,
   ListSharedFilesError,
@@ -365,52 +395,43 @@ export const listSharedFiles = (): Effect.Effect<
     method: "GET",
     path: "/v2/files/shared",
   }).pipe(selectJsonField("shared"), withOperationErrors(ListSharedFilesErrorSpec));
+
 export const getSharedWith = (
   fileId: number,
 ): Effect.Effect<SharedFileSharedWith, GetSharedWithError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(fileId).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedFileId) =>
-      requestJson(SharedFileSharedWithSchema, {
-        method: "GET",
-        path: `/v2/files/${encodePathSegment(decodedFileId)}/shared-with-v2`,
-      }),
-    ),
-    withOperationErrors(GetSharedWithErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, fileId, (decodedFileId) =>
+    requestJson(SharedFileSharedWithSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/shared-with-v2`,
+    }),
+  ).pipe(withOperationErrors(GetSharedWithErrorSpec));
+
 export const unshareFile = (
   input: SharingUnshareInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, UnshareFileError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(SharingUnshareInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value: {
-            shares: joinCsv(decodedInput.shares) ?? "everyone",
-          },
+  decodeAndRun(SharingUnshareInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          shares: joinCsv(decodedInput.shares) ?? "everyone",
         },
-        method: "POST",
-        path: `/v2/files/${encodePathSegment(decodedInput.fileId)}/unshare`,
-      }),
-    ),
-    withOperationErrors(UnshareFileErrorSpec),
-  );
+      },
+      method: "POST",
+      path: `/v2/files/${encodePathSegment(decodedInput.fileId)}/unshare`,
+    }),
+  ).pipe(withOperationErrors(UnshareFileErrorSpec));
+
 export const createPublicShare = (
   fileId: number,
 ): Effect.Effect<PublicShare, CreatePublicShareError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(fileId).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedFileId) =>
-      requestJson(PublicShareEnvelopeSchema, {
-        method: "POST",
-        path: `/v2/public_share/${encodePathSegment(decodedFileId)}`,
-      }),
-    ),
-    selectJsonField("public_share"),
-    withOperationErrors(CreatePublicShareErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, fileId, (decodedFileId) =>
+    requestJson(PublicShareEnvelopeSchema, {
+      method: "POST",
+      path: `/v2/public_share/${encodePathSegment(decodedFileId)}`,
+    }),
+  ).pipe(selectJsonField("public_share"), withOperationErrors(CreatePublicShareErrorSpec));
+
 export const listPublicShares = (): Effect.Effect<
   ReadonlyArray<PublicShare>,
   ListPublicSharesError,
@@ -420,6 +441,7 @@ export const listPublicShares = (): Effect.Effect<
     method: "GET",
     path: "/v2/public_share/list",
   }).pipe(selectJsonField("public_shares"), withOperationErrors(ListPublicSharesErrorSpec));
+
 export const deletePublicShare = (
   id: number,
 ): Effect.Effect<
@@ -427,16 +449,13 @@ export const deletePublicShare = (
   DeletePublicShareError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestJson(OkResponseSchema, {
-        method: "DELETE",
-        path: `/v2/public_share/${encodePathSegment(decodedId)}`,
-      }),
-    ),
-    withOperationErrors(DeletePublicShareErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, id, (decodedId) =>
+    requestJson(OkResponseSchema, {
+      method: "DELETE",
+      path: `/v2/public_share/${encodePathSegment(decodedId)}`,
+    }),
+  ).pipe(withOperationErrors(DeletePublicShareErrorSpec));
+
 export const getPublicShare = (): Effect.Effect<
   PublicShare,
   GetPublicShareError,
@@ -446,24 +465,22 @@ export const getPublicShare = (): Effect.Effect<
     method: "GET",
     path: "/v2/public_share",
   }).pipe(selectJsonField("public_share"), withOperationErrors(GetPublicShareErrorSpec));
+
 export const listPublicShareFiles = (
   query: PublicShareListQuery = {},
 ): Effect.Effect<
-  Schema.Schema.Type<typeof PublicShareFileListEnvelopeSchema>,
+  Schema.Schema.Type<typeof FilesListEnvelopeSchema>,
   ListPublicShareFilesError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PublicShareListQuerySchema, { onExcessProperty: "error" })(query).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedQuery) =>
-      requestJson(PublicShareFileListEnvelopeSchema, {
-        method: "GET",
-        path: "/v2/public_share/files/list",
-        query: decodedQuery,
-      }),
-    ),
-    withOperationErrors(ListPublicShareFilesErrorSpec),
-  );
+  decodeAndRun(PublicShareListQuerySchema, query, (decodedQuery) =>
+    requestJson(FilesListEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/public_share/files/list",
+      query: decodedQuery,
+    }),
+  ).pipe(withOperationErrors(ListPublicShareFilesErrorSpec));
+
 export const continuePublicShareFiles = (
   cursor: string,
   query: {
@@ -474,12 +491,13 @@ export const continuePublicShareFiles = (
   ContinuePublicShareFilesError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(PublicShareContinueInputSchema, { onExcessProperty: "error" })({
-    cursor,
-    query,
-  }).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
+  decodeAndRun(
+    PublicShareContinueInputSchema,
+    {
+      cursor,
+      query,
+    },
+    (decodedInput) =>
       requestJson(PublicShareFileListContinueEnvelopeSchema, {
         body: {
           type: "form",
@@ -489,20 +507,14 @@ export const continuePublicShareFiles = (
         path: "/v2/public_share/files/list/continue",
         query: decodedInput.query,
       }),
-    ),
-    withOperationErrors(ContinuePublicShareFilesErrorSpec),
-  );
+  ).pipe(withOperationErrors(ContinuePublicShareFilesErrorSpec));
+
 export const getPublicShareFileUrl = (
   fileId: number,
 ): Effect.Effect<string, GetPublicShareFileUrlError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveIntegerSchema)(fileId).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedFileId) =>
-      requestJson(PublicShareFileUrlEnvelopeSchema, {
-        method: "GET",
-        path: `/v2/public_share/files/${encodePathSegment(decodedFileId)}/url`,
-      }),
-    ),
-    selectJsonField("url"),
-    withOperationErrors(GetPublicShareFileUrlErrorSpec),
-  );
+  decodeAndRun(PositiveIntegerSchema, fileId, (decodedFileId) =>
+    requestJson(PublicShareFileUrlEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/public_share/files/${encodePathSegment(decodedFileId)}/url`,
+    }),
+  ).pipe(selectJsonField("url"), withOperationErrors(GetPublicShareFileUrlErrorSpec));

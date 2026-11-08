@@ -1,10 +1,10 @@
-import { Predicate } from "effect";
+import { Data, Predicate, Schema } from "effect";
 
 import {
   PutioApiError,
   PutioAuthError,
   type PutioErrorEnvelope,
-  isPutioErrorEnvelope,
+  PutioErrorEnvelopeSchema,
   PutioOperationError,
   PutioRateLimitError,
   type PutioKnownOperationErrorContract,
@@ -34,11 +34,13 @@ export type LocalizedErrorRecoverySuggestion =
   | LocalizedErrorRecoverySuggestionTypeAction
   | LocalizedErrorRecoverySuggestionTypeCaptcha;
 
+export type LocalizedErrorMeta = Record<string, Schema.Json | undefined>;
+
 export interface LocalizedErrorParams {
   readonly message: string;
   readonly recoverySuggestion: LocalizedErrorRecoverySuggestion;
   readonly underlyingError: unknown;
-  readonly meta?: Record<string, unknown>;
+  readonly meta?: LocalizedErrorMeta;
 }
 
 export class LocalizedError extends Error {
@@ -46,7 +48,7 @@ export class LocalizedError extends Error {
 
   readonly underlyingError: unknown;
 
-  readonly meta: Record<string, unknown>;
+  readonly meta: LocalizedErrorMeta;
 
   constructor(params: LocalizedErrorParams) {
     super(params.message);
@@ -57,7 +59,7 @@ export class LocalizedError extends Error {
   }
 }
 
-type StatusAndBodyError =
+export type PutioErrorWithBody =
   | PutioApiError
   | PutioAuthError
   | PutioRateLimitError
@@ -69,25 +71,28 @@ export type PutioLocalizableError = {
   readonly status?: number;
 };
 
-export type PutioErrorWithBody = StatusAndBodyError;
+class LocalizablePutioErrorEnvelope extends Data.TaggedClass("PutioErrorEnvelope")<{
+  readonly body: PutioErrorEnvelope;
+  readonly status: number | undefined;
+}> {}
 
-const isLocalizablePutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelope =>
-  Predicate.isObject(value) &&
-  ("status_code" in value || "error_type" in value || "error_message" in value) &&
-  isPutioErrorEnvelope(value);
+const isLocalizablePutioErrorEnvelope = Schema.is(
+  PutioErrorEnvelopeSchema.check(
+    Schema.makeFilter(
+      (envelope) =>
+        "status_code" in envelope || "error_type" in envelope || "error_message" in envelope,
+      { expected: "a put.io error envelope with a status code, error type, or error message" },
+    ),
+  ),
+);
 
-const isPutioErrorWithBody = (value: unknown): value is PutioLocalizableError =>
-  Predicate.isObject(value) && "body" in value && isPutioErrorEnvelope(value.body);
+const isPutioErrorWithBody = Schema.is(Schema.Struct({ body: PutioErrorEnvelopeSchema }));
 
 const normalizePutioError = (
   error: PutioErrorEnvelope | PutioLocalizableError,
 ): PutioLocalizableError => {
   if (isLocalizablePutioErrorEnvelope(error)) {
-    return {
-      _tag: "PutioErrorEnvelope",
-      body: error,
-      status: error.status_code,
-    };
+    return new LocalizablePutioErrorEnvelope({ body: error, status: error.status_code });
   }
 
   return error;
@@ -126,11 +131,11 @@ export type ErrorLocalizer<E> =
   | MatchConditionLocalizer<E>
   | GenericErrorLocalizer;
 
-export type ErrorLocalizerFn = (error: unknown) => LocalizedError;
+export type ErrorLocalizerFn = <E>(error: E) => LocalizedError;
 
 export const isErrorLocalizer = (fn: unknown): fn is ErrorLocalizerFn => {
   try {
-    return typeof fn === "function" && fn(new Error("test")) instanceof LocalizedError;
+    return Predicate.isFunction(fn) && fn(new Error("test")) instanceof LocalizedError;
   } catch {
     return false;
   }
@@ -144,45 +149,23 @@ export const createLocalizeError =
   ): LocalizedError => {
     const localizers = [...scopedLocalizers, ...globalLocalizers];
 
-    if (isPutioErrorWithBody(error) || isLocalizablePutioErrorEnvelope(error)) {
-      const apiError = normalizePutioError(error);
+    const apiError =
+      isPutioErrorWithBody(error) || isLocalizablePutioErrorEnvelope(error)
+        ? normalizePutioError(error)
+        : undefined;
 
-      const byErrorType = localizers.find(
+    const byErrorType =
+      apiError &&
+      localizers.find(
         (localizer): localizer is APIErrorByErrorTypeLocalizer =>
           localizer.kind === "api_error_type" && localizer.error_type === apiError.body.error_type,
       );
 
-      if (byErrorType) {
-        return new LocalizedError({
-          underlyingError: apiError,
-          ...byErrorType.localize(apiError),
-        });
-      }
-
-      const byMatchCondition = localizers.find(
-        (localizer): localizer is MatchConditionLocalizer<ScopedError> =>
-          localizer.kind === "match_condition" && localizer.match(error),
-      );
-
-      if (byMatchCondition) {
-        return new LocalizedError({
-          underlyingError: error,
-          ...byMatchCondition.localize(error),
-        });
-      }
-
-      const byStatusCode = localizers.find(
-        (localizer): localizer is APIErrorByStatusCodeLocalizer =>
-          localizer.kind === "api_status_code" &&
-          localizer.status_code === apiError.body.status_code,
-      );
-
-      if (byStatusCode) {
-        return new LocalizedError({
-          underlyingError: apiError,
-          ...byStatusCode.localize(apiError),
-        });
-      }
+    if (apiError && byErrorType) {
+      return new LocalizedError({
+        underlyingError: apiError,
+        ...byErrorType.localize(apiError),
+      });
     }
 
     const byMatchCondition = localizers.find(
@@ -194,6 +177,21 @@ export const createLocalizeError =
       return new LocalizedError({
         underlyingError: error,
         ...byMatchCondition.localize(error),
+      });
+    }
+
+    const byStatusCode =
+      apiError &&
+      localizers.find(
+        (localizer): localizer is APIErrorByStatusCodeLocalizer =>
+          localizer.kind === "api_status_code" &&
+          localizer.status_code === apiError.body.status_code,
+      );
+
+    if (apiError && byStatusCode) {
+      return new LocalizedError({
+        underlyingError: apiError,
+        ...byStatusCode.localize(apiError),
       });
     }
 

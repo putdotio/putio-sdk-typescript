@@ -1,8 +1,8 @@
 import { Effect, Schema } from "effect";
+import { decodeAndRun } from "../core/validation.js";
 import {
   PutioValidationError,
   definePutioOperationErrorSpec,
-  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
   type PutioSdkError,
@@ -13,22 +13,25 @@ import {
   selectJsonField,
   type PutioSdkContext,
 } from "../core/http.js";
+
 const RequestedFlag = Schema.Literal(1);
+
 export const AccountDiskSchema = Schema.Struct({
   avail: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   used: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
 });
+
 export const AccountWarningsSchema = Schema.Struct({
   callback_url_has_failed: Schema.optional(Schema.Boolean),
   pushover_token_has_failed: Schema.optional(Schema.Boolean),
 });
+
 const AccountSettingsFields = {
   beta_user: Schema.Boolean,
   callback_url: Schema.NullOr(Schema.String),
   dark_theme: Schema.Boolean,
   default_download_folder: Schema.Int,
-  // Cross-client privacy controls.
   diagnostics_enabled: Schema.Boolean,
   dont_autoselect_subtitles: Schema.Boolean,
   fluid_layout: Schema.Boolean,
@@ -54,11 +57,14 @@ const AccountSettingsFields = {
   use_start_from: Schema.Boolean,
   video_player: Schema.NullOr(Schema.Literals(["html5", "flash"])),
 };
+
 export const AccountSettingsSchema = Schema.Struct(AccountSettingsFields);
 const AccountFeaturesSchema = Schema.Record(Schema.String, Schema.Boolean);
+
 export const PasInfoSchema = Schema.Struct({
   user_hash: Schema.String,
 });
+
 export const AccountInfoBaseSchema = Schema.Struct({
   account_active: Schema.optional(Schema.NullOr(Schema.Boolean)),
   account_status: Schema.Literals(["active", "inactive", "stranger"]),
@@ -80,6 +86,7 @@ export const AccountInfoBaseSchema = Schema.Struct({
   username: Schema.String,
   warnings: AccountWarningsSchema,
 });
+
 export const AccountInfoQuerySchema = Schema.Struct({
   download_token: Schema.optional(RequestedFlag),
   features: Schema.optional(RequestedFlag),
@@ -89,6 +96,7 @@ export const AccountInfoQuerySchema = Schema.Struct({
   profitwell: Schema.optional(RequestedFlag),
   push_token: Schema.optional(RequestedFlag),
 });
+
 export const AccountInfoBroadSchema = AccountInfoBaseSchema.pipe(
   Schema.fieldsAssign({
     download_token: Schema.optional(Schema.String),
@@ -99,26 +107,32 @@ export const AccountInfoBroadSchema = AccountInfoBaseSchema.pipe(
     user_hash: Schema.optional(Schema.String),
   }),
 );
+
 const AccountInfoEnvelopeSchema = Schema.Struct({
   info: AccountInfoBroadSchema,
   status: Schema.Literal("OK"),
 });
+
 const AccountSettingsEnvelopeSchema = Schema.Struct({
   settings: AccountSettingsSchema,
   status: Schema.Literal("OK"),
 });
+
 export const AccountSubtitleLanguageSchema = Schema.Struct({
   code: Schema.String,
   name: Schema.String,
 });
+
 const AccountSubtitleLanguagesEnvelopeSchema = Schema.Struct({
   languages: Schema.Array(AccountSubtitleLanguageSchema),
   status: Schema.Literal("OK"),
 });
+
 export const AccountTwoFactorSettingsSchema = Schema.Struct({
   code: Schema.String,
   enable: Schema.Boolean,
 });
+
 const AccountSettingsPatchFields = {
   beta_user: Schema.optional(AccountSettingsFields.beta_user),
   callback_url: Schema.optional(AccountSettingsFields.callback_url),
@@ -149,11 +163,13 @@ const AccountSettingsPatchFields = {
   use_start_from: Schema.optional(AccountSettingsFields.use_start_from),
   video_player: Schema.optional(AccountSettingsFields.video_player),
 };
+
 const SaveAccountSettingsCommonFields = {
   ...AccountSettingsPatchFields,
   two_factor_enabled: Schema.optional(AccountTwoFactorSettingsSchema),
   username: Schema.optional(Schema.String),
 };
+
 export const SaveAccountSettingsPayloadSchema = Schema.Union([
   Schema.Struct(SaveAccountSettingsCommonFields),
   Schema.Struct({
@@ -169,6 +185,7 @@ export const SaveAccountSettingsPayloadSchema = Schema.Union([
     password: Schema.String,
   }),
 ]);
+
 export const AccountClearOptionsSchema = Schema.Struct({
   active_transfers: Schema.Boolean,
   files: Schema.Boolean,
@@ -179,32 +196,47 @@ export const AccountClearOptionsSchema = Schema.Struct({
   rss_logs: Schema.Boolean,
   trash: Schema.Boolean,
 });
+
 const AccountConfirmationSubjectSchema = Schema.Literals([
   "mail_change",
   "password_change",
   "subscription_upgrade",
 ]);
+
 export const AccountConfirmationSchema = Schema.Struct({
   created_at: Schema.String,
   subject: AccountConfirmationSubjectSchema,
 });
+
 const AccountConfirmationsEnvelopeSchema = Schema.Struct({
   confirmations: Schema.Array(AccountConfirmationSchema),
   status: Schema.Literal("OK"),
 });
+
 export type AccountDisk = Schema.Schema.Type<typeof AccountDiskSchema>;
+
 export type AccountWarnings = Schema.Schema.Type<typeof AccountWarningsSchema>;
+
 export type AccountSettings = Schema.Schema.Type<typeof AccountSettingsSchema>;
+
 export type AccountInfoQuery = Schema.Schema.Type<typeof AccountInfoQuerySchema>;
+
 export type PasInfo = Schema.Schema.Type<typeof PasInfoSchema>;
+
 export type AccountInfoBase = Schema.Schema.Type<typeof AccountInfoBaseSchema>;
+
 export type AccountInfoBroad = Schema.Schema.Type<typeof AccountInfoBroadSchema>;
+
 export type SaveAccountSettingsPayload = Schema.Schema.Type<
   typeof SaveAccountSettingsPayloadSchema
 >;
+
 export type AccountClearOptions = Schema.Schema.Type<typeof AccountClearOptionsSchema>;
+
 export type AccountConfirmation = Schema.Schema.Type<typeof AccountConfirmationSchema>;
+
 export type AccountSubtitleLanguage = Schema.Schema.Type<typeof AccountSubtitleLanguageSchema>;
+
 export type AccountInfoResponseFor<TQuery extends AccountInfoQuery> = AccountInfoBase &
   (TQuery["download_token"] extends 1
     ? {
@@ -236,15 +268,14 @@ export type AccountInfoResponseFor<TQuery extends AccountInfoQuery> = AccountInf
         readonly push_token: string;
       }
     : {});
-const missingFieldError = (field: string) =>
-  new PutioValidationError({
-    cause: `Expected put.io to include "${field}" because it was requested`,
-  });
+
 const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
-  Effect.fail(missingFieldError(field));
-const widenValidationError = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | PutioValidationError, R> => effect;
+  Effect.fail(
+    new PutioValidationError({
+      cause: `Expected put.io to include "${field}" because it was requested`,
+    }),
+  );
+
 const mapSensitiveAccountDecodeError = (operation: "destroy" | "saveSettings") => () =>
   new PutioValidationError({
     cause: {
@@ -253,59 +284,37 @@ const mapSensitiveAccountDecodeError = (operation: "destroy" | "saveSettings") =
       reason: "Invalid request input",
     },
   });
-const hasDownloadToken = (
-  value: AccountInfoBroad,
-): value is AccountInfoBroad & {
-  readonly download_token: string;
-} => typeof value.download_token === "string";
-const hasFeatures = (
-  value: AccountInfoBroad,
-): value is AccountInfoBroad & {
-  readonly features: Record<string, boolean>;
-} => typeof value.features === "object" && value.features !== null;
-const hasPas = (
-  value: AccountInfoBroad,
-): value is AccountInfoBroad & {
-  readonly pas: PasInfo;
-} => typeof value.pas === "object" && value.pas !== null && typeof value.pas.user_hash === "string";
-const hasPaddleUserId = (
-  value: AccountInfoBroad,
-): value is AccountInfoBroad & {
-  readonly paddle_user_id: number | string | null;
-} => "paddle_user_id" in value;
-const hasPushToken = (
-  value: AccountInfoBroad,
-): value is AccountInfoBroad & {
-  readonly push_token: string;
-} => typeof value.push_token === "string";
-const ensureAccountInfoFields = <TQuery extends AccountInfoQuery>(
+
+const ensureAccountInfoFields = (
   effect: Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext>,
-  query: TQuery,
-): Effect.Effect<
-  AccountInfoResponseFor<TQuery>,
-  PutioSdkError | PutioValidationError,
-  PutioSdkContext
-> =>
+  query: AccountInfoQuery,
+): Effect.Effect<AccountInfoBroad, PutioSdkError | PutioValidationError, PutioSdkContext> =>
   Effect.gen(function* () {
-    const info = yield* widenValidationError(effect);
-    if (query.download_token === 1 && !hasDownloadToken(info)) {
+    const info = yield* effect;
+
+    if (query.download_token === 1 && info.download_token === undefined) {
       return yield* failMissingField("download_token");
     }
-    if (query.features === 1 && !hasFeatures(info)) {
+
+    if (query.features === 1 && info.features === undefined) {
       return yield* failMissingField("features");
     }
-    if (query.pas === 1 && !hasPas(info)) {
+
+    if (query.pas === 1 && info.pas === undefined) {
       return yield* failMissingField("pas");
     }
-    if (query.profitwell === 1 && !hasPaddleUserId(info)) {
+
+    if (query.profitwell === 1 && !("paddle_user_id" in info)) {
       return yield* failMissingField("paddle_user_id");
     }
-    if (query.push_token === 1 && !hasPushToken(info)) {
+
+    if (query.push_token === 1 && info.push_token === undefined) {
       return yield* failMissingField("push_token");
     }
-    // Requested-field checks above establish the query-conditioned contract.
-    return info as AccountInfoResponseFor<TQuery>;
+
+    return info;
   });
+
 export const SaveAccountSettingsErrorSpec = definePutioOperationErrorSpec({
   domain: "account",
   operation: "saveSettings",
@@ -330,13 +339,17 @@ export const SaveAccountSettingsErrorSpec = definePutioOperationErrorSpec({
     { errorType: "NOT_ENABLED", statusCode: 403 as const },
   ],
 });
+
 export const AccountConfirmationsErrorSpec = definePutioOperationErrorSpec({
   domain: "account",
   operation: "listConfirmations",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
+
 export type SaveAccountSettingsError = PutioOperationFailure<typeof SaveAccountSettingsErrorSpec>;
+
 export type AccountConfirmationsError = PutioOperationFailure<typeof AccountConfirmationsErrorSpec>;
+
 export function getAccountInfo(query: {
   readonly download_token: 1;
   readonly pas: 1;
@@ -398,20 +411,17 @@ export function getAccountInfo(
   query: AccountInfoQuery,
 ): Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext>;
 export function getAccountInfo(query: AccountInfoQuery = {}) {
-  return Schema.decodeUnknownEffect(AccountInfoQuerySchema, {
-    onExcessProperty: "error",
-  })(query).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedQuery) => {
-      const effect = requestJson(AccountInfoEnvelopeSchema, {
-        method: "GET",
-        path: "/v2/account/info",
-        query: decodedQuery,
-      }).pipe(selectJsonField("info"));
-      return ensureAccountInfoFields(effect, decodedQuery);
-    }),
-  );
+  return decodeAndRun(AccountInfoQuerySchema, query, (decodedQuery) => {
+    const effect = requestJson(AccountInfoEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/account/info",
+      query: decodedQuery,
+    }).pipe(selectJsonField("info"));
+
+    return ensureAccountInfoFields(effect, decodedQuery);
+  });
 }
+
 export const getAccountSettings = (): Effect.Effect<
   AccountSettings,
   PutioSdkError,
@@ -421,6 +431,7 @@ export const getAccountSettings = (): Effect.Effect<
     method: "GET",
     path: "/v2/account/settings",
   }).pipe(selectJsonField("settings"));
+
 export const listAccountSubtitleLanguages = (): Effect.Effect<
   ReadonlyArray<AccountSubtitleLanguage>,
   PutioSdkError,
@@ -430,6 +441,7 @@ export const listAccountSubtitleLanguages = (): Effect.Effect<
     method: "GET",
     path: "/v2/account/subtitle_languages",
   }).pipe(selectJsonField("languages"));
+
 export const saveAccountSettings = (
   payload: SaveAccountSettingsPayload,
 ): Effect.Effect<
@@ -453,24 +465,21 @@ export const saveAccountSettings = (
     ),
     withOperationErrors(SaveAccountSettingsErrorSpec),
   );
+
 export const clearAccount = (
   options: AccountClearOptions,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(AccountClearOptionsSchema, {
-    onExcessProperty: "error",
-  })(options).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedOptions) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value: decodedOptions,
-        },
-        method: "POST",
-        path: "/v2/account/clear",
-      }),
-    ),
+  decodeAndRun(AccountClearOptionsSchema, options, (decodedOptions) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: decodedOptions,
+      },
+      method: "POST",
+      path: "/v2/account/clear",
+    }),
   );
+
 export const destroyAccount = (
   currentPassword: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
@@ -489,22 +498,18 @@ export const destroyAccount = (
       }),
     ),
   );
+
 export const listAccountConfirmations = (
   subject?: AccountConfirmation["subject"],
 ): Effect.Effect<ReadonlyArray<AccountConfirmation>, AccountConfirmationsError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(Schema.UndefinedOr(AccountConfirmationSubjectSchema))(subject).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedSubject) =>
-      requestJson(AccountConfirmationsEnvelopeSchema, {
-        method: "GET",
-        path: "/v2/account/confirmation/list",
-        query: decodedSubject
-          ? {
-              type: decodedSubject,
-            }
-          : undefined,
-      }),
-    ),
-    selectJsonField("confirmations"),
-    withOperationErrors(AccountConfirmationsErrorSpec),
-  );
+  decodeAndRun(Schema.UndefinedOr(AccountConfirmationSubjectSchema), subject, (decodedSubject) =>
+    requestJson(AccountConfirmationsEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/account/confirmation/list",
+      query: decodedSubject
+        ? {
+            type: decodedSubject,
+          }
+        : undefined,
+    }),
+  ).pipe(selectJsonField("confirmations"), withOperationErrors(AccountConfirmationsErrorSpec));

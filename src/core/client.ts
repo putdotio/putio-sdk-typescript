@@ -1,4 +1,4 @@
-import { Cause, Context, Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
+import { Context, Effect, Layer, ManagedRuntime, Predicate, Schema, Struct } from "effect";
 
 import {
   clearAccount,
@@ -127,8 +127,8 @@ import {
   searchFriends,
   sendFriendRequest,
 } from "../domains/friends.js";
-import { makePutioSdkConfig, makePutioSdkLiveLayer, PutioSdkConfig } from "./http.js";
-import type { PutioSdkConfigShape, PutioSdkContext } from "./http.js";
+import { normalizePutioSdkOptions, PutioSdkConfig, putioSdkLiveLayer } from "./http.js";
+import type { PutioSdkOptions, PutioSdkContext } from "./http.js";
 import {
   buildOAuthAppIconUrl,
   buildOAuthAuthorizeUrl,
@@ -218,77 +218,47 @@ import { listTunnelRoutes } from "../domains/tunnel.js";
 import { cancelZip, createZip, getZip, listZips } from "../domains/zips.js";
 import { mapConfigurationError } from "./errors.js";
 
-type PutioSdkPromiseRuntime = ManagedRuntime.ManagedRuntime<PutioSdkContext, never>;
-type PutioSdkPromiseRuntimeConfig = Omit<PutioSdkConfigShape, "accessToken">;
+type PutioSdkPromiseRuntimeConfig = Omit<PutioSdkOptions, "accessToken">;
 
 interface PutioSdkPromiseState {
   accessToken: string | undefined;
+  disposed: boolean;
+  runtime: ManagedRuntime.ManagedRuntime<PutioSdkContext, never> | undefined;
   readonly runtimeConfig: PutioSdkPromiseRuntimeConfig;
 }
 
-const promiseClientRuntimeCache = new WeakMap<PutioSdkPromiseState, PutioSdkPromiseRuntime>();
-const disposedPromiseClientStates = new WeakSet<PutioSdkPromiseState>();
-
-const getPromiseClientRuntime = (state: PutioSdkPromiseState): PutioSdkPromiseRuntime => {
-  if (disposedPromiseClientStates.has(state)) {
+const getPromiseClientRuntime = (state: PutioSdkPromiseState) => {
+  if (state.disposed) {
     throw mapConfigurationError(
       "This Promise client has been disposed and can no longer execute SDK effects",
     );
   }
 
-  const cachedRuntime = promiseClientRuntimeCache.get(state);
+  state.runtime ??= ManagedRuntime.make(putioSdkLiveLayer(state.runtimeConfig));
 
-  if (cachedRuntime) {
-    return cachedRuntime;
-  }
-
-  const runtime = ManagedRuntime.make(makePutioSdkLiveLayer(state.runtimeConfig));
-  promiseClientRuntimeCache.set(state, runtime);
-  return runtime;
+  return state.runtime;
 };
 
 const disposePromiseClientRuntime = async (state: PutioSdkPromiseState): Promise<void> => {
-  disposedPromiseClientStates.add(state);
-
-  const runtime = promiseClientRuntimeCache.get(state);
-  promiseClientRuntimeCache.delete(state);
-
-  if (!runtime) {
-    return;
-  }
-
-  await runtime.dispose();
+  const { runtime } = state;
+  state.disposed = true;
+  state.runtime = undefined;
+  await runtime?.dispose();
 };
-
-const rejectWithSdkFailure = <A, E>(exit: Exit.Exit<A, E>): Promise<A> =>
-  Exit.match(exit, {
-    onSuccess: (value) => Promise.resolve(value),
-    onFailure: (cause) => {
-      const failure = cause.reasons.find(Cause.isFailReason);
-
-      if (failure) {
-        return Promise.reject(failure.error);
-      }
-
-      return Promise.reject(Cause.squash(cause));
-    },
-  });
 
 const provideSdk = async <A, E>(
   state: PutioSdkPromiseState,
   effect: Effect.Effect<A, E, PutioSdkContext>,
-) => {
-  const operationConfig = {
-    ...state.runtimeConfig,
-    accessToken: state.accessToken,
-  };
-  const operation = Effect.provideService(effect, PutioSdkConfig, operationConfig);
-
-  return rejectWithSdkFailure(await getPromiseClientRuntime(state).runPromiseExit(operation));
-};
+): Promise<A> =>
+  getPromiseClientRuntime(state).runPromise(
+    Effect.provideService(effect, PutioSdkConfig, {
+      ...state.runtimeConfig,
+      accessToken: state.accessToken,
+    }),
+  );
 
 const snapshotUrl = (value: string | URL | undefined): string | URL | undefined =>
-  typeof value === "string" || value === undefined ? value : new URL(value.href);
+  Predicate.isString(value) || value === undefined ? value : new URL(value.href);
 
 const snapshotHeaders = (value: HeadersInit | undefined): HeadersInit | undefined =>
   value === undefined ? undefined : [...new Headers(value)];
@@ -299,25 +269,16 @@ type PromiseOperation<T> = T extends (...args: infer Args) => infer Result
     : T
   : never;
 
-type OperationBoundary = "input-free" | "pure" | "validated";
-type Operation = (...args: never[]) => unknown;
-const operationEntryMarker = Symbol("PutioSdkOperationEntry");
-interface OperationEntry<T extends Operation> {
-  readonly [operationEntryMarker]: true;
-  readonly boundary: OperationBoundary;
-  readonly run: T;
+type Operation = (...args: never[]) => void;
+
+type SdkEffectOperation = (...args: never[]) => Effect.Effect<unknown, unknown, PutioSdkContext>;
+
+class OperationEntry<T extends Operation> {
+  constructor(
+    readonly run: T,
+    readonly toPromise: (state: PutioSdkPromiseState) => (...args: Parameters<T>) => void,
+  ) {}
 }
-
-type EffectOperation<T extends Operation> =
-  ReturnType<T> extends Effect.Effect<infer _Success, infer _Error, infer _Requirements>
-    ? T
-    : never;
-
-type InputFreeEffectOperation<T extends Operation> =
-  Parameters<T> extends [] ? EffectOperation<T> : never;
-
-type ValidatedEffectOperation<T extends Operation> =
-  Parameters<T> extends [] ? never : EffectOperation<T>;
 
 type EffectReturnMember<T> =
   T extends Effect.Effect<infer _Success, infer _Error, infer _Requirements> ? T : never;
@@ -326,25 +287,24 @@ type PureOperation<T extends Operation> = [EffectReturnMember<ReturnType<T>>] ex
   ? T
   : never;
 
-const operationAtBoundary = <T extends Operation>(
-  run: T,
-  boundary: OperationBoundary,
-): OperationEntry<T> => {
-  const entry = { boundary, run };
-  Object.defineProperty(entry, operationEntryMarker, { value: true });
-  return Object.freeze(entry) as OperationEntry<T>;
-};
+const effect = <T extends SdkEffectOperation>(operation: T): OperationEntry<T> =>
+  new OperationEntry(
+    operation,
+    (state) =>
+      (...args: Parameters<T>) =>
+        provideSdk(state, operation(...args)),
+  );
 
-const inputFree = <T extends Operation>(
-  operation: InputFreeEffectOperation<T>,
-): OperationEntry<T> => operationAtBoundary(operation, "input-free");
+const pure = <T extends Operation>(operation: T & PureOperation<T>): OperationEntry<T> =>
+  new OperationEntry(operation, () => operation);
 
-const pure = <T extends Operation>(operation: PureOperation<T>): OperationEntry<T> =>
-  operationAtBoundary(operation, "pure");
+interface OperationNamespace {
+  readonly [key: string]: OperationNamespace | OperationEntry<Operation>;
+}
 
-const validated = <T extends Operation>(
-  operation: ValidatedEffectOperation<T>,
-): OperationEntry<T> => operationAtBoundary(operation, "validated");
+interface ClientNamespace {
+  readonly [key: string]: ClientNamespace | Operation;
+}
 
 type EffectOperationTree<T> =
   T extends OperationEntry<infer TOperation>
@@ -360,350 +320,273 @@ type PromiseOperationTree<T> =
       ? { [Key in keyof T]: PromiseOperationTree<T[Key]> }
       : never;
 
-const isOperationEntry = (value: unknown): value is OperationEntry<Operation> =>
-  typeof value === "object" &&
-  value !== null &&
-  Object.getPrototypeOf(value) === Object.prototype &&
-  Object.isFrozen(value) &&
-  Object.hasOwn(value, operationEntryMarker) &&
-  value[operationEntryMarker] === true &&
-  Object.hasOwn(value, "boundary") &&
-  Object.hasOwn(value, "run") &&
-  Reflect.ownKeys(value).length === 3 &&
-  (value.boundary === "input-free" ||
-    value.boundary === "pure" ||
-    value.boundary === "validated") &&
-  typeof value.run === "function";
-
-const runClassifiedOperation = (
-  entry: OperationEntry<Operation>,
-  args: ReadonlyArray<unknown>,
-): unknown => {
-  const result: unknown = Reflect.apply(entry.run, undefined, args);
-
-  if (entry.boundary === "pure") {
-    if (Effect.isEffect(result)) {
-      throw new TypeError("Pure SDK operation returned an Effect");
-    }
-
-    return result;
-  }
-
-  if (!Effect.isEffect(result)) {
-    throw new TypeError(`${entry.boundary} SDK operation did not return an Effect`);
-  }
-
-  return result;
-};
-
-const cloneOperationTree = <T extends object>(tree: T): EffectOperationTree<T> =>
+const mapOperationTree = (
+  tree: OperationNamespace,
+  toOperation: (entry: OperationEntry<Operation>) => Operation,
+): ClientNamespace =>
   Object.fromEntries(
     Object.entries(tree).map(([key, value]) => [
       key,
-      isOperationEntry(value) ? value.run : cloneOperationTree(value as object),
+      value instanceof OperationEntry ? toOperation(value) : mapOperationTree(value, toOperation),
     ]),
-  ) as EffectOperationTree<T>;
-
-const runPromiseOperation = (
-  entry: OperationEntry<Operation>,
-  state: PutioSdkPromiseState,
-  args: ReadonlyArray<unknown>,
-): unknown => {
-  const result = runClassifiedOperation(entry, args);
-
-  return entry.boundary === "pure"
-    ? result
-    : provideSdk(state, result as Effect.Effect<unknown, unknown, PutioSdkContext>);
-};
-
-const makePromiseOperationTree = <T extends object>(
-  tree: T,
-  state: PutioSdkPromiseState,
-): PromiseOperationTree<T> =>
-  Object.fromEntries(
-    Object.entries(tree).map(([key, value]) => [
-      key,
-      isOperationEntry(value)
-        ? (...args: ReadonlyArray<unknown>) => runPromiseOperation(value, state, args)
-        : makePromiseOperationTree(value as object, state),
-    ]),
-  ) as PromiseOperationTree<T>;
-
-const assertClassifiedOperationTree = (tree: object, parentPath = ""): void => {
-  const entries = Object.entries(tree);
-
-  if (Object.getPrototypeOf(tree) !== Object.prototype || entries.length === 0) {
-    throw new TypeError(
-      `SDK operation namespace ${parentPath || "<root>"} is not a non-empty plain object`,
-    );
-  }
-
-  for (const [key, value] of entries) {
-    const path = parentPath ? `${parentPath}.${key}` : key;
-
-    if (isOperationEntry(value)) {
-      continue;
-    }
-
-    if (typeof value === "object" && value !== null) {
-      assertClassifiedOperationTree(value as object, path);
-    } else {
-      throw new TypeError(`SDK operation ${path} has no request-boundary classification`);
-    }
-  }
-};
+  );
 
 const sharedOperationTree = {
   account: {
     appSpecificPasswords: {
-      create: validated(createAppSpecificPassword),
-      delete: validated(deleteAppSpecificPassword),
-      deleteAll: inputFree(deleteAllAppSpecificPasswords),
-      list: inputFree(listAppSpecificPasswords),
+      create: effect(createAppSpecificPassword),
+      delete: effect(deleteAppSpecificPassword),
+      deleteAll: effect(deleteAllAppSpecificPasswords),
+      list: effect(listAppSpecificPasswords),
     },
-    clear: validated(clearAccount),
-    destroy: validated(destroyAccount),
-    getInfo: validated(getAccountInfo),
-    getSettings: inputFree(getAccountSettings),
-    listSubtitleLanguages: inputFree(listAccountSubtitleLanguages),
-    listConfirmations: validated(listAccountConfirmations),
-    saveSettings: validated(saveAccountSettings),
+    clear: effect(clearAccount),
+    destroy: effect(destroyAccount),
+    getInfo: effect(getAccountInfo),
+    getSettings: effect(getAccountSettings),
+    listSubtitleLanguages: effect(listAccountSubtitleLanguages),
+    listConfirmations: effect(listAccountConfirmations),
+    saveSettings: effect(saveAccountSettings),
   },
   auth: {
     buildLoginUrl: pure(buildAuthLoginUrl),
-    checkCodeMatch: validated(checkCodeMatch),
-    clients: inputFree(clients),
-    exchangeAuthorizationCode: validated(exchangeOAuthAuthorizationCode),
-    exists: validated(exists),
-    forgotPassword: validated(forgotPassword),
-    getCode: validated(getCode),
-    getFamilyInvite: validated(getFamilyInvite),
-    getFriendInvite: validated(getFriendInvite),
-    getGiftCard: validated(getGiftCard),
-    getVoucher: validated(getVoucher),
-    grants: inputFree(grants),
-    linkDevice: validated(linkDevice),
-    login: validated(login),
-    logout: inputFree(logout),
-    register: validated(register),
-    resetPassword: validated(resetPassword),
-    revokeAllClients: inputFree(revokeAllClients),
-    revokeApp: validated(revokeApp),
-    revokeClient: validated(revokeClient),
+    checkCodeMatch: effect(checkCodeMatch),
+    clients: effect(clients),
+    exchangeAuthorizationCode: effect(exchangeOAuthAuthorizationCode),
+    exists: effect(exists),
+    forgotPassword: effect(forgotPassword),
+    getCode: effect(getCode),
+    getFamilyInvite: effect(getFamilyInvite),
+    getFriendInvite: effect(getFriendInvite),
+    getGiftCard: effect(getGiftCard),
+    getVoucher: effect(getVoucher),
+    grants: effect(grants),
+    linkDevice: effect(linkDevice),
+    login: effect(login),
+    logout: effect(logout),
+    register: effect(register),
+    resetPassword: effect(resetPassword),
+    revokeAllClients: effect(revokeAllClients),
+    revokeApp: effect(revokeApp),
+    revokeClient: effect(revokeClient),
     twoFactor: {
-      generateTOTP: inputFree(generateTOTP),
-      getRecoveryCodes: inputFree(getRecoveryCodes),
-      regenerateRecoveryCodes: inputFree(regenerateRecoveryCodes),
-      verifyTOTP: validated(verifyTOTP),
+      generateTOTP: effect(generateTOTP),
+      getRecoveryCodes: effect(getRecoveryCodes),
+      regenerateRecoveryCodes: effect(regenerateRecoveryCodes),
+      verifyTOTP: effect(verifyTOTP),
     },
-    validateToken: validated(validateToken),
+    validateToken: effect(validateToken),
   },
   config: {
-    deleteKey: validated(deleteConfigKey),
-    getKey: validated(getConfigKey),
-    getKeyWith: validated(getConfigKeyWith),
-    read: inputFree(readConfig),
-    readWith: validated(readConfigWith),
-    setKey: validated(setConfigKey),
-    write: validated(writeConfig),
+    deleteKey: effect(deleteConfigKey),
+    getKey: effect(getConfigKey),
+    getKeyWith: effect(getConfigKeyWith),
+    read: effect(readConfig),
+    readWith: effect(readConfigWith),
+    setKey: effect(setConfigKey),
+    write: effect(writeConfig),
   },
   downloadLinks: {
-    create: validated(createDownloadLinks),
-    get: validated(getDownloadLinks),
+    create: effect(createDownloadLinks),
+    get: effect(getDownloadLinks),
   },
   events: {
-    clear: inputFree(clearEvents),
-    delete: validated(deleteEvent),
-    getTorrent: validated(getEventTorrent),
-    list: validated(listEvents),
+    clear: effect(clearEvents),
+    delete: effect(deleteEvent),
+    getTorrent: effect(getEventTorrent),
+    list: effect(listEvents),
   },
   family: {
-    createInvite: inputFree(createFamilyInvite),
-    join: validated(joinFamily),
-    listInvites: inputFree(listFamilyInvites),
-    listMembers: inputFree(listFamilyMembers),
-    removeMember: validated(removeFamilyMember),
+    createInvite: effect(createFamilyInvite),
+    join: effect(joinFamily),
+    listInvites: effect(listFamilyInvites),
+    listMembers: effect(listFamilyMembers),
+    removeMember: effect(removeFamilyMember),
   },
   ifttt: {
-    getStatus: inputFree(getIftttStatus),
-    sendEvent: validated(sendIftttEvent),
+    getStatus: effect(getIftttStatus),
+    sendEvent: effect(sendIftttEvent),
   },
   podcast: {
-    getLinks: validated(getPodcastLinks),
+    getLinks: effect(getPodcastLinks),
   },
   files: {
-    canWrite: validated(canWriteFile),
-    continue: validated(continueFiles),
-    continueSearch: validated(continueSearch),
-    copy: validated(copyFile),
-    convertToMp4: validated(convertFileToMp4),
-    convertManyToMp4: validated(convertFilesToMp4),
-    convertSelectionToMp4: validated(convertFileSelectionToMp4),
-    createUploadRequest: validated(createFileUploadRequest),
-    createFolder: validated(createFolder),
-    deleteExtraction: validated(deleteFileExtraction),
-    deleteMp4: validated(deleteFileMp4),
-    deleteSelection: validated(deleteFileSelection),
-    delete: validated(deleteFiles),
-    extract: validated(extractFiles),
-    findNext: validated(findNextFile),
-    findNextVideo: validated(findNextVideo),
-    getApiContentUrl: validated(getApiContentUrl),
-    getApiDownloadUrl: validated(getApiDownloadUrl),
-    getApiMp4DownloadUrl: validated(getApiMp4DownloadUrl),
-    get: validated(getFile),
-    getChild: validated(getFileChild),
-    getDownloadUrl: validated(getDownloadUrl),
-    getHlsMasterPlaylist: validated(getHlsMasterPlaylist),
-    getHlsStreamUrl: validated(getHlsStreamUrl),
-    getXspfPlaylistUrl: validated(getXspfPlaylistUrl),
-    getMp4Status: validated(getMp4Status),
-    getStartFrom: validated(getStartFrom),
-    list: validated(queryFiles),
-    listActiveConversions: inputFree(listActiveMp4Conversions),
-    listExtractions: inputFree(listFileExtractions),
-    listSubtitles: validated(listFileSubtitles),
-    move: validated(moveFiles),
-    moveSelection: validated(moveFileSelection),
-    putMp4ToMyFiles: validated(putMp4ToMyFiles),
-    rename: validated(renameFile),
-    resetSortSettings: inputFree(resetFileSortSettings),
-    resetStartFrom: validated(resetStartFrom),
-    search: validated(searchFiles),
-    setSort: validated(setFileSort),
-    setWatchStatus: validated(setFilesWatchStatus),
-    setStartFrom: validated(setStartFrom),
-    touch: validated(touchFiles),
-    upload: validated(uploadFile),
+    canWrite: effect(canWriteFile),
+    continue: effect(continueFiles),
+    continueSearch: effect(continueSearch),
+    copy: effect(copyFile),
+    convertToMp4: effect(convertFileToMp4),
+    convertManyToMp4: effect(convertFilesToMp4),
+    convertSelectionToMp4: effect(convertFileSelectionToMp4),
+    createUploadRequest: effect(createFileUploadRequest),
+    createFolder: effect(createFolder),
+    deleteExtraction: effect(deleteFileExtraction),
+    deleteMp4: effect(deleteFileMp4),
+    deleteSelection: effect(deleteFileSelection),
+    delete: effect(deleteFiles),
+    extract: effect(extractFiles),
+    findNext: effect(findNextFile),
+    findNextVideo: effect(findNextVideo),
+    getApiContentUrl: effect(getApiContentUrl),
+    getApiDownloadUrl: effect(getApiDownloadUrl),
+    getApiMp4DownloadUrl: effect(getApiMp4DownloadUrl),
+    get: effect(getFile),
+    getChild: effect(getFileChild),
+    getDownloadUrl: effect(getDownloadUrl),
+    getHlsMasterPlaylist: effect(getHlsMasterPlaylist),
+    getHlsStreamUrl: effect(getHlsStreamUrl),
+    getXspfPlaylistUrl: effect(getXspfPlaylistUrl),
+    getMp4Status: effect(getMp4Status),
+    getStartFrom: effect(getStartFrom),
+    list: effect(queryFiles),
+    listActiveConversions: effect(listActiveMp4Conversions),
+    listExtractions: effect(listFileExtractions),
+    listSubtitles: effect(listFileSubtitles),
+    move: effect(moveFiles),
+    moveSelection: effect(moveFileSelection),
+    putMp4ToMyFiles: effect(putMp4ToMyFiles),
+    rename: effect(renameFile),
+    resetSortSettings: effect(resetFileSortSettings),
+    resetStartFrom: effect(resetStartFrom),
+    search: effect(searchFiles),
+    setSort: effect(setFileSort),
+    setWatchStatus: effect(setFilesWatchStatus),
+    setStartFrom: effect(setStartFrom),
+    touch: effect(touchFiles),
+    upload: effect(uploadFile),
   },
   friendInvites: {
-    create: inputFree(createFriendInvite),
-    list: inputFree(listFriendInvites),
+    create: effect(createFriendInvite),
+    list: effect(listFriendInvites),
   },
   friends: {
-    approve: validated(approveFriendRequest),
-    countWaitingRequests: inputFree(countWaitingRequests),
-    deny: validated(denyFriendRequest),
-    list: inputFree(listFriends),
-    listSentRequests: inputFree(listSentRequests),
-    listWaitingRequests: inputFree(listWaitingRequests),
-    remove: validated(removeFriend),
-    search: validated(searchFriends),
-    sendRequest: validated(sendFriendRequest),
-    sharedFolder: validated(getFriendSharedFolder),
+    approve: effect(approveFriendRequest),
+    countWaitingRequests: effect(countWaitingRequests),
+    deny: effect(denyFriendRequest),
+    list: effect(listFriends),
+    listSentRequests: effect(listSentRequests),
+    listWaitingRequests: effect(listWaitingRequests),
+    remove: effect(removeFriend),
+    search: effect(searchFriends),
+    sendRequest: effect(sendFriendRequest),
+    sharedFolder: effect(getFriendSharedFolder),
   },
   oauth: {
     buildAuthorizeUrl: pure(buildOAuthAuthorizeUrl),
     buildIconUrl: pure(buildOAuthAppIconUrl),
-    create: validated(createOAuthApp),
-    delete: validated(deleteOAuthApp),
-    get: validated(getOAuthApp),
-    getPopularApps: inputFree(getPopularOAuthApps),
-    query: inputFree(queryOAuthApps),
-    regenerateToken: validated(regenerateOAuthAppToken),
-    setIcon: validated(setOAuthAppIcon),
-    update: validated(updateOAuthApp),
+    create: effect(createOAuthApp),
+    delete: effect(deleteOAuthApp),
+    get: effect(getOAuthApp),
+    getPopularApps: effect(getPopularOAuthApps),
+    query: effect(queryOAuthApps),
+    regenerateToken: effect(regenerateOAuthAppToken),
+    setIcon: effect(setOAuthAppIcon),
+    update: effect(updateOAuthApp),
   },
   payment: {
     changePlan: {
       classifyResponse: pure(classifyPaymentChangePlanResponse),
-      preview: validated(previewPaymentChangePlan),
-      submit: validated(submitPaymentChangePlan),
+      preview: effect(previewPaymentChangePlan),
+      submit: effect(submitPaymentChangePlan),
     },
-    confirmFastspringOrder: validated(confirmFastspringOrder),
-    getInfo: inputFree(getPaymentInfo),
-    listHistory: validated(listPaymentHistory),
-    listInvites: inputFree(listPaymentInvites),
-    listOptions: inputFree(listPaymentOptions),
-    listPlans: inputFree(listPaymentPlans),
+    confirmFastspringOrder: effect(confirmFastspringOrder),
+    getInfo: effect(getPaymentInfo),
+    listHistory: effect(listPaymentHistory),
+    listInvites: effect(listPaymentInvites),
+    listOptions: effect(listPaymentOptions),
+    listPlans: effect(listPaymentPlans),
     methods: {
-      addPaddleWaitingPayment: validated(createPaddleWaitingPayment),
-      createOpenNodeCharge: validated(createOpenNodeCharge),
-      createPaddleBillingUpdatePaymentMethodTransaction: validated(
+      addPaddleWaitingPayment: effect(createPaddleWaitingPayment),
+      createOpenNodeCharge: effect(createOpenNodeCharge),
+      createPaddleBillingUpdatePaymentMethodTransaction: effect(
         createPaddleBillingUpdatePaymentMethodTransaction,
       ),
-      getPaddleBillingInvoiceUrl: validated(getPaddleBillingInvoiceUrl),
+      getPaddleBillingInvoiceUrl: effect(getPaddleBillingInvoiceUrl),
     },
-    report: validated(reportPayments),
-    stopSubscription: inputFree(stopPaymentSubscription),
+    report: effect(reportPayments),
+    stopSubscription: effect(stopPaymentSubscription),
     voucher: {
-      getInfo: validated(getPaymentVoucherInfo),
-      redeem: validated(redeemPaymentVoucher),
+      getInfo: effect(getPaymentVoucherInfo),
+      redeem: effect(redeemPaymentVoucher),
     },
   },
   rateLimits: {
-    removeBan: validated(removeRateLimitBan),
+    removeBan: effect(removeRateLimitBan),
   },
   rss: {
-    clearLogs: validated(clearRssFeedLogs),
-    create: validated(createRssFeed),
-    delete: validated(deleteRssFeed),
-    get: validated(getRssFeed),
-    list: inputFree(listRssFeeds),
-    listItems: validated(listRssFeedItems),
-    pause: validated(pauseRssFeed),
-    resume: validated(resumeRssFeed),
-    retryAll: validated(retryAllRssFeedItems),
-    retryItem: validated(retryRssFeedItem),
-    update: validated(updateRssFeed),
+    clearLogs: effect(clearRssFeedLogs),
+    create: effect(createRssFeed),
+    delete: effect(deleteRssFeed),
+    get: effect(getRssFeed),
+    list: effect(listRssFeeds),
+    listItems: effect(listRssFeedItems),
+    pause: effect(pauseRssFeed),
+    resume: effect(resumeRssFeed),
+    retryAll: effect(retryAllRssFeedItems),
+    retryItem: effect(retryRssFeedItem),
+    update: effect(updateRssFeed),
   },
   sharing: {
-    clone: validated(cloneSharedFiles),
-    getCloneInfo: validated(getSharingCloneInfo),
-    getSharedWith: validated(getSharedWith),
-    listSharedFiles: inputFree(listSharedFiles),
+    clone: effect(cloneSharedFiles),
+    getCloneInfo: effect(getSharingCloneInfo),
+    getSharedWith: effect(getSharedWith),
+    listSharedFiles: effect(listSharedFiles),
     publicAccess: {
-      continueFiles: validated(continuePublicShareFiles),
-      get: inputFree(getPublicShare),
-      getFileUrl: validated(getPublicShareFileUrl),
-      listFiles: validated(listPublicShareFiles),
+      continueFiles: effect(continuePublicShareFiles),
+      get: effect(getPublicShare),
+      getFileUrl: effect(getPublicShareFileUrl),
+      listFiles: effect(listPublicShareFiles),
     },
     publicShares: {
-      create: validated(createPublicShare),
-      delete: validated(deletePublicShare),
-      list: inputFree(listPublicShares),
+      create: effect(createPublicShare),
+      delete: effect(deletePublicShare),
+      list: effect(listPublicShares),
     },
-    shareFiles: validated(shareFiles),
-    unshare: validated(unshareFile),
+    shareFiles: effect(shareFiles),
+    unshare: effect(unshareFile),
   },
   tunnel: {
-    listRoutes: inputFree(listTunnelRoutes),
+    listRoutes: effect(listTunnelRoutes),
   },
   trash: {
-    continue: validated(continueTrash),
-    delete: validated(deleteTrash),
-    empty: inputFree(emptyTrash),
-    list: validated(listTrash),
-    restore: validated(restoreTrash),
+    continue: effect(continueTrash),
+    delete: effect(deleteTrash),
+    empty: effect(emptyTrash),
+    list: effect(listTrash),
+    restore: effect(restoreTrash),
   },
   transfers: {
-    add: validated(addTransfer),
-    addMany: validated(addManyTransfers),
-    addTrackers: validated(addTransferTrackers),
-    cancel: validated(cancelTransfers),
-    clean: validated(cleanTransfers),
-    continue: validated(continueTransfers),
-    count: inputFree(countTransfers),
-    get: validated(getTransfer),
-    getTorrent: validated(getTransferTorrent),
-    info: validated(getTransferInfo),
-    list: validated(listTransfers),
-    reannounce: validated(reannounceTransfer),
-    remove: validated(removeTransfers),
-    retry: validated(retryTransfer),
-    stopRecording: validated(stopTransferRecording),
+    add: effect(addTransfer),
+    addMany: effect(addManyTransfers),
+    addTrackers: effect(addTransferTrackers),
+    cancel: effect(cancelTransfers),
+    clean: effect(cleanTransfers),
+    continue: effect(continueTransfers),
+    count: effect(countTransfers),
+    get: effect(getTransfer),
+    getTorrent: effect(getTransferTorrent),
+    info: effect(getTransferInfo),
+    list: effect(listTransfers),
+    reannounce: effect(reannounceTransfer),
+    remove: effect(removeTransfers),
+    retry: effect(retryTransfer),
+    stopRecording: effect(stopTransferRecording),
   },
   zips: {
-    cancel: validated(cancelZip),
-    create: validated(createZip),
-    get: validated(getZip),
-    list: inputFree(listZips),
+    cancel: effect(cancelZip),
+    create: effect(createZip),
+    get: effect(getZip),
+    list: effect(listZips),
   },
-};
+} satisfies OperationNamespace;
 
-assertClassifiedOperationTree(sharedOperationTree);
+type SharedOperationTree = typeof sharedOperationTree;
 
-export const createPutioSdkEffectClient = () => cloneOperationTree(sharedOperationTree);
+export const createPutioSdkEffectClient = (): EffectOperationTree<SharedOperationTree> =>
+  // SAFETY: mapOperationTree keeps every key of sharedOperationTree and replaces each entry with its own `run`.
+  mapOperationTree(
+    sharedOperationTree,
+    (entry) => entry.run,
+  ) as EffectOperationTree<SharedOperationTree>;
 
 export type PutioSdkEffectClient = ReturnType<typeof createPutioSdkEffectClient>;
 
@@ -712,26 +595,24 @@ export class PutioSdk extends Context.Service<PutioSdk, PutioSdkEffectClient>()(
 export const makePutioSdkEffectClientLayer = () =>
   Layer.succeed(PutioSdk, createPutioSdkEffectClient());
 
-export const makePutioSdkLiveClientLayer = (config: PutioSdkConfigShape) =>
-  Layer.mergeAll(makePutioSdkEffectClientLayer(), makePutioSdkLiveLayer(config));
+export const makePutioSdkLiveClientLayer = (config: PutioSdkOptions) =>
+  Layer.mergeAll(makePutioSdkEffectClientLayer(), putioSdkLiveLayer(config));
 
-export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape = {}) => {
-  const normalizedConfig = makePutioSdkConfig({
-    ...initialConfig,
-    baseUrl: snapshotUrl(initialConfig.baseUrl),
-    headers: snapshotHeaders(initialConfig.headers),
-    uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
-    webAppUrl: snapshotUrl(initialConfig.webAppUrl),
-  });
-  const runtimeConfig: PutioSdkPromiseRuntimeConfig = {
-    baseUrl: normalizedConfig.baseUrl,
-    headers: normalizedConfig.headers,
-    uploadBaseUrl: normalizedConfig.uploadBaseUrl,
-    webAppUrl: normalizedConfig.webAppUrl,
-  };
+export const createPutioSdkPromiseClient = (initialConfig: PutioSdkOptions = {}) => {
   const config: PutioSdkPromiseState = {
     accessToken: initialConfig.accessToken,
-    runtimeConfig,
+    disposed: false,
+    runtime: undefined,
+    runtimeConfig: Struct.omit(
+      normalizePutioSdkOptions({
+        ...initialConfig,
+        baseUrl: snapshotUrl(initialConfig.baseUrl),
+        headers: snapshotHeaders(initialConfig.headers),
+        uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
+        webAppUrl: snapshotUrl(initialConfig.webAppUrl),
+      }),
+      ["accessToken"],
+    ),
   };
 
   function getInfo(query: {
@@ -816,7 +697,11 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
     return provideSdk(config, getFileChild(input));
   }
 
-  const operations = makePromiseOperationTree(sharedOperationTree, config);
+  const operations =
+    // SAFETY: mapOperationTree keeps every key of sharedOperationTree and replaces each entry with the Promise adapter built for its own `run`.
+    mapOperationTree(sharedOperationTree, (entry) =>
+      entry.toPromise(config),
+    ) as PromiseOperationTree<SharedOperationTree>;
 
   return {
     dispose: () => disposePromiseClientRuntime(config),

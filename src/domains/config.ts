@@ -1,5 +1,6 @@
-import { Effect, Schema, SchemaIssue, SchemaParser } from "effect";
-import { mapDecodeErrorToValidationError, type PutioSdkError } from "../core/errors.js";
+import { Effect, Predicate, Schema, SchemaIssue, SchemaParser } from "effect";
+import { decodeAndRun } from "../core/validation.js";
+import { type PutioSdkError } from "../core/errors.js";
 import {
   OkResponseSchema,
   encodePathSegment,
@@ -7,184 +8,191 @@ import {
   selectJsonField,
   type PutioSdkContext,
 } from "../core/http.js";
+
 export type PutioJsonPrimitive = string | number | boolean | null;
+
 export type PutioJsonValue =
   | PutioJsonPrimitive
   | {
       readonly [key: string]: PutioJsonValue;
     }
   | ReadonlyArray<PutioJsonValue>;
+
 export type PutioJsonObject = {
   readonly [key: string]: PutioJsonValue;
 };
+
 const nativeObjectConstructorSource = Function.prototype.toString.call(Object);
 const nativeArrayConstructorSource = Function.prototype.toString.call(Array);
-const hasMatchingNativeConstructor = (prototype: object, constructorSource: string): boolean => {
+
+const isNativePrototype = (prototype: unknown, constructorSource: string): prototype is object => {
   const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor")?.value;
-  const constructorPrototype =
-    typeof constructor === "function"
-      ? Object.getOwnPropertyDescriptor(constructor, "prototype")?.value
-      : undefined;
+
   return (
-    typeof constructor === "function" &&
-    constructorPrototype === prototype &&
+    Predicate.isFunction(constructor) &&
+    Object.getOwnPropertyDescriptor(constructor, "prototype")?.value === prototype &&
     Function.prototype.toString.call(constructor) === constructorSource
   );
 };
-const isPlainRecord = (value: object): value is Record<string, unknown> => {
+
+const isPlainRecord = (value: unknown): value is object => {
   try {
+    if (Array.isArray(value)) {
+      return false;
+    }
+
     const prototype = Object.getPrototypeOf(value);
+
     if (prototype === null) {
       return true;
     }
+
     if (Object.getPrototypeOf(prototype) !== null) {
       return false;
     }
-    return hasMatchingNativeConstructor(prototype, nativeObjectConstructorSource);
+
+    return isNativePrototype(prototype, nativeObjectConstructorSource);
   } catch {
     return false;
   }
 };
-const isPlainArray = (value: ReadonlyArray<unknown>): boolean => {
+
+const isPlainArray = (value: unknown): value is ReadonlyArray<unknown> => {
   try {
+    if (!Array.isArray(value)) {
+      return false;
+    }
+
     const prototype = Object.getPrototypeOf(value);
+
     return (
       prototype !== null &&
       Object.getPrototypeOf(prototype) !== null &&
-      hasMatchingNativeConstructor(prototype, nativeArrayConstructorSource)
+      isNativePrototype(prototype, nativeArrayConstructorSource)
     );
   } catch {
     return false;
   }
 };
-type JsonWalkMode = "snapshot" | "validate";
-type JsonWalkResult =
-  | { readonly _tag: "Invalid" }
-  | { readonly _tag: "Validated" }
-  | { readonly _tag: "Snapshot"; readonly value: PutioJsonValue };
-const invalidJsonWalk: JsonWalkResult = { _tag: "Invalid" };
-const validatedJsonWalk: JsonWalkResult = { _tag: "Validated" };
-const walkJsonValue = (
+
+type JsonCopies = Map<object, PutioJsonValue>;
+
+const copyOfJsonValue = (value: PutioJsonValue, copies: JsonCopies): PutioJsonValue =>
+  (Predicate.isObjectKeyword(value) ? copies.get(value) : undefined) ?? value;
+
+const isJsonValueWithin = (
   value: unknown,
-  mode: JsonWalkMode,
-  ancestors: Set<object> = new Set(),
-): JsonWalkResult => {
-  if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return mode === "snapshot" ? { _tag: "Snapshot", value } : validatedJsonWalk;
+  ancestors: Set<object>,
+  copies: JsonCopies | undefined,
+): value is PutioJsonValue => {
+  if (Predicate.isNull(value) || Predicate.isString(value) || Predicate.isBoolean(value)) {
+    return true;
   }
-  if (typeof value === "number") {
-    return Number.isFinite(value)
-      ? mode === "snapshot"
-        ? { _tag: "Snapshot", value }
-        : validatedJsonWalk
-      : invalidJsonWalk;
+
+  if (Predicate.isNumber(value)) {
+    return Number.isFinite(value);
   }
-  if (typeof value !== "object" || ancestors.has(value)) {
-    return invalidJsonWalk;
+
+  if (!Predicate.isObjectKeyword(value) || ancestors.has(value)) {
+    return false;
   }
+
   ancestors.add(value);
+
   try {
     if (Array.isArray(value)) {
       if (!isPlainArray(value)) {
-        return invalidJsonWalk;
+        return false;
       }
-      const descriptors = Object.getOwnPropertyDescriptors(value);
-      const lengthDescriptor = descriptors["length"];
-      if (
-        lengthDescriptor === undefined ||
-        !("value" in lengthDescriptor) ||
-        !Number.isSafeInteger(lengthDescriptor.value) ||
-        lengthDescriptor.value < 0
-      ) {
-        return invalidJsonWalk;
+
+      const descriptors = Object.getOwnPropertyDescriptors<object>(value);
+      const length = descriptors["length"]?.value;
+
+      if (!Number.isSafeInteger(length) || length < 0) {
+        return false;
       }
-      const output: Array<PutioJsonValue> | undefined = mode === "snapshot" ? [] : undefined;
-      for (let index = 0; index < lengthDescriptor.value; index += 1) {
+
+      const output: Array<PutioJsonValue> = [];
+
+      for (let index = 0; index < length; index += 1) {
         const descriptor = descriptors[String(index)];
-        if (descriptor === undefined || !("value" in descriptor)) {
-          return invalidJsonWalk;
+
+        if (
+          descriptor === undefined ||
+          !("value" in descriptor) ||
+          !isJsonValueWithin(descriptor.value, ancestors, copies)
+        ) {
+          return false;
         }
-        const item = walkJsonValue(descriptor.value, mode, ancestors);
-        if (item._tag === "Invalid") {
-          return item;
-        }
-        if (output === undefined) {
-          if (item._tag !== "Validated") {
-            return invalidJsonWalk;
-          }
-        } else {
-          if (item._tag !== "Snapshot") {
-            return invalidJsonWalk;
-          }
-          output.push(item.value);
+
+        if (copies !== undefined) {
+          output.push(copyOfJsonValue(descriptor.value, copies));
         }
       }
-      return output === undefined ? validatedJsonWalk : { _tag: "Snapshot", value: output };
+
+      copies?.set(value, output);
+
+      return true;
     }
+
     if (!isPlainRecord(value)) {
-      return invalidJsonWalk;
+      return false;
     }
-    const output: Record<string, PutioJsonValue> | undefined = mode === "snapshot" ? {} : undefined;
+
+    const output: Record<string, PutioJsonValue> = {};
+
     for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
       if (!descriptor.enumerable) {
         continue;
       }
-      if (!("value" in descriptor)) {
-        return invalidJsonWalk;
+
+      if (!("value" in descriptor) || !isJsonValueWithin(descriptor.value, ancestors, copies)) {
+        return false;
       }
-      const item = walkJsonValue(descriptor.value, mode, ancestors);
-      if (item._tag === "Invalid") {
-        return item;
+
+      if (copies !== undefined) {
+        Object.defineProperty(output, key, {
+          configurable: true,
+          enumerable: true,
+          value: copyOfJsonValue(descriptor.value, copies),
+          writable: true,
+        });
       }
-      if (output === undefined) {
-        if (item._tag !== "Validated") {
-          return invalidJsonWalk;
-        }
-        continue;
-      }
-      if (item._tag !== "Snapshot") {
-        return invalidJsonWalk;
-      }
-      Object.defineProperty(output, key, {
-        configurable: true,
-        enumerable: true,
-        value: item.value,
-        writable: true,
-      });
     }
-    return output === undefined ? validatedJsonWalk : { _tag: "Snapshot", value: output };
+
+    copies?.set(value, output);
+
+    return true;
   } catch {
-    return invalidJsonWalk;
+    return false;
   } finally {
     ancestors.delete(value);
   }
 };
-const snapshotJsonValue = (value: unknown): PutioJsonValue | undefined => {
-  const result = walkJsonValue(value, "snapshot");
-  return result._tag === "Snapshot" ? result.value : undefined;
-};
-const snapshotJsonObject = (value: unknown): PutioJsonObject | undefined => {
-  const snapshot = snapshotJsonValue(value);
-  return typeof snapshot === "object" && snapshot !== null && !Array.isArray(snapshot)
-    ? snapshot
-    : undefined;
-};
+
 const isJsonValue = (value: unknown): value is PutioJsonValue =>
-  walkJsonValue(value, "validate")._tag === "Validated";
+  isJsonValueWithin(value, new Set(), undefined);
+
+const isJsonObjectValue = (value: PutioJsonValue): value is PutioJsonObject =>
+  Predicate.isObjectKeyword(value) && !Array.isArray(value);
+
 const isJsonObject = (value: unknown): value is PutioJsonObject =>
-  typeof value === "object" && value !== null && isJsonValue(value) && !Array.isArray(value);
+  isJsonValue(value) && isJsonObjectValue(value);
+
 export const JsonValueSchema = Schema.declareConstructor<PutioJsonValue>()(
   [],
   () => (input, ast, options) => {
-    const snapshot = snapshotJsonValue(input);
-    return snapshot === undefined
-      ? Effect.fail(new SchemaIssue.InvalidType(ast, input, options))
-      : Effect.succeed(snapshot);
+    const copies: JsonCopies = new Map();
+
+    return isJsonValueWithin(input, new Set(), copies)
+      ? Effect.succeed(copyOfJsonValue(input, copies))
+      : Effect.fail(new SchemaIssue.InvalidType(ast, input, options));
   },
   {
     expected: "a JSON-compatible value",
   },
 );
+
 const JsonValueResponseSchema = Schema.declareConstructor<PutioJsonValue>()(
   [],
   () => (input, ast, options) =>
@@ -195,6 +203,7 @@ const JsonValueResponseSchema = Schema.declareConstructor<PutioJsonValue>()(
     expected: "a JSON-compatible value",
   },
 );
+
 const JsonObjectResponseSchema = Schema.declareConstructor<PutioJsonObject>()(
   [],
   () => (input, ast, options) =>
@@ -205,18 +214,27 @@ const JsonObjectResponseSchema = Schema.declareConstructor<PutioJsonObject>()(
     expected: "a JSON object",
   },
 );
+
 export const JsonObjectSchema = Schema.declareConstructor<PutioJsonObject>()(
   [],
   () => (input, ast, options) => {
-    const snapshot = snapshotJsonObject(input);
-    return snapshot === undefined
-      ? Effect.fail(new SchemaIssue.InvalidType(ast, input, options))
-      : Effect.succeed(snapshot);
+    const copies: JsonCopies = new Map();
+
+    if (!isJsonValueWithin(input, new Set(), copies)) {
+      return Effect.fail(new SchemaIssue.InvalidType(ast, input, options));
+    }
+
+    const copy = copyOfJsonValue(input, copies);
+
+    return isJsonObjectValue(copy)
+      ? Effect.succeed(copy)
+      : Effect.fail(new SchemaIssue.InvalidType(ast, input, options));
   },
   {
     expected: "a JSON object",
   },
 );
+
 const ConfigKeySchema = Schema.String.check(
   Schema.isMinLength(1),
   Schema.isPattern(/^(?!\.{1,2}$)/),
@@ -224,69 +242,87 @@ const ConfigKeySchema = Schema.String.check(
     expected: "a well-formed Unicode config key",
   }),
 );
+
 const ConfigSetKeyInputSchema = Schema.Struct({
   key: ConfigKeySchema,
   value: JsonValueSchema,
 });
-const getResponseEnvelopeFields = (
-  input: unknown,
-  valueField: "config" | "value",
-): { readonly status: unknown; readonly value: unknown } | undefined => {
-  if (typeof input !== "object" || input === null || !isPlainRecord(input)) {
-    return undefined;
-  }
-  try {
-    const statusDescriptor = Object.getOwnPropertyDescriptor(input, "status");
-    const valueDescriptor = Object.getOwnPropertyDescriptor(input, valueField);
-    if (
-      statusDescriptor === undefined ||
-      !("value" in statusDescriptor) ||
-      valueDescriptor === undefined ||
-      !("value" in valueDescriptor)
-    ) {
-      return undefined;
-    }
-    return {
-      status: statusDescriptor.value,
-      value: valueDescriptor.value,
-    };
-  } catch {
-    return undefined;
-  }
-};
+
+const okEnvelopeField = (
+  status: PropertyDescriptor | undefined,
+  field: PropertyDescriptor | undefined,
+): PropertyDescriptor | undefined =>
+  status !== undefined &&
+  "value" in status &&
+  status.value === "OK" &&
+  field !== undefined &&
+  "value" in field
+    ? field
+    : undefined;
+
 const makeConfigEnvelopeSchema = <A>(schema: Schema.ConstraintDecoder<A, never>) =>
   Schema.declareConstructor<{
     readonly config: A;
     readonly status: "OK";
-  }>()([schema], ([configSchema]) => (input, ast, options) => {
-    const fields = getResponseEnvelopeFields(input, "config");
-    if (fields === undefined || fields.status !== "OK") {
-      return Effect.fail(new SchemaIssue.InvalidType(ast, input, options));
-    }
-    return SchemaParser.decodeUnknownEffect(configSchema)(fields.value, options).pipe(
-      Effect.map((config) => ({ config, status: "OK" })),
-    );
-  });
+  }>()(
+    [schema],
+    ([configSchema]) =>
+      (input, ast, options) =>
+        Effect.try({
+          try: () =>
+            isPlainRecord(input)
+              ? okEnvelopeField(
+                  Object.getOwnPropertyDescriptor(input, "status"),
+                  Object.getOwnPropertyDescriptor(input, "config"),
+                )
+              : undefined,
+          catch: () => new SchemaIssue.InvalidType(ast, input, options),
+        }).pipe(
+          Effect.flatMap((field) =>
+            field === undefined
+              ? Effect.fail(new SchemaIssue.InvalidType(ast, input, options))
+              : SchemaParser.decodeUnknownEffect(configSchema)(field.value, options),
+          ),
+          Effect.map((config) => ({ config, status: "OK" })),
+        ),
+  );
+
 const makeConfigValueEnvelopeSchema = <A>(schema: Schema.ConstraintDecoder<A, never>) =>
   Schema.declareConstructor<{
     readonly status: "OK";
     readonly value: A;
-  }>()([schema], ([valueSchema]) => (input, ast, options) => {
-    const fields = getResponseEnvelopeFields(input, "value");
-    if (fields === undefined || fields.status !== "OK") {
-      return Effect.fail(new SchemaIssue.InvalidType(ast, input, options));
-    }
-    return SchemaParser.decodeUnknownEffect(valueSchema)(fields.value, options).pipe(
-      Effect.map((value) => ({ status: "OK", value })),
-    );
-  });
+  }>()(
+    [schema],
+    ([valueSchema]) =>
+      (input, ast, options) =>
+        Effect.try({
+          try: () =>
+            isPlainRecord(input)
+              ? okEnvelopeField(
+                  Object.getOwnPropertyDescriptor(input, "status"),
+                  Object.getOwnPropertyDescriptor(input, "value"),
+                )
+              : undefined,
+          catch: () => new SchemaIssue.InvalidType(ast, input, options),
+        }).pipe(
+          Effect.flatMap((field) =>
+            field === undefined
+              ? Effect.fail(new SchemaIssue.InvalidType(ast, input, options))
+              : SchemaParser.decodeUnknownEffect(valueSchema)(field.value, options),
+          ),
+          Effect.map((value) => ({ status: "OK", value })),
+        ),
+  );
+
 const ConfigEnvelopeSchema = makeConfigEnvelopeSchema(JsonObjectResponseSchema);
 const ConfigValueEnvelopeSchema = makeConfigValueEnvelopeSchema(JsonValueResponseSchema);
+
 export const readConfig = (): Effect.Effect<PutioJsonObject, PutioSdkError, PutioSdkContext> =>
   requestJson(ConfigEnvelopeSchema, {
     method: "GET",
     path: "/v2/config",
   }).pipe(selectJsonField("config"));
+
 export const readConfigWith = <A>(
   schema: Schema.ConstraintDecoder<A, never>,
 ): Effect.Effect<A, PutioSdkError, PutioSdkContext> =>
@@ -294,64 +330,58 @@ export const readConfigWith = <A>(
     method: "GET",
     path: "/v2/config",
   }).pipe(Effect.map((envelope) => envelope["config"]));
+
 export const writeConfig = (
   config: PutioJsonObject,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(JsonObjectSchema)(config).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedConfig) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "json",
-          value: {
-            config: decodedConfig,
-          },
+  decodeAndRun(JsonObjectSchema, config, (decodedConfig) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "json",
+        value: {
+          config: decodedConfig,
         },
-        method: "PUT",
-        path: "/v2/config",
-      }),
-    ),
+      },
+      method: "PUT",
+      path: "/v2/config",
+    }),
   );
+
 export const getConfigKey = (
   key: string,
 ): Effect.Effect<PutioJsonValue, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigKeySchema)(key).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedKey) =>
-      requestJson(ConfigValueEnvelopeSchema, {
-        method: "GET",
-        path: `/v2/config/${encodePathSegment(decodedKey)}`,
-      }),
-    ),
-    selectJsonField("value"),
-  );
+  decodeAndRun(ConfigKeySchema, key, (decodedKey) =>
+    requestJson(ConfigValueEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/config/${encodePathSegment(decodedKey)}`,
+    }),
+  ).pipe(selectJsonField("value"));
+
 export const getConfigKeyWith = <A>(
   key: string,
   schema: Schema.ConstraintDecoder<A, never>,
 ): Effect.Effect<A, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigKeySchema)(key).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedKey) =>
-      requestJson(
-        makeConfigValueEnvelopeSchema(JsonValueResponseSchema.pipe(Schema.decodeTo(schema))),
-        {
-          method: "GET",
-          path: `/v2/config/${encodePathSegment(decodedKey)}`,
-        },
-      ),
+  decodeAndRun(ConfigKeySchema, key, (decodedKey) =>
+    requestJson(
+      makeConfigValueEnvelopeSchema(JsonValueResponseSchema.pipe(Schema.decodeTo(schema))),
+      {
+        method: "GET",
+        path: `/v2/config/${encodePathSegment(decodedKey)}`,
+      },
     ),
-    Effect.map((envelope) => envelope["value"]),
-  );
+  ).pipe(Effect.map((envelope) => envelope["value"]));
+
 export const setConfigKey = (
   key: string,
   value: PutioJsonValue,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigSetKeyInputSchema, { onExcessProperty: "error" })({
-    key,
-    value,
-  }).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
+  decodeAndRun(
+    ConfigSetKeyInputSchema,
+    {
+      key,
+      value,
+    },
+    (decodedInput) =>
       requestJson(OkResponseSchema, {
         body: {
           type: "json",
@@ -362,17 +392,14 @@ export const setConfigKey = (
         method: "PUT",
         path: `/v2/config/${encodePathSegment(decodedInput.key)}`,
       }),
-    ),
   );
+
 export const deleteConfigKey = (
   key: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(ConfigKeySchema)(key).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedKey) =>
-      requestJson(OkResponseSchema, {
-        method: "DELETE",
-        path: `/v2/config/${encodePathSegment(decodedKey)}`,
-      }),
-    ),
+  decodeAndRun(ConfigKeySchema, key, (decodedKey) =>
+    requestJson(OkResponseSchema, {
+      method: "DELETE",
+      path: `/v2/config/${encodePathSegment(decodedKey)}`,
+    }),
   );

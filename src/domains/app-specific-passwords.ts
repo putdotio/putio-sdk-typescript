@@ -1,9 +1,9 @@
 import { Effect, Schema } from "effect";
+import { decodeAndRun } from "../core/validation.js";
 
 import {
   PutioErrorEnvelopeSchema,
   definePutioOperationErrorSpec,
-  mapDecodeErrorToValidationError,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
@@ -17,10 +17,12 @@ import {
 } from "../core/http.js";
 
 const AppSpecificPasswordIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
+
 const AppSpecificPasswordNoteSchema = Schema.Trim.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(255),
 );
+
 const MaskedIpv4AddressPattern = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}XXX$/;
 const Ipv6HextetPattern = /^[\dA-Fa-f]{1,4}$/;
 
@@ -76,20 +78,19 @@ const ListAppSpecificPasswordsEnvelopeSchema = Schema.Struct({
 });
 
 export type AppSpecificPassword = Schema.Schema.Type<typeof AppSpecificPasswordSchema>;
+
 export type CreateAppSpecificPasswordInput = Schema.Schema.Type<
   typeof CreateAppSpecificPasswordInputSchema
 >;
+
 export type CreateAppSpecificPasswordResult = AppSpecificPassword & {
   readonly password: string;
 };
 
-const RestrictedAppSpecificPasswordError: {
-  readonly errorType: "invalid_scope";
-  readonly statusCode: 401;
-} = {
+const RestrictedAppSpecificPasswordError = {
   errorType: "invalid_scope",
   statusCode: 401,
-};
+} as const;
 
 const TooManyAppSpecificPasswordsErrorBodySchema = PutioErrorEnvelopeSchema.pipe(
   Schema.fieldsAssign({
@@ -135,12 +136,15 @@ export const DeleteAllAppSpecificPasswordsErrorSpec = definePutioOperationErrorS
 export type CreateAppSpecificPasswordError = PutioOperationFailure<
   typeof CreateAppSpecificPasswordErrorSpec
 >;
+
 export type ListAppSpecificPasswordsError = PutioOperationFailure<
   typeof ListAppSpecificPasswordsErrorSpec
 >;
+
 export type DeleteAppSpecificPasswordError = PutioOperationFailure<
   typeof DeleteAppSpecificPasswordErrorSpec
 >;
+
 export type DeleteAllAppSpecificPasswordsError = PutioOperationFailure<
   typeof DeleteAllAppSpecificPasswordsErrorSpec
 >;
@@ -152,20 +156,16 @@ export const createAppSpecificPassword = (
   CreateAppSpecificPasswordError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(CreateAppSpecificPasswordInputSchema, {
-    onExcessProperty: "error",
-  })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(CreateAppSpecificPasswordEnvelopeSchema, {
-        body: {
-          type: "form",
-          value: decodedInput,
-        },
-        method: "POST",
-        path: "/v2/app_specific_password/create",
-      }),
-    ),
+  decodeAndRun(CreateAppSpecificPasswordInputSchema, input, (decodedInput) =>
+    requestJson(CreateAppSpecificPasswordEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: decodedInput,
+      },
+      method: "POST",
+      path: "/v2/app_specific_password/create",
+    }),
+  ).pipe(
     selectJsonFields("created_at", "id", "ip_address", "last_used_at", "note", "password"),
     withOperationErrors(CreateAppSpecificPasswordErrorSpec),
   );
@@ -183,17 +183,12 @@ export const listAppSpecificPasswords = (): Effect.Effect<
 export const deleteAppSpecificPassword = (
   id: number,
 ): Effect.Effect<void, DeleteAppSpecificPasswordError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(AppSpecificPasswordIdSchema)(id).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedId) =>
-      requestJson(OkResponseSchema, {
-        method: "POST",
-        path: `/v2/app_specific_password/${encodePathSegment(decodedId)}/delete`,
-      }),
-    ),
-    Effect.asVoid,
-    withOperationErrors(DeleteAppSpecificPasswordErrorSpec),
-  );
+  decodeAndRun(AppSpecificPasswordIdSchema, id, (decodedId) =>
+    requestJson(OkResponseSchema, {
+      method: "POST",
+      path: `/v2/app_specific_password/${encodePathSegment(decodedId)}/delete`,
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(DeleteAppSpecificPasswordErrorSpec));
 
 export const deleteAllAppSpecificPasswords = (): Effect.Effect<
   void,

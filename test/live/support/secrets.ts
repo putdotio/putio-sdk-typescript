@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 
 type RequiredSecretKey =
   | "PUTIO_CLIENT_ID_FIRST_PARTY"
-  | "PUTIO_CLIENT_ID_THIRD_PARTY"
   | "PUTIO_CLIENT_SECRET_FIRST_PARTY"
   | "PUTIO_TOKEN_FIRST_PARTY"
   | "PUTIO_TOKEN_THIRD_PARTY"
@@ -11,10 +10,8 @@ type RequiredSecretKey =
   | "PUTIO_TEST_USERNAME";
 
 type OptionalSecretKey =
-  | "PUTIO_AUTH_TOKEN"
   | "PUTIO_CLIENT_ID"
   | "PUTIO_CLIENT_ID_THIRD_PARTY"
-  | "PUTIO_OAUTH_TOKEN"
   | "PUTIO_LIVE_OWNED_VIDEO_FILE_ID"
   | "PUTIO_LIVE_RSS_SOURCE_URL"
   | "PUTIO_TOKEN_PAYMENT_OWNER"
@@ -26,26 +23,7 @@ type OptionalSecretKey =
   | "PUTIO_TEST_TOTP"
   | "PUTIO_TEST_TOTP_REFERENCE";
 
-const readEnv = (key: string): string | undefined => {
-  loadPackageEnvFile();
-
-  const value = process.env[key];
-
-  if (!value) {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-};
-
-let packageEnvLoaded = false;
-
 export const loadEnvFiles = (envFilePaths: ReadonlyArray<string>): void => {
-  if (typeof process.loadEnvFile !== "function") {
-    return;
-  }
-
   for (const envFilePath of envFilePaths) {
     try {
       process.loadEnvFile(envFilePath);
@@ -57,23 +35,19 @@ export const loadEnvFiles = (envFilePaths: ReadonlyArray<string>): void => {
   }
 };
 
-const loadPackageEnvFile = (): void => {
-  if (packageEnvLoaded) {
-    return;
-  }
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-  packageEnvLoaded = true;
+loadEnvFiles([
+  join(packageRoot, ".env.live-tokens"),
+  join(packageRoot, ".env.local"),
+  join(packageRoot, ".env"),
+]);
 
-  const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-  loadEnvFiles([
-    join(packageRoot, ".env.live-tokens"),
-    join(packageRoot, ".env.local"),
-    join(packageRoot, ".env"),
-  ]);
-};
+export const readOptionalSecret = (key: OptionalSecretKey): string | undefined =>
+  process.env[key]?.trim() || undefined;
 
-export const requireSecret = <TKey extends RequiredSecretKey>(key: TKey): string => {
-  const value = readEnv(key);
+const requireSecret = (key: RequiredSecretKey): string => {
+  const value = process.env[key]?.trim();
 
   if (!value) {
     throw new Error(`Missing required secret environment variable: ${key}`);
@@ -82,12 +56,8 @@ export const requireSecret = <TKey extends RequiredSecretKey>(key: TKey): string
   return value;
 };
 
-export const readOptionalSecret = <TKey extends OptionalSecretKey>(key: TKey): string | undefined =>
-  readEnv(key);
-
 export type PutioLiveTokens = {
   readonly firstPartyToken: string;
-  readonly legacyClientId?: string;
   readonly thirdPartyToken: string;
 };
 
@@ -111,7 +81,6 @@ export type PutioBootstrapSecrets = {
 
 export const readLiveTokens = (): PutioLiveTokens => ({
   firstPartyToken: requireSecret("PUTIO_TOKEN_FIRST_PARTY"),
-  legacyClientId: readOptionalSecret("PUTIO_CLIENT_ID"),
   thirdPartyToken: requireSecret("PUTIO_TOKEN_THIRD_PARTY"),
 });
 
@@ -122,12 +91,14 @@ export const readCredentialFixture = (): PutioCredentialFixture => ({
   username: requireSecret("PUTIO_TEST_USERNAME"),
 });
 
-export const readSecondaryCredentialFixture = (): PutioCredentialFixture | null => {
+export const readSecondaryCredentialFixture = (): PutioCredentialFixture => {
   const username = readOptionalSecret("PUTIO_TEST_SECONDARY_USERNAME");
   const password = readOptionalSecret("PUTIO_TEST_SECONDARY_PASSWORD");
 
   if (!username || !password) {
-    return null;
+    throw new Error(
+      "Missing secondary live account fixture: set PUTIO_TEST_SECONDARY_USERNAME and PUTIO_TEST_SECONDARY_PASSWORD.",
+    );
   }
 
   return {
@@ -138,35 +109,13 @@ export const readSecondaryCredentialFixture = (): PutioCredentialFixture | null 
   };
 };
 
-export const readBootstrapSecrets = (): PutioBootstrapSecrets => ({
-  credentials: readCredentialFixture(),
-  firstPartyClient: readFirstPartyClientCredentials(),
-  thirdPartyClientId: readOptionalSecret("PUTIO_CLIENT_ID_THIRD_PARTY"),
-});
-
 export const readFirstPartyClientCredentials = (): PutioClientCredentials => ({
   clientId: requireSecret("PUTIO_CLIENT_ID_FIRST_PARTY"),
   clientSecret: requireSecret("PUTIO_CLIENT_SECRET_FIRST_PARTY"),
 });
 
-export const hydrateLiveTokenEnv = (): void => {
-  loadPackageEnvFile();
-
-  if (process.env.PUTIO_TOKEN_FIRST_PARTY && process.env.PUTIO_TOKEN_THIRD_PARTY) {
-    return;
-  }
-
-  if (!process.env.PUTIO_TOKEN_FIRST_PARTY) {
-    const legacyToken = readOptionalSecret("PUTIO_AUTH_TOKEN");
-    if (legacyToken) {
-      process.env.PUTIO_TOKEN_FIRST_PARTY = legacyToken;
-    }
-  }
-
-  if (!process.env.PUTIO_TOKEN_THIRD_PARTY) {
-    const legacyToken = readOptionalSecret("PUTIO_OAUTH_TOKEN");
-    if (legacyToken) {
-      process.env.PUTIO_TOKEN_THIRD_PARTY = legacyToken;
-    }
-  }
-};
+export const readBootstrapSecrets = (): PutioBootstrapSecrets => ({
+  credentials: readCredentialFixture(),
+  firstPartyClient: readFirstPartyClientCredentials(),
+  thirdPartyClientId: readOptionalSecret("PUTIO_CLIENT_ID_THIRD_PARTY"),
+});

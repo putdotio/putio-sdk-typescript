@@ -1,11 +1,12 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { createLiveTokenClients } from "./support/helpers.js";
+import { PutioOperationError } from "../../dist/index.js";
+import { createLiveTokenClients } from "./support/harness.js";
 
 describe("account live", () => {
   const clients = createLiveTokenClients();
 
-  test("account info returns the expected conditional fields", async () => {
+  test("account info returns every requested conditional field", async () => {
     const info = await clients.oauthClient.account.getInfo({
       download_token: 1,
       features: 1,
@@ -14,24 +15,11 @@ describe("account live", () => {
       push_token: 1,
     });
 
-    expect(typeof info.download_token).toBe("string");
-    expect(typeof info.push_token).toBe("string");
-    expect(info.features).toBeTruthy();
-    expect(info.pas).toBeTruthy();
-    expect(typeof info.pas?.user_hash).toBe("string");
-    expect(Object.prototype.hasOwnProperty.call(info, "paddle_user_id")).toBe(true);
-    expect(Array.isArray(info.settings.subtitle_languages)).toBe(true);
+    expect(info.pas?.user_hash).toBeDefined();
   });
 
-  test("account settings preserve nullable fields", async () => {
-    const settings = await clients.oauthClient.account.getSettings();
-
-    expect(Array.isArray(settings.subtitle_languages)).toBe(true);
-    expect(settings.callback_url === null || typeof settings.callback_url === "string").toBe(true);
-    expect(settings.locale === null || typeof settings.locale === "string").toBe(true);
-    expect(
-      settings.transfer_sort_by === null || typeof settings.transfer_sort_by === "string",
-    ).toBe(true);
+  test("account settings decode", async () => {
+    await clients.oauthClient.account.getSettings();
   });
 
   test("supported subtitle languages expose stable code and name fields", async () => {
@@ -68,12 +56,12 @@ describe("account live", () => {
   });
 
   test("invalid callback url yields a typed operation error", async () => {
-    await expect(
-      clients.authClient.account.saveSettings({
-        callback_url: "putio-typescript-sdk-invalid-callback",
-      }),
-    ).rejects.toMatchObject({
-      _tag: "PutioOperationError",
+    const failure = clients.authClient.account.saveSettings({
+      callback_url: "putio-typescript-sdk-invalid-callback",
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(PutioOperationError);
+    await expect(failure).rejects.toMatchObject({
       body: {
         error_type: "INVALID_CALLBACK_URL",
       },
@@ -88,16 +76,14 @@ describe("account live", () => {
   });
 
   test("first-party confirmations listing succeeds", async () => {
-    const confirmations = await clients.authClient.account.listConfirmations("password_change");
-
-    expect(Array.isArray(confirmations)).toBe(true);
+    await clients.authClient.account.listConfirmations("password_change");
   });
 
   test("third-party confirmations listing rejects with a typed operation error", async () => {
-    await expect(
-      clients.oauthClient.account.listConfirmations("password_change"),
-    ).rejects.toMatchObject({
-      _tag: "PutioOperationError",
+    const failure = clients.oauthClient.account.listConfirmations("password_change");
+
+    await expect(failure).rejects.toBeInstanceOf(PutioOperationError);
+    await expect(failure).rejects.toMatchObject({
       body: {
         error_type: "invalid_scope",
       },

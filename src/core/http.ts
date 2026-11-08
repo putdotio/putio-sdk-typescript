@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Predicate, Schema, Struct } from "effect";
 
 import {
   DEFAULT_PUTIO_API_BASE_URL,
@@ -7,13 +7,13 @@ import {
 } from "./defaults.js";
 import {
   fallbackPutioErrorEnvelope,
-  makeResponseError,
   mapConfigurationError,
   mapDecodeErrorToValidationError,
   mapTransportError,
   parseErrorBody,
   PutioConfigurationError,
   type PutioSdkError,
+  toPutioResponseError,
 } from "./errors.js";
 
 export type PutioQueryValue = string | number | boolean | null | undefined;
@@ -22,7 +22,7 @@ export type PutioQuery = Readonly<Record<string, PutioQueryValue>>;
 
 export type PutioPathSegment = string | number | boolean;
 
-export interface PutioSdkConfigShape {
+export interface PutioSdkOptions {
   readonly accessToken?: string;
   readonly baseUrl?: string | URL;
   readonly headers?: HeadersInit;
@@ -30,7 +30,7 @@ export interface PutioSdkConfigShape {
   readonly webAppUrl?: string | URL;
 }
 
-export class PutioSdkConfig extends Context.Service<PutioSdkConfig, PutioSdkConfigShape>()(
+export class PutioSdkConfig extends Context.Service<PutioSdkConfig, PutioSdkOptions>()(
   "PutioSdkConfig",
 ) {}
 
@@ -48,17 +48,17 @@ export interface PutioHttpResponse {
   readonly status: number;
 }
 
-export interface PutioHttpClientShape {
+export interface PutioHttpClientService {
   readonly execute: (request: PutioHttpRequest) => Effect.Effect<PutioHttpResponse, PutioSdkError>;
 }
 
-export class PutioHttpClient extends Context.Service<PutioHttpClient, PutioHttpClientShape>()(
+export class PutioHttpClient extends Context.Service<PutioHttpClient, PutioHttpClientService>()(
   "PutioHttpClient",
 ) {}
 
 export type PutioSdkContext = PutioSdkConfig | PutioHttpClient;
 
-export const makePutioSdkConfig = (config: PutioSdkConfigShape): PutioSdkConfigShape => ({
+export const normalizePutioSdkOptions = (config: PutioSdkOptions): PutioSdkOptions => ({
   accessToken: config.accessToken,
   baseUrl: config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
   headers: config.headers,
@@ -66,11 +66,11 @@ export const makePutioSdkConfig = (config: PutioSdkConfigShape): PutioSdkConfigS
   webAppUrl: config.webAppUrl ?? DEFAULT_PUTIO_WEB_APP_URL,
 });
 
-export const makePutioSdkLayer = (config: PutioSdkConfigShape) =>
-  Layer.succeed(PutioSdkConfig, makePutioSdkConfig(config));
+export const putioSdkLayer = (config: PutioSdkOptions) =>
+  Layer.succeed(PutioSdkConfig, normalizePutioSdkOptions(config));
 
-export const makePutioSdkLiveLayer = (config: PutioSdkConfigShape) =>
-  Layer.mergeAll(makePutioSdkLayer(config), makePutioFetchLayer());
+export const putioSdkLiveLayer = (config: PutioSdkOptions) =>
+  Layer.mergeAll(putioSdkLayer(config), makePutioFetchLayer());
 
 export const makePutioFetchLayer = (
   fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
@@ -78,10 +78,11 @@ export const makePutioFetchLayer = (
 
 export const makePutioFetchClient = (
   fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
-): PutioHttpClientShape => ({
+): PutioHttpClientService => ({
   execute: (request) =>
     Effect.suspend(() => {
       const controller = new AbortController();
+
       const read = <A>(body: () => Promise<A>) =>
         Effect.tryPromise({ try: body, catch: mapTransportError }).pipe(
           Effect.onInterrupt(() => Effect.sync(() => controller.abort())),
@@ -102,13 +103,12 @@ export const makePutioFetchClient = (
             ? read(() => response.json())
             : read(() => response.text()).pipe(
                 Effect.flatMap((text) =>
-                  Schema.decodeUnknownEffect(Schema.UnknownFromJsonString)(text).pipe(
+                  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
                     Effect.mapError(() =>
-                      makeResponseError(
+                      toPutioResponseError(
                         response.status,
                         response.headers,
                         fallbackPutioErrorEnvelope(response.status),
-                        // Native JSON errors can quote response contents in their message.
                         new SyntaxError("The HTTP error response body is not valid JSON"),
                       ),
                     ),
@@ -166,7 +166,7 @@ type PutioRequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 type PutioRequestBody =
   | { readonly type: "none" }
   | { readonly type: "json"; readonly value: unknown }
-  | { readonly type: "form"; readonly value: Record<string, unknown> }
+  | { readonly type: "form"; readonly value: Readonly<Record<string, Schema.Json | undefined>> }
   | { readonly type: "form-data"; readonly value: FormData };
 
 interface PutioRequestOptions {
@@ -192,22 +192,12 @@ const decodeSuccessJson = <S extends Schema.Top>(schema: S, response: PutioHttpR
 
 const decodeFailure = (response: PutioHttpResponse, headers: Headers) =>
   response.json.pipe(
-    Effect.flatMap((json) => parseErrorBody(response.status, json)),
-    Effect.map((body) => makeResponseError(response.status, headers, body)),
+    Effect.flatMap(parseErrorBody(response.status)),
+    Effect.map((body) => toPutioResponseError(response.status, headers, body)),
   );
-
-const toBasicAuthorization = (username: string, password: string) => {
-  if (typeof globalThis.btoa === "function") {
-    return `Basic ${globalThis.btoa(`${username}:${password}`)}`;
-  }
-
-  throw mapConfigurationError(
-    "This runtime does not provide btoa(), so Basic auth cannot be encoded safely",
-  );
-};
 
 const resolveAuthorization = (
-  config: PutioSdkConfigShape,
+  config: PutioSdkOptions,
   auth: PutioAuth | undefined,
 ): Effect.Effect<string | undefined, PutioSdkError> => {
   const resolvedAuth = auth ?? { type: "config-token" as const };
@@ -219,7 +209,7 @@ const resolveAuthorization = (
       return Effect.succeed(`Token ${resolvedAuth.token}`);
     case "basic":
       return Effect.try({
-        try: () => toBasicAuthorization(resolvedAuth.username, resolvedAuth.password),
+        try: () => `Basic ${btoa(`${resolvedAuth.username}:${resolvedAuth.password}`)}`,
         catch: mapConfigurationError,
       });
     case "config-token":
@@ -235,16 +225,16 @@ const resolveAuthorization = (
   }
 };
 
-const normalizeFormValue = (value: unknown): string => {
-  if (value === null || value === undefined) {
+const normalizeFormValue = (value: Schema.Json): string => {
+  if (value === null) {
     return "";
   }
 
-  if (typeof value === "string") {
+  if (Predicate.isString(value)) {
     return value;
   }
 
-  if (typeof value === "number" || typeof value === "boolean") {
+  if (Predicate.isNumber(value) || Predicate.isBoolean(value)) {
     return String(value);
   }
 
@@ -281,11 +271,11 @@ const makeRequest = (
 ) =>
   Effect.gen(function* () {
     const headers = new Headers(configHeaders);
-    // `auth` alone decides credentials, including `none`.
     headers.delete("authorization");
     new Headers(options.headers).forEach((value, name) => headers.set(name, value));
 
     const body = options.body ?? { type: "none" as const };
+
     if (!headers.has("accept")) {
       headers.set("accept", "application/json");
     }
@@ -311,6 +301,7 @@ const executeRequest = (options: PutioRequestOptions) =>
     const config = yield* PutioSdkConfig;
     const httpClient = yield* PutioHttpClient;
     const authorization = yield* resolveAuthorization(config, options.auth);
+
     const url = yield* Effect.try({
       try: () =>
         buildPutioUrl(
@@ -320,6 +311,7 @@ const executeRequest = (options: PutioRequestOptions) =>
         ),
       catch: mapUrlBuildError,
     });
+
     const request = yield* makeRequest(url, options, config.headers, authorization);
 
     return yield* httpClient.execute(request);
@@ -349,15 +341,7 @@ export const selectJsonFields =
   <A extends { readonly [P in K[number]]: unknown }, E, R>(
     effect: Effect.Effect<A, E, R>,
   ): Effect.Effect<Pick<A, K[number]>, E, R> =>
-    effect.pipe(
-      Effect.map(
-        (value) =>
-          Object.fromEntries(fields.map((field) => [field, value[field as K[number]]])) as Pick<
-            A,
-            K[number]
-          >,
-      ),
-    );
+    effect.pipe(Effect.map((value) => Struct.pick(value, fields)));
 
 export const requestArrayBuffer = (
   options: PutioRequestOptions,

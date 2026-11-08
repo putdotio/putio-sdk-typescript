@@ -1,5 +1,8 @@
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
+import type { Effect } from "effect";
 import { describe, expect, it } from "vite-plus/test";
+
+import type { PutioSdkContext } from "../core/http.js";
 
 import * as oauth from "./oauth.js";
 import * as rss from "./rss.js";
@@ -97,6 +100,34 @@ const rssFeed = {
 };
 
 describe("operational domain boundaries", () => {
+  const okRoutes: ReadonlyArray<
+    readonly [string, string, Effect.Effect<unknown, unknown, PutioSdkContext>]
+  > = [
+    ["POST", "/v2/rss/1/pause", rss.pauseRssFeed(1)],
+    ["POST", "/v2/rss/1/resume", rss.resumeRssFeed(1)],
+    ["POST", "/v2/rss/1/delete", rss.deleteRssFeed(1)],
+    ["POST", "/v2/rss/1/clear-log", rss.clearRssFeedLogs(1)],
+    ["POST", "/v2/rss/1/items/2/retry", rss.retryRssFeedItem(1, 2)],
+    ["POST", "/v2/rss/1/retry-all", rss.retryAllRssFeedItems(1)],
+    ["POST", "/v2/oauth/apps/9/delete", oauth.deleteOAuthApp(9)],
+    ["DELETE", "/v2/public_share/1", sharing.deletePublicShare(1)],
+    ["POST", "/v2/trash/empty", trash.emptyTrash()],
+    ["GET", "/v2/zips/9/cancel", zips.cancelZip(9)],
+  ];
+
+  it.each(okRoutes)("sends an OK-only operation to %s %s", async (method, path, effect) => {
+    await runSdkEffect(
+      effect,
+      (request) => {
+        expect(request.method).toBe(method);
+        expect(new URL(request.url).pathname).toBe(path);
+
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    );
+  });
+
   it("covers rss endpoints", async () => {
     expect(
       await runSdkEffect(
@@ -126,6 +157,7 @@ describe("operational domain boundaries", () => {
           expect(body.get("delete_old_files")).toBe("on");
           expect(body.get("parent_dir_id")).toBe("newf");
           expect(body.get("unwanted_keywords")).toBe("");
+
           return jsonResponse({ feed: rssFeed, status: "OK" });
         },
         { accessToken: "token-123" },
@@ -144,21 +176,12 @@ describe("operational domain boundaries", () => {
           const body = getFormBody(request);
           expect(body.get("dont_process_whole_feed")).toBe("true");
           expect(body.get("unwanted_keywords")).toBe("spam");
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
       ),
     ).toEqual({ status: "OK" });
-
-    await runSdkEffect(rss.pauseRssFeed(1), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
-    await runSdkEffect(rss.resumeRssFeed(1), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
-    await runSdkEffect(rss.deleteRssFeed(1), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
 
     expect(
       await runSdkEffect(
@@ -182,28 +205,22 @@ describe("operational domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toMatchObject({ items: [expect.objectContaining({ id: 1 })] });
-
-    await runSdkEffect(rss.clearRssFeedLogs(1), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
-    await runSdkEffect(rss.retryRssFeedItem(1, 2), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
-    await runSdkEffect(rss.retryAllRssFeedItems(1), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
   });
 
   it("rejects invalid rss inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
+
     const validParams = {
       rss_source_url: "https://example.com/feed.xml",
       title: "SDK Feed",
     };
+
     const failures = await Promise.all([
       runSdkExit(rss.getRssFeed(0), handler),
       // @ts-expect-error JavaScript callers can provide null instead of feed parameters.
@@ -232,9 +249,9 @@ describe("operational domain boundaries", () => {
       runSdkExit(rss.retryAllRssFeedItems(0), handler),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -284,6 +301,7 @@ describe("operational domain boundaries", () => {
         oauth.getOAuthApp(9, { edit: true }),
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/oauth/apps/9/edit");
+
           return jsonResponse({
             app: {
               callback: "https://example.com/callback",
@@ -308,6 +326,7 @@ describe("operational domain boundaries", () => {
         oauth.getOAuthApp(9),
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/oauth/apps/9");
+
           return jsonResponse({
             app: {
               callback: "https://example.com/callback",
@@ -333,6 +352,7 @@ describe("operational domain boundaries", () => {
       }),
       (request) => {
         expect(getFormDataBody(request).get("icon")).toBeInstanceOf(Blob);
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -353,6 +373,7 @@ describe("operational domain boundaries", () => {
           expect(body.get("icon")).toBeInstanceOf(Blob);
           expect(body.get("name")).toBe("SDK app");
           expect(body.get("hidden")).toBe("true");
+
           return jsonResponse({
             app: {
               callback: "https://example.com/callback",
@@ -382,6 +403,7 @@ describe("operational domain boundaries", () => {
         (request) => {
           const body = getFormDataBody(request);
           expect(body.get("description")).toBe("Updated SDK app");
+
           return jsonResponse({
             app: {
               callback: "https://example.com/callback",
@@ -429,18 +451,17 @@ describe("operational domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toHaveLength(1);
-
-    await runSdkEffect(oauth.deleteOAuthApp(9), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
   });
 
   it("rejects invalid oauth app inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
+
     const validCreateInput = {
       callback: "https://example.com/callback",
       description: "A valid SDK application",
@@ -481,9 +502,9 @@ describe("operational domain boundaries", () => {
       runSdkExit(oauth.regenerateOAuthAppToken(0), handler),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -493,6 +514,7 @@ describe("operational domain boundaries", () => {
         sharing.cloneSharedFiles(),
         (request) => {
           expect(getFormBody(request).get("parent_id")).toBe("0");
+
           return jsonResponse({ id: 9, status: "OK" });
         },
         { accessToken: "token-123" },
@@ -511,6 +533,7 @@ describe("operational domain boundaries", () => {
           expect(body.get("cursor")).toBe("cursor-1");
           expect(body.get("file_ids")).toBe("7");
           expect(body.get("parent_id")).toBe("5");
+
           return jsonResponse({ id: 10, status: "OK" });
         },
         { accessToken: "token-123" },
@@ -535,6 +558,7 @@ describe("operational domain boundaries", () => {
         }),
         (request) => {
           expect(getFormBody(request).get("friends")).toBe("everyone");
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
@@ -556,6 +580,7 @@ describe("operational domain boundaries", () => {
           expect(body.get("cursor")).toBe("cursor-1");
           expect(body.get("file_ids")).toBe("7");
           expect(body.get("friends")).toBe("sdk-user,sdk");
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
@@ -563,7 +588,6 @@ describe("operational domain boundaries", () => {
     ).toEqual({ status: "OK" });
 
     const emptyFriendsExit = await runSdkExit(
-      // @ts-expect-error This covers untyped JavaScript callers.
       sharing.shareFiles({
         ids: [7],
         target: {
@@ -612,6 +636,7 @@ describe("operational domain boundaries", () => {
       }),
       (request) => {
         expect(getFormBody(request).get("shares")).toBe("everyone");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -624,6 +649,7 @@ describe("operational domain boundaries", () => {
       }),
       (request) => {
         expect(getFormBody(request).get("shares")).toBe("1,everyone");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -679,10 +705,6 @@ describe("operational domain boundaries", () => {
       ),
     ).toHaveLength(1);
 
-    await runSdkEffect(sharing.deletePublicShare(1), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
-
     expect(
       await runSdkEffect(
         sharing.getPublicShare(),
@@ -717,6 +739,7 @@ describe("operational domain boundaries", () => {
           expect(request.url).toBe(
             "https://api.put.io/v2/public_share/files/list?parent_id=7&total=1",
           );
+
           return jsonResponse({
             breadcrumbs: [[0, "Root"]],
             cursor: null,
@@ -738,6 +761,7 @@ describe("operational domain boundaries", () => {
             "https://api.put.io/v2/public_share/files/list/continue?per_page=2",
           );
           expect(getFormBody(request).get("cursor")).toBe("cursor-1");
+
           return jsonResponse({
             cursor: null,
             files: [sharedFile],
@@ -761,10 +785,13 @@ describe("operational domain boundaries", () => {
 
   it("rejects invalid sharing inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
+
     const failures = await Promise.all([
       // @ts-expect-error JavaScript callers can provide null instead of a request object.
       runSdkExit(sharing.cloneSharedFiles(null), handler),
@@ -798,9 +825,9 @@ describe("operational domain boundaries", () => {
       runSdkExit(sharing.getPublicShareFileUrl(0), handler),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -812,6 +839,7 @@ describe("operational domain boundaries", () => {
         }),
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/transfers/list?per_page=2");
+
           return jsonResponse({
             cursor: "cursor-1",
             status: "OK",
@@ -829,6 +857,7 @@ describe("operational domain boundaries", () => {
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/transfers/list/continue?per_page=3");
           expect(getFormBody(request).get("cursor")).toBe("cursor-1");
+
           return jsonResponse({
             cursor: null,
             status: "OK",
@@ -854,6 +883,7 @@ describe("operational domain boundaries", () => {
           (request) => {
             expect(request.method).toBe("GET");
             expect(request.url).toBe("https://api.put.io/v2/transfers/11/torrent");
+
             return arrayBufferResponse([0x64, 0x38, 0x3a]);
           },
           { accessToken: "token-123" },
@@ -876,6 +906,7 @@ describe("operational domain boundaries", () => {
           expect(getFormBody(request).get("urls")).toBe(
             "https://example.com/a\nhttps://example.com/b",
           );
+
           return jsonResponse({
             disk_avail: 100,
             ret: [
@@ -906,6 +937,7 @@ describe("operational domain boundaries", () => {
           expect(body.get("callback_url")).toBe("https://example.com/callback");
           expect(body.get("save_parent_id")).toBe("5");
           expect(body.get("url")).toBe("https://example.com/file");
+
           return jsonResponse({ status: "OK", transfer });
         },
         { accessToken: "token-123" },
@@ -930,6 +962,7 @@ describe("operational domain boundaries", () => {
               { save_parent_id: 5, url: "https://example.com/b" },
             ]),
           );
+
           return jsonResponse({
             errors: [],
             status: "OK",
@@ -951,6 +984,7 @@ describe("operational domain boundaries", () => {
           expect(getFormBody(request).get("trackers")).toBe(
             "udp://tracker.example:80,https://tracker.example/announce",
           );
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
@@ -964,6 +998,7 @@ describe("operational domain boundaries", () => {
         expect(request.url).toBe("https://api.put.io/v2/transfers/remove");
         expect(body.get("transfer_ids")).toBe("11,12");
         expect(body.has("remove_filter")).toBe(false);
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -975,18 +1010,19 @@ describe("operational domain boundaries", () => {
         const body = getFormBody(request);
         expect(body.get("remove_filter")).toBe("completed");
         expect(body.has("transfer_ids")).toBe(false);
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
     );
 
     await runSdkEffect(
-      // @ts-expect-error JavaScript callers can provide explicit undefined optional fields.
       transfers.removeTransfers({ filter: "all", ids: undefined }),
       (request) => {
         const body = getFormBody(request);
         expect(body.get("remove_filter")).toBe("all");
         expect(body.has("transfer_ids")).toBe(false);
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -996,6 +1032,7 @@ describe("operational domain boundaries", () => {
       transfers.cancelTransfers([11, 12]),
       (request) => {
         expect(getFormBody(request).get("transfer_ids")).toBe("11,12");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -1006,6 +1043,7 @@ describe("operational domain boundaries", () => {
         transfers.cleanTransfers([11]),
         (request) => {
           expect(getFormBody(request).get("transfer_ids")).toBe("11");
+
           return jsonResponse({ deleted_ids: [11], status: "OK" });
         },
         { accessToken: "token-123" },
@@ -1017,6 +1055,7 @@ describe("operational domain boundaries", () => {
         transfers.retryTransfer(11),
         (request) => {
           expect(getFormBody(request).get("id")).toBe("11");
+
           return jsonResponse({ status: "OK", transfer });
         },
         { accessToken: "token-123" },
@@ -1027,6 +1066,7 @@ describe("operational domain boundaries", () => {
       transfers.reannounceTransfer(11),
       (request) => {
         expect(getFormBody(request).get("id")).toBe("11");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -1036,6 +1076,7 @@ describe("operational domain boundaries", () => {
       transfers.stopTransferRecording(11),
       (request) => {
         expect(getFormBody(request).get("transfer_id")).toBe("11");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -1048,6 +1089,7 @@ describe("operational domain boundaries", () => {
         }),
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/trash/list?per_page=2");
+
           return jsonResponse({
             cursor: "cursor-1",
             files: [
@@ -1083,6 +1125,7 @@ describe("operational domain boundaries", () => {
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/trash/list/continue?per_page=2");
           expect(getFormBody(request).get("cursor")).toBe("cursor-1");
+
           return jsonResponse({
             cursor: null,
             files: [],
@@ -1099,6 +1142,7 @@ describe("operational domain boundaries", () => {
       }),
       (request) => {
         expect(getFormBody(request).get("file_ids")).toBe("1,2");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -1111,14 +1155,11 @@ describe("operational domain boundaries", () => {
       }),
       (request) => {
         expect(getFormBody(request).get("cursor")).toBe("cursor-1");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
     );
-
-    await runSdkEffect(trash.emptyTrash(), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
 
     expect(
       await runSdkEffect(
@@ -1144,6 +1185,7 @@ describe("operational domain boundaries", () => {
           expect(body.get("cursor")).toBe("cursor-1");
           expect(body.get("exclude_ids")).toBe("2");
           expect(body.get("file_ids")).toBe("1");
+
           return jsonResponse({ status: "OK", zip_id: 9 });
         },
         { accessToken: "token-123" },
@@ -1181,18 +1223,17 @@ describe("operational domain boundaries", () => {
         { accessToken: "token-123" },
       ),
     ).toMatchObject({ missing_files: [{ missing: true }] });
-
-    await runSdkEffect(zips.cancelZip(9), () => jsonResponse({ status: "OK" }), {
-      accessToken: "token-123",
-    });
   });
 
   it("rejects invalid transfer utility inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
+
     const failures = await Promise.all([
       // @ts-expect-error JavaScript callers can provide null instead of a query object.
       runSdkExit(transfers.listTransfers(null), handler, { accessToken: "token-123" }),
@@ -1281,18 +1322,21 @@ describe("operational domain boundaries", () => {
       runSdkExit(transfers.stopTransferRecording(0), handler, { accessToken: "token-123" }),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
   it("rejects invalid trash and zip inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
+
     const failures = await Promise.all([
       // @ts-expect-error JavaScript callers can provide null instead of a query object.
       runSdkExit(trash.listTrash(null), handler),
@@ -1322,7 +1366,6 @@ describe("operational domain boundaries", () => {
       runSdkExit(trash.deleteTrash({ cursor: "cursor" }), handler),
       // @ts-expect-error JavaScript callers can provide null instead of a request object.
       runSdkExit(zips.createZip(null), handler),
-      // @ts-expect-error JavaScript callers can omit both zip selectors.
       runSdkExit(zips.createZip({}), handler),
       runSdkExit(zips.createZip({ cursor: "" }), handler),
       runSdkExit(zips.createZip({ file_ids: [] }), handler),
@@ -1334,9 +1377,9 @@ describe("operational domain boundaries", () => {
       runSdkExit(zips.cancelZip(0), handler),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -1357,7 +1400,6 @@ describe("operational domain boundaries", () => {
     const error = expectFailure(failure);
     expect(error).toBeInstanceOf(PutioOperationError);
     expect(error).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "sharing",
       operation: "getPublicShareFileUrl",
       status: 404,
@@ -1377,8 +1419,8 @@ describe("operational domain boundaries", () => {
       { accessToken: "token-123" },
     );
 
+    expect(expectFailure(torrentFailure)).toBeInstanceOf(PutioOperationError);
     expect(expectFailure(torrentFailure)).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "transfers",
       operation: "getTorrent",
       reason: {
@@ -1405,8 +1447,8 @@ describe("operational domain boundaries", () => {
       { accessToken: "token-123" },
     );
 
+    expect(expectFailure(addTrackersFailure)).toBeInstanceOf(PutioOperationError);
     expect(expectFailure(addTrackersFailure)).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "transfers",
       operation: "addTrackers",
       reason: {
@@ -1429,8 +1471,8 @@ describe("operational domain boundaries", () => {
       { accessToken: "token-123" },
     );
 
+    expect(expectFailure(removeFailure)).toBeInstanceOf(PutioOperationError);
     expect(expectFailure(removeFailure)).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "transfers",
       operation: "remove",
       status: 400,

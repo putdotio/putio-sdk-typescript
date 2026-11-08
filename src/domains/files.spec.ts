@@ -1,5 +1,5 @@
 import { Exit } from "effect";
-import { PutioValidationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError } from "../core/errors.js";
 import { describe, expect, it } from "vite-plus/test";
 
 import * as files from "./files.js";
@@ -39,6 +39,7 @@ const baseFile = {
 describe("files domain", () => {
   it("preserves a null codec name in subtitle media info", async () => {
     const stream = { codec_type: "subtitle", codec_name: null };
+
     const file = await runSdkEffect(
       files.getFile({ id: 9, query: { media_info: 1 } }),
       () =>
@@ -51,6 +52,7 @@ describe("files domain", () => {
 
   it.each([-99, 0, 123])("preserves media stream level %s", async (level) => {
     const stream = { codec_name: "mjpeg", codec_type: "video", level };
+
     const file = await runSdkEffect(
       files.getFile({ id: 9, query: { media_info: 1 } }),
       () =>
@@ -86,6 +88,7 @@ describe("files domain", () => {
           expect(url.pathname).toBe("/v2/files/7/child");
           expect(url.searchParams.get("name")).toBe("SDK File");
           expect(url.searchParams.get("stream_url")).toBe("1");
+
           return jsonResponse({
             file: { ...baseFile, stream_url: "https://download.put.io/stream" },
             status: "OK",
@@ -110,6 +113,7 @@ describe("files domain", () => {
           expect(body.get("file_id")).toBe("9");
           expect(body.get("name")).toBe("SDK Copy");
           expect(body.get("parent_id")).toBe("7");
+
           return jsonResponse({
             file: { ...baseFile, id: 10, name: "SDK Copy", parent_id: 7 },
             status: "OK",
@@ -131,6 +135,7 @@ describe("files domain", () => {
           expect(request.url).toBe("https://api.put.io/v2/files/touch");
           expect(body.get("file_ids")).toBe("9,10");
           expect(body.get("updated_at")).toBe("2026-08-01T12:30:00.000Z");
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
@@ -143,6 +148,7 @@ describe("files domain", () => {
         (request) => {
           expect(request.method).toBe("GET");
           expect(request.url).toBe("https://api.put.io/v2/files/9/can-write");
+
           return jsonResponse({ status: "OK", user_id: 23 });
         },
         { accessToken: "token-123" },
@@ -152,8 +158,10 @@ describe("files domain", () => {
 
   it("rejects invalid file utility inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
 
@@ -173,9 +181,9 @@ describe("files domain", () => {
       runSdkExit(files.canWriteFile(0), handler, { accessToken: "token-123" }),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -189,6 +197,7 @@ describe("files domain", () => {
           expect(request.url).toBe("https://api.put.io/v2/files/set-sort-by");
           expect(body.get("file_id")).toBe("42");
           expect(body.get("sort_by")).toBe("MODIFIED_DESC");
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
@@ -201,6 +210,7 @@ describe("files domain", () => {
         (request) => {
           expect(request.method).toBe("POST");
           expect(request.url).toBe("https://api.put.io/v2/files/remove-sort-by-settings");
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
@@ -244,6 +254,7 @@ describe("files domain", () => {
         files.getHlsMasterPlaylist(42, { playOriginal: true }),
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/files/42/hls/media.m3u8?original=1");
+
           return new Response("#EXTM3U", { status: 200 });
         },
         { accessToken: "token-123" },
@@ -270,8 +281,8 @@ describe("files domain", () => {
       ),
     );
 
+    expect(invalidMedia).toBeInstanceOf(PutioOperationError);
     expect(invalidMedia).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "files",
       operation: "hlsMasterPlaylist",
       status: 400,
@@ -292,6 +303,7 @@ describe("files domain", () => {
       files.queryFiles(files.SHARED_WITH_YOU_ROOT_ID),
       (request) => {
         expect(request.url).toBe("https://api.put.io/v2/files/list?parent_id=-2");
+
         return jsonResponse({
           cursor: null,
           files: [{ ...baseFile, file_type: "FOLDER", id: -7000, name: "sharer", parent_id: -2 }],
@@ -301,12 +313,14 @@ describe("files domain", () => {
       },
       { accessToken: "token-123" },
     );
+
     expect(sharedRoot.files[0]?.id).toBe(-7000);
 
     const sharerFolder = await runSdkEffect(
       files.getFile({ id: -7000 }),
       (request) => {
         expect(request.url).toBe("https://api.put.io/v2/files/-7000");
+
         return jsonResponse({
           file: { ...baseFile, file_type: "FOLDER", id: -7000, name: "sharer" },
           status: "OK",
@@ -314,21 +328,26 @@ describe("files domain", () => {
       },
       { accessToken: "token-123" },
     );
+
     expect(sharerFolder.id).toBe(-7000);
 
-    for (const effect of [files.queryFiles(-1), files.getFile({ id: -1 })]) {
-      expect(
-        expectFailure(
-          await runSdkExit(effect, () => emptyResponse(), { accessToken: "token-123" }),
-        ),
-      ).toBeInstanceOf(PutioValidationError);
-    }
+    const negativeIdFailures = await Promise.all([
+      runSdkExit(files.queryFiles(-1), () => emptyResponse(), { accessToken: "token-123" }),
+      runSdkExit(files.getFile({ id: -1 }), () => emptyResponse(), { accessToken: "token-123" }),
+    ]);
+
+    expect(negativeIdFailures.map((exit) => expectFailure<unknown>(exit))).toEqual([
+      expect.any(PutioValidationError),
+      expect.any(PutioValidationError),
+    ]);
   });
 
   it("rejects invalid folder sort settings before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
 
@@ -337,6 +356,7 @@ describe("files domain", () => {
         accessToken: "token-123",
       }),
     );
+
     const invalidSort = expectFailure(
       await runSdkExit(
         // @ts-expect-error JavaScript callers can still supply unknown sort values.
@@ -398,6 +418,7 @@ describe("files domain", () => {
 
     const accessTokenConfig = { accessToken: "token-123", baseUrl: "https://api.put.io" };
     const downloadToken = "download-123";
+
     const configBackedUrls = await Promise.all([
       runConfigEffect(files.getApiDownloadUrl(42, { downloadToken }), accessTokenConfig),
       runConfigEffect(
@@ -411,6 +432,7 @@ describe("files domain", () => {
       runConfigEffect(files.getHlsStreamUrl(42, { downloadToken }), accessTokenConfig),
       runConfigEffect(files.getXspfPlaylistUrl(42, { downloadToken }), accessTokenConfig),
     ]);
+
     expect(configBackedUrls).toEqual([
       "https://api.put.io/v2/files/42/download?oauth_token=download-123",
       "https://api.put.io/v2/files/42/stream?notunnel=1&oauth_token=download-123",
@@ -436,7 +458,6 @@ describe("files domain", () => {
     expect(uploadRequest.body.get("filename")).toBe("hello.txt");
     expect(uploadRequest.body.get("parent_id")).toBe("7");
 
-    // Media URLs leave the app, so a missing download token must never fall back to accessToken.
     const missingDownloadToken = await Promise.all([
       // @ts-expect-error JavaScript callers can omit the download token.
       runConfigExit(files.getApiDownloadUrl(42, {}), accessTokenConfig),
@@ -449,6 +470,7 @@ describe("files domain", () => {
       // @ts-expect-error JavaScript callers can omit the download token.
       runConfigExit(files.getXspfPlaylistUrl(42, {}), accessTokenConfig),
     ]);
+
     for (const exit of missingDownloadToken) {
       expect(Exit.isSuccess(exit) ? exit.value : "").not.toContain("token-123");
       expect(expectFailure(exit)).toBeInstanceOf(PutioValidationError);
@@ -495,7 +517,8 @@ describe("files domain", () => {
         accessToken: "token-123",
       }),
     ]);
-    expect(invalidDirectAccess.map(expectFailure)).toEqual(
+
+    expect(invalidDirectAccess.map((exit) => expectFailure<unknown>(exit))).toEqual(
       invalidDirectAccess.map(() => expect.any(PutioValidationError)),
     );
   });
@@ -520,6 +543,7 @@ describe("files domain", () => {
         files.getFile({ id: 0 }),
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/files/0");
+
           return jsonResponse({
             file: { ...baseFile, id: 0, name: "Root" },
             status: "OK",
@@ -576,8 +600,11 @@ describe("files domain", () => {
       { accessToken: "token-123" },
     );
 
-    expect(file.stream_url).toBe("https://api.put.io/stream.m3u8");
-    expect(file.mp4_stream_url).toBe("https://api.put.io/mp4.m3u8");
+    expect(file).toMatchObject({
+      is_mp4_available: true,
+      mp4_stream_url: "https://api.put.io/mp4.m3u8",
+      stream_url: "https://api.put.io/stream.m3u8",
+    });
 
     const matroska = await runSdkEffect(
       files.getFile({ id: 10, query: { media_info: 1 } }),
@@ -634,7 +661,6 @@ describe("files domain", () => {
     const validationError = expectFailure(validationExit);
     expect(validationError).toBeInstanceOf(PutioValidationError);
     expect(validationError).toMatchObject({
-      _tag: "PutioValidationError",
       cause: 'Expected put.io to include "stream_url" because it was requested',
     });
 
@@ -662,8 +688,8 @@ describe("files domain", () => {
         { accessToken: "token-123" },
       );
 
+      expect(expectFailure(missingExit)).toBeInstanceOf(PutioValidationError);
       expect(expectFailure(missingExit)).toMatchObject({
-        _tag: "PutioValidationError",
         cause: expectedCause,
       });
     }
@@ -759,6 +785,7 @@ describe("files domain", () => {
       },
       { accessToken: "token-123" },
     );
+
     expect(expectFailure(invalidSearch)).toBeInstanceOf(PutioValidationError);
 
     expect(
@@ -919,8 +946,10 @@ describe("files domain", () => {
 
   it("rejects invalid file mutation inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
 
@@ -980,9 +1009,9 @@ describe("files domain", () => {
       ),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
 
     const descriptorFailure = expectFailure(
@@ -994,13 +1023,16 @@ describe("files domain", () => {
         { accessToken: "token-123" },
       ),
     );
+
     expect(descriptorFailure).toBeInstanceOf(PutioValidationError);
   });
 
   it("rejects invalid file read inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
 
@@ -1049,9 +1081,9 @@ describe("files domain", () => {
       runSdkExit(files.findNextVideo(0), handler, { accessToken: "token-123" }),
     ]);
 
-    expect(
-      failures.map(expectFailure).every((error) => error instanceof PutioValidationError),
-    ).toBe(true);
+    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+      failures.map(() => expect.any(PutioValidationError)),
+    );
     expect(requestCount).toBe(0);
   });
 
@@ -1109,6 +1141,7 @@ describe("files domain", () => {
           expect(request.method).toBe("POST");
           expect(request.url).toBe("https://api.put.io/v2/files/9/start-from");
           expect(getFormBody(request).get("time")).toBe("12.5");
+
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
@@ -1121,6 +1154,7 @@ describe("files domain", () => {
         (request) => {
           expect(request.method).toBe("POST");
           expect(request.url).toBe("https://api.put.io/v2/files/9/start-from/delete");
+
           return jsonResponse({ status: "OK" });
         },
         {
@@ -1154,19 +1188,34 @@ describe("files domain", () => {
       ),
     ).toMatchObject({ status: "NOT_AVAILABLE" });
 
-    await runSdkEffect(files.deleteFileMp4(9), () => emptyResponse({ status: 200 }), {
-      accessToken: "token-123",
-    });
+    await runSdkEffect(
+      files.deleteFileMp4(9),
+      (request) => {
+        expect(request.method).toBe("DELETE");
+        expect(new URL(request.url).pathname).toBe("/v2/files/9/mp4");
 
-    await runSdkEffect(files.putMp4ToMyFiles(9), () => emptyResponse({ status: 200 }), {
-      accessToken: "token-123",
-    });
+        return emptyResponse({ status: 200 });
+      },
+      { accessToken: "token-123" },
+    );
+
+    await runSdkEffect(
+      files.putMp4ToMyFiles(9),
+      (request) => {
+        expect(request.method).toBe("GET");
+        expect(new URL(request.url).pathname).toBe("/v2/files/9/put-mp4-to-my-folders");
+
+        return emptyResponse({ status: 200 });
+      },
+      { accessToken: "token-123" },
+    );
 
     expect(
       await runSdkEffect(
         files.convertFilesToMp4([9, 10]),
         (request) => {
           expect(getFormBody(request).get("file_ids")).toBe("9,10");
+
           return jsonResponse({ count: 2, status: "OK" });
         },
         { accessToken: "token-123" },
@@ -1212,6 +1261,7 @@ describe("files domain", () => {
         expect(body.get("cursor")).toBe("cursor-1");
         expect(body.get("file_ids")).toBe("9");
         expect(body.get("watched")).toBe("true");
+
         return emptyResponse({ status: 200 });
       },
       { accessToken: "token-123" },
@@ -1267,9 +1317,16 @@ describe("files domain", () => {
       ),
     ).toHaveLength(1);
 
-    await runSdkEffect(files.deleteFileExtraction(1), () => emptyResponse({ status: 200 }), {
-      accessToken: "token-123",
-    });
+    await runSdkEffect(
+      files.deleteFileExtraction(1),
+      (request) => {
+        expect(request.method).toBe("DELETE");
+        expect(new URL(request.url).pathname).toBe("/v2/files/extract/1");
+
+        return emptyResponse({ status: 200 });
+      },
+      { accessToken: "token-123" },
+    );
 
     expect(
       await runSdkEffect(
@@ -1373,20 +1430,20 @@ describe("files domain", () => {
       type: "transfer",
     });
 
-    await expect(
-      runSdkEffect(
-        files.uploadFile({
-          file: new Blob(["hello"], { type: "text/plain" }),
+    const emptyUpload = await runSdkExit(
+      files.uploadFile({
+        file: new Blob(["hello"], { type: "text/plain" }),
+      }),
+      () =>
+        jsonResponse({
+          status: "OK",
         }),
-        () =>
-          jsonResponse({
-            status: "OK",
-          }),
-        {
-          accessToken: "token-123",
-          uploadBaseUrl: "https://upload.put.io",
-        },
-      ),
-    ).rejects.toBeTruthy();
+      {
+        accessToken: "token-123",
+        uploadBaseUrl: "https://upload.put.io",
+      },
+    );
+
+    expect(expectFailure(emptyUpload)).toBeInstanceOf(PutioValidationError);
   });
 });

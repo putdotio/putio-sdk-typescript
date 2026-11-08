@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
+import { Predicate } from "effect";
 import { chromium, firefox, webkit } from "playwright";
 import { build } from "vite";
 
@@ -46,6 +47,7 @@ const browserNamesFromEnvironment = (): ReadonlyArray<BrowserName> => {
     .split(",")
     .map((name) => name.trim())
     .filter((name) => name.length > 0);
+
   const invalid: Array<string> = [];
   const selected: Array<BrowserName> = [];
 
@@ -79,12 +81,15 @@ const contentTypeFor = (filePath: string) => {
   if (filePath.endsWith(".html")) {
     return "text/html; charset=utf-8";
   }
+
   if (filePath.endsWith(".js")) {
     return "text/javascript; charset=utf-8";
   }
+
   if (filePath.endsWith(".css")) {
     return "text/css; charset=utf-8";
   }
+
   return "application/octet-stream";
 };
 
@@ -97,6 +102,7 @@ const isPathInsideDirectory = (directory: string, filePath: string) => {
 const serveDirectory = (directory: string) =>
   new Promise<StaticServer>((resolveServer, reject) => {
     const root = resolve(directory);
+
     const server = createServer(async (request, response) => {
       try {
         const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -106,6 +112,7 @@ const serveDirectory = (directory: string) =>
         if (!isPathInsideDirectory(root, filePath)) {
           response.writeHead(403);
           response.end("Forbidden");
+
           return;
         }
 
@@ -124,11 +131,12 @@ const serveDirectory = (directory: string) =>
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
 
-      if (typeof address === "object" && address !== null) {
+      if (address !== null && !Predicate.isString(address)) {
         resolveServer({
           server,
           url: `http://127.0.0.1:${address.port}`,
         });
+
         return;
       }
 
@@ -141,6 +149,7 @@ const closeServer = (server: Server) =>
     server.close((error) => {
       if (error) {
         reject(error);
+
         return;
       }
 
@@ -159,6 +168,7 @@ const runBrowserTarget = async (browserName: BrowserName, url: string, httpUrl: 
   page.on("console", (message) => {
     const expectedHttpFailure =
       message.location().url === `${httpUrl}/error` && message.text().includes("429");
+
     if (message.type() === "error" && !expectedHttpFailure) {
       pageErrors.push(message.text());
     }
@@ -305,6 +315,7 @@ run().catch((error: unknown) => {
     });
     const previousCwd = process.cwd();
     process.chdir(context.workspace);
+
     try {
       await build();
     } finally {

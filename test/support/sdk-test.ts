@@ -1,12 +1,13 @@
-import { Cause, Effect, Exit } from "effect";
+import { Cause, Effect, Exit, Predicate, Schema } from "effect";
 
 import { PutioTransportError } from "../../src/core/errors.js";
 import {
   PutioHttpClient,
-  makePutioSdkLayer,
-  type PutioHttpClientShape,
+  PutioSdkConfig,
+  putioSdkLayer,
+  type PutioHttpClientService,
   type PutioHttpRequest,
-  type PutioSdkConfigShape,
+  type PutioSdkOptions,
   type PutioSdkContext,
 } from "../../src/core/http.js";
 
@@ -26,8 +27,8 @@ export const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
   return failure.error;
 };
 
-export const jsonResponse = (
-  body: unknown,
+export const jsonResponse = <TBody>(
+  body: TBody,
   init: Omit<ResponseInit, "headers"> & {
     readonly headers?: ResponseInit["headers"];
   } = {},
@@ -45,7 +46,7 @@ export const emptyResponse = (init: ResponseInit = {}): Response => new Response
 export const arrayBufferResponse = (body: ArrayLike<number>, init: ResponseInit = {}): Response =>
   new Response(new Uint8Array(Array.from(body)), init);
 
-const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientShape => ({
+const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientService => ({
   execute: (request) => {
     const response = handler(request);
 
@@ -67,34 +68,34 @@ const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientShape =
 const provideSdkTest = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
   handler: MockRequestHandler,
-  config: PutioSdkConfigShape = {},
+  config: PutioSdkOptions = {},
 ) =>
   effect.pipe(
     Effect.provideService(PutioHttpClient, makeMockHttpClient(handler)),
-    Effect.provide(makePutioSdkLayer(config)),
+    Effect.provide(putioSdkLayer(config)),
   );
 
 export const runSdkEffect = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
   handler: MockRequestHandler,
-  config: PutioSdkConfigShape = {},
+  config: PutioSdkOptions = {},
 ) => Effect.runPromise(provideSdkTest(effect, handler, config));
 
 export const runSdkExit = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
   handler: MockRequestHandler,
-  config: PutioSdkConfigShape = {},
+  config: PutioSdkOptions = {},
 ) => Effect.runPromiseExit(provideSdkTest(effect, handler, config));
 
 export const runConfigEffect = <A, E>(
-  effect: Effect.Effect<A, E, import("../../src/core/http.js").PutioSdkConfig>,
-  config: PutioSdkConfigShape = {},
-) => Effect.runPromise(effect.pipe(Effect.provide(makePutioSdkLayer(config))));
+  effect: Effect.Effect<A, E, PutioSdkConfig>,
+  config: PutioSdkOptions = {},
+) => Effect.runPromise(effect.pipe(Effect.provide(putioSdkLayer(config))));
 
 export const runConfigExit = <A, E>(
-  effect: Effect.Effect<A, E, import("../../src/core/http.js").PutioSdkConfig>,
-  config: PutioSdkConfigShape = {},
-) => Effect.runPromiseExit(effect.pipe(Effect.provide(makePutioSdkLayer(config))));
+  effect: Effect.Effect<A, E, PutioSdkConfig>,
+  config: PutioSdkOptions = {},
+) => Effect.runPromiseExit(effect.pipe(Effect.provide(putioSdkLayer(config))));
 
 export const getAuthorizationHeader = (request: PutioHttpRequest) =>
   request.headers.get("authorization") ?? undefined;
@@ -104,7 +105,7 @@ const getBodyText = (request: PutioHttpRequest): string | null => {
     return null;
   }
 
-  if (typeof request.body === "string") {
+  if (Predicate.isString(request.body)) {
     return request.body;
   }
 
@@ -119,14 +120,16 @@ const getBodyText = (request: PutioHttpRequest): string | null => {
   throw new Error("Expected a textual request body.");
 };
 
-export const getJsonBody = <T>(request: PutioHttpRequest): T => {
+const decodeJsonBody = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json));
+
+export const getJsonBody = (request: PutioHttpRequest): Schema.Json => {
   const body = getBodyText(request);
 
   if (body === null) {
     throw new Error("Expected a JSON body.");
   }
 
-  return JSON.parse(body) as T;
+  return decodeJsonBody(body);
 };
 
 export const getFormBody = (request: PutioHttpRequest): URLSearchParams => {

@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
+import { DEFAULT_PUTIO_API_BASE_URL, DEFAULT_PUTIO_UPLOAD_BASE_URL } from "../core/defaults.js";
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
 import {
-  mapDecodeErrorToValidationError,
   mapConfigurationError,
   PutioValidationError,
   definePutioOperationErrorSpec,
@@ -18,27 +18,29 @@ import {
   requestText,
   requestVoid,
   selectJsonField,
-  type PutioSdkConfigShape,
+  type PutioSdkOptions,
   type PutioSdkContext,
 } from "../core/http.js";
 import {
   NonEmptyStringSchema,
   PositiveIntegerSchema,
   decodeAndRun,
-  makeCursorSelectionSchema,
+  cursorSelectionSchema,
 } from "../core/validation.js";
+
 const RequestedFlag = Schema.Literal(1);
 const NonNegativeFileIdSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
-// Readable file ids: real ids plus the virtual sharing tree put.io serves
-// from the same routes (-2 is the "shared with you" root, ids below it are
-// per-sharer folders). -1 is not a file and stays rejected.
+
 export const SHARED_WITH_YOU_ROOT_ID = -2;
+
 const ReadableFileIdSchema = Schema.Int.check(
   Schema.makeFilter((id: number) => id >= 0 || id <= SHARED_WITH_YOU_ROOT_ID, {
     expected: "a file id that is non-negative or a virtual sharing id (-2 or lower)",
   }),
 );
+
 const PositiveFileIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
+
 export const FileTypeSchema = Schema.Literals([
   "FOLDER",
   "FILE",
@@ -50,7 +52,9 @@ export const FileTypeSchema = Schema.Literals([
   "TEXT",
   "SWF",
 ]);
+
 export const FolderTypeSchema = Schema.Literals(["REGULAR", "SHARED_ROOT", "SHARED_FRIEND"]);
+
 export const FileSortSchema = Schema.Literals([
   "NAME_ASC",
   "NAME_DESC",
@@ -65,19 +69,23 @@ export const FileSortSchema = Schema.Literals([
   "WATCH_ASC",
   "WATCH_DESC",
 ]);
+
 export const FileSetSortInputSchema = Schema.Struct({
   fileId: NonNegativeFileIdSchema,
   sortBy: FileSortSchema,
 });
+
 export const FileCopyInputSchema = Schema.Struct({
   fileId: PositiveFileIdSchema,
   name: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   parentId: NonNegativeFileIdSchema,
 });
+
 export const FileTouchInputSchema = Schema.Struct({
   fileIds: Schema.Array(NonNegativeFileIdSchema).check(Schema.isMinLength(1)),
   updatedAt: Schema.optional(Schema.Date),
 });
+
 export const FileMediaMetadataSchema = Schema.Struct({
   aspect_ratio: Schema.optional(
     Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
@@ -87,33 +95,33 @@ export const FileMediaMetadataSchema = Schema.Struct({
   height: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   width: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
 });
+
 export const FileMediaInfoFormatSchema = Schema.Struct({
   bit_rate: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
   duration: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
   name: Schema.optional(Schema.String),
 });
+
 export const FileMediaInfoStreamSchema = Schema.Struct({
   channels: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-  // Streams whose codec was not identified can carry a null name.
   codec_name: Schema.optional(Schema.NullOr(Schema.String)),
   codec_type: Schema.optional(Schema.String),
   height: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-  // FFmpeg reports an unknown codec level as -99, including MJPEG streams.
   level: Schema.optional(
     Schema.Union([Schema.Literal(-99), Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))]),
   ),
   profile: Schema.optional(Schema.NullOr(Schema.String)),
-  // put.io only derives an RFC 6381 codec string for MP4-family containers;
-  // Matroska and other streams report null.
   rfc6381_codec: Schema.optional(Schema.NullOr(Schema.String)),
   width: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
+
 export const FileMediaInfoSchema = Schema.Struct({
   format: Schema.optional(Schema.NullOr(FileMediaInfoFormatSchema)),
   mime_type: Schema.optional(Schema.NullOr(Schema.String)),
   playback_issues: Schema.optional(Schema.Array(Schema.String)),
   streams: Schema.optional(Schema.Array(FileMediaInfoStreamSchema)),
 });
+
 export const FileBaseSchema = Schema.Struct({
   content_type: Schema.NullOr(Schema.String),
   created_at: Schema.String,
@@ -136,6 +144,7 @@ export const FileBaseSchema = Schema.Struct({
   start_from: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
   updated_at: Schema.String,
 });
+
 export const FileBroadSchema = FileBaseSchema.pipe(
   Schema.fieldsAssign({
     content_type_and_codecs: Schema.optional(Schema.NullOr(Schema.String)),
@@ -150,6 +159,7 @@ export const FileBroadSchema = FileBaseSchema.pipe(
     video_metadata: Schema.optional(Schema.NullOr(FileMediaMetadataSchema)),
   }),
 );
+
 export const FileQuerySchema = Schema.Struct({
   codecs: Schema.optional(RequestedFlag),
   media_info: Schema.optional(RequestedFlag),
@@ -159,11 +169,13 @@ export const FileQuerySchema = Schema.Struct({
   stream_url: Schema.optional(RequestedFlag),
   video_metadata: Schema.optional(RequestedFlag),
 });
+
 export const FileGetChildInputSchema = Schema.Struct({
   name: Schema.String.check(Schema.isMinLength(1)),
   parentId: NonNegativeFileIdSchema,
   query: Schema.optional(FileQuerySchema),
 });
+
 export const FilesListQuerySchema = FileQuerySchema.mapFields(
   ({ codecs: _codecs, media_info: _mediaInfo, ...fields }) => fields,
 ).pipe(
@@ -186,15 +198,19 @@ export const FilesListQuerySchema = FileQuerySchema.mapFields(
     video_metadata_parent: Schema.optional(RequestedFlag),
   }),
 );
+
 export const FilesSearchQuerySchema = Schema.Struct({
   per_page: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
   query: Schema.String,
 });
+
 export const FileBreadcrumbSchema = Schema.Tuple([Schema.Int, Schema.String]);
+
 const FileEnvelopeSchema = Schema.Struct({
   file: FileBroadSchema,
   status: Schema.Literal("OK"),
 });
+
 export const FilesListEnvelopeSchema = Schema.Struct({
   breadcrumbs: Schema.optional(Schema.Array(FileBreadcrumbSchema)),
   cursor: Schema.NullOr(Schema.String),
@@ -203,50 +219,47 @@ export const FilesListEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   total: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
-const FilesListContinueEnvelopeSchema = Schema.Struct({
-  breadcrumbs: Schema.optional(Schema.Array(FileBreadcrumbSchema)),
-  cursor: Schema.NullOr(Schema.String),
-  files: Schema.Array(FileBroadSchema),
-  parent: Schema.optional(Schema.NullOr(FileBroadSchema)),
-  status: Schema.Literal("OK"),
-  total: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
-});
+
+const FilesListContinueEnvelopeSchema = FilesListEnvelopeSchema.pipe(
+  Schema.fieldsAssign({ parent: Schema.optional(Schema.NullOr(FileBroadSchema)) }),
+);
+
 const FilesSearchEnvelopeSchema = Schema.Struct({
   cursor: Schema.NullOr(Schema.String),
   files: Schema.Array(FileBroadSchema),
   status: Schema.Literal("OK"),
   total: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
+
 const FilesListInputSchema = Schema.Struct({
   parent: Schema.Union([ReadableFileIdSchema, Schema.Literal("friends")]),
   query: FilesListQuerySchema,
 });
+
 const FilesContinueInputSchema = Schema.Struct({
   cursor: NonEmptyStringSchema,
   query: Schema.Struct({
     per_page: Schema.optional(PositiveIntegerSchema),
   }),
 });
+
 const FileGetInputSchema = Schema.Struct({
   id: ReadableFileIdSchema,
   query: Schema.optional(FileQuerySchema),
 });
-const FilesSearchContinueInputSchema = Schema.Struct({
-  cursor: NonEmptyStringSchema,
-  query: Schema.Struct({
-    per_page: Schema.optional(PositiveIntegerSchema),
-  }),
-});
+
 const FileSubtitlesInputSchema = Schema.Struct({
   fileId: PositiveFileIdSchema,
   options: Schema.Struct({
     languages: Schema.optional(Schema.Array(NonEmptyStringSchema).check(Schema.isMinLength(1))),
   }),
 });
+
 const FileNextInputSchema = Schema.Struct({
   fileId: PositiveFileIdSchema,
   fileType: FileTypeSchema,
 });
+
 const FileCreateFolderInputSchema = Schema.Struct({
   name: Schema.optional(NonEmptyStringSchema),
   parent_id: Schema.optional(NonNegativeFileIdSchema),
@@ -256,59 +269,72 @@ const FileCreateFolderInputSchema = Schema.Struct({
     expected: "a non-empty folder name or path",
   }),
 );
+
 const FileRenameInputSchema = Schema.Struct({
   file_id: PositiveFileIdSchema,
   name: NonEmptyStringSchema,
 });
+
 const FileStartFromSetInputSchema = Schema.Struct({
   file_id: PositiveFileIdSchema,
   time: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
 });
+
 const FileStartFromEnvelopeSchema = Schema.Struct({
   start_from: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   status: Schema.Literal("OK"),
 });
+
 const FileDownloadUrlEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   url: Schema.String,
 });
+
 const FileCanWriteEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   user_id: Schema.Int,
 });
+
 const FileUploadTransferSchema = Schema.Struct({
   id: Schema.Int,
   name: Schema.String,
 });
+
 const FileUploadEnvelopeSchema = Schema.Struct({
   file: Schema.optional(FileBroadSchema),
   status: Schema.Literal("OK"),
   transfer: Schema.optional(FileUploadTransferSchema),
 });
+
 const FileConversionNotAvailableSchema = Schema.Struct({
   id: Schema.Int,
   status: Schema.Literal("NOT_AVAILABLE"),
 });
+
 const FileConversionInQueueSchema = Schema.Struct({
   id: Schema.Int,
   percent_done: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
   status: Schema.Literal("IN_QUEUE"),
 });
+
 const FileConversionConvertingSchema = Schema.Struct({
   id: Schema.Int,
   percent_done: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   status: Schema.Literal("CONVERTING"),
 });
+
 const FileConversionCompletedSchema = Schema.Struct({
   id: Schema.Int,
   percent_done: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
   status: Schema.Literal("COMPLETED"),
 });
+
 const FileConversionErrorSchema = Schema.Struct({
   id: Schema.Int,
   status: Schema.Literal("ERROR"),
 });
+
 export const FileConversionStatusSchema = Schema.Union([
   FileConversionNotAvailableSchema,
   FileConversionInQueueSchema,
@@ -316,17 +342,21 @@ export const FileConversionStatusSchema = Schema.Union([
   FileConversionCompletedSchema,
   FileConversionErrorSchema,
 ]);
+
 const FileConversionStatusEnvelopeSchema = Schema.Struct({
   mp4: FileConversionStatusSchema,
   status: Schema.Literal("OK"),
 });
+
 const FilesBulkConvertEnvelopeSchema = Schema.Struct({
   count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   status: Schema.Literal("OK"),
 });
+
 const ActiveConversionFields = {
   name: Schema.String,
 };
+
 export const FileActiveConversionSchema = Schema.Union([
   FileConversionNotAvailableSchema.pipe(Schema.fieldsAssign(ActiveConversionFields)),
   FileConversionInQueueSchema.pipe(Schema.fieldsAssign(ActiveConversionFields)),
@@ -334,9 +364,11 @@ export const FileActiveConversionSchema = Schema.Union([
   FileConversionCompletedSchema.pipe(Schema.fieldsAssign(ActiveConversionFields)),
   FileConversionErrorSchema.pipe(Schema.fieldsAssign(ActiveConversionFields)),
 ]);
+
 const FileActiveConversionsEnvelopeSchema = Schema.Struct({
   mp4s: Schema.Array(FileActiveConversionSchema),
 });
+
 export const FileSubtitleSchema = Schema.Struct({
   format: Schema.String,
   key: Schema.String,
@@ -346,25 +378,30 @@ export const FileSubtitleSchema = Schema.Struct({
   source: Schema.String,
   url: Schema.String,
 });
+
 const FileSubtitlesEnvelopeSchema = Schema.Struct({
   default: Schema.NullOr(Schema.String),
   subtitles: Schema.Array(FileSubtitleSchema),
 });
+
 const FileDeleteResultEnvelopeSchema = Schema.Struct({
   cursor: Schema.NullOr(Schema.String),
   skipped: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   status: Schema.Literal("OK"),
 });
+
 export const FilesMoveErrorSchema = Schema.Struct({
   error_type: Schema.String,
   id: Schema.Int,
   name: Schema.NullOr(Schema.String),
   status_code: Schema.Int,
 });
+
 const FilesMoveEnvelopeSchema = Schema.Struct({
   errors: Schema.Array(FilesMoveErrorSchema),
   status: Schema.Literal("OK"),
 });
+
 export const FileExtractionStatusSchema = Schema.Literals([
   "ERROR",
   "EXTRACTED",
@@ -374,6 +411,7 @@ export const FileExtractionStatusSchema = Schema.Literals([
   "PASSWORD_OBTAINED",
   "SENT_TO_QUEUE",
 ]);
+
 export const FileExtractionSchema = Schema.Struct({
   files: Schema.Array(Schema.Int),
   id: Schema.Int,
@@ -382,10 +420,12 @@ export const FileExtractionSchema = Schema.Struct({
   num_parts: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   status: FileExtractionStatusSchema,
 });
+
 const FileExtractionsEnvelopeSchema = Schema.Struct({
   extractions: Schema.Array(FileExtractionSchema),
   status: Schema.optional(Schema.Literal("OK")),
 });
+
 const FilesBulkSelectionSchema = Schema.Struct({
   cursor: Schema.optional(NonEmptyStringSchema),
   excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
@@ -395,51 +435,64 @@ const FilesBulkSelectionSchema = Schema.Struct({
     expected: "a non-empty cursor or file ID selection",
   }),
 );
+
 const FilesDeleteOptionsSchema = Schema.Struct({
   ignoreFileOwner: Schema.optional(Schema.Boolean),
   partialDelete: Schema.optional(Schema.Boolean),
   skipTrash: Schema.optional(Schema.Boolean),
 });
+
 const FilesSelectionDeleteOptionsSchema = Schema.Struct({
   partialDelete: Schema.optional(Schema.Boolean),
   skipTrash: Schema.optional(Schema.Boolean),
 });
+
 const FilesIdsInputSchema = Schema.Array(PositiveFileIdSchema).check(Schema.isMinLength(1));
+
 const FilesMoveInputSchema = Schema.Struct({
   ids: FilesIdsInputSchema,
   parentId: NonNegativeFileIdSchema,
 });
+
 const FilesMoveSelectionInputSchema = Schema.Struct({
   parentId: NonNegativeFileIdSchema,
   selection: FilesBulkSelectionSchema,
 });
-const FilesWatchStatusInputSchema = makeCursorSelectionSchema("ids", "excludeIds", {
+
+const FilesWatchStatusInputSchema = cursorSelectionSchema("ids", "excludeIds", {
   watched: Schema.Boolean,
 });
-const FilesExtractInputSchema = makeCursorSelectionSchema("ids", "excludeIds", {
+
+const FilesExtractInputSchema = cursorSelectionSchema("ids", "excludeIds", {
   password: Schema.optional(NonEmptyStringSchema),
 });
+
 const FileUploadInputSchema = Schema.Struct({
   file: Schema.instanceOf(Blob),
   fileName: Schema.optional(NonEmptyStringSchema),
   parentId: Schema.optional(NonNegativeFileIdSchema),
 });
+
 const FileUploadOptionsSchema = Schema.Struct({
   oauthToken: Schema.optional(NonEmptyStringSchema),
 });
+
 const FileDirectAccessOptionsSchema = Schema.Struct({
   downloadToken: NonEmptyStringSchema,
   useTunnel: Schema.optional(Schema.Boolean),
 });
+
 const FileApiDownloadUrlOptionsSchema = FileDirectAccessOptionsSchema.pipe(
   Schema.fieldsAssign({ name: Schema.optional(NonEmptyStringSchema) }),
 );
+
 const FileApiMp4DownloadUrlOptionsSchema = FileDirectAccessOptionsSchema.pipe(
   Schema.fieldsAssign({
     convert: Schema.optional(Schema.Boolean),
     name: Schema.optional(NonEmptyStringSchema),
   }),
 );
+
 const FileHlsStreamUrlOptionsSchema = Schema.Struct({
   maxSubtitleCount: Schema.optional(PositiveIntegerSchema),
   downloadToken: NonEmptyStringSchema,
@@ -448,6 +501,7 @@ const FileHlsStreamUrlOptionsSchema = Schema.Struct({
     Schema.Array(NonEmptyStringSchema).check(Schema.isMinLength(1)),
   ),
 });
+
 const FileHlsMasterPlaylistOptionsSchema = Schema.Struct({
   maxSubtitleCount: Schema.optional(PositiveIntegerSchema),
   playOriginal: Schema.optional(Schema.Boolean),
@@ -455,59 +509,97 @@ const FileHlsMasterPlaylistOptionsSchema = Schema.Struct({
     Schema.Array(NonEmptyStringSchema).check(Schema.isMinLength(1)),
   ),
 });
+
 const FileXspfPlaylistUrlOptionsSchema = Schema.Struct({
   downloadToken: NonEmptyStringSchema,
 });
+
 const FilesNextFileSchema = Schema.Struct({
   id: Schema.Int,
   name: Schema.String,
   parent_id: Schema.NullOr(Schema.Int),
 });
+
 const FilesNextFileEnvelopeSchema = Schema.Struct({
   next_file: FilesNextFileSchema,
   status: Schema.Literal("OK"),
 });
+
 const FilesNextVideoEnvelopeSchema = Schema.Struct({
   next_video: FilesNextFileSchema,
   status: Schema.Literal("OK"),
 });
+
 export type FileType = Schema.Schema.Type<typeof FileTypeSchema>;
+
 export type FolderType = Schema.Schema.Type<typeof FolderTypeSchema>;
+
 export type FileSort = Schema.Schema.Type<typeof FileSortSchema>;
+
 export type FileSetSortInput = Schema.Schema.Type<typeof FileSetSortInputSchema>;
+
 export type FileCopyInput = Schema.Schema.Type<typeof FileCopyInputSchema>;
+
 export type FileTouchInput = Schema.Schema.Type<typeof FileTouchInputSchema>;
+
 export type FileMediaMetadata = Schema.Schema.Type<typeof FileMediaMetadataSchema>;
+
 export type FileMediaInfo = Schema.Schema.Type<typeof FileMediaInfoSchema>;
+
 export type FileBase = Schema.Schema.Type<typeof FileBaseSchema>;
+
 export type FileBroad = Schema.Schema.Type<typeof FileBroadSchema>;
+
 export type FileCore = FileBase;
+
 export type FileVideoMetadata = FileMediaMetadata;
+
 export type FileQuery = Schema.Schema.Type<typeof FileQuerySchema>;
+
 export type FileGetChildInput = Schema.Schema.Type<typeof FileGetChildInputSchema>;
+
 export type FilesListQuery = Schema.Schema.Type<typeof FilesListQuerySchema>;
+
 export type FilesSearchQuery = Schema.Schema.Type<typeof FilesSearchQuerySchema>;
+
 export type FileBreadcrumb = Schema.Schema.Type<typeof FileBreadcrumbSchema>;
+
 export type FileListResponse = Schema.Schema.Type<typeof FilesListEnvelopeSchema>;
+
 export type FileListContinuationResponse = Schema.Schema.Type<
   typeof FilesListContinueEnvelopeSchema
 >;
+
 export type FileSearchResponse = Schema.Schema.Type<typeof FilesSearchEnvelopeSchema>;
+
 export type FileCreateFolderInput = Schema.Schema.Type<typeof FileCreateFolderInputSchema>;
+
 export type FileRenameInput = Schema.Schema.Type<typeof FileRenameInputSchema>;
+
 export type FileStartFromSetInput = Schema.Schema.Type<typeof FileStartFromSetInputSchema>;
+
 export type FileConversionStatus = Schema.Schema.Type<typeof FileConversionStatusSchema>;
+
 export type FileActiveConversion = Schema.Schema.Type<typeof FileActiveConversionSchema>;
+
 export type FileExtractionStatus = Schema.Schema.Type<typeof FileExtractionStatusSchema>;
+
 export type FileExtraction = Schema.Schema.Type<typeof FileExtractionSchema>;
+
 export type FileSubtitle = Schema.Schema.Type<typeof FileSubtitleSchema>;
+
 export type FilesMoveError = Schema.Schema.Type<typeof FilesMoveErrorSchema>;
-type FilesBulkSelectionShape = Schema.Schema.Type<typeof FilesBulkSelectionSchema>;
+
+type FilesBulkSelectionFields = Schema.Schema.Type<typeof FilesBulkSelectionSchema>;
+
 export type FilesBulkSelection =
-  | (FilesBulkSelectionShape & { readonly cursor: string })
-  | (FilesBulkSelectionShape & { readonly ids: ReadonlyArray<number> });
+  | (FilesBulkSelectionFields & { readonly cursor: string })
+  | (FilesBulkSelectionFields & { readonly ids: ReadonlyArray<number> });
+
 export type FileUploadTransfer = Schema.Schema.Type<typeof FileUploadTransferSchema>;
+
 export type FileUploadEnvelope = Schema.Schema.Type<typeof FileUploadEnvelopeSchema>;
+
 export type FileUploadResult =
   | {
       readonly type: "file";
@@ -517,21 +609,26 @@ export type FileUploadResult =
       readonly type: "transfer";
       readonly transfer: FileUploadTransfer;
     };
+
 export type FileDirectAccessOptions = {
   /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
   readonly downloadToken: string;
   readonly useTunnel?: boolean;
 };
+
 export type FileApiDownloadUrlOptions = FileDirectAccessOptions & {
   readonly name?: string;
 };
+
 export type FileApiMp4DownloadUrlOptions = FileDirectAccessOptions & {
   readonly convert?: boolean;
   readonly name?: string;
 };
+
 export type FileHlsMasterPlaylistOptions = Schema.Schema.Type<
   typeof FileHlsMasterPlaylistOptionsSchema
 >;
+
 export type FileHlsStreamUrlOptions = {
   readonly maxSubtitleCount?: number;
   /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
@@ -539,20 +636,24 @@ export type FileHlsStreamUrlOptions = {
   readonly playOriginal?: boolean;
   readonly subtitleLanguages?: ReadonlyArray<string>;
 };
+
 export type FileXspfPlaylistUrlOptions = {
   /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
   readonly downloadToken: string;
 };
+
 export type FileUploadInput = {
   readonly file: Blob;
   readonly fileName?: string;
   readonly parentId?: number;
 };
+
 export type FileUploadRequestDescriptor = {
   readonly body: FormData;
   readonly method: "POST";
   readonly url: string;
 };
+
 export type FileResponseFor<TQuery extends FileQuery> = FileBase &
   (TQuery["stream_url"] extends 1
     ? {
@@ -601,6 +702,7 @@ export type FileResponseFor<TQuery extends FileQuery> = FileBase &
         readonly media_info: FileMediaInfo | null;
       }
     : {});
+
 export const QueryFilesErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "query",
@@ -609,6 +711,7 @@ export const QueryFilesErrorSpec = definePutioOperationErrorSpec({
     { errorType: "invalid_scope", statusCode: 401 as const },
   ],
 });
+
 export const ContinueFilesErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "continue",
@@ -617,6 +720,7 @@ export const ContinueFilesErrorSpec = definePutioOperationErrorSpec({
     { errorType: "invalid_scope", statusCode: 401 as const },
   ],
 });
+
 export const GetFileErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "get",
@@ -625,6 +729,7 @@ export const GetFileErrorSpec = definePutioOperationErrorSpec({
     { errorType: "invalid_scope", statusCode: 401 as const },
   ],
 });
+
 export const GetHlsMasterPlaylistErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "hlsMasterPlaylist",
@@ -638,6 +743,7 @@ export const GetHlsMasterPlaylistErrorSpec = definePutioOperationErrorSpec({
     { errorType: "FILE_NOT_READY", statusCode: 503 as const },
   ],
 });
+
 export const GetFileChildErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "getChild",
@@ -648,6 +754,7 @@ export const GetFileChildErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const CopyFileErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "copy",
@@ -659,6 +766,7 @@ export const CopyFileErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const TouchFilesErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "touch",
@@ -668,6 +776,7 @@ export const TouchFilesErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 403 as const },
   ],
 });
+
 export const CanWriteFileErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "canWrite",
@@ -678,6 +787,7 @@ export const CanWriteFileErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const SearchFilesErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "search",
@@ -687,6 +797,7 @@ export const SearchFilesErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
+
 export const CreateFolderErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "createFolder",
@@ -699,6 +810,7 @@ export const CreateFolderErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const RenameFileErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "rename",
@@ -711,6 +823,7 @@ export const RenameFileErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const StartFromErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "startFrom",
@@ -721,6 +834,7 @@ export const StartFromErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const DownloadUrlErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "getDownloadUrl",
@@ -730,6 +844,7 @@ export const DownloadUrlErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const FileMp4ErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "mp4",
@@ -741,6 +856,7 @@ export const FileMp4ErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const FileSubtitlesErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "listSubtitles",
@@ -750,6 +866,7 @@ export const FileSubtitlesErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 402 as const },
   ],
 });
+
 export const FileActiveConversionsErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "listActiveConversions",
@@ -758,6 +875,7 @@ export const FileActiveConversionsErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 402 as const },
   ],
 });
+
 export const FileMp4MutationErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "manageMp4",
@@ -771,6 +889,7 @@ export const FileMp4MutationErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const FileExtractionsErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "extract",
@@ -780,6 +899,7 @@ export const FileExtractionsErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 402 as const },
   ],
 });
+
 export const FileWatchStatusErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "setWatchStatus",
@@ -789,6 +909,7 @@ export const FileWatchStatusErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 400 as const },
   ],
 });
+
 export const FileUploadErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "upload",
@@ -799,47 +920,68 @@ export const FileUploadErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 429 as const },
   ],
 });
+
 export type QueryFilesError = PutioOperationFailure<typeof QueryFilesErrorSpec>;
+
 export type ContinueFilesError = PutioOperationFailure<typeof ContinueFilesErrorSpec>;
+
 export type GetFileError = PutioOperationFailure<typeof GetFileErrorSpec>;
+
 export type GetHlsMasterPlaylistError = PutioOperationFailure<typeof GetHlsMasterPlaylistErrorSpec>;
+
 export type GetFileChildError = PutioOperationFailure<typeof GetFileChildErrorSpec>;
+
 export type CopyFileError = PutioOperationFailure<typeof CopyFileErrorSpec>;
+
 export type TouchFilesError = PutioOperationFailure<typeof TouchFilesErrorSpec>;
+
 export type CanWriteFileError = PutioOperationFailure<typeof CanWriteFileErrorSpec>;
+
 export type SearchFilesError = PutioOperationFailure<typeof SearchFilesErrorSpec>;
+
 export type CreateFolderError = PutioOperationFailure<typeof CreateFolderErrorSpec>;
+
 export type RenameFileError = PutioOperationFailure<typeof RenameFileErrorSpec>;
+
 export type StartFromError = PutioOperationFailure<typeof StartFromErrorSpec>;
+
 export type DownloadUrlError = PutioOperationFailure<typeof DownloadUrlErrorSpec>;
+
 export type FileMp4Error = PutioOperationFailure<typeof FileMp4ErrorSpec>;
+
 export type FileSubtitlesError = PutioOperationFailure<typeof FileSubtitlesErrorSpec>;
+
 export type FileActiveConversionsError = PutioOperationFailure<
   typeof FileActiveConversionsErrorSpec
 >;
+
 export type FileMp4MutationError = PutioOperationFailure<typeof FileMp4MutationErrorSpec>;
+
 export type FileExtractionsError = PutioOperationFailure<typeof FileExtractionsErrorSpec>;
+
 export type FileWatchStatusError = PutioOperationFailure<typeof FileWatchStatusErrorSpec>;
+
 export type FileUploadError = PutioOperationFailure<typeof FileUploadErrorSpec>;
-const missingFieldError = (field: string) =>
-  new PutioValidationError({
-    cause: `Expected put.io to include "${field}" because it was requested`,
-  });
+
 const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
-  Effect.fail(missingFieldError(field));
-const widenValidationError = <A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-): Effect.Effect<A, E | PutioValidationError, R> => effect;
+  Effect.fail(
+    new PutioValidationError({
+      cause: `Expected put.io to include "${field}" because it was requested`,
+    }),
+  );
+
 const hasStreamUrl = (
   value: FileBroad,
 ): value is FileBroad & {
   readonly stream_url: string | null;
 } => "stream_url" in value;
+
 const hasMp4StreamUrl = (
   value: FileBroad,
 ): value is FileBroad & {
   readonly mp4_stream_url: string | null;
 } => "mp4_stream_url" in value;
+
 const hasMp4StreamUrlWhenAvailable = (
   value: FileBroad,
 ): value is FileBroad &
@@ -852,43 +994,50 @@ const hasMp4StreamUrlWhenAvailable = (
         readonly is_mp4_available: false;
       }
   ) => !value.is_mp4_available || hasMp4StreamUrl(value);
+
 const hasMp4StatusFields = (
   value: FileBroad,
 ): value is FileBroad & {
   readonly mp4_size: number | null;
   readonly need_convert: boolean;
-} => "mp4_size" in value && typeof value.need_convert === "boolean";
+} => "mp4_size" in value && value.need_convert !== undefined;
+
 const hasVideoMetadata = (
   value: FileBroad,
 ): value is FileBroad & {
   readonly video_metadata: FileMediaMetadata | null;
 } => "video_metadata" in value;
+
 const hasMediaMetadata = (
   value: FileBroad,
 ): value is FileBroad & {
   readonly media_metadata: FileMediaMetadata | null;
 } => "media_metadata" in value;
+
 const hasCodecs = (
   value: FileBroad,
 ): value is FileBroad & {
   readonly content_type_and_codecs: string | null;
 } => "content_type_and_codecs" in value;
+
 const hasMediaInfo = (
   value: FileBroad,
 ): value is FileBroad & {
   readonly media_info: FileMediaInfo | null;
 } => "media_info" in value;
+
 const useTunnelToQuery = (useTunnel?: boolean) =>
   useTunnel === false
     ? {
         notunnel: 1,
       }
     : {};
+
 const resolveRouteContext = (
   token?: string,
 ): Effect.Effect<
   {
-    readonly config: PutioSdkConfigShape;
+    readonly config: PutioSdkOptions;
     readonly token: string;
   },
   PutioSdkError,
@@ -897,40 +1046,50 @@ const resolveRouteContext = (
   Effect.gen(function* () {
     const config = yield* PutioSdkConfig;
     const resolvedToken = token ?? config.accessToken;
+
     if (resolvedToken) {
       return {
         config,
         token: resolvedToken,
       };
     }
+
     return yield* Effect.fail(
       mapConfigurationError(
         "This helper requires a token, but neither an override nor PutioSdkConfig.accessToken was provided",
       ),
     );
   });
-const resolveApiBaseUrl: Effect.Effect<string, never, PutioSdkConfig> = Effect.gen(function* () {
-  const config = yield* PutioSdkConfig;
-  return config.baseUrl ?? "https://api.put.io";
-});
-const normalizeFileName = (name: string) => encodeURIComponent(name);
-const toUploadResult = (value: FileUploadEnvelope): FileUploadResult => {
+
+const resolveApiBaseUrl: Effect.Effect<string | URL, never, PutioSdkConfig> = Effect.gen(
+  function* () {
+    const config = yield* PutioSdkConfig;
+
+    return config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL;
+  },
+);
+
+const toOriginalFlag = (playOriginal: boolean | undefined) =>
+  playOriginal === undefined ? undefined : playOriginal ? 1 : 0;
+
+const toUploadResult = (
+  value: FileUploadEnvelope,
+): Effect.Effect<FileUploadResult, PutioValidationError> => {
   if (value.file) {
-    return {
-      file: value.file,
-      type: "file",
-    };
+    return Effect.succeed({ file: value.file, type: "file" });
   }
+
   if (value.transfer) {
-    return {
-      transfer: value.transfer,
-      type: "transfer",
-    };
+    return Effect.succeed({ transfer: value.transfer, type: "transfer" });
   }
-  throw new PutioValidationError({
-    cause: 'Expected put.io upload response to contain either "file" or "transfer"',
-  });
+
+  return Effect.fail(
+    new PutioValidationError({
+      cause: 'Expected put.io upload response to contain either "file" or "transfer"',
+    }),
+  );
 };
+
 export const buildFileApiDownloadUrl = (
   baseUrl: string | URL,
   fileId: number,
@@ -939,13 +1098,14 @@ export const buildFileApiDownloadUrl = (
   buildPutioUrl(
     baseUrl,
     options.name
-      ? `/v2/files/${encodePathSegment(fileId)}/download/${normalizeFileName(options.name)}`
+      ? `/v2/files/${encodePathSegment(fileId)}/download/${encodePathSegment(options.name)}`
       : `/v2/files/${encodePathSegment(fileId)}/download`,
     {
       ...useTunnelToQuery(options.useTunnel),
       oauth_token: options.downloadToken,
     },
   );
+
 export const buildFileApiContentUrl = (
   baseUrl: string | URL,
   fileId: number,
@@ -955,6 +1115,7 @@ export const buildFileApiContentUrl = (
     ...useTunnelToQuery(options.useTunnel),
     oauth_token: options.downloadToken,
   });
+
 export const buildFileApiMp4DownloadUrl = (
   baseUrl: string | URL,
   fileId: number,
@@ -963,7 +1124,7 @@ export const buildFileApiMp4DownloadUrl = (
   buildPutioUrl(
     baseUrl,
     options.name
-      ? `/v2/files/${encodePathSegment(fileId)}/mp4/download/${normalizeFileName(options.name)}`
+      ? `/v2/files/${encodePathSegment(fileId)}/mp4/download/${encodePathSegment(options.name)}`
       : `/v2/files/${encodePathSegment(fileId)}/mp4/download`,
     {
       ...useTunnelToQuery(options.useTunnel),
@@ -971,6 +1132,7 @@ export const buildFileApiMp4DownloadUrl = (
       oauth_token: options.downloadToken,
     },
   );
+
 export const buildFileHlsStreamUrl = (
   baseUrl: string | URL,
   fileId: number,
@@ -979,10 +1141,10 @@ export const buildFileHlsStreamUrl = (
   buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/hls/media.m3u8`, {
     max_subtitle_count: options.maxSubtitleCount,
     oauth_token: options.downloadToken,
-    original:
-      typeof options.playOriginal === "boolean" ? (options.playOriginal ? 1 : 0) : undefined,
+    original: toOriginalFlag(options.playOriginal),
     subtitle_languages: joinCsv(options.subtitleLanguages),
   });
+
 export const buildFileXspfPlaylistUrl = (
   baseUrl: string | URL,
   fileId: number,
@@ -991,50 +1153,62 @@ export const buildFileXspfPlaylistUrl = (
   buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/xspf`, {
     oauth_token: options.downloadToken,
   });
+
 export const createFileUploadFormData = (input: FileUploadInput): FormData => {
   const formData = new FormData();
   formData.append("file", input.file);
+
   if (input.fileName) {
     formData.append("filename", input.fileName);
   }
+
   if (input.parentId !== undefined) {
     formData.append("parent_id", String(input.parentId));
   }
+
   return formData;
 };
-const ensureFileQueryFields = <TQuery extends FileQuery, E>(
+
+const ensureFileQueryFields = <E>(
   effect: Effect.Effect<FileBroad, E, PutioSdkContext>,
-  query: TQuery,
-): Effect.Effect<FileResponseFor<TQuery>, E | PutioValidationError, PutioSdkContext> =>
+  query: FileQuery,
+): Effect.Effect<FileBroad, E | PutioValidationError, PutioSdkContext> =>
   Effect.gen(function* () {
-    const file = yield* widenValidationError(effect);
+    const file = yield* effect;
+
     if (query.stream_url === 1 && !hasStreamUrl(file)) {
       return yield* failMissingField("stream_url");
     }
+
     if ((query.mp4_status === 1 || query.mp4_stream_url === 1) && !hasMp4StatusFields(file)) {
       return yield* failMissingField(
         query.mp4_stream_url === 1 ? "mp4_size/need_convert" : "mp4_size",
       );
     }
+
     if (query.mp4_stream_url === 1 && !hasMp4StreamUrlWhenAvailable(file)) {
       return yield* failMissingField("mp4_stream_url");
     }
+
     if (query.video_metadata === 1 && query.media_metadata !== 1 && !hasVideoMetadata(file)) {
       return yield* failMissingField("video_metadata");
     }
+
     if (query.media_metadata === 1 && !hasMediaMetadata(file)) {
       return yield* failMissingField("media_metadata");
     }
+
     if (query.codecs === 1 && !hasCodecs(file)) {
       return yield* failMissingField("content_type_and_codecs");
     }
+
     if (query.media_info === 1 && !hasMediaInfo(file)) {
       return yield* failMissingField("media_info");
     }
-    // Requested-field checks above turn the decoded broad payload into the
-    // query-conditioned response contract the rest of the SDK can trust.
-    return file as FileResponseFor<TQuery>;
+
+    return file;
   });
+
 export const queryFiles = (
   parent: number | "friends",
   query: FilesListQuery = {},
@@ -1055,6 +1229,7 @@ export const queryFiles = (
             },
     }),
   ).pipe(withOperationErrors(QueryFilesErrorSpec));
+
 export const continueFiles = (
   cursor: string,
   query: {
@@ -1074,6 +1249,7 @@ export const continueFiles = (
       query: decodedInput.query,
     }),
   ).pipe(withOperationErrors(ContinueFilesErrorSpec));
+
 export function getFile(input: {
   readonly id: number;
 }): Effect.Effect<FileCore, GetFileError | PutioValidationError, PutioSdkContext>;
@@ -1088,11 +1264,13 @@ export function getFile(input: { readonly id: number; readonly query?: FileQuery
       path: `/v2/files/${encodePathSegment(decodedInput.id)}`,
       query: decodedInput.query,
     }).pipe(selectJsonField("file"), withOperationErrors(GetFileErrorSpec));
+
     return decodedInput.query === undefined
       ? effect
       : ensureFileQueryFields(effect, decodedInput.query);
   });
 }
+
 export function getFileChild(input: {
   readonly name: string;
   readonly parentId: number;
@@ -1107,103 +1285,85 @@ export function getFileChild<TQuery extends FileQuery>(input: {
   PutioSdkContext
 >;
 export function getFileChild(input: FileGetChildInput) {
-  return Schema.decodeUnknownEffect(FileGetChildInputSchema, { onExcessProperty: "error" })(
-    input,
-  ).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) => {
-      const effect = requestJson(FileEnvelopeSchema, {
-        method: "GET",
-        path: `/v2/files/${encodePathSegment(decodedInput.parentId)}/child`,
-        query: {
-          ...decodedInput.query,
-          name: decodedInput.name,
-        },
-      }).pipe(selectJsonField("file"), withOperationErrors(GetFileChildErrorSpec));
-      return decodedInput.query === undefined
-        ? effect
-        : ensureFileQueryFields(effect, decodedInput.query);
-    }),
-  );
+  return decodeAndRun(FileGetChildInputSchema, input, (decodedInput) => {
+    const effect = requestJson(FileEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedInput.parentId)}/child`,
+      query: {
+        ...decodedInput.query,
+        name: decodedInput.name,
+      },
+    }).pipe(selectJsonField("file"), withOperationErrors(GetFileChildErrorSpec));
+
+    return decodedInput.query === undefined
+      ? effect
+      : ensureFileQueryFields(effect, decodedInput.query);
+  });
 }
+
 export const copyFile = (
   input: FileCopyInput,
 ): Effect.Effect<FileBroad, CopyFileError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FileCopyInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(FileEnvelopeSchema, {
-        body: {
-          type: "form",
-          value: {
-            file_id: decodedInput.fileId,
-            name: decodedInput.name,
-            parent_id: decodedInput.parentId,
-          },
+  decodeAndRun(FileCopyInputSchema, input, (decodedInput) =>
+    requestJson(FileEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          file_id: decodedInput.fileId,
+          name: decodedInput.name,
+          parent_id: decodedInput.parentId,
         },
-        method: "POST",
-        path: "/v2/files/copy",
-      }),
-    ),
-    selectJsonField("file"),
-    withOperationErrors(CopyFileErrorSpec),
-  );
+      },
+      method: "POST",
+      path: "/v2/files/copy",
+    }),
+  ).pipe(selectJsonField("file"), withOperationErrors(CopyFileErrorSpec));
+
 export const touchFiles = (
   input: FileTouchInput,
 ): Effect.Effect<void, TouchFilesError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FileTouchInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value: {
-            file_ids: joinCsv(decodedInput.fileIds),
-            updated_at: decodedInput.updatedAt?.toISOString(),
-          },
+  decodeAndRun(FileTouchInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          file_ids: joinCsv(decodedInput.fileIds),
+          updated_at: decodedInput.updatedAt?.toISOString(),
         },
-        method: "POST",
-        path: "/v2/files/touch",
-      }),
-    ),
-    Effect.asVoid,
-    withOperationErrors(TouchFilesErrorSpec),
-  );
+      },
+      method: "POST",
+      path: "/v2/files/touch",
+    }),
+  ).pipe(Effect.asVoid, withOperationErrors(TouchFilesErrorSpec));
+
 export const canWriteFile = (
   fileId: number,
 ): Effect.Effect<number, CanWriteFileError | PutioValidationError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(PositiveFileIdSchema)(fileId).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedFileId) =>
-      requestJson(FileCanWriteEnvelopeSchema, {
-        method: "GET",
-        path: `/v2/files/${encodePathSegment(decodedFileId)}/can-write`,
-      }),
-    ),
-    selectJsonField("user_id"),
-    withOperationErrors(CanWriteFileErrorSpec),
-  );
+  decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
+    requestJson(FileCanWriteEnvelopeSchema, {
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decodedFileId)}/can-write`,
+    }),
+  ).pipe(selectJsonField("user_id"), withOperationErrors(CanWriteFileErrorSpec));
+
 export const searchFiles = (
   query: FilesSearchQuery,
 ): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FilesSearchQuerySchema, { onExcessProperty: "error" })(query).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedQuery) =>
-      requestJson(FilesSearchEnvelopeSchema, {
-        method: "GET",
-        path: "/v2/files/search",
-        query: decodedQuery,
-      }),
-    ),
-    withOperationErrors(SearchFilesErrorSpec),
-  );
+  decodeAndRun(FilesSearchQuerySchema, query, (decodedQuery) =>
+    requestJson(FilesSearchEnvelopeSchema, {
+      method: "GET",
+      path: "/v2/files/search",
+      query: decodedQuery,
+    }),
+  ).pipe(withOperationErrors(SearchFilesErrorSpec));
+
 export const continueSearch = (
   cursor: string,
   query: {
     readonly per_page?: number;
   } = {},
 ): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
-  decodeAndRun(FilesSearchContinueInputSchema, { cursor, query }, (decodedInput) =>
+  decodeAndRun(FilesContinueInputSchema, { cursor, query }, (decodedInput) =>
     requestJson(FilesSearchEnvelopeSchema, {
       body: {
         type: "form",
@@ -1216,31 +1376,30 @@ export const continueSearch = (
       query: decodedInput.query,
     }),
   ).pipe(withOperationErrors(SearchFilesErrorSpec));
+
 export const setFileSort = (
   input: FileSetSortInput,
 ): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(FileSetSortInputSchema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
-    Effect.flatMap((decodedInput) =>
-      requestJson(OkResponseSchema, {
-        body: {
-          type: "form",
-          value: {
-            file_id: decodedInput.fileId,
-            sort_by: decodedInput.sortBy,
-          },
+  decodeAndRun(FileSetSortInputSchema, input, (decodedInput) =>
+    requestJson(OkResponseSchema, {
+      body: {
+        type: "form",
+        value: {
+          file_id: decodedInput.fileId,
+          sort_by: decodedInput.sortBy,
         },
-        method: "POST",
-        path: "/v2/files/set-sort-by",
-      }),
-    ),
-    Effect.asVoid,
-  );
+      },
+      method: "POST",
+      path: "/v2/files/set-sort-by",
+    }),
+  ).pipe(Effect.asVoid);
+
 export const resetFileSortSettings = (): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
   requestJson(OkResponseSchema, {
     method: "POST",
     path: "/v2/files/remove-sort-by-settings",
   }).pipe(Effect.asVoid);
+
 export const createFolder = (
   input: FileCreateFolderInput,
 ): Effect.Effect<FileBroad, CreateFolderError, PutioSdkContext> =>
@@ -1254,6 +1413,7 @@ export const createFolder = (
       path: "/v2/files/create-folder",
     }),
   ).pipe(selectJsonField("file"), withOperationErrors(CreateFolderErrorSpec));
+
 export const renameFile = (
   input: FileRenameInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, RenameFileError, PutioSdkContext> =>
@@ -1267,6 +1427,7 @@ export const renameFile = (
       path: "/v2/files/rename",
     }),
   ).pipe(withOperationErrors(RenameFileErrorSpec));
+
 export const deleteFiles = (
   ids: ReadonlyArray<number>,
   options: {
@@ -1300,6 +1461,7 @@ export const deleteFiles = (
         },
       }),
   );
+
 export const deleteFileSelection = (
   selection: FilesBulkSelection,
   options: {
@@ -1332,6 +1494,7 @@ export const deleteFileSelection = (
         },
       }),
   );
+
 export const moveFiles = (
   ids: ReadonlyArray<number>,
   parentId: number,
@@ -1349,6 +1512,7 @@ export const moveFiles = (
       path: "/v2/files/move",
     }),
   ).pipe(selectJsonField("errors"));
+
 export const moveFileSelection = (
   selection: FilesBulkSelection,
   parentId: number,
@@ -1366,6 +1530,7 @@ export const moveFileSelection = (
       path: "/v2/files/move",
     }),
   ).pipe(selectJsonField("errors"));
+
 export const getStartFrom = (
   fileId: number,
 ): Effect.Effect<number, StartFromError, PutioSdkContext> =>
@@ -1375,6 +1540,7 @@ export const getStartFrom = (
       path: `/v2/files/${encodePathSegment(decodedFileId)}/start-from`,
     }),
   ).pipe(selectJsonField("start_from"), withOperationErrors(StartFromErrorSpec));
+
 export const getDownloadUrl = (
   fileId: number,
 ): Effect.Effect<string, DownloadUrlError, PutioSdkContext> =>
@@ -1384,6 +1550,7 @@ export const getDownloadUrl = (
       path: `/v2/files/${encodePathSegment(decodedFileId)}/url`,
     }),
   ).pipe(selectJsonField("url"), withOperationErrors(DownloadUrlErrorSpec));
+
 export const getApiDownloadUrl = (
   fileId: number,
   options: FileApiDownloadUrlOptions,
@@ -1399,6 +1566,7 @@ export const getApiDownloadUrl = (
         Effect.map((baseUrl) => buildFileApiDownloadUrl(baseUrl, decoded.fileId, decoded.options)),
       ),
   );
+
 export const getApiContentUrl = (
   fileId: number,
   options: FileDirectAccessOptions,
@@ -1414,6 +1582,7 @@ export const getApiContentUrl = (
         Effect.map((baseUrl) => buildFileApiContentUrl(baseUrl, decoded.fileId, decoded.options)),
       ),
   );
+
 export const getApiMp4DownloadUrl = (
   fileId: number,
   options: FileApiMp4DownloadUrlOptions,
@@ -1431,6 +1600,7 @@ export const getApiMp4DownloadUrl = (
         ),
       ),
   );
+
 export const getHlsStreamUrl = (
   fileId: number,
   options: FileHlsStreamUrlOptions,
@@ -1446,6 +1616,7 @@ export const getHlsStreamUrl = (
         Effect.map((baseUrl) => buildFileHlsStreamUrl(baseUrl, decoded.fileId, decoded.options)),
       ),
   );
+
 /**
  * Fetches the HLS master playlist the player would load, so callers can
  * inspect the served variant's CODECS, VIDEO-RANGE, and rendition set without
@@ -1469,16 +1640,12 @@ export const getHlsMasterPlaylist = (
         path: `/v2/files/${encodePathSegment(decoded.fileId)}/hls/media.m3u8`,
         query: {
           max_subtitle_count: decoded.options.maxSubtitleCount,
-          original:
-            typeof decoded.options.playOriginal === "boolean"
-              ? decoded.options.playOriginal
-                ? 1
-                : 0
-              : undefined,
+          original: toOriginalFlag(decoded.options.playOriginal),
           subtitle_languages: joinCsv(decoded.options.subtitleLanguages),
         },
       }),
   ).pipe(withOperationErrors(GetHlsMasterPlaylistErrorSpec));
+
 export const getXspfPlaylistUrl = (
   fileId: number,
   options: FileXspfPlaylistUrlOptions,
@@ -1494,6 +1661,7 @@ export const getXspfPlaylistUrl = (
         Effect.map((baseUrl) => buildFileXspfPlaylistUrl(baseUrl, decoded.fileId, decoded.options)),
       ),
   );
+
 export const listFileSubtitles = (
   fileId: number,
   options: {
@@ -1518,6 +1686,7 @@ export const listFileSubtitles = (
         : undefined,
     }),
   ).pipe(withOperationErrors(FileSubtitlesErrorSpec));
+
 export const setStartFrom = (
   input: FileStartFromSetInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, StartFromError, PutioSdkContext> =>
@@ -1533,6 +1702,7 @@ export const setStartFrom = (
       path: `/v2/files/${encodePathSegment(decodedInput.file_id)}/start-from`,
     }),
   ).pipe(withOperationErrors(StartFromErrorSpec));
+
 export const resetStartFrom = (
   fileId: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, StartFromError, PutioSdkContext> =>
@@ -1542,6 +1712,7 @@ export const resetStartFrom = (
       path: `/v2/files/${encodePathSegment(decodedFileId)}/start-from/delete`,
     }),
   ).pipe(withOperationErrors(StartFromErrorSpec));
+
 export const getMp4Status = (
   fileId: number,
 ): Effect.Effect<FileConversionStatus, FileMp4Error, PutioSdkContext> =>
@@ -1551,6 +1722,7 @@ export const getMp4Status = (
       path: `/v2/files/${encodePathSegment(decodedFileId)}/mp4`,
     }),
   ).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
+
 export const convertFileToMp4 = (
   fileId: number,
 ): Effect.Effect<FileConversionStatus, FileMp4Error, PutioSdkContext> =>
@@ -1560,6 +1732,7 @@ export const convertFileToMp4 = (
       path: `/v2/files/${encodePathSegment(decodedFileId)}/mp4`,
     }),
   ).pipe(selectJsonField("mp4"), withOperationErrors(FileMp4ErrorSpec));
+
 export const deleteFileMp4 = (
   fileId: number,
 ): Effect.Effect<void, FileMp4MutationError, PutioSdkContext> =>
@@ -1569,6 +1742,7 @@ export const deleteFileMp4 = (
       path: `/v2/files/${encodePathSegment(decodedFileId)}/mp4`,
     }),
   ).pipe(withOperationErrors(FileMp4MutationErrorSpec));
+
 export const putMp4ToMyFiles = (
   fileId: number,
 ): Effect.Effect<void, FileMp4MutationError, PutioSdkContext> =>
@@ -1578,6 +1752,7 @@ export const putMp4ToMyFiles = (
       path: `/v2/files/${encodePathSegment(decodedFileId)}/put-mp4-to-my-folders`,
     }),
   ).pipe(withOperationErrors(FileMp4MutationErrorSpec));
+
 export const convertFilesToMp4 = (
   ids: ReadonlyArray<number>,
 ): Effect.Effect<number, PutioSdkError, PutioSdkContext> =>
@@ -1593,6 +1768,7 @@ export const convertFilesToMp4 = (
       path: "/v2/files/convert_mp4",
     }),
   ).pipe(selectJsonField("count"));
+
 export const convertFileSelectionToMp4 = (
   selection: FilesBulkSelection,
 ): Effect.Effect<number, PutioSdkError, PutioSdkContext> =>
@@ -1606,6 +1782,7 @@ export const convertFileSelectionToMp4 = (
       path: "/v2/files/convert_mp4",
     }),
   ).pipe(selectJsonField("count"));
+
 export const listActiveMp4Conversions = (): Effect.Effect<
   ReadonlyArray<FileActiveConversion>,
   FileActiveConversionsError,
@@ -1615,6 +1792,7 @@ export const listActiveMp4Conversions = (): Effect.Effect<
     method: "GET",
     path: "/v2/mp4/queue",
   }).pipe(selectJsonField("mp4s"), withOperationErrors(FileActiveConversionsErrorSpec));
+
 export const setFilesWatchStatus = (
   selection: FilesBulkSelection & {
     readonly watched: boolean;
@@ -1633,6 +1811,7 @@ export const setFilesWatchStatus = (
       path: "/v2/files/watch-status",
     }),
   ).pipe(withOperationErrors(FileWatchStatusErrorSpec));
+
 export const extractFiles = (
   selection: FilesBulkSelection & {
     readonly password?: string;
@@ -1651,6 +1830,7 @@ export const extractFiles = (
       path: "/v2/files/extract",
     }),
   ).pipe(selectJsonField("extractions"), withOperationErrors(FileExtractionsErrorSpec));
+
 export const listFileExtractions = (): Effect.Effect<
   ReadonlyArray<FileExtraction>,
   FileExtractionsError,
@@ -1660,6 +1840,7 @@ export const listFileExtractions = (): Effect.Effect<
     method: "GET",
     path: "/v2/files/extract",
   }).pipe(selectJsonField("extractions"), withOperationErrors(FileExtractionsErrorSpec));
+
 export const deleteFileExtraction = (
   extractionId: number,
 ): Effect.Effect<void, PutioSdkError, PutioSdkContext> =>
@@ -1669,6 +1850,7 @@ export const deleteFileExtraction = (
       path: `/v2/files/extract/${encodePathSegment(decodedExtractionId)}`,
     }),
   );
+
 export const findNextFile = (
   fileId: number,
   fileType: FileType,
@@ -1682,6 +1864,7 @@ export const findNextFile = (
       },
     }),
   ).pipe(selectJsonField("next_file"));
+
 export const findNextVideo = (
   fileId: number,
 ): Effect.Effect<Schema.Schema.Type<typeof FilesNextFileSchema>, PutioSdkError, PutioSdkContext> =>
@@ -1691,6 +1874,7 @@ export const findNextVideo = (
       path: `/v2/files/${encodePathSegment(decodedFileId)}/next-video`,
     }),
   ).pipe(selectJsonField("next_video"));
+
 export const createFileUploadRequest = (
   input: FileUploadInput,
   options: {
@@ -1705,12 +1889,17 @@ export const createFileUploadRequest = (
         Effect.map(({ config, token }) => ({
           body: createFileUploadFormData(decoded.input),
           method: "POST" as const,
-          url: buildPutioUrl(config.uploadBaseUrl ?? "https://upload.put.io", "/v2/files/upload", {
-            oauth_token: token,
-          }),
+          url: buildPutioUrl(
+            config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
+            "/v2/files/upload",
+            {
+              oauth_token: token,
+            },
+          ),
         })),
       ),
   );
+
 export const uploadFile = (
   input: FileUploadInput,
   options: {
@@ -1727,7 +1916,7 @@ export const uploadFile = (
             auth: {
               type: "none",
             },
-            baseUrl: config.uploadBaseUrl ?? "https://upload.put.io",
+            baseUrl: config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
             body: {
               type: "form-data",
               value: createFileUploadFormData(decoded.input),
@@ -1740,4 +1929,4 @@ export const uploadFile = (
           }),
         ),
       ),
-  ).pipe(Effect.map(toUploadResult), withOperationErrors(FileUploadErrorSpec));
+  ).pipe(Effect.flatMap(toUploadResult), withOperationErrors(FileUploadErrorSpec));

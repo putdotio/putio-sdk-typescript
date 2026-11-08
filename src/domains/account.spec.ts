@@ -127,7 +127,7 @@ describe("account domain", () => {
       { accessToken: "token-123" },
     );
 
-    expect(fullInfo.features.beta).toBe(true);
+    expect(fullInfo.features?.beta).toBe(true);
     expect(fullInfo.user_hash).toBe("intercom-user");
     expect(fullInfo.paddle_user_id).toBe("ctm_99");
 
@@ -138,6 +138,7 @@ describe("account domain", () => {
       }),
       (request) => {
         expect(request.url).toBe("https://api.put.io/v2/account/info?intercom=1&platform=ios");
+
         return jsonResponse({ info: baseAccountInfo, status: "OK" });
       },
       { accessToken: "token-123" },
@@ -160,7 +161,6 @@ describe("account domain", () => {
     const error = expectFailure(exit);
     expect(error).toBeInstanceOf(PutioValidationError);
     expect(error).toMatchObject({
-      _tag: "PutioValidationError",
       cause: 'Expected put.io to include "push_token" because it was requested',
     });
 
@@ -178,8 +178,8 @@ describe("account domain", () => {
         { accessToken: "token-123" },
       );
 
+      expect(expectFailure(missingExit)).toBeInstanceOf(PutioValidationError);
       expect(expectFailure(missingExit)).toMatchObject({
-        _tag: "PutioValidationError",
         cause: expectedCause,
       });
     }
@@ -239,6 +239,7 @@ describe("account domain", () => {
           theme: "auto",
           username: "sdk-next",
         });
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -260,6 +261,7 @@ describe("account domain", () => {
             enable: true,
           },
         });
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },
@@ -270,8 +272,10 @@ describe("account domain", () => {
 
   it("rejects invalid account request inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
 
@@ -282,6 +286,7 @@ describe("account domain", () => {
         handler,
       ),
     );
+
     const invalidNestedSettings = expectFailure(
       await runSdkExit(
         saveAccountSettings({
@@ -294,7 +299,9 @@ describe("account domain", () => {
         handler,
       ),
     );
+
     const sensitiveSettings = "settings-secret-value";
+
     const invalidSensitiveSettings = expectFailure(
       await runSdkExit(
         saveAccountSettings({
@@ -305,6 +312,7 @@ describe("account domain", () => {
         handler,
       ),
     );
+
     const invalidSubtitleCount = expectFailure(
       await runSdkExit(
         saveAccountSettings({
@@ -313,6 +321,7 @@ describe("account domain", () => {
         handler,
       ),
     );
+
     const unknownSetting = expectFailure(
       await runSdkExit(
         // @ts-expect-error JavaScript callers can supply unknown settings.
@@ -320,6 +329,7 @@ describe("account domain", () => {
         handler,
       ),
     );
+
     const incompleteClearOptions = expectFailure(
       await runSdkExit(
         // @ts-expect-error JavaScript callers can omit required clear flags.
@@ -327,6 +337,7 @@ describe("account domain", () => {
         handler,
       ),
     );
+
     const invalidPassword = expectFailure(
       await runSdkExit(
         // @ts-expect-error JavaScript callers can supply non-string passwords.
@@ -334,7 +345,9 @@ describe("account domain", () => {
         handler,
       ),
     );
+
     const emptyPassword = expectFailure(await runSdkExit(destroyAccount(""), handler));
+
     const invalidConfirmationSubject = expectFailure(
       await runSdkExit(
         // @ts-expect-error JavaScript callers can supply unknown confirmation subjects.
@@ -428,7 +441,6 @@ describe("account domain", () => {
     const error = expectFailure(failure);
     expect(error).toBeInstanceOf(PutioOperationError);
     expect(error).toMatchObject({
-      _tag: "PutioOperationError",
       domain: "account",
       operation: "listConfirmations",
     });
@@ -462,6 +474,7 @@ describe("account domain", () => {
       destroyAccount("secret"),
       (request) => {
         expect(getFormBody(request).get("current_password")).toBe("secret");
+
         return jsonResponse({ status: "OK" });
       },
       { accessToken: "token-123" },

@@ -42,7 +42,9 @@ const IftttPlaybackIngredientsSchema = Schema.Struct({
   file_name: NonEmptyStringSchema,
   file_type: NonEmptyStringSchema,
 });
+
 const isIftttPlaybackIngredients = Schema.is(IftttPlaybackIngredientsSchema);
+
 const IftttEventInputSchema = Schema.Struct({
   clientName: Schema.optional(NonEmptyStringSchema),
   eventType: NonEmptyStringSchema,
@@ -76,6 +78,7 @@ export const SendIftttEventErrorSpec = definePutioOperationErrorSpec({
 });
 
 export type GetIftttStatusError = PutioOperationFailure<typeof GetIftttStatusErrorSpec>;
+
 export type SendIftttEventError = PutioOperationFailure<typeof SendIftttEventErrorSpec>;
 
 export const getIftttStatus = (): Effect.Effect<

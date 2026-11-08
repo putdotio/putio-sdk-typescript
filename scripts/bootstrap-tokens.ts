@@ -2,7 +2,6 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
 import { liveTokenCacheUrl, writeLiveTokenCache } from "./live-token-cache.ts";
-import { bootstrapRuntimeTokens } from "../test/live/support/bootstrap.ts";
 import { readBootstrapSecrets } from "../test/live/support/secrets.ts";
 
 const refresh = process.argv.slice(2).includes("--refresh");
@@ -13,10 +12,8 @@ if (existsSync(liveTokenCacheUrl) && !refresh) {
   );
 }
 
-const packageDir = new URL("..", import.meta.url);
-
 const buildResult = spawnSync("vp", ["pack"], {
-  cwd: packageDir,
+  cwd: new URL("..", import.meta.url),
   stdio: "inherit",
 });
 
@@ -24,12 +21,8 @@ if (buildResult.status !== 0) {
   process.exit(buildResult.status ?? 1);
 }
 
-const secrets = readBootstrapSecrets();
-const { createPutioSdkPromiseClient } = await import("../dist/index.js");
-
-const bootstrapped = await bootstrapRuntimeTokens(secrets, async (config = {}) =>
-  createPutioSdkPromiseClient(config),
-);
+const { bootstrapRuntimeTokens } = await import("../test/live/support/bootstrap.ts");
+const bootstrapped = await bootstrapRuntimeTokens(readBootstrapSecrets());
 
 await writeLiveTokenCache(liveTokenCacheUrl, {
   firstPartyToken: bootstrapped.firstParty.accessToken,

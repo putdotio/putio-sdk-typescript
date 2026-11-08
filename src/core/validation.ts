@@ -5,9 +5,9 @@ import { mapDecodeErrorToValidationError } from "./errors.js";
 export const PositiveIntegerSchema = Schema.Int.check(Schema.isGreaterThan(0));
 export const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
 
-export const decodeAndRun = <S extends Schema.Top, A, E, R>(
+export const decodeAndRun = <S extends Schema.Top, I, A, E, R>(
   schema: S,
-  input: unknown,
+  input: I,
   run: (decoded: S["Type"]) => Effect.Effect<A, E, R>,
 ) =>
   Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(input).pipe(
@@ -15,7 +15,11 @@ export const decodeAndRun = <S extends Schema.Top, A, E, R>(
     Effect.flatMap(run),
   );
 
-export const makeCursorSelectionSchema = <
+type CursorSelectionFields = {
+  readonly cursor?: string;
+} & Readonly<Record<string, ReadonlyArray<number> | string | undefined>>;
+
+export const cursorSelectionSchema = <
   const TIdsField extends string,
   const TExcludeIdsField extends string,
   const TFields extends Schema.Struct.Fields,
@@ -30,7 +34,8 @@ export const makeCursorSelectionSchema = <
     [idsField]: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
     ...fields,
   }).check(
-    Schema.makeFilter((input) => input.cursor !== undefined || input[idsField] !== undefined, {
-      expected: "a non-empty cursor or file ID selection",
-    }),
+    Schema.makeFilter(
+      (input: CursorSelectionFields) => input.cursor !== undefined || input[idsField] !== undefined,
+      { expected: "a non-empty cursor or file ID selection" },
+    ),
   );

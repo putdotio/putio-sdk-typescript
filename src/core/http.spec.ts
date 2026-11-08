@@ -1,5 +1,7 @@
-import { Cause, Effect, Exit, Fiber, Schema } from "effect";
+import { Effect, Fiber } from "effect";
 import { describe, expect, it } from "vite-plus/test";
+
+import { expectFailure, runSdkEffect, runSdkExit } from "../../test/support/sdk-test.js";
 
 import {
   PutioApiError,
@@ -13,11 +15,10 @@ import {
   PutioHttpClient,
   buildPutioUrl,
   makePutioFetchClient,
-  makePutioSdkConfig,
-  makePutioSdkLayer,
-  makePutioSdkLiveLayer,
-  type PutioHttpClientShape,
-  type PutioHttpRequest,
+  normalizePutioSdkOptions,
+  putioSdkLayer,
+  putioSdkLiveLayer,
+  type PutioHttpClientService,
   PutioSdkConfig,
   requestArrayBuffer,
   requestText,
@@ -28,54 +29,9 @@ import {
   type PutioSdkContext,
 } from "./http.js";
 
-type MockRequestHandler = (request: PutioHttpRequest) => Response;
-
-const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
-  if (Exit.isSuccess(exit)) {
-    throw new Error("Expected the effect to fail.");
-  }
-
-  const failure = exit.cause.reasons.find(Cause.isFailReason);
-
-  if (!failure) {
-    throw Cause.squash(exit.cause);
-  }
-
-  return failure.error;
-};
-
-const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientShape => ({
-  execute: (request) => {
-    const response = handler(request);
-
-    return Effect.succeed({
-      arrayBuffer: Effect.tryPromise({
-        try: () => response.arrayBuffer(),
-        catch: (cause) => new PutioTransportError({ cause }),
-      }),
-      headers: response.headers,
-      json: Effect.tryPromise({
-        try: () => response.json(),
-        catch: (cause) => new PutioTransportError({ cause }),
-      }),
-      status: response.status,
-    });
-  },
-});
-
-const provideSdkTest = <A, E>(
-  effect: Effect.Effect<A, E, PutioSdkContext>,
-  handler: MockRequestHandler,
-  config: Parameters<typeof makePutioSdkConfig>[0] = {},
-) =>
-  effect.pipe(
-    Effect.provideService(PutioHttpClient, makeMockHttpClient(handler)),
-    Effect.provide(makePutioSdkLayer(config)),
-  );
-
 describe("sdk core http", () => {
   it("applies default sdk configuration values", () => {
-    expect(makePutioSdkConfig({ accessToken: "token" })).toEqual({
+    expect(normalizePutioSdkOptions({ accessToken: "token" })).toEqual({
       accessToken: "token",
       baseUrl: "https://api.put.io",
       uploadBaseUrl: "https://upload.put.io",
@@ -88,7 +44,7 @@ describe("sdk core http", () => {
       Effect.all({
         config: PutioSdkConfig,
         httpClient: PutioHttpClient,
-      }).pipe(Effect.provide(makePutioSdkLiveLayer({ accessToken: "token-123" }))),
+      }).pipe(Effect.provide(putioSdkLiveLayer({ accessToken: "token-123" }))),
     );
 
     expect(result.config).toEqual({
@@ -97,15 +53,16 @@ describe("sdk core http", () => {
       uploadBaseUrl: "https://upload.put.io",
       webAppUrl: "https://app.put.io",
     });
-    expect(result.httpClient).toBeDefined();
   });
 
   it("aborts fetch transport when the Effect is interrupted", async () => {
     let observedSignal: AbortSignal | undefined;
     let markStarted: (() => void) | undefined;
+
     const started = new Promise<void>((resolve) => {
       markStarted = resolve;
     });
+
     const httpClient = makePutioFetchClient((_input, init) => {
       observedSignal = init?.signal ?? undefined;
 
@@ -124,6 +81,7 @@ describe("sdk core http", () => {
         url: "https://api.put.io/v2/test",
       }),
     );
+
     await started;
     await Effect.runPromise(Fiber.interrupt(fiber));
 
@@ -136,22 +94,28 @@ describe("sdk core http", () => {
     async (kind) => {
       const started = Promise.withResolvers<void>();
       let observedSignal: AbortSignal | undefined;
+
       const client = makePutioFetchClient(async (_input, init) => {
         observedSignal = init?.signal ?? undefined;
+
         class PendingResponse extends Response {
           override json() {
             started.resolve();
+
             return super.json();
           }
           override arrayBuffer() {
             started.resolve();
+
             return super.arrayBuffer();
           }
           override text() {
             started.resolve();
+
             return super.text();
           }
         }
+
         return new PendingResponse(
           new ReadableStream({
             start(controller) {
@@ -165,6 +129,7 @@ describe("sdk core http", () => {
           { status: kind === "error" ? 429 : 200 },
         );
       });
+
       const fiber = Effect.runFork(
         client
           .execute({ headers: new Headers(), method: "GET", url: "https://example.invalid/test" })
@@ -174,6 +139,7 @@ describe("sdk core http", () => {
             ),
           ),
       );
+
       await started.promise;
       expect(observedSignal?.aborted).toBe(false);
       await Effect.runPromise(Fiber.interrupt(fiber));
@@ -185,21 +151,26 @@ describe("sdk core http", () => {
     "does not abort successful %s reads or reuse request controllers",
     async (kind) => {
       const signals: Array<AbortSignal> = [];
+
       const client = makePutioFetchClient(async (_input, init) => {
         if (init?.signal) signals.push(init.signal);
+
         return Response.json({ status: "OK" });
       });
+
       const request = client.execute({
         headers: new Headers(),
         method: "GET",
         url: "https://example.invalid/test",
       });
+
       for (let index = 0; index < 2; index++) {
         const response = await Effect.runPromise(request);
         expect(signals[index]?.aborted).toBe(false);
         await Effect.runPromise(kind === "json" ? response.json : response.arrayBuffer);
         expect(signals[index]?.aborted).toBe(false);
       }
+
       expect(signals[0]).not.toBe(signals[1]);
     },
   );
@@ -228,24 +199,18 @@ describe("sdk core http", () => {
       PutioConfigurationError,
     );
 
-    const exit = await Effect.runPromiseExit(
-      provideSdkTest(
-        requestJson(OkResponseSchema, {
-          method: "GET",
-          path: "https://evil.test/path",
-        }),
-        () => {
-          throw new Error("request should not execute");
-        },
-        { accessToken: "token-123" },
-      ),
+    const exit = await runSdkExit(
+      requestJson(OkResponseSchema, {
+        method: "GET",
+        path: "https://evil.test/path",
+      }),
+      () => {
+        throw new Error("request should not execute");
+      },
+      { accessToken: "token-123" },
     );
 
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      expect(expectFailure(exit)).toBeInstanceOf(PutioConfigurationError);
-    }
+    expect(expectFailure(exit)).toBeInstanceOf(PutioConfigurationError);
   });
 
   it("projects decoded JSON envelopes with shared selectors", async () => {
@@ -273,209 +238,181 @@ describe("sdk core http", () => {
   });
 
   it("sends token-authenticated requests and decodes successful JSON", async () => {
-    const result = await Effect.runPromise(
-      provideSdkTest(
-        requestJson(OkResponseSchema, {
-          method: "GET",
-          path: "/v2/test",
-          query: { page: 2 },
-        }),
-        (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/test?page=2");
-          expect(request.headers.get("authorization")).toBe("Token token-123");
+    const result = await runSdkEffect(
+      requestJson(OkResponseSchema, {
+        method: "GET",
+        path: "/v2/test",
+        query: { page: 2 },
+      }),
+      (request) => {
+        expect(request.url).toBe("https://api.put.io/v2/test?page=2");
+        expect(request.headers.get("authorization")).toBe("Token token-123");
 
-          return new Response(JSON.stringify({ status: "OK" }), {
-            status: 200,
-            headers: {
-              "content-type": "application/json",
-            },
-          });
-        },
-        { accessToken: "token-123" },
-      ),
+        return new Response(JSON.stringify({ status: "OK" }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+          },
+        });
+      },
+      { accessToken: "token-123" },
     );
 
     expect(result).toEqual({ status: "OK" });
   });
 
   it("sends configured headers under request headers and the sdk authorization", async () => {
-    await Effect.runPromise(
-      provideSdkTest(
-        requestVoid({
-          method: "POST",
-          path: "/v2/test",
-          headers: { "x-request-id": "request" },
-        }),
-        (request) => {
-          expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
-          expect(request.headers.get("x-request-id")).toBe("request");
-          expect(request.headers.get("authorization")).toBe("Token token-123");
+    await runSdkEffect(
+      requestVoid({
+        method: "POST",
+        path: "/v2/test",
+        headers: { "x-request-id": "request" },
+      }),
+      (request) => {
+        expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
+        expect(request.headers.get("x-request-id")).toBe("request");
+        expect(request.headers.get("authorization")).toBe("Token token-123");
 
-          return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+        return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+      },
+      {
+        accessToken: "token-123",
+        headers: {
+          authorization: "Token spoofed",
+          "x-forwarded-for": "203.0.113.7",
+          "x-request-id": "config",
         },
-        {
-          accessToken: "token-123",
-          headers: {
-            authorization: "Token spoofed",
-            "x-forwarded-for": "203.0.113.7",
-            "x-request-id": "config",
-          },
-        },
-      ),
+      },
     );
   });
 
   it("never sends a configured authorization header on unauthenticated requests", async () => {
-    await Effect.runPromise(
-      provideSdkTest(
-        requestVoid({ method: "POST", path: "/v2/test", auth: { type: "none" } }),
-        (request) => {
-          expect(request.headers.has("authorization")).toBe(false);
-          expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
+    await runSdkEffect(
+      requestVoid({ method: "POST", path: "/v2/test", auth: { type: "none" } }),
+      (request) => {
+        expect(request.headers.has("authorization")).toBe(false);
+        expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
 
-          return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
-        },
-        { headers: { authorization: "Token leaked", "x-forwarded-for": "203.0.113.7" } },
-      ),
+        return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+      },
+      { headers: { authorization: "Token leaked", "x-forwarded-for": "203.0.113.7" } },
     );
   });
 
   it("fails fast when a config-token request has no configured access token", async () => {
-    const exit = await Effect.runPromiseExit(
-      provideSdkTest(
-        requestJson(OkResponseSchema, {
-          method: "GET",
-          path: "/v2/test",
-        }),
-        () => new Response(null, { status: 204 }),
-      ),
+    const exit = await runSdkExit(
+      requestJson(OkResponseSchema, {
+        method: "GET",
+        path: "/v2/test",
+      }),
+      () => new Response(null, { status: 204 }),
     );
 
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      const error = expectFailure(exit);
-      expect(error).toBeInstanceOf(PutioConfigurationError);
-      expect(error).toMatchObject({
-        _tag: "PutioConfigurationError",
-      });
-    }
+    const error = expectFailure(exit);
+    expect(error).toBeInstanceOf(PutioConfigurationError);
   });
 
   it("maps non-success JSON responses to typed auth errors", async () => {
-    const exit = await Effect.runPromiseExit(
-      provideSdkTest(
-        requestJson(OkResponseSchema, {
-          method: "GET",
-          path: "/v2/test",
-          auth: { type: "token", token: "override-token" },
-        }),
-        (request) => {
-          expect(request.headers.get("authorization")).toBe("Token override-token");
+    const exit = await runSdkExit(
+      requestJson(OkResponseSchema, {
+        method: "GET",
+        path: "/v2/test",
+        auth: { type: "token", token: "override-token" },
+      }),
+      (request) => {
+        expect(request.headers.get("authorization")).toBe("Token override-token");
 
-          return new Response(
-            JSON.stringify({
-              error_message: "Unauthorized",
-              error_type: "AUTH_FAILED",
-              status_code: 401,
-            }),
-            {
-              status: 401,
-              headers: {
-                "content-type": "application/json",
-              },
+        return new Response(
+          JSON.stringify({
+            error_message: "Unauthorized",
+            error_type: "AUTH_FAILED",
+            status_code: 401,
+          }),
+          {
+            status: 401,
+            headers: {
+              "content-type": "application/json",
             },
-          );
-        },
-      ),
+          },
+        );
+      },
     );
 
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      expect(expectFailure(exit)).toBeInstanceOf(PutioAuthError);
-    }
+    expect(expectFailure(exit)).toBeInstanceOf(PutioAuthError);
   });
 
   it("maps rate-limited responses with metadata", async () => {
-    const exit = await Effect.runPromiseExit(
-      provideSdkTest(
-        requestJson(OkResponseSchema, {
-          method: "GET",
-          path: "/v2/test",
-          auth: { type: "none" },
-        }),
-        () =>
-          new Response(
-            JSON.stringify({
-              error_message: "Too many requests",
-              error_type: "TooManyRequests",
-              status_code: 429,
-            }),
-            {
-              status: 429,
-              headers: {
-                "content-type": "application/json",
-                "x-ratelimit-action": "captcha-needed",
-                "x-ratelimit-id": "limit-id",
-              },
+    const exit = await runSdkExit(
+      requestJson(OkResponseSchema, {
+        method: "GET",
+        path: "/v2/test",
+        auth: { type: "none" },
+      }),
+      () =>
+        new Response(
+          JSON.stringify({
+            error_message: "Too many requests",
+            error_type: "TooManyRequests",
+            status_code: 429,
+          }),
+          {
+            status: 429,
+            headers: {
+              "content-type": "application/json",
+              "x-ratelimit-action": "captcha-needed",
+              "x-ratelimit-id": "limit-id",
             },
-          ),
-      ),
+          },
+        ),
     );
 
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      const error = expectFailure(exit);
-      expect(error).toBeInstanceOf(PutioRateLimitError);
-      expect(error).toMatchObject({
-        _tag: "PutioRateLimitError",
-        action: "captcha-needed",
-        id: "limit-id",
-      });
-    }
+    const error = expectFailure(exit);
+    expect(error).toBeInstanceOf(PutioRateLimitError);
+    expect(error).toMatchObject({
+      action: "captcha-needed",
+      id: "limit-id",
+    });
   });
 
-  it.each([401, 403, 429, 502])(
-    "retains HTTP metadata for invalid error bodies (%i)",
-    async (status) => {
-      for (const body of ["<html>private response</html>", "", "{invalid"]) {
-        const client = makePutioFetchClient(
-          async () =>
-            new Response(body, {
-              status,
-              headers: { "retry-after": "60", "x-ratelimit-id": "test-limit" },
-            }),
-        );
-        const error = expectFailure(
-          await Effect.runPromiseExit(
-            requestJson(OkResponseSchema, {
-              method: "GET",
-              path: "/test",
-              auth: { type: "none" },
-            }).pipe(
-              Effect.provideService(PutioHttpClient, client),
-              Effect.provide(makePutioSdkLayer({})),
-            ),
+  it.each([
+    [401, PutioAuthError],
+    [403, PutioAuthError],
+    [429, PutioRateLimitError],
+    [502, PutioApiError],
+  ])("retains HTTP metadata for invalid error bodies (%i)", async (status, ErrorClass) => {
+    for (const body of ["<html>private response</html>", "", "{invalid"]) {
+      const client = makePutioFetchClient(
+        async () =>
+          new Response(body, {
+            status,
+            headers: { "retry-after": "60", "x-ratelimit-id": "test-limit" },
+          }),
+      );
+
+      const error = expectFailure(
+        await Effect.runPromiseExit(
+          requestJson(OkResponseSchema, {
+            method: "GET",
+            path: "/test",
+            auth: { type: "none" },
+          }).pipe(
+            Effect.provideService(PutioHttpClient, client),
+            Effect.provide(putioSdkLayer({})),
           ),
-        );
-        expect(error).toMatchObject({
-          _tag:
-            status === 429
-              ? "PutioRateLimitError"
-              : status === 502
-                ? "PutioApiError"
-                : "PutioAuthError",
-          status,
-          body: { status_code: status },
-          cause: expect.any(SyntaxError),
-        });
-        expect(JSON.stringify(error)).not.toContain("private response");
-        if (status === 429) expect(error).toMatchObject({ retryAfter: "60", id: "test-limit" });
-      }
-    },
-  );
+        ),
+      );
+
+      expect(error).toBeInstanceOf(ErrorClass);
+      expect(error).toMatchObject({
+        status,
+        body: { status_code: status },
+        cause: expect.any(SyntaxError),
+      });
+      expect(JSON.stringify(error)).not.toContain("private response");
+
+      if (status === 429) expect(error).toMatchObject({ retryAfter: "60", id: "test-limit" });
+    }
+  });
 
   it.each([new TypeError("body connection lost"), new SyntaxError("body source failed")])(
     "preserves genuine error body I/O failures: %s",
@@ -491,51 +428,50 @@ describe("sdk core http", () => {
             { status: 429 },
           ),
       );
+
       const error = expectFailure(
         await Effect.runPromiseExit(
           requestVoid({ method: "GET", path: "/test", auth: { type: "none" } }).pipe(
             Effect.provideService(PutioHttpClient, client),
-            Effect.provide(makePutioSdkLayer({})),
+            Effect.provide(putioSdkLayer({})),
           ),
         ),
       );
+
       expect(error).toBeInstanceOf(PutioTransportError);
       expect(error).toHaveProperty("cause", cause);
     },
   );
 
   it("returns array buffers for binary responses", async () => {
-    const result = await Effect.runPromise(
-      provideSdkTest(
-        requestArrayBuffer({
-          method: "GET",
-          path: "/v2/binary",
-          auth: { type: "none" },
+    const result = await runSdkEffect(
+      requestArrayBuffer({
+        method: "GET",
+        path: "/v2/binary",
+        auth: { type: "none" },
+      }),
+      () =>
+        new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
         }),
-        () =>
-          new Response(new Uint8Array([1, 2, 3]), {
-            status: 200,
-          }),
-      ),
     );
 
     expect(Array.from(result)).toEqual([1, 2, 3]);
   });
 
   it("returns text for non-JSON responses and keeps a caller-supplied accept header", async () => {
-    const result = await Effect.runPromise(
-      provideSdkTest(
-        requestText({
-          method: "GET",
-          path: "/v2/playlist.m3u8",
-          auth: { type: "none" },
-          headers: { accept: "application/vnd.apple.mpegurl" },
-        }),
-        (request) => {
-          expect(request.headers.get("accept")).toBe("application/vnd.apple.mpegurl");
-          return new Response("#EXTM3U\n#EXT-X-VERSION:3\n", { status: 200 });
-        },
-      ),
+    const result = await runSdkEffect(
+      requestText({
+        method: "GET",
+        path: "/v2/playlist.m3u8",
+        auth: { type: "none" },
+        headers: { accept: "application/vnd.apple.mpegurl" },
+      }),
+      (request) => {
+        expect(request.headers.get("accept")).toBe("application/vnd.apple.mpegurl");
+
+        return new Response("#EXTM3U\n#EXT-X-VERSION:3\n", { status: 200 });
+      },
     );
 
     expect(result).toBe("#EXTM3U\n#EXT-X-VERSION:3\n");
@@ -545,9 +481,11 @@ describe("sdk core http", () => {
     const jsonFailure = new PutioTransportError({ cause: "json read failed" });
     const errorJsonFailure = new PutioTransportError({ cause: "error json read failed" });
     const binaryFailure = new PutioTransportError({ cause: "binary read failed" });
-    const httpClient: PutioHttpClientShape = {
+
+    const httpClient: PutioHttpClientService = {
       execute: (request) => {
         const isErrorResponse = request.url.endsWith("/v2/error");
+
         return Effect.succeed({
           arrayBuffer: Effect.fail(binaryFailure),
           headers: new Headers(),
@@ -556,10 +494,11 @@ describe("sdk core http", () => {
         });
       },
     };
+
     const provideClient = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
       effect.pipe(
         Effect.provideService(PutioHttpClient, httpClient),
-        Effect.provide(makePutioSdkLayer({})),
+        Effect.provide(putioSdkLayer({})),
       );
 
     const [jsonExit, errorJsonExit, binaryExit] = await Promise.all([
@@ -598,145 +537,84 @@ describe("sdk core http", () => {
   });
 
   it("maps failed binary responses to sdk errors", async () => {
-    const exit = await Effect.runPromiseExit(
-      provideSdkTest(
-        requestArrayBuffer({
-          method: "GET",
-          path: "/v2/binary",
-          auth: { type: "none" },
-        }),
-        () =>
-          new Response(
-            JSON.stringify({
-              error_message: "Missing binary",
-              status_code: 404,
-            }),
-            {
-              status: 404,
-              headers: {
-                "content-type": "application/json",
-              },
+    const exit = await runSdkExit(
+      requestArrayBuffer({
+        method: "GET",
+        path: "/v2/binary",
+        auth: { type: "none" },
+      }),
+      () =>
+        new Response(
+          JSON.stringify({
+            error_message: "Missing binary",
+            status_code: 404,
+          }),
+          {
+            status: 404,
+            headers: {
+              "content-type": "application/json",
             },
-          ),
-      ),
+          },
+        ),
     );
 
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      expect(expectFailure(exit)).toBeInstanceOf(PutioApiError);
-    }
+    expect(expectFailure(exit)).toBeInstanceOf(PutioApiError);
   });
 
   it("treats successful void responses as success", async () => {
-    const result = await Effect.runPromise(
-      provideSdkTest(
-        requestVoid({
-          method: "DELETE",
-          path: "/v2/files/1",
-          auth: { type: "none" },
-        }),
-        () => new Response(null, { status: 204 }),
-      ),
+    const result = await runSdkEffect(
+      requestVoid({
+        method: "DELETE",
+        path: "/v2/files/1",
+        auth: { type: "none" },
+      }),
+      () => new Response(null, { status: 204 }),
     );
 
     expect(result).toBeUndefined();
   });
 
   it("maps failed void responses to sdk errors", async () => {
-    const exit = await Effect.runPromiseExit(
-      provideSdkTest(
-        requestVoid({
-          method: "DELETE",
-          path: "/v2/files/1",
-          auth: { type: "none" },
-        }),
-        () =>
-          new Response(
-            JSON.stringify({
-              error_message: "Forbidden",
-              status_code: 403,
-            }),
-            {
-              status: 403,
-              headers: {
-                "content-type": "application/json",
-              },
-            },
-          ),
-      ),
-    );
-
-    expect(Exit.isFailure(exit)).toBe(true);
-
-    if (Exit.isFailure(exit)) {
-      expect(expectFailure(exit)).toBeInstanceOf(PutioAuthError);
-    }
-  });
-
-  it("supports multipart form-data request bodies", async () => {
-    const result = await Effect.runPromise(
-      provideSdkTest(
-        requestJson(OkResponseSchema, {
-          method: "POST",
-          path: "/v2/files/upload",
-          auth: { type: "none" },
-          body: {
-            type: "form-data",
-            value: (() => {
-              const body = new FormData();
-              body.set("file", new Blob(["hello"]), "hello.txt");
-              return body;
-            })(),
-          },
-        }),
-        () =>
-          new Response(JSON.stringify({ status: "OK" }), {
-            status: 200,
+    const exit = await runSdkExit(
+      requestVoid({
+        method: "DELETE",
+        path: "/v2/files/1",
+        auth: { type: "none" },
+      }),
+      () =>
+        new Response(
+          JSON.stringify({
+            error_message: "Forbidden",
+            status_code: 403,
+          }),
+          {
+            status: 403,
             headers: {
               "content-type": "application/json",
             },
-          }),
-      ),
+          },
+        ),
     );
 
-    expect(result).toEqual({ status: "OK" });
+    expect(expectFailure(exit)).toBeInstanceOf(PutioAuthError);
   });
 
-  it("accepts custom schemas for successful JSON bodies", async () => {
-    const SchemaWithName = Schema.Struct({
-      status: Schema.Literal("OK"),
-      user: Schema.Struct({
-        name: Schema.String,
+  it("sends multipart form-data bodies unchanged", async () => {
+    const body = new FormData();
+    body.set("file", new Blob(["hello"]), "hello.txt");
+
+    await runSdkEffect(
+      requestVoid({
+        method: "POST",
+        path: "/v2/files/upload",
+        auth: { type: "none" },
+        body: { type: "form-data", value: body },
       }),
-    });
+      (request) => {
+        expect(request.body).toBe(body);
 
-    const result = await Effect.runPromise(
-      provideSdkTest(
-        requestJson(SchemaWithName, {
-          method: "GET",
-          path: "/v2/account/info",
-          auth: { type: "none" },
-        }),
-        () =>
-          new Response(
-            JSON.stringify({
-              status: "OK",
-              user: { name: "Altay" },
-            }),
-            {
-              status: 200,
-              headers: {
-                "content-type": "application/json",
-              },
-            },
-          ),
-      ),
+        return new Response(null, { status: 204 });
+      },
     );
-
-    expect(result).toEqual({
-      status: "OK",
-      user: { name: "Altay" },
-    });
   });
 });

@@ -1,9 +1,11 @@
 import { describe, expect, test } from "vite-plus/test";
 
-import { createLiveTokenClients } from "./support/helpers.js";
+import { assertPresent, createLiveTokenClients } from "./support/harness.js";
+import { readOptionalSecret } from "./support/secrets.js";
 
 const DISPOSABLE_CALLBACK = "https://example.com/putio-typescript-sdk-live/oauth/callback";
 const DISPOSABLE_WEBSITE = "https://example.com/putio-typescript-sdk-live/oauth";
+
 const DISPOSABLE_ICON_BYTES = Uint8Array.from(
   Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlAb9sAAAAASUVORK5CYII=",
@@ -14,44 +16,24 @@ const DISPOSABLE_ICON_BYTES = Uint8Array.from(
 describe("oauth live", () => {
   const { authClient } = createLiveTokenClients();
 
-  test("oauth apps query succeeds", async () => {
-    const apps = await authClient.oauth.query();
-
-    expect(Array.isArray(apps)).toBe(true);
-  });
-
-  test("popular apps payload is normalized", async () => {
+  test("popular apps report icon presence", async () => {
     const apps = await authClient.oauth.getPopularApps();
 
-    expect(Array.isArray(apps)).toBe(true);
-    expect(
-      apps.every(
-        (app) =>
-          typeof app.id === "number" &&
-          typeof app.name === "string" &&
-          typeof app.description === "string" &&
-          typeof app.website === "string" &&
-          typeof app.has_icon === "boolean",
-      ),
-    ).toBe(true);
+    expect(apps.every((app) => app.has_icon !== null)).toBe(true);
   });
 
   test("oauth app detail succeeds for the configured app", async () => {
     const apps = await authClient.oauth.query();
-    const configuredClientId = process.env.PUTIO_CLIENT_ID
-      ? Number(process.env.PUTIO_CLIENT_ID)
-      : NaN;
-    const ownedAppId = apps.find((app) => app.id === configuredClientId)?.id ?? apps[0]?.id;
+    const configuredClientId = Number(readOptionalSecret("PUTIO_CLIENT_ID"));
 
-    if (ownedAppId === undefined) {
-      expect(apps.length).toBe(0);
-      return;
-    }
+    const ownedAppId = assertPresent(
+      apps.find((app) => app.id === configuredClientId)?.id ?? apps[0]?.id,
+      "expected at least one owned oauth app",
+    );
 
     const app = await authClient.oauth.get(ownedAppId, { edit: true });
 
     expect(app.app.id).toBe(ownedAppId);
-    expect(typeof app.token === "string" || app.token === null).toBe(true);
   });
 
   test("oauth disposable app lifecycle succeeds", async () => {
@@ -68,9 +50,11 @@ describe("oauth live", () => {
       });
 
       createdId = created.app.id;
+
       if (!("hidden" in created.app) || !("secret" in created.app)) {
         throw new Error("expected editable oauth app payload after create");
       }
+
       expect(created.app.hidden).toBe(true);
       expect(created.app.secret.length).toBeGreaterThan(0);
 
@@ -83,9 +67,11 @@ describe("oauth live", () => {
       });
 
       expect(updated.app.id).toBe(created.app.id);
+
       if (!("hidden" in updated.app) || !("callback" in updated.app)) {
         throw new Error("expected editable oauth app payload after update");
       }
+
       expect(updated.app.hidden).toBe(false);
       expect(updated.app.callback).toContain("updated=");
 

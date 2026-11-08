@@ -43,7 +43,9 @@ const FriendInviteCreateEnvelopeSchema = Schema.Struct({
 export type FriendInviteJoinedUserStatus = Schema.Schema.Type<
   typeof FriendInviteJoinedUserStatusSchema
 >;
+
 export type FriendInviteJoinedUser = Schema.Schema.Type<typeof FriendInviteJoinedUserSchema>;
+
 export type FriendInvite = Schema.Schema.Type<typeof FriendInviteSchema>;
 
 export const ListFriendInvitesErrorSpec = definePutioOperationErrorSpec({
@@ -64,6 +66,7 @@ export const CreateFriendInviteErrorSpec = definePutioOperationErrorSpec({
 });
 
 export type ListFriendInvitesError = PutioOperationFailure<typeof ListFriendInvitesErrorSpec>;
+
 export type CreateFriendInviteError = PutioOperationFailure<typeof CreateFriendInviteErrorSpec>;
 
 export const listFriendInvites = (): Effect.Effect<

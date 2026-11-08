@@ -71,7 +71,4 @@ accepts a published version number again.
 
 The installed Effect version's guide is `node_modules/effect/AGENTS.md`;
 consult it for the APIs the change touches, and search `node_modules/effect/src`
-for anything it does not cover.
-
-- Effect setup or agent guidance: `effect-ts` skill. Keep the pinned `effect`
-  version; skip its `effect@latest` install step.
+for anything it does not cover. Keep the pinned `effect` version.

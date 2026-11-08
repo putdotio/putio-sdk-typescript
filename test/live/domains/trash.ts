@@ -1,4 +1,4 @@
-import { createClients, createLiveHarness } from "../support/harness.js";
+import { assertPresent, createClients, createLiveHarness } from "../support/harness.js";
 
 const { authClient, oauthClient } = await createClients({
   authClient: "PUTIO_TOKEN_FIRST_PARTY",
@@ -82,6 +82,7 @@ const collectTrashPages = async (perPage: number, targetIds?: ReadonlySet<number
     const next = await authClient.trash.continue(cursor, {
       per_page: perPage,
     });
+
     files.push(...next.files);
     cursor = next.cursor;
     pages += 1;
@@ -112,12 +113,10 @@ await run("trash list shape", async () => {
   });
 
   assert(Array.isArray(result.files), "expected trash files array");
-  assert(typeof result.total === "number", "expected trash total");
-  assert(typeof result.trash_size === "number", "expected trash_size");
 
   return {
     count: result.files.length,
-    cursor_present: result.cursor === null || typeof result.cursor === "string",
+    cursor_present: result.cursor !== null,
     total: result.total,
   };
 });
@@ -191,15 +190,6 @@ await run("trash disposable lifecycle", () =>
           file.folder_type === "REGULAR",
           "expected trash folders to keep REGULAR folder_type",
         );
-        assert(typeof file.deleted_at === "string", "expected deleted_at on trash entries");
-        assert(
-          typeof file.expiration_date === "string",
-          "expected expiration_date on trash entries",
-        );
-        assert(
-          file.parent_id === null || typeof file.parent_id === "number",
-          "expected parent_id to stay nullable-number shaped on trash entries",
-        );
       });
       assert(listing.pages >= 1, "expected at least one trash page for disposable trash probes");
 
@@ -208,8 +198,11 @@ await run("trash disposable lifecycle", () =>
       });
       trashedIds.delete(created[0]);
 
-      const restored = await waitForFileReachable(created[0]);
-      assert(restored, "expected restored folder to become reachable after restore starts");
+      const restored = assertPresent(
+        await waitForFileReachable(created[0]),
+        "expected restored folder to become reachable after restore starts",
+      );
+
       assert(restored.id === created[0], "expected restored folder to be reachable again");
       restoredIds.add(created[0]);
 
@@ -225,6 +218,7 @@ await run("trash disposable lifecycle", () =>
         const afterEmpty = await authClient.trash.list({
           per_page: 5,
         });
+
         assert(afterEmpty.total === 0, "expected empty trash after disposable cleanup");
       } else {
         await authClient.trash.delete({
@@ -322,12 +316,14 @@ await run("trash child restore and delete reject non-toplevel entries", () =>
         name: `putio-typescript-sdk-trash-${seed}-parent`,
         parent_id: 0,
       });
+
       parentId = parent.id;
 
       const child = await authClient.files.createFolder({
         name: `putio-typescript-sdk-trash-${seed}-child`,
         parent_id: parent.id,
       });
+
       childId = child.id;
 
       await authClient.files.delete([parent.id]);

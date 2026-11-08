@@ -1,3 +1,4 @@
+import { Option, Predicate, Schema } from "effect";
 import { test } from "vite-plus/test";
 
 import type { FileUploadResult, PutioSdkPromiseClient } from "../../../dist/index.js";
@@ -5,39 +6,63 @@ import { hydrateLiveTokenEnv } from "./secrets.ts";
 import { createPutioSdkPromiseClient as createPromiseSdkClient } from "../../../dist/index.js";
 
 type JsonPrimitive = boolean | null | number | string;
-type LiveDetails =
-  | JsonPrimitive
-  | readonly unknown[]
-  | {
-      readonly [key: string]: unknown;
-    };
 
-type OperationErrorReason = {
-  readonly errorType?: unknown;
-  readonly kind?: unknown;
+type LiveDetailsRecord = {
+  readonly [key: string]: LiveDetails | undefined;
 };
 
-type OperationErrorBody = {
-  readonly error_message?: unknown;
-  readonly error_type?: unknown;
-};
+type LiveDetails = JsonPrimitive | readonly LiveDetails[] | LiveDetailsRecord;
 
-type OperationErrorCandidate = {
-  readonly _tag?: unknown;
-  readonly body?: OperationErrorBody;
-  readonly domain?: unknown;
-  readonly message?: unknown;
-  readonly name?: unknown;
-  readonly operation?: unknown;
-  readonly reason?: OperationErrorReason;
-  readonly status?: unknown;
-};
+type PromiseClientConfig = Parameters<typeof createPromiseSdkClient>[0];
+
+const OperationErrorSchema = Schema.Struct({
+  _tag: Schema.Literal("PutioOperationError"),
+  body: Schema.optional(
+    Schema.Struct({
+      error_message: Schema.optional(Schema.String),
+      error_type: Schema.optional(Schema.String),
+    }),
+  ),
+  domain: Schema.String,
+  operation: Schema.String,
+  reason: Schema.optional(
+    Schema.Struct({
+      errorType: Schema.optional(Schema.String),
+      kind: Schema.String,
+    }),
+  ),
+  status: Schema.Number,
+});
+
+type OperationError = typeof OperationErrorSchema.Type;
+
+const TaggedErrorSchema = Schema.Struct({
+  _tag: Schema.String,
+  status: Schema.optional(Schema.Number),
+});
 
 type OperationErrorExpectation = {
   readonly domain: string;
   readonly operation: string;
   readonly errorType?: string;
   readonly statusCode?: number;
+};
+
+type OperationErrorDetails = {
+  readonly error_message: string | undefined;
+  readonly error_type: string | undefined;
+  readonly operation: string;
+  readonly status: number;
+};
+
+type ErrorTagExpectation = {
+  readonly status?: number;
+  readonly tag: string;
+};
+
+type ErrorTagDetails = {
+  readonly status: number | undefined;
+  readonly tag: string;
 };
 
 type LiveHarness = {
@@ -49,9 +74,6 @@ type LiveHarness = {
   readonly run: (name: string, fn: () => LiveDetails | Promise<LiveDetails>) => Promise<void>;
   readonly sleep: typeof sleep;
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
 
 export const requireEnv = (keys: readonly string[]): void => {
   for (const key of keys) {
@@ -69,6 +91,7 @@ export const createClients = async <TClientEnvMap extends Readonly<Record<string
   const envKeys = [...new Set(Object.values(clientEnvMap))];
   requireEnv(envKeys);
 
+  // SAFETY: Object.fromEntries maps every own key of clientEnvMap to a client, so the result has exactly the keys of TClientEnvMap.
   return Object.fromEntries(
     Object.entries(clientEnvMap).map(([clientName, envKey]) => [
       clientName,
@@ -80,10 +103,10 @@ export const createClients = async <TClientEnvMap extends Readonly<Record<string
 };
 
 export const createPromiseClient = async (
-  config: Record<string, unknown> = {},
+  config: PromiseClientConfig = {},
 ): Promise<PutioSdkPromiseClient> => createPromiseSdkClient(config);
 
-export const assert = (condition: unknown, message: string): void => {
+export const assert = (condition: boolean, message: string): void => {
   if (!condition) {
     throw new Error(message);
   }
@@ -100,58 +123,26 @@ export function assertPresent<T>(value: T, message: string): NonNullable<T> {
 export const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-export const isOperationError = (
-  error: unknown,
-): error is OperationErrorCandidate & {
-  readonly _tag: "PutioOperationError";
-  readonly domain: string;
-  readonly operation: string;
-  readonly status: number;
-} => {
-  if (!isRecord(error)) {
-    return false;
-  }
-
-  return (
-    error._tag === "PutioOperationError" &&
-    typeof error.domain === "string" &&
-    typeof error.operation === "string" &&
-    typeof error.status === "number"
+const decodeOperationError = (cause: unknown): OperationError =>
+  Option.getOrThrowWith(
+    Schema.decodeUnknownOption(OperationErrorSchema)(cause),
+    () => new Error("expected PutioOperationError", { cause }),
   );
-};
 
-export const expectOperationError = (
-  error: unknown,
-): OperationErrorCandidate & {
-  readonly _tag: "PutioOperationError";
-  readonly domain: string;
-  readonly operation: string;
-  readonly status: number;
-} => {
-  if (!isOperationError(error)) {
-    throw new Error("expected PutioOperationError");
-  }
-
-  return error;
-};
+export const expectOperationError = (cause: unknown): OperationError => decodeOperationError(cause);
 
 export const isFileUploadFileResult = (
   upload: FileUploadResult,
 ): upload is Extract<FileUploadResult, { readonly type: "file" }> => upload.type === "file";
 
 export const assertOperationError = (
-  error: unknown,
+  cause: unknown,
   expected: OperationErrorExpectation,
-): {
-  readonly error_message: unknown;
-  readonly error_type: unknown;
-  readonly operation: string;
-  readonly status: number;
-} => {
-  assert(isRecord(error), "expected error object");
-  const candidate = error as OperationErrorCandidate;
+): OperationErrorDetails => {
+  assert(Predicate.isTagged(cause, "PutioOperationError"), "expected PutioOperationError");
 
-  assert(candidate._tag === "PutioOperationError", "expected PutioOperationError");
+  const candidate = decodeOperationError(cause);
+
   assert(candidate.domain === expected.domain, `expected domain ${expected.domain}`);
   assert(candidate.operation === expected.operation, `expected operation ${expected.operation}`);
 
@@ -176,24 +167,17 @@ export const assertOperationError = (
     error_message: candidate.body?.error_message,
     error_type: candidate.body?.error_type,
     operation: expected.operation,
-    status: candidate.status as number,
+    status: candidate.status,
   };
 };
 
-export const assertErrorTag = (
-  error: unknown,
-  expected: {
-    readonly status?: number;
-    readonly tag: string;
-  },
-): {
-  readonly status: unknown;
-  readonly tag: string;
-} => {
-  assert(isRecord(error), "expected error object");
-  const candidate = error as OperationErrorCandidate;
+export const assertErrorTag = (cause: unknown, expected: ErrorTagExpectation): ErrorTagDetails => {
+  const candidate = Option.getOrThrowWith(
+    Schema.decodeUnknownOption(TaggedErrorSchema)(cause),
+    () => new Error("expected error object", { cause }),
+  );
 
-  assert(candidate._tag === expected.tag, `expected ${expected.tag}`);
+  assert(Predicate.isTagged(candidate, expected.tag), `expected ${expected.tag}`);
 
   if (expected.status !== undefined) {
     assert(candidate.status === expected.status, `expected status ${expected.status}`);

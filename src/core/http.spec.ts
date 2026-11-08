@@ -13,10 +13,10 @@ import {
   PutioHttpClient,
   buildPutioUrl,
   makePutioFetchClient,
-  makePutioSdkConfig,
-  makePutioSdkLayer,
-  makePutioSdkLiveLayer,
-  type PutioHttpClientShape,
+  normalizePutioSdkOptions,
+  putioSdkLayer,
+  putioSdkLiveLayer,
+  type PutioHttpClientService,
   type PutioHttpRequest,
   PutioSdkConfig,
   requestArrayBuffer,
@@ -44,7 +44,7 @@ const expectFailure = <E>(exit: Exit.Exit<unknown, E>): E => {
   return failure.error;
 };
 
-const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientShape => ({
+const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientService => ({
   execute: (request) => {
     const response = handler(request);
 
@@ -66,16 +66,16 @@ const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientShape =
 const provideSdkTest = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
   handler: MockRequestHandler,
-  config: Parameters<typeof makePutioSdkConfig>[0] = {},
+  config: Parameters<typeof normalizePutioSdkOptions>[0] = {},
 ) =>
   effect.pipe(
     Effect.provideService(PutioHttpClient, makeMockHttpClient(handler)),
-    Effect.provide(makePutioSdkLayer(config)),
+    Effect.provide(putioSdkLayer(config)),
   );
 
 describe("sdk core http", () => {
   it("applies default sdk configuration values", () => {
-    expect(makePutioSdkConfig({ accessToken: "token" })).toEqual({
+    expect(normalizePutioSdkOptions({ accessToken: "token" })).toEqual({
       accessToken: "token",
       baseUrl: "https://api.put.io",
       uploadBaseUrl: "https://upload.put.io",
@@ -88,7 +88,7 @@ describe("sdk core http", () => {
       Effect.all({
         config: PutioSdkConfig,
         httpClient: PutioHttpClient,
-      }).pipe(Effect.provide(makePutioSdkLiveLayer({ accessToken: "token-123" }))),
+      }).pipe(Effect.provide(putioSdkLiveLayer({ accessToken: "token-123" }))),
     );
 
     expect(result.config).toEqual({
@@ -103,9 +103,11 @@ describe("sdk core http", () => {
   it("aborts fetch transport when the Effect is interrupted", async () => {
     let observedSignal: AbortSignal | undefined;
     let markStarted: (() => void) | undefined;
+
     const started = new Promise<void>((resolve) => {
       markStarted = resolve;
     });
+
     const httpClient = makePutioFetchClient((_input, init) => {
       observedSignal = init?.signal ?? undefined;
 
@@ -124,6 +126,7 @@ describe("sdk core http", () => {
         url: "https://api.put.io/v2/test",
       }),
     );
+
     await started;
     await Effect.runPromise(Fiber.interrupt(fiber));
 
@@ -136,22 +139,28 @@ describe("sdk core http", () => {
     async (kind) => {
       const started = Promise.withResolvers<void>();
       let observedSignal: AbortSignal | undefined;
+
       const client = makePutioFetchClient(async (_input, init) => {
         observedSignal = init?.signal ?? undefined;
+
         class PendingResponse extends Response {
           override json() {
             started.resolve();
+
             return super.json();
           }
           override arrayBuffer() {
             started.resolve();
+
             return super.arrayBuffer();
           }
           override text() {
             started.resolve();
+
             return super.text();
           }
         }
+
         return new PendingResponse(
           new ReadableStream({
             start(controller) {
@@ -165,6 +174,7 @@ describe("sdk core http", () => {
           { status: kind === "error" ? 429 : 200 },
         );
       });
+
       const fiber = Effect.runFork(
         client
           .execute({ headers: new Headers(), method: "GET", url: "https://example.invalid/test" })
@@ -174,6 +184,7 @@ describe("sdk core http", () => {
             ),
           ),
       );
+
       await started.promise;
       expect(observedSignal?.aborted).toBe(false);
       await Effect.runPromise(Fiber.interrupt(fiber));
@@ -185,21 +196,26 @@ describe("sdk core http", () => {
     "does not abort successful %s reads or reuse request controllers",
     async (kind) => {
       const signals: Array<AbortSignal> = [];
+
       const client = makePutioFetchClient(async (_input, init) => {
         if (init?.signal) signals.push(init.signal);
+
         return Response.json({ status: "OK" });
       });
+
       const request = client.execute({
         headers: new Headers(),
         method: "GET",
         url: "https://example.invalid/test",
       });
+
       for (let index = 0; index < 2; index++) {
         const response = await Effect.runPromise(request);
         expect(signals[index]?.aborted).toBe(false);
         await Effect.runPromise(kind === "json" ? response.json : response.arrayBuffer);
         expect(signals[index]?.aborted).toBe(false);
       }
+
       expect(signals[0]).not.toBe(signals[1]);
     },
   );
@@ -356,9 +372,6 @@ describe("sdk core http", () => {
     if (Exit.isFailure(exit)) {
       const error = expectFailure(exit);
       expect(error).toBeInstanceOf(PutioConfigurationError);
-      expect(error).toMatchObject({
-        _tag: "PutioConfigurationError",
-      });
     }
   });
 
@@ -430,52 +443,51 @@ describe("sdk core http", () => {
       const error = expectFailure(exit);
       expect(error).toBeInstanceOf(PutioRateLimitError);
       expect(error).toMatchObject({
-        _tag: "PutioRateLimitError",
         action: "captcha-needed",
         id: "limit-id",
       });
     }
   });
 
-  it.each([401, 403, 429, 502])(
-    "retains HTTP metadata for invalid error bodies (%i)",
-    async (status) => {
-      for (const body of ["<html>private response</html>", "", "{invalid"]) {
-        const client = makePutioFetchClient(
-          async () =>
-            new Response(body, {
-              status,
-              headers: { "retry-after": "60", "x-ratelimit-id": "test-limit" },
-            }),
-        );
-        const error = expectFailure(
-          await Effect.runPromiseExit(
-            requestJson(OkResponseSchema, {
-              method: "GET",
-              path: "/test",
-              auth: { type: "none" },
-            }).pipe(
-              Effect.provideService(PutioHttpClient, client),
-              Effect.provide(makePutioSdkLayer({})),
-            ),
+  it.each([
+    [401, PutioAuthError],
+    [403, PutioAuthError],
+    [429, PutioRateLimitError],
+    [502, PutioApiError],
+  ])("retains HTTP metadata for invalid error bodies (%i)", async (status, ErrorClass) => {
+    for (const body of ["<html>private response</html>", "", "{invalid"]) {
+      const client = makePutioFetchClient(
+        async () =>
+          new Response(body, {
+            status,
+            headers: { "retry-after": "60", "x-ratelimit-id": "test-limit" },
+          }),
+      );
+
+      const error = expectFailure(
+        await Effect.runPromiseExit(
+          requestJson(OkResponseSchema, {
+            method: "GET",
+            path: "/test",
+            auth: { type: "none" },
+          }).pipe(
+            Effect.provideService(PutioHttpClient, client),
+            Effect.provide(putioSdkLayer({})),
           ),
-        );
-        expect(error).toMatchObject({
-          _tag:
-            status === 429
-              ? "PutioRateLimitError"
-              : status === 502
-                ? "PutioApiError"
-                : "PutioAuthError",
-          status,
-          body: { status_code: status },
-          cause: expect.any(SyntaxError),
-        });
-        expect(JSON.stringify(error)).not.toContain("private response");
-        if (status === 429) expect(error).toMatchObject({ retryAfter: "60", id: "test-limit" });
-      }
-    },
-  );
+        ),
+      );
+
+      expect(error).toBeInstanceOf(ErrorClass);
+      expect(error).toMatchObject({
+        status,
+        body: { status_code: status },
+        cause: expect.any(SyntaxError),
+      });
+      expect(JSON.stringify(error)).not.toContain("private response");
+
+      if (status === 429) expect(error).toMatchObject({ retryAfter: "60", id: "test-limit" });
+    }
+  });
 
   it.each([new TypeError("body connection lost"), new SyntaxError("body source failed")])(
     "preserves genuine error body I/O failures: %s",
@@ -491,14 +503,16 @@ describe("sdk core http", () => {
             { status: 429 },
           ),
       );
+
       const error = expectFailure(
         await Effect.runPromiseExit(
           requestVoid({ method: "GET", path: "/test", auth: { type: "none" } }).pipe(
             Effect.provideService(PutioHttpClient, client),
-            Effect.provide(makePutioSdkLayer({})),
+            Effect.provide(putioSdkLayer({})),
           ),
         ),
       );
+
       expect(error).toBeInstanceOf(PutioTransportError);
       expect(error).toHaveProperty("cause", cause);
     },
@@ -533,6 +547,7 @@ describe("sdk core http", () => {
         }),
         (request) => {
           expect(request.headers.get("accept")).toBe("application/vnd.apple.mpegurl");
+
           return new Response("#EXTM3U\n#EXT-X-VERSION:3\n", { status: 200 });
         },
       ),
@@ -545,9 +560,11 @@ describe("sdk core http", () => {
     const jsonFailure = new PutioTransportError({ cause: "json read failed" });
     const errorJsonFailure = new PutioTransportError({ cause: "error json read failed" });
     const binaryFailure = new PutioTransportError({ cause: "binary read failed" });
-    const httpClient: PutioHttpClientShape = {
+
+    const httpClient: PutioHttpClientService = {
       execute: (request) => {
         const isErrorResponse = request.url.endsWith("/v2/error");
+
         return Effect.succeed({
           arrayBuffer: Effect.fail(binaryFailure),
           headers: new Headers(),
@@ -556,10 +573,11 @@ describe("sdk core http", () => {
         });
       },
     };
+
     const provideClient = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
       effect.pipe(
         Effect.provideService(PutioHttpClient, httpClient),
-        Effect.provide(makePutioSdkLayer({})),
+        Effect.provide(putioSdkLayer({})),
       );
 
     const [jsonExit, errorJsonExit, binaryExit] = await Promise.all([
@@ -686,6 +704,7 @@ describe("sdk core http", () => {
             value: (() => {
               const body = new FormData();
               body.set("file", new Blob(["hello"]), "hello.txt");
+
               return body;
             })(),
           },

@@ -18,27 +18,51 @@ declare global {
 }
 
 export * from "./core/client.js";
+
 export * from "./core/defaults.js";
+
 export * from "./core/errors.js";
+
 export * from "./core/http.js";
+
 export * from "./domains/account.js";
+
 export * from "./domains/app-specific-passwords.js";
+
 export * from "./domains/auth.js";
+
 export * from "./domains/config.js";
+
 export * from "./domains/download-links.js";
+
 export * from "./domains/events.js";
+
 export * from "./domains/family.js";
+
 export * from "./domains/files.js";
+
 export * from "./domains/friend-invites.js";
+
 export * from "./domains/friends.js";
+
 export * from "./domains/ifttt.js";
+
 export * from "./domains/oauth.js";
+
 export * from "./domains/payment.js";
+
 export * from "./domains/podcast.js";
+
 export * from "./domains/rate-limits.js";
+
 export * from "./domains/rss.js";
+
 export * from "./domains/sharing.js";
+
 export * from "./domains/trash.js";
+
 export * from "./domains/transfers.js";
+
 export * from "./domains/tunnel.js";
+
 export * from "./domains/zips.js";

@@ -9,12 +9,14 @@ const live = createLiveHarness("file-direct live");
 const { assert, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
+
 void sleep;
 
 const { download_token: downloadToken } = await client.account.getInfo({ download_token: 1 });
 
 const createDisposableTextFile = async (label: string) => {
   const name = `putio-typescript-sdk-${label}-${Date.now()}.txt`;
+
   const upload = await client.files.upload({
     file: new File(["sdk live probe\n"], name, {
       type: "text/plain",
@@ -35,6 +37,7 @@ await run("files api download url redirects", async () => {
 
   try {
     const url = await client.files.getApiDownloadUrl(file.id, { downloadToken });
+
     const response = await fetch(url, {
       redirect: "manual",
     });
@@ -58,6 +61,7 @@ await run("files api content url redirects", async () => {
 
   try {
     const url = await client.files.getApiContentUrl(file.id, { downloadToken });
+
     const response = await fetch(url, {
       redirect: "manual",
     });
@@ -107,6 +111,7 @@ await run("files api mp4 download url redirects for owned video", async () => {
     downloadToken,
     name: "putio-typescript-sdk-live.mp4",
   });
+
   const response = await fetch(url, {
     redirect: "manual",
   });
@@ -159,6 +164,7 @@ await run("files XSPF playlist is fetchable for owned video", async () => {
 
 await run("files upload works through upload.put.io", async () => {
   const name = `putio-typescript-sdk-upload-probe-${Date.now()}.txt`;
+
   const upload = await client.files.upload({
     file: new File(["sdk upload probe\n"], name, {
       type: "text/plain",

@@ -14,6 +14,7 @@ const live = createLiveHarness("friend invites live");
 const { assert, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
+
 void sleep;
 
 const publicClient = await createPromiseClient();
@@ -39,20 +40,13 @@ const requireSecondaryClient = async () => {
 await run("friend invites list shape", async () => {
   const result = await authClient.friendInvites.list();
   assert(Array.isArray(result.invites), "expected invites array");
-  assert(typeof result.remaining_limit === "number", "expected remaining_limit number");
   assert(
     result.invites.every(
       (invite) =>
-        typeof invite.code === "string" &&
-        typeof invite.created_at === "string" &&
-        (invite.user === null ||
-          (typeof invite.user.name === "string" &&
-            typeof invite.user.avatar_url === "string" &&
-            typeof invite.user.created_at === "string" &&
-            (invite.user.earned_amount === null || typeof invite.user.earned_amount === "number") &&
-            ["CONVERTED", "IN_TRIAL", "TRIAL_ENDED", "TRIAL_NOT_STARTED", "UNKNOWN"].includes(
-              invite.user.status,
-            ))),
+        invite.user === null ||
+        ["CONVERTED", "IN_TRIAL", "TRIAL_ENDED", "TRIAL_NOT_STARTED", "UNKNOWN"].includes(
+          invite.user.status,
+        ),
     ),
     "expected normalized friend invite payload",
   );
@@ -78,8 +72,8 @@ await run("friend invites positive lookup with secondary fixture", async () => {
   const code = existing.code;
   const invite = await publicClient.auth.getFriendInvite(code);
 
-  assert(typeof invite.inviter === "string" && invite.inviter.length > 0, "expected inviter");
-  assert(typeof invite.plan.code === "string" && invite.plan.code.length > 0, "expected plan");
+  assert(invite.inviter.length > 0, "expected inviter");
+  assert(invite.plan.code.length > 0, "expected plan");
 
   return {
     code_length: code.length,

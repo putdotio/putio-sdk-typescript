@@ -14,6 +14,7 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
+
 export const RssFeedSchema = Schema.Struct({
   created_at: Schema.String,
   delete_old_files: Schema.Boolean,
@@ -33,6 +34,7 @@ export const RssFeedSchema = Schema.Struct({
   unwanted_keywords: Schema.String,
   updated_at: Schema.String,
 });
+
 export const RssFeedParamsSchema = Schema.Struct({
   delete_old_files: Schema.optional(Schema.Boolean),
   dont_process_whole_feed: Schema.optional(Schema.Boolean),
@@ -44,14 +46,17 @@ export const RssFeedParamsSchema = Schema.Struct({
   title: NonEmptyStringSchema,
   unwanted_keywords: Schema.optional(Schema.String),
 });
+
 const RssFeedUpdateInputSchema = Schema.Struct({
   id: PositiveIntegerSchema,
   params: RssFeedParamsSchema,
 });
+
 const RssFeedItemRetryInputSchema = Schema.Struct({
   feedId: PositiveIntegerSchema,
   itemId: PositiveIntegerSchema,
 });
+
 const RssFeedItemBaseSchema = Schema.Struct({
   detected_date: Schema.String,
   id: Schema.Int.check(Schema.isGreaterThan(0)),
@@ -59,43 +64,54 @@ const RssFeedItemBaseSchema = Schema.Struct({
   publish_date: Schema.NullOr(Schema.String),
   title: Schema.String,
 });
+
 export const RssFeedItemSucceededSchema = RssFeedItemBaseSchema.pipe(
   Schema.fieldsAssign({
     is_failed: Schema.Literal(false),
     user_file_id: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   }),
 );
+
 export const RssFeedItemFailedSchema = RssFeedItemBaseSchema.pipe(
   Schema.fieldsAssign({
     failure_reason: Schema.String,
     is_failed: Schema.Literal(true),
   }),
 );
+
 export const RssFeedItemSchema = Schema.Union([
   RssFeedItemSucceededSchema,
   RssFeedItemFailedSchema,
 ]);
+
 const RssFeedsEnvelopeSchema = Schema.Struct({
   feeds: Schema.Array(RssFeedSchema),
   status: Schema.Literal("OK"),
 });
+
 const RssFeedEnvelopeSchema = Schema.Struct({
   feed: RssFeedSchema,
   status: Schema.Literal("OK"),
 });
+
 const RssFeedItemsEnvelopeSchema = Schema.Struct({
   feed: RssFeedSchema,
   items: Schema.Array(RssFeedItemSchema),
   status: Schema.Literal("OK"),
 });
+
 export type RssFeed = Schema.Schema.Type<typeof RssFeedSchema>;
+
 export type RssFeedParams = Schema.Schema.Type<typeof RssFeedParamsSchema>;
+
 export type RssFeedItem = Schema.Schema.Type<typeof RssFeedItemSchema>;
+
 export const ListRssFeedsErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "list",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
+
 export const GetRssFeedErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "get",
@@ -105,6 +121,7 @@ export const GetRssFeedErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const CreateRssFeedErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "create",
@@ -121,6 +138,7 @@ export const CreateRssFeedErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 403 as const },
   ],
 });
+
 export const UpdateRssFeedErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "update",
@@ -135,6 +153,7 @@ export const UpdateRssFeedErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const PauseRssFeedErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "pause",
@@ -144,6 +163,7 @@ export const PauseRssFeedErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const ResumeRssFeedErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "resume",
@@ -154,6 +174,7 @@ export const ResumeRssFeedErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const DeleteRssFeedErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "delete",
@@ -163,6 +184,7 @@ export const DeleteRssFeedErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const ListRssFeedItemsErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "listItems",
@@ -172,6 +194,7 @@ export const ListRssFeedItemsErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const ClearRssFeedLogsErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "clearLogs",
@@ -181,6 +204,7 @@ export const ClearRssFeedLogsErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const RetryRssFeedItemErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "retryItem",
@@ -192,6 +216,7 @@ export const RetryRssFeedItemErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export const RetryAllRssFeedItemsErrorSpec = definePutioOperationErrorSpec({
   domain: "rss",
   operation: "retryAll",
@@ -202,17 +227,29 @@ export const RetryAllRssFeedItemsErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 404 as const },
   ],
 });
+
 export type ListRssFeedsError = PutioOperationFailure<typeof ListRssFeedsErrorSpec>;
+
 export type GetRssFeedError = PutioOperationFailure<typeof GetRssFeedErrorSpec>;
+
 export type CreateRssFeedError = PutioOperationFailure<typeof CreateRssFeedErrorSpec>;
+
 export type UpdateRssFeedError = PutioOperationFailure<typeof UpdateRssFeedErrorSpec>;
+
 export type PauseRssFeedError = PutioOperationFailure<typeof PauseRssFeedErrorSpec>;
+
 export type ResumeRssFeedError = PutioOperationFailure<typeof ResumeRssFeedErrorSpec>;
+
 export type DeleteRssFeedError = PutioOperationFailure<typeof DeleteRssFeedErrorSpec>;
+
 export type ListRssFeedItemsError = PutioOperationFailure<typeof ListRssFeedItemsErrorSpec>;
+
 export type ClearRssFeedLogsError = PutioOperationFailure<typeof ClearRssFeedLogsErrorSpec>;
+
 export type RetryRssFeedItemError = PutioOperationFailure<typeof RetryRssFeedItemErrorSpec>;
+
 export type RetryAllRssFeedItemsError = PutioOperationFailure<typeof RetryAllRssFeedItemsErrorSpec>;
+
 const toCreateBody = (params: RssFeedParams) => ({
   delete_old_files: params.delete_old_files ? "on" : undefined,
   dont_process_whole_feed: params.dont_process_whole_feed,
@@ -222,6 +259,7 @@ const toCreateBody = (params: RssFeedParams) => ({
   title: params.title,
   unwanted_keywords: params.unwanted_keywords ?? "",
 });
+
 const toUpdateBody = (params: RssFeedParams) => ({
   delete_old_files: params.delete_old_files,
   dont_process_whole_feed: params.dont_process_whole_feed,
@@ -231,6 +269,7 @@ const toUpdateBody = (params: RssFeedParams) => ({
   title: params.title,
   unwanted_keywords: params.unwanted_keywords ?? "",
 });
+
 export const listRssFeeds = (): Effect.Effect<
   ReadonlyArray<RssFeed>,
   ListRssFeedsError,
@@ -240,6 +279,7 @@ export const listRssFeeds = (): Effect.Effect<
     method: "GET",
     path: "/v2/rss/list",
   }).pipe(selectJsonField("feeds"), withOperationErrors(ListRssFeedsErrorSpec));
+
 export const getRssFeed = (id: number): Effect.Effect<RssFeed, GetRssFeedError, PutioSdkContext> =>
   Schema.decodeUnknownEffect(PositiveIntegerSchema)(id).pipe(
     Effect.mapError(mapDecodeErrorToValidationError),
@@ -252,6 +292,7 @@ export const getRssFeed = (id: number): Effect.Effect<RssFeed, GetRssFeedError, 
     selectJsonField("feed"),
     withOperationErrors(GetRssFeedErrorSpec),
   );
+
 export const createRssFeed = (
   params: RssFeedParams,
 ): Effect.Effect<RssFeed, CreateRssFeedError, PutioSdkContext> =>
@@ -270,6 +311,7 @@ export const createRssFeed = (
     selectJsonField("feed"),
     withOperationErrors(CreateRssFeedErrorSpec),
   );
+
 export const updateRssFeed = (
   id: number,
   params: RssFeedParams,
@@ -295,6 +337,7 @@ export const updateRssFeed = (
     ),
     withOperationErrors(UpdateRssFeedErrorSpec),
   );
+
 export const pauseRssFeed = (
   id: number,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PauseRssFeedError, PutioSdkContext> =>
@@ -308,6 +351,7 @@ export const pauseRssFeed = (
     ),
     withOperationErrors(PauseRssFeedErrorSpec),
   );
+
 export const resumeRssFeed = (
   id: number,
 ): Effect.Effect<
@@ -325,6 +369,7 @@ export const resumeRssFeed = (
     ),
     withOperationErrors(ResumeRssFeedErrorSpec),
   );
+
 export const deleteRssFeed = (
   id: number,
 ): Effect.Effect<
@@ -342,6 +387,7 @@ export const deleteRssFeed = (
     ),
     withOperationErrors(DeleteRssFeedErrorSpec),
   );
+
 export const listRssFeedItems = (
   id: number,
 ): Effect.Effect<
@@ -363,6 +409,7 @@ export const listRssFeedItems = (
     selectJsonFields("feed", "items"),
     withOperationErrors(ListRssFeedItemsErrorSpec),
   );
+
 export const clearRssFeedLogs = (
   id: number,
 ): Effect.Effect<
@@ -380,6 +427,7 @@ export const clearRssFeedLogs = (
     ),
     withOperationErrors(ClearRssFeedLogsErrorSpec),
   );
+
 export const retryRssFeedItem = (
   feedId: number,
   itemId: number,
@@ -401,6 +449,7 @@ export const retryRssFeedItem = (
     ),
     withOperationErrors(RetryRssFeedItemErrorSpec),
   );
+
 export const retryAllRssFeedItems = (
   feedId: number,
 ): Effect.Effect<

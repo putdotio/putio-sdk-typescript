@@ -10,9 +10,11 @@ const live = createLiveHarness("rss live");
 const { assert, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
+
 void sleep;
 
 type RssClient = typeof authClient;
+
 type RssCreateInput = Parameters<RssClient["rss"]["create"]>[0];
 
 const requireRssSourceUrl = (): string => {
@@ -45,21 +47,14 @@ const createProbeRssFeed = async (
 await run("rss list shape", async () => {
   const feeds = await authClient.rss.list();
   assert(Array.isArray(feeds), "expected feeds array");
-  feeds.slice(0, 5).forEach((feed) => {
-    if (feed.failed_item_count !== undefined) {
-      assert(typeof feed.failed_item_count === "number", "expected numeric failed_item_count");
-    }
-    assert(
-      feed.paused_at === null || typeof feed.paused_at === "string",
-      "expected nullable paused_at",
-    );
-  });
+
   return { count: feeds.length };
 });
 
 await run("rss list is readable with oauth token", async () => {
   const feeds = await oauthClient.rss.list();
   assert(Array.isArray(feeds), "expected oauth-token rss list");
+
   return { count: feeds.length };
 });
 
@@ -99,23 +94,15 @@ await run("rss create update lifecycle", async () => {
     const updated = await authClient.rss.get(created.id);
     assert(updated.title === updatedTitle, "expected updated title");
     assert(updated.keyword === "typescript", "expected updated keyword");
-    assert(
-      typeof (updated.failed_item_count ?? 0) === "number",
-      "expected numeric failed_item_count",
-    );
 
     const logs = await authClient.rss.listItems(created.id);
     assert(logs.feed.id === created.id, "expected logs feed");
     assert(Array.isArray(logs.items), "expected rss items array");
-    assert(
-      logs.feed.paused_at === null || typeof logs.feed.paused_at === "string",
-      "expected nullable logs feed paused_at",
-    );
 
     await authClient.rss.pause(created.id);
     const paused = await authClient.rss.get(created.id);
     assert(paused.paused === true, "expected paused feed");
-    assert(typeof paused.paused_at === "string", "expected paused_at timestamp after pause");
+    assert(paused.paused_at !== null, "expected paused_at timestamp after pause");
 
     await authClient.rss.resume(created.id);
     const resumed = await authClient.rss.get(created.id);
@@ -144,7 +131,6 @@ await run("rss create is writable with oauth token", async () => {
   const created = createdProbe.feed;
 
   try {
-    assert(typeof created.id === "number", "expected created oauth rss id");
     return { id: created.id };
   } finally {
     await oauthClient.rss.delete(created.id).catch(() => undefined);

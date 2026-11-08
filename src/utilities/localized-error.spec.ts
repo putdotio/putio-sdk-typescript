@@ -106,7 +106,9 @@ describe("utility localized error", () => {
       knownErrors: [{ errorType: "FILE_LOST", statusCode: 400 }] as const,
       operation: "move",
     });
+
     const [contract] = spec.knownErrors;
+
     const operationError = new PutioOperationError({
       body: {
         error_message: "lost",

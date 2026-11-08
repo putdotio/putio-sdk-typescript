@@ -10,21 +10,22 @@ import {
   makePutioSdkEffectClientLayer,
   makePutioSdkLiveClientLayer,
 } from "./client.js";
+import { PutioAuthError, PutioConfigurationError, PutioOperationError } from "./errors.js";
 import { PutioSdkConfig } from "./http.js";
 
-const collectFunctionPaths = (value: unknown, parentPath = ""): ReadonlyArray<string> => {
-  if (typeof value === "function") {
-    return parentPath ? [parentPath] : [];
-  }
+interface ClientSurface {
+  readonly [key: string]: ClientSurface | ((...args: never[]) => void);
+}
 
-  if (!Predicate.isObject(value)) {
-    return [];
-  }
+const collectFunctionPaths = (surface: ClientSurface, parentPath = ""): ReadonlyArray<string> =>
+  Object.entries(surface).flatMap(([key, member]) => {
+    const path = parentPath ? `${parentPath}.${key}` : key;
 
-  return Object.entries(value).flatMap(([key, child]) =>
-    collectFunctionPaths(child, parentPath ? `${parentPath}.${key}` : key),
-  );
-};
+    return Predicate.isFunction(member) ? [path] : collectFunctionPaths(member, path);
+  });
+
+const requestUrl = (input: RequestInfo | URL): URL =>
+  new URL(input instanceof Request ? input.url : input);
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -135,6 +136,7 @@ describe("sdk client factories", () => {
           headers: { "content-type": "application/json" },
         }),
     );
+
     vi.stubGlobal("fetch", fetchMock);
     const headers = new Headers({ "x-forwarded-for": "203.0.113.7" });
     const client = createPutioSdkPromiseClient({ accessToken: "token-123", headers });
@@ -169,12 +171,7 @@ describe("sdk client factories", () => {
 
   it("supports representative Promise-client workflows without live IO", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === "string"
-          ? new URL(input)
-          : input instanceof URL
-            ? input
-            : new URL(input.url);
+      const url = requestUrl(input);
 
       switch (url.pathname) {
         case "/v2/oauth2/oob/code":
@@ -276,8 +273,10 @@ describe("sdk client factories", () => {
         oauthToken: "token-123",
       }),
     ).toBe("https://api.put.io/v2/oauth/apps/5/icon?oauth_token=token-123");
-    await expect(client.auth.grants()).rejects.toMatchObject({
-      _tag: "PutioOperationError",
+    const grants = client.auth.grants();
+
+    await expect(grants).rejects.toBeInstanceOf(PutioOperationError);
+    await expect(grants).rejects.toMatchObject({
       body: {
         error_type: "invalid_scope",
         status_code: 401,
@@ -296,18 +295,16 @@ describe("sdk client factories", () => {
 
   it("routes the Promise client's typed overload wrappers through their operations", async () => {
     const requests: Array<string> = [];
-    const json = (body: unknown, status = 200) =>
+
+    const json = (body: Schema.Json, status = 200) =>
       new Response(JSON.stringify(body), {
         status,
         headers: { "content-type": "application/json" },
       });
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === "string"
-          ? new URL(input)
-          : input instanceof URL
-            ? input
-            : new URL(input.url);
+      const url = requestUrl(input);
+
       requests.push(`${url.pathname}${url.search}`);
 
       switch (url.pathname) {
@@ -322,6 +319,7 @@ describe("sdk client factories", () => {
           return json({ error_type: "invalid_scope", status_code: 401 }, 401);
       }
     });
+
     vi.stubGlobal("fetch", fetchMock);
 
     const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
@@ -334,10 +332,10 @@ describe("sdk client factories", () => {
     await expect(client.config.readWith(Schema.Struct({ theme: Schema.String }))).resolves.toEqual({
       theme: "dark",
     });
-    await expect(client.account.getInfo({ download_token: 1 })).rejects.toMatchObject({
-      _tag: "PutioAuthError",
-      status: 401,
-    });
+    const accountInfo = client.account.getInfo({ download_token: 1 });
+
+    await expect(accountInfo).rejects.toBeInstanceOf(PutioAuthError);
+    await expect(accountInfo).rejects.toMatchObject({ status: 401 });
 
     expect(requests).toEqual([
       "/v2/files/9",
@@ -352,13 +350,16 @@ describe("sdk client factories", () => {
 
   it("updates the Promise access token before and after runtime creation", async () => {
     const authorizations: Array<string | null> = [];
+
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       authorizations.push(new Headers(init?.headers).get("authorization"));
+
       return new Response(JSON.stringify({ status: "OK" }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
     });
+
     vi.stubGlobal("fetch", fetchMock);
 
     const initialConfig = { accessToken: "initial-token" };
@@ -368,9 +369,9 @@ describe("sdk client factories", () => {
     activeClient.setAccessToken("replacement-token");
     await expect(activeClient.config.deleteKey("replacement")).resolves.toEqual({ status: "OK" });
     activeClient.setAccessToken(undefined);
-    await expect(activeClient.config.deleteKey("cleared")).rejects.toMatchObject({
-      _tag: "PutioConfigurationError",
-    });
+    await expect(activeClient.config.deleteKey("cleared")).rejects.toBeInstanceOf(
+      PutioConfigurationError,
+    );
 
     const beforeFirstRequestClient = createPutioSdkPromiseClient(initialConfig);
     beforeFirstRequestClient.setAccessToken("before-first-request-token");
@@ -392,25 +393,28 @@ describe("sdk client factories", () => {
 
   it("snapshots caller-owned Promise client URLs", async () => {
     const requestedUrls: Array<string> = [];
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      requestedUrls.push(
-        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-      );
+      requestedUrls.push(requestUrl(input).href);
+
       return new Response(JSON.stringify({ status: "OK" }), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
     });
+
     vi.stubGlobal("fetch", fetchMock);
 
     const baseUrl = new Proxy(new URL("https://api.snapshot.test"), {
-      get: (target, key) => Reflect.get(target, key, target),
+      get: (target, key) => (key === "href" ? target.href : undefined),
       getPrototypeOf: () => null,
       set: (target, key, value) => Reflect.set(target, key, value, target),
     });
+
     const uploadBaseUrl = new URL("https://upload.snapshot.test");
     const webAppUrl = new URL("https://app.snapshot.test");
     expect(baseUrl).not.toBeInstanceOf(URL);
+
     const client = createPutioSdkPromiseClient({
       accessToken: "token-123",
       baseUrl,
@@ -423,9 +427,11 @@ describe("sdk client factories", () => {
     webAppUrl.hostname = "app.mutated.test";
 
     await expect(client.config.deleteKey("snapshot")).resolves.toEqual({ status: "OK" });
+
     const uploadRequest = await client.files.createUploadRequest({
       file: new Blob(["snapshot"]),
     });
+
     const loginUrl = client.auth.buildLoginUrl({
       clientId: 1,
       redirectUri: "https://consumer.test/callback",
@@ -445,19 +451,18 @@ describe("sdk client factories", () => {
     const authorizations = new Map<string, string | null>();
     let markFirstStarted: (() => void) | undefined;
     let releaseFirst: (() => void) | undefined;
+
     const firstStarted = new Promise<void>((resolve) => {
       markFirstStarted = resolve;
     });
+
     const firstReleased = new Promise<void>((resolve) => {
       releaseFirst = resolve;
     });
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url =
-        typeof input === "string"
-          ? new URL(input)
-          : input instanceof URL
-            ? input
-            : new URL(input.url);
+      const url = requestUrl(input);
+
       authorizations.set(url.pathname, new Headers(init?.headers).get("authorization"));
 
       if (url.pathname === "/v2/config/first") {
@@ -470,6 +475,7 @@ describe("sdk client factories", () => {
         headers: { "content-type": "application/json" },
       });
     });
+
     vi.stubGlobal("fetch", fetchMock);
 
     const client = createPutioSdkPromiseClient({ accessToken: "first-token" });
@@ -501,8 +507,6 @@ describe("sdk client factories", () => {
 
     await client.dispose();
 
-    await expect(client.account.getSettings()).rejects.toMatchObject({
-      _tag: "PutioConfigurationError",
-    });
+    await expect(client.account.getSettings()).rejects.toBeInstanceOf(PutioConfigurationError);
   });
 });

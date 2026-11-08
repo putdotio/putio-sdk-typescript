@@ -31,6 +31,7 @@ describe("public contract fixtures", () => {
           });
           expect(getAuthorizationHeader(request)).toBeUndefined();
           expect(formEntries(getFormBody(request))).toEqual(fixture.request.form);
+
           return jsonResponse(fixture.response);
         },
         { accessToken },
@@ -50,6 +51,7 @@ describe("public contract fixtures", () => {
           });
           expect(getAuthorizationHeader(request)).toBe(`Token ${accessToken}`);
           expect(formEntries(getFormBody(request))).toEqual(fixture.request.form);
+
           return jsonResponse(fixture.response);
         },
         { accessToken },
@@ -65,6 +67,7 @@ describe("public contract fixtures", () => {
         (request) => {
           expect({ method: request.method, url: request.url }).toEqual(fixture.request);
           expect(getAuthorizationHeader(request)).toBe(`Token ${accessToken}`);
+
           return jsonResponse(fixture.response);
         },
         { accessToken },
@@ -74,11 +77,13 @@ describe("public contract fixtures", () => {
 
   it("replays a binary torrent response", async () => {
     const fixture = publicContractFixtures.transferTorrent;
+
     const result = await runSdkEffect(
       transfers.getTransferTorrent(fixture.input),
       (request) => {
         expect({ method: request.method, url: request.url }).toEqual(fixture.request);
         expect(getAuthorizationHeader(request)).toBe(`Token ${accessToken}`);
+
         return arrayBufferResponse(fixture.responseBytes);
       },
       { accessToken },

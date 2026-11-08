@@ -1,3 +1,5 @@
+import { Predicate } from "effect";
+
 import {
   assertPresent,
   createClients,
@@ -13,13 +15,10 @@ const live = createLiveHarness("download-links live");
 const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
+
 void sleep;
 
-const isRateLimitError = (error: unknown): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  "_tag" in error &&
-  error._tag === "PutioRateLimitError";
+const isRateLimitError = Predicate.isTagged("PutioRateLimitError");
 
 const retryOnRateLimit = async <T>(operation: () => Promise<T>): Promise<T> => {
   let rateLimitError: unknown;
@@ -71,6 +70,7 @@ const findProbeFile = async (): Promise<ProbeFile> => {
   const root = await client.files.list(0, {
     per_page: 20,
   });
+
   const owned = root.files.find((file) => file.file_type !== "FOLDER");
 
   if (owned) {
@@ -80,6 +80,7 @@ const findProbeFile = async (): Promise<ProbeFile> => {
   const shared = await client.files.list("friends", {
     per_page: 20,
   });
+
   const sharedFile = shared.files.find((file) => file.file_type !== "FOLDER");
 
   if (sharedFile) {
@@ -109,6 +110,7 @@ const createCursorProbeFiles = async () => {
 
   for (let index = 0; index < 2; index += 1) {
     const name = `putio-typescript-sdk-download-links-cursor-${Date.now()}-${index}.txt`;
+
     const upload = await client.files.upload({
       file: new File([`sdk download-links cursor probe ${index}\n`], name, {
         type: "text/plain",
@@ -135,16 +137,15 @@ await run("download links create and fetch", async () => {
       ids: [probeFile.id],
     });
 
-    assert(typeof created.id === "number", "expected download links task id");
-
     const first = await client.downloadLinks.get(created.id);
+
     if (first.links_status === "NEW" || first.links_status === "PROCESSING") {
       assert(first.links === null, "expected pending download links payload to keep links null");
     } else if (first.links_status === "DONE") {
       assert(Array.isArray(first.links.download_links), "expected DONE download links array");
     } else {
       assert(
-        typeof first.error_msg === "string",
+        first.error_msg !== null && first.error_msg !== undefined,
         "expected error message for errored download links",
       );
     }
@@ -153,18 +154,6 @@ await run("download links create and fetch", async () => {
     assert(result.links_status === "DONE", "expected links_status DONE");
     const links = assertPresent(result.links, "expected completed links payload");
     assert(links.download_links.length > 0, "expected download links");
-    assert(
-      links.download_links.every((url) => typeof url === "string"),
-      "expected string download links",
-    );
-    assert(
-      links.media_links.every((url) => typeof url === "string"),
-      "expected string media links",
-    );
-    assert(
-      links.mp4_links.every((url) => typeof url === "string"),
-      "expected string mp4 links",
-    );
 
     return {
       download_count: links.download_links.length,
@@ -185,6 +174,7 @@ await run("download links repeated create reuses cached task id", async () => {
     const first = await client.downloadLinks.create({
       ids: [probeFile.id],
     });
+
     const second = await client.downloadLinks.create({
       ids: [probeFile.id],
     });

@@ -1,4 +1,4 @@
-import { Cause, Context, Effect, Exit, Layer, ManagedRuntime, Schema } from "effect";
+import { Cause, Context, Effect, Exit, Layer, ManagedRuntime, Predicate, Schema } from "effect";
 
 import {
   clearAccount,
@@ -127,8 +127,8 @@ import {
   searchFriends,
   sendFriendRequest,
 } from "../domains/friends.js";
-import { makePutioSdkConfig, makePutioSdkLiveLayer, PutioSdkConfig } from "./http.js";
-import type { PutioSdkConfigShape, PutioSdkContext } from "./http.js";
+import { normalizePutioSdkOptions, PutioSdkConfig, putioSdkLiveLayer } from "./http.js";
+import type { PutioSdkOptions, PutioSdkContext } from "./http.js";
 import {
   buildOAuthAppIconUrl,
   buildOAuthAuthorizeUrl,
@@ -219,7 +219,8 @@ import { cancelZip, createZip, getZip, listZips } from "../domains/zips.js";
 import { mapConfigurationError } from "./errors.js";
 
 type PutioSdkPromiseRuntime = ManagedRuntime.ManagedRuntime<PutioSdkContext, never>;
-type PutioSdkPromiseRuntimeConfig = Omit<PutioSdkConfigShape, "accessToken">;
+
+type PutioSdkPromiseRuntimeConfig = Omit<PutioSdkOptions, "accessToken">;
 
 interface PutioSdkPromiseState {
   accessToken: string | undefined;
@@ -242,8 +243,9 @@ const getPromiseClientRuntime = (state: PutioSdkPromiseState): PutioSdkPromiseRu
     return cachedRuntime;
   }
 
-  const runtime = ManagedRuntime.make(makePutioSdkLiveLayer(state.runtimeConfig));
+  const runtime = ManagedRuntime.make(putioSdkLiveLayer(state.runtimeConfig));
   promiseClientRuntimeCache.set(state, runtime);
+
   return runtime;
 };
 
@@ -282,13 +284,14 @@ const provideSdk = async <A, E>(
     ...state.runtimeConfig,
     accessToken: state.accessToken,
   };
+
   const operation = Effect.provideService(effect, PutioSdkConfig, operationConfig);
 
   return rejectWithSdkFailure(await getPromiseClientRuntime(state).runPromiseExit(operation));
 };
 
 const snapshotUrl = (value: string | URL | undefined): string | URL | undefined =>
-  typeof value === "string" || value === undefined ? value : new URL(value.href);
+  Predicate.isString(value) || value === undefined ? value : new URL(value.href);
 
 const snapshotHeaders = (value: HeadersInit | undefined): HeadersInit | undefined =>
   value === undefined ? undefined : [...new Headers(value)];
@@ -299,52 +302,54 @@ type PromiseOperation<T> = T extends (...args: infer Args) => infer Result
     : T
   : never;
 
-type OperationBoundary = "input-free" | "pure" | "validated";
-type Operation = (...args: never[]) => unknown;
-const operationEntryMarker = Symbol("PutioSdkOperationEntry");
-interface OperationEntry<T extends Operation> {
-  readonly [operationEntryMarker]: true;
-  readonly boundary: OperationBoundary;
-  readonly run: T;
+type Operation = (...args: never[]) => void;
+
+type SdkEffectOperation = (...args: never[]) => Effect.Effect<unknown, unknown, PutioSdkContext>;
+
+class OperationEntry<T extends Operation> {
+  constructor(
+    readonly run: T,
+    readonly toPromise: (state: PutioSdkPromiseState) => (...args: Parameters<T>) => void,
+  ) {}
 }
-
-type EffectOperation<T extends Operation> =
-  ReturnType<T> extends Effect.Effect<infer _Success, infer _Error, infer _Requirements>
-    ? T
-    : never;
-
-type InputFreeEffectOperation<T extends Operation> =
-  Parameters<T> extends [] ? EffectOperation<T> : never;
-
-type ValidatedEffectOperation<T extends Operation> =
-  Parameters<T> extends [] ? never : EffectOperation<T>;
 
 type EffectReturnMember<T> =
   T extends Effect.Effect<infer _Success, infer _Error, infer _Requirements> ? T : never;
+
+type InputFreeEffectOperation<T extends SdkEffectOperation> = Parameters<T> extends [] ? T : never;
+
+type ValidatedEffectOperation<T extends SdkEffectOperation> = Parameters<T> extends [] ? never : T;
 
 type PureOperation<T extends Operation> = [EffectReturnMember<ReturnType<T>>] extends [never]
   ? T
   : never;
 
-const operationAtBoundary = <T extends Operation>(
-  run: T,
-  boundary: OperationBoundary,
-): OperationEntry<T> => {
-  const entry = { boundary, run };
-  Object.defineProperty(entry, operationEntryMarker, { value: true });
-  return Object.freeze(entry) as OperationEntry<T>;
-};
+const effectEntry = <T extends SdkEffectOperation>(operation: T): OperationEntry<T> =>
+  new OperationEntry(
+    operation,
+    (state) =>
+      (...args: Parameters<T>) =>
+        provideSdk(state, operation(...args)),
+  );
 
-const inputFree = <T extends Operation>(
-  operation: InputFreeEffectOperation<T>,
-): OperationEntry<T> => operationAtBoundary(operation, "input-free");
+const inputFree = <T extends SdkEffectOperation>(
+  operation: T & InputFreeEffectOperation<T>,
+): OperationEntry<T> => effectEntry(operation);
 
-const pure = <T extends Operation>(operation: PureOperation<T>): OperationEntry<T> =>
-  operationAtBoundary(operation, "pure");
+const pure = <T extends Operation>(operation: T & PureOperation<T>): OperationEntry<T> =>
+  new OperationEntry(operation, () => operation);
 
-const validated = <T extends Operation>(
-  operation: ValidatedEffectOperation<T>,
-): OperationEntry<T> => operationAtBoundary(operation, "validated");
+const validated = <T extends SdkEffectOperation>(
+  operation: T & ValidatedEffectOperation<T>,
+): OperationEntry<T> => effectEntry(operation);
+
+interface OperationNamespace {
+  readonly [key: string]: OperationNamespace | OperationEntry<Operation>;
+}
+
+interface ClientNamespace {
+  readonly [key: string]: ClientNamespace | Operation;
+}
 
 type EffectOperationTree<T> =
   T extends OperationEntry<infer TOperation>
@@ -360,98 +365,16 @@ type PromiseOperationTree<T> =
       ? { [Key in keyof T]: PromiseOperationTree<T[Key]> }
       : never;
 
-const isOperationEntry = (value: unknown): value is OperationEntry<Operation> =>
-  typeof value === "object" &&
-  value !== null &&
-  Object.getPrototypeOf(value) === Object.prototype &&
-  Object.isFrozen(value) &&
-  Object.hasOwn(value, operationEntryMarker) &&
-  value[operationEntryMarker] === true &&
-  Object.hasOwn(value, "boundary") &&
-  Object.hasOwn(value, "run") &&
-  Reflect.ownKeys(value).length === 3 &&
-  (value.boundary === "input-free" ||
-    value.boundary === "pure" ||
-    value.boundary === "validated") &&
-  typeof value.run === "function";
-
-const runClassifiedOperation = (
-  entry: OperationEntry<Operation>,
-  args: ReadonlyArray<unknown>,
-): unknown => {
-  const result: unknown = Reflect.apply(entry.run, undefined, args);
-
-  if (entry.boundary === "pure") {
-    if (Effect.isEffect(result)) {
-      throw new TypeError("Pure SDK operation returned an Effect");
-    }
-
-    return result;
-  }
-
-  if (!Effect.isEffect(result)) {
-    throw new TypeError(`${entry.boundary} SDK operation did not return an Effect`);
-  }
-
-  return result;
-};
-
-const cloneOperationTree = <T extends object>(tree: T): EffectOperationTree<T> =>
+const mapOperationTree = (
+  tree: OperationNamespace,
+  toOperation: (entry: OperationEntry<Operation>) => Operation,
+): ClientNamespace =>
   Object.fromEntries(
     Object.entries(tree).map(([key, value]) => [
       key,
-      isOperationEntry(value) ? value.run : cloneOperationTree(value as object),
+      value instanceof OperationEntry ? toOperation(value) : mapOperationTree(value, toOperation),
     ]),
-  ) as EffectOperationTree<T>;
-
-const runPromiseOperation = (
-  entry: OperationEntry<Operation>,
-  state: PutioSdkPromiseState,
-  args: ReadonlyArray<unknown>,
-): unknown => {
-  const result = runClassifiedOperation(entry, args);
-
-  return entry.boundary === "pure"
-    ? result
-    : provideSdk(state, result as Effect.Effect<unknown, unknown, PutioSdkContext>);
-};
-
-const makePromiseOperationTree = <T extends object>(
-  tree: T,
-  state: PutioSdkPromiseState,
-): PromiseOperationTree<T> =>
-  Object.fromEntries(
-    Object.entries(tree).map(([key, value]) => [
-      key,
-      isOperationEntry(value)
-        ? (...args: ReadonlyArray<unknown>) => runPromiseOperation(value, state, args)
-        : makePromiseOperationTree(value as object, state),
-    ]),
-  ) as PromiseOperationTree<T>;
-
-const assertClassifiedOperationTree = (tree: object, parentPath = ""): void => {
-  const entries = Object.entries(tree);
-
-  if (Object.getPrototypeOf(tree) !== Object.prototype || entries.length === 0) {
-    throw new TypeError(
-      `SDK operation namespace ${parentPath || "<root>"} is not a non-empty plain object`,
-    );
-  }
-
-  for (const [key, value] of entries) {
-    const path = parentPath ? `${parentPath}.${key}` : key;
-
-    if (isOperationEntry(value)) {
-      continue;
-    }
-
-    if (typeof value === "object" && value !== null) {
-      assertClassifiedOperationTree(value as object, path);
-    } else {
-      throw new TypeError(`SDK operation ${path} has no request-boundary classification`);
-    }
-  }
-};
+  );
 
 const sharedOperationTree = {
   account: {
@@ -699,11 +622,16 @@ const sharedOperationTree = {
     get: validated(getZip),
     list: inputFree(listZips),
   },
-};
+} satisfies OperationNamespace;
 
-assertClassifiedOperationTree(sharedOperationTree);
+type SharedOperationTree = typeof sharedOperationTree;
 
-export const createPutioSdkEffectClient = () => cloneOperationTree(sharedOperationTree);
+export const createPutioSdkEffectClient = (): EffectOperationTree<SharedOperationTree> =>
+  // SAFETY: mapOperationTree keeps every key of sharedOperationTree and replaces each entry with its own `run`.
+  mapOperationTree(
+    sharedOperationTree,
+    (entry) => entry.run,
+  ) as EffectOperationTree<SharedOperationTree>;
 
 export type PutioSdkEffectClient = ReturnType<typeof createPutioSdkEffectClient>;
 
@@ -712,23 +640,25 @@ export class PutioSdk extends Context.Service<PutioSdk, PutioSdkEffectClient>()(
 export const makePutioSdkEffectClientLayer = () =>
   Layer.succeed(PutioSdk, createPutioSdkEffectClient());
 
-export const makePutioSdkLiveClientLayer = (config: PutioSdkConfigShape) =>
-  Layer.mergeAll(makePutioSdkEffectClientLayer(), makePutioSdkLiveLayer(config));
+export const makePutioSdkLiveClientLayer = (config: PutioSdkOptions) =>
+  Layer.mergeAll(makePutioSdkEffectClientLayer(), putioSdkLiveLayer(config));
 
-export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape = {}) => {
-  const normalizedConfig = makePutioSdkConfig({
+export const createPutioSdkPromiseClient = (initialConfig: PutioSdkOptions = {}) => {
+  const normalizedConfig = normalizePutioSdkOptions({
     ...initialConfig,
     baseUrl: snapshotUrl(initialConfig.baseUrl),
     headers: snapshotHeaders(initialConfig.headers),
     uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
     webAppUrl: snapshotUrl(initialConfig.webAppUrl),
   });
+
   const runtimeConfig: PutioSdkPromiseRuntimeConfig = {
     baseUrl: normalizedConfig.baseUrl,
     headers: normalizedConfig.headers,
     uploadBaseUrl: normalizedConfig.uploadBaseUrl,
     webAppUrl: normalizedConfig.webAppUrl,
   };
+
   const config: PutioSdkPromiseState = {
     accessToken: initialConfig.accessToken,
     runtimeConfig,
@@ -816,7 +746,11 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkConfigShape =
     return provideSdk(config, getFileChild(input));
   }
 
-  const operations = makePromiseOperationTree(sharedOperationTree, config);
+  const operations =
+    // SAFETY: mapOperationTree keeps every key of sharedOperationTree and replaces each entry with the Promise adapter built for its own `run`.
+    mapOperationTree(sharedOperationTree, (entry) =>
+      entry.toPromise(config),
+    ) as PromiseOperationTree<SharedOperationTree>;
 
   return {
     dispose: () => disposePromiseClientRuntime(config),

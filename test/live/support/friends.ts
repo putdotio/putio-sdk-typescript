@@ -1,3 +1,6 @@
+import { Schema } from "effect";
+
+import type { PutioSdkPromiseClient } from "../../../dist/index.js";
 import { bootstrapFirstPartyTokenWithCredentials } from "./bootstrap.ts";
 import {
   readCredentialFixture,
@@ -59,23 +62,17 @@ type LiveFriendsClient = {
     }) => Promise<LiveFileUploadResult>;
   };
   readonly friends: {
-    readonly approve: (username: string) => Promise<unknown>;
+    readonly approve: PutioSdkPromiseClient["friends"]["approve"];
     readonly list: () => Promise<{
       readonly friends: ReadonlyArray<LiveFriend>;
     }>;
     readonly listSentRequests: () => Promise<ReadonlyArray<LiveFriendBase>>;
     readonly listWaitingRequests: () => Promise<ReadonlyArray<LiveFriendBase>>;
-    readonly sendRequest: (username: string) => Promise<unknown>;
+    readonly sendRequest: PutioSdkPromiseClient["friends"]["sendRequest"];
     readonly sharedFolder: (username: string) => Promise<LiveFile | null>;
   };
   readonly sharing: {
-    readonly shareFiles: (input: {
-      readonly ids: readonly number[];
-      readonly target: {
-        readonly friendNames: readonly string[];
-        readonly type: "friends";
-      };
-    }) => Promise<unknown>;
+    readonly shareFiles: PutioSdkPromiseClient["sharing"]["shareFiles"];
   };
 };
 
@@ -93,27 +90,25 @@ let secondaryClientPromise: Promise<LiveFriendsClient> | null = null;
 const hasName = (rows: ReadonlyArray<LiveFriendBase>, username: string): boolean =>
   rows.some((row) => row.name === username);
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null;
-
-const isAlreadySharedError = (error: unknown): boolean => {
-  if (!isRecord(error)) {
-    return false;
-  }
-
-  if (error._tag !== "PutioOperationError") {
-    return false;
-  }
-
-  if (error.domain !== "sharing" || error.operation !== "shareFiles" || error.status !== 400) {
-    return false;
-  }
-
-  const reason = isRecord(error.reason) ? error.reason : {};
-  const body = isRecord(error.body) ? error.body : {};
-
-  return reason.errorType === "ALREADY_SHARED" || body.error_type === "ALREADY_SHARED";
+const shareFilesBadRequestFields = {
+  _tag: Schema.Literal("PutioOperationError"),
+  domain: Schema.Literal("sharing"),
+  operation: Schema.Literal("shareFiles"),
+  status: Schema.Literal(400),
 };
+
+const AlreadySharedErrorSchema = Schema.Union([
+  Schema.Struct({
+    ...shareFilesBadRequestFields,
+    reason: Schema.Struct({ errorType: Schema.Literal("ALREADY_SHARED") }),
+  }),
+  Schema.Struct({
+    ...shareFilesBadRequestFields,
+    body: Schema.Struct({ error_type: Schema.Literal("ALREADY_SHARED") }),
+  }),
+]);
+
+const isAlreadySharedError = Schema.is(AlreadySharedErrorSchema);
 
 const readSecondaryFriendFixture = () => {
   const primary = readCredentialFixture();
@@ -150,6 +145,7 @@ export const findLiveFriend = async (
   predicate: (friend: LiveFriend) => boolean = () => true,
 ): Promise<LiveFriend | null> => {
   const { friends } = await client.friends.list();
+
   return friends.find(predicate) ?? null;
 };
 
@@ -189,11 +185,13 @@ const approvePendingFriendship = async (
 
   if (hasName(primaryWaiting, secondaryUsername)) {
     await primaryClient.friends.approve(secondaryUsername);
+
     return true;
   }
 
   if (hasName(secondaryWaiting, primaryUsername)) {
     await secondaryClient.friends.approve(primaryUsername);
+
     return true;
   }
 
@@ -205,6 +203,7 @@ export const requireLiveFriend = async (
   createClient: SecondaryClientFactory,
 ): Promise<LiveFriend> => {
   const { primaryUsername, secondaryUsername } = readSecondaryFriendFixture();
+
   const existing = await findLiveFriend(
     primaryClient,
     (candidate) => candidate.name === secondaryUsername,
@@ -390,21 +389,21 @@ export const requireLiveFriendWithSharedFiles = async (
   const sharedFolder = await findOrCreateSecondarySharedFolder(secondaryClient);
   await ensureSecondarySharedFile(secondaryClient, sharedFolder.id);
 
-  await secondaryClient.sharing
-    .shareFiles({
+  try {
+    await secondaryClient.sharing.shareFiles({
       ids: [sharedFolder.id],
       target: {
         friendNames: [primaryUsername],
         type: "friends",
       },
-    })
-    .catch(async (error: unknown) => {
-      if (!isAlreadySharedError(error)) {
-        throw error;
-      }
-
-      await waitForPrimarySharedFixture(primaryClient, secondaryUsername);
     });
+  } catch (error) {
+    if (!isAlreadySharedError(error)) {
+      throw error;
+    }
+
+    await waitForPrimarySharedFixture(primaryClient, secondaryUsername);
+  }
 
   await waitForPrimarySharedFixture(primaryClient, secondaryUsername);
 

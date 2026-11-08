@@ -42,27 +42,36 @@ const TrashContinueEnvelopeSchema = Schema.Struct({
 });
 
 export type TrashFile = Schema.Schema.Type<typeof TrashFileSchema>;
+
 export type TrashListResponse = Schema.Schema.Type<typeof TrashListEnvelopeSchema>;
+
 export type TrashContinueResponse = Schema.Schema.Type<typeof TrashContinueEnvelopeSchema>;
+
 const TrashListQuerySchema = Schema.Struct({
   per_page: Schema.optional(PositiveIntegerSchema),
 });
+
 const TrashCursorBulkInputSchema = Schema.Struct({
   cursor: NonEmptyStringSchema,
   file_ids: Schema.optional(Schema.Never),
   useCursor: Schema.Literal(true),
 });
+
 const TrashIdsBulkInputSchema = Schema.Struct({
   cursor: Schema.optional(Schema.Never),
   file_ids: Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1)),
   useCursor: Schema.optional(Schema.Literal(false)),
 });
+
 const TrashBulkInputSchema = Schema.Union([TrashCursorBulkInputSchema, TrashIdsBulkInputSchema]);
+
 const TrashContinueInputSchema = Schema.Struct({
   cursor: NonEmptyStringSchema,
   query: TrashListQuerySchema,
 });
+
 export type TrashListQuery = Schema.Schema.Type<typeof TrashListQuerySchema>;
+
 export type TrashBulkInput = Schema.Schema.Type<typeof TrashBulkInputSchema>;
 
 const RestrictedReadError = { errorType: "invalid_scope", statusCode: 401 as const };
@@ -116,9 +125,13 @@ export const EmptyTrashErrorSpec = definePutioOperationErrorSpec({
 });
 
 export type ListTrashError = PutioOperationFailure<typeof ListTrashErrorSpec>;
+
 export type ContinueTrashError = PutioOperationFailure<typeof ContinueTrashErrorSpec>;
+
 export type RestoreTrashError = PutioOperationFailure<typeof RestoreTrashErrorSpec>;
+
 export type DeleteTrashError = PutioOperationFailure<typeof DeleteTrashErrorSpec>;
+
 export type EmptyTrashError = PutioOperationFailure<typeof EmptyTrashErrorSpec>;
 
 const toBulkTrashBody = (input: TrashBulkInput) => {
@@ -128,6 +141,7 @@ const toBulkTrashBody = (input: TrashBulkInput) => {
       file_ids: undefined,
     };
   }
+
   return {
     cursor: undefined,
     file_ids: joinCsv(input.file_ids),

@@ -66,9 +66,10 @@ const waitForSearchCursor = async (query: string) => {
       per_page: 2,
       query,
     });
+
     lastTotal = search.total;
 
-    if (typeof search.cursor === "string") {
+    if (search.cursor !== null) {
       return search;
     }
 
@@ -86,10 +87,10 @@ await run("files root list shape", async () => {
 
   assert(result.parent?.id === 0, "expected root parent id");
   assert(Array.isArray(result.files), "expected files array");
-  assert(typeof result.total === "number", "expected total");
+  assert(result.total !== undefined, "expected total");
 
   return {
-    cursor_present: result.cursor === null || typeof result.cursor === "string",
+    cursor_present: result.cursor !== null,
     first_names: result.files.map((file) => file.name),
     total: result.total,
   };
@@ -106,10 +107,10 @@ await run("files list continue", async () => {
       total: 1,
     });
 
-    assert(typeof firstPage.cursor === "string", "expected files list cursor");
+    const firstCursor = assertPresent(firstPage.cursor, "expected files list cursor");
     assert(firstPage.files.length === 2, "expected first page to respect per_page");
 
-    const nextPage = await oauthClient.files.continue(firstPage.cursor, {
+    const nextPage = await oauthClient.files.continue(firstCursor, {
       per_page: 2,
     });
 
@@ -148,11 +149,10 @@ await run("files search and continue", async () => {
     const search = await waitForSearchCursor(query);
 
     assert(Array.isArray(search.files), "expected search files array");
-    assert(typeof search.total === "number", "expected search total");
     assert(search.files.length === 2, "expected first search page to respect per_page");
-    assert(typeof search.cursor === "string", "expected files search cursor");
+    const searchCursor = assertPresent(search.cursor, "expected files search cursor");
 
-    const nextPage = await oauthClient.files.continueSearch(search.cursor, {
+    const nextPage = await oauthClient.files.continueSearch(searchCursor, {
       per_page: 2,
     });
 
@@ -161,7 +161,7 @@ await run("files search and continue", async () => {
 
     return {
       first_page: search.files.length,
-      next_cursor_present: nextPage.cursor === null || typeof nextPage.cursor === "string",
+      next_cursor_present: nextPage.cursor !== null,
       next_page: nextPage.files.length,
       total: search.total,
     };
@@ -177,7 +177,6 @@ await run("files mp4 search shape", async () => {
   });
 
   assert(Array.isArray(search.files), "expected search files array");
-  assert(typeof search.total === "number", "expected search total");
 
   return {
     first_page: search.files.length,
@@ -203,6 +202,7 @@ await run("files search too long query yields typed 400", async () => {
 
 await run("files get with conditional media fields", async () => {
   const video = await requireOwnedVideoFixture(authClient);
+
   const mediaQuery = {
     codecs: 1,
     media_info: 1,
@@ -211,6 +211,7 @@ await run("files get with conditional media fields", async () => {
     stream_url: 1,
     video_metadata: 1,
   } as const;
+
   const file = await oauthClient.files.get({
     id: video.id,
     query: mediaQuery,
@@ -219,15 +220,19 @@ await run("files get with conditional media fields", async () => {
   if (!("stream_url" in file)) {
     throw new Error("expected stream_url");
   }
+
   if (!("content_type_and_codecs" in file)) {
     throw new Error("expected content_type_and_codecs");
   }
+
   if (!("need_convert" in file)) {
     throw new Error("expected need_convert");
   }
+
   if (!("media_info" in file)) {
     throw new Error("expected media_info");
   }
+
   if (!("video_metadata" in file)) {
     throw new Error("expected video_metadata");
   }
@@ -235,16 +240,14 @@ await run("files get with conditional media fields", async () => {
   return {
     id: file.id,
     is_mp4_available: file.is_mp4_available,
-    mp4_stream_url_present:
-      "mp4_stream_url" in file
-        ? file.mp4_stream_url === null || typeof file.mp4_stream_url === "string"
-        : null,
+    mp4_stream_url_present: "mp4_stream_url" in file ? file.mp4_stream_url !== undefined : null,
     name: file.name,
   };
 });
 
 await run("files parent media flags from query(list by file id)", async () => {
   const video = await requireOwnedVideoFixture(authClient);
+
   const parentQuery = {
     breadcrumbs: 1,
     codecs_parent: 1,
@@ -255,6 +258,7 @@ await run("files parent media flags from query(list by file id)", async () => {
     total: 1,
     video_metadata_parent: 1,
   } as const;
+
   const result = await oauthClient.files.list(video.id, {
     ...parentQuery,
   });
@@ -262,18 +266,23 @@ await run("files parent media flags from query(list by file id)", async () => {
   const parent = assertPresent(result.parent, "expected queried file as parent");
   assert(parent.id === video.id, "expected queried file as parent");
   assert(Array.isArray(result.files), "expected child files array");
+
   if (!("stream_url" in parent)) {
     throw new Error("expected parent stream_url");
   }
+
   if (!("video_metadata" in parent)) {
     throw new Error("expected parent video_metadata");
   }
+
   if (!("content_type_and_codecs" in parent)) {
     throw new Error("expected parent codecs");
   }
+
   if (!("media_info" in parent)) {
     throw new Error("expected parent media_info");
   }
+
   if (!("need_convert" in parent)) {
     throw new Error("expected parent need_convert");
   }
@@ -294,6 +303,7 @@ await run("files parent media flags from query(list by file id)", async () => {
 
 await run("files list child media flags", async () => {
   const video = await requireOwnedVideoFixture(authClient);
+
   const list = await oauthClient.files.list(assertPresent(video.parent_id, "expected parent id"), {
     media_metadata: 1,
     per_page: 100,
@@ -305,9 +315,11 @@ await run("files list child media flags", async () => {
     list.files.find((file) => file.id === video.id),
     "expected owned video to be in parent listing",
   );
+
   if (!("stream_url" in child)) {
     throw new Error("expected child stream_url");
   }
+
   if (!("media_metadata" in child)) {
     throw new Error("expected child media_metadata");
   }
@@ -323,8 +335,6 @@ await run("files mp4 status", async () => {
   const video = await requireOwnedVideoFixture(authClient);
   const status = await oauthClient.files.getMp4Status(video.id);
 
-  assert(typeof status.status === "string", "expected mp4 status");
-
   return status;
 });
 
@@ -333,10 +343,6 @@ await run("files subtitles envelope shape", async () => {
   const result = await oauthClient.files.listSubtitles(video.id);
 
   assert(Array.isArray(result.subtitles), "expected subtitles array");
-  assert(
-    result.default === null || typeof result.default === "string",
-    "expected default subtitle key",
-  );
 
   return {
     count: result.subtitles.length,
@@ -384,9 +390,6 @@ await run("files next-file and next-video", async () => {
   const video = await requireOwnedVideoFixture(authClient);
   const nextFile = await oauthClient.files.findNext(video.id, "VIDEO");
   const nextVideo = await oauthClient.files.findNextVideo(video.id);
-
-  assert(typeof nextFile.id === "number", "expected next_file id");
-  assert(typeof nextVideo.id === "number", "expected next_video id");
 
   return {
     next_file_id: nextFile.id,

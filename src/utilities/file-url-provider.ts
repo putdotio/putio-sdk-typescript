@@ -1,4 +1,4 @@
-import { Result, Schema } from "effect";
+import { Predicate, Result, Schema } from "effect";
 
 import { mapDecodeErrorToValidationError } from "../core/errors.js";
 import { joinCsv } from "../core/forms.js";
@@ -28,9 +28,11 @@ const decodeOptions = (options: FileUrlProviderOptions): FileUrlProviderOptions 
   const decoded = Schema.decodeUnknownResult(FileUrlProviderOptionsSchema, {
     onExcessProperty: "error",
   })(options);
+
   if (Result.isFailure(decoded)) {
     throw mapDecodeErrorToValidationError(decoded.failure);
   }
+
   return decoded.success;
 };
 
@@ -55,7 +57,7 @@ export class FileUrlProvider {
   }
 
   getDownloadUrl(fileOrFileId: FileUrlProviderInput | number): string | null {
-    if (typeof fileOrFileId === "number") {
+    if (Predicate.isNumber(fileOrFileId)) {
       return buildPutioUrl(this.baseUrl, `/v2/files/${encodePathSegment(fileOrFileId)}/download`, {
         oauth_token: this.downloadToken,
       });

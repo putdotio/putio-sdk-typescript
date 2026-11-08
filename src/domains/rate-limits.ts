@@ -21,9 +21,6 @@ const RemoveRateLimitBanInputSchema = Schema.Struct({
 
 export type RemoveRateLimitBanInput = Schema.Schema.Type<typeof RemoveRateLimitBanInputSchema>;
 
-// 403 `CAPTCHA_FAILED`: the reCAPTCHA token was rejected.
-// 403 `Forbidden`: the request came from a different IP than the limited one.
-// 404: the ID is unknown, expired, or not a captcha-needed IP limit.
 export const RemoveRateLimitBanErrorSpec = definePutioOperationErrorSpec({
   domain: "rateLimits",
   operation: "removeBan",

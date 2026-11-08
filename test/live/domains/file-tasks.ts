@@ -97,6 +97,7 @@ await run("files start_from roundtrip semantics", async () => {
 await run("files next-file natural ordering with disposable fixtures", async () => {
   const created: Array<{ readonly id: number; readonly name: string }> = [];
   const suffix = Date.now();
+
   const folder = await authClient.files.createFolder({
     name: `putio-typescript-sdk-next-file-${suffix}`,
     parent_id: 0,
@@ -119,6 +120,7 @@ await run("files next-file natural ordering with disposable fixtures", async () 
       if (!isFileUploadFileResult(upload)) {
         throw new Error("expected uploaded next-file probe to be a file");
       }
+
       created.push(upload.file);
     }
 
@@ -126,6 +128,7 @@ await run("files next-file natural ordering with disposable fixtures", async () 
       created.find((file) => file.name.includes("-episode-1-")),
       "expected episode 1 fixture",
     );
+
     const episode2 = assertPresent(
       created.find((file) => file.name.includes("-episode-2-")),
       "expected episode 2 fixture",
@@ -148,6 +151,7 @@ await run("files next-file natural ordering with disposable fixtures", async () 
 
 await run("files extract an owned archive", async () => {
   const name = `putio-typescript-sdk-extract-${Date.now()}.zip`;
+
   const upload = await authClient.files.upload({
     file: createStoredZipFile(name),
     fileName: name,
@@ -174,6 +178,7 @@ await run("files extract an owned archive", async () => {
     if (extractionId !== undefined) {
       await client.files.deleteExtraction(extractionId).catch(() => undefined);
     }
+
     await authClient.files
       .delete([upload.file.id, ...extractedFileIds], { skipTrash: true })
       .catch(() => undefined);

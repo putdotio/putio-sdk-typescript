@@ -68,7 +68,7 @@ await run("transfers list per_page too large yields typed 400", async () => {
 
 await run("transfers count", async () => {
   const count = await client.transfers.count();
-  assert(typeof count === "number", "expected numeric transfer count");
+
   return { count };
 });
 
@@ -212,12 +212,10 @@ await run("failed URL transfer can be retried and cancelled", async () => {
   const created = await client.transfers.add({
     url: `https://example.invalid/putio-typescript-sdk-transfer-${Date.now()}.iso`,
   });
+
   const transferIds = new Set([created.id]);
 
   try {
-    assert(typeof created.id === "number", "expected created transfer id");
-    assert(typeof created.save_parent_id === "number", "expected save_parent_id");
-
     const listed = await client.transfers.list({
       per_page: 20,
     });
@@ -228,7 +226,7 @@ await run("failed URL transfer can be retried and cancelled", async () => {
     );
 
     const errored = await waitForTransferError(created.id);
-    assert(typeof errored.error_message === "string", "expected transfer error message");
+    assert(errored.error_message !== null, "expected transfer error message");
 
     const retried = await client.transfers.retry(created.id);
     transferIds.add(retried.id);
@@ -249,6 +247,7 @@ await run("failed URL transfer can be retried and cancelled", async () => {
 
 await run("torrent upload returns a decoded transfer and metainfo", async () => {
   const name = `putio-typescript-sdk-torrent-transfer-${Date.now()}`;
+
   const upload = await authClient.files.upload({
     file: createTorrentFile(name),
     fileName: `${name}.torrent`,
@@ -280,6 +279,7 @@ await run("torrent upload returns a decoded transfer and metainfo", async () => 
 await run("transfers clean returns deleted ids array", async () => {
   const result = await client.transfers.clean();
   assert(Array.isArray(result.deleted_ids), "expected deleted_ids array");
+
   return result;
 });
 

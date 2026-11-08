@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
 
+import { Option, Predicate, Schema } from "effect";
+
 import { bootstrapFirstPartyTokenWithCredentials } from "../test/live/support/bootstrap.ts";
 import { requireLiveFriendWithSharedFiles } from "../test/live/support/friends.ts";
 import { requireOwnedVideoFixture } from "../test/live/support/media.ts";
@@ -10,12 +12,16 @@ import {
   readSecondaryCredentialFixture,
 } from "../test/live/support/secrets.ts";
 
-import type { PutioSdkConfigShape, PutioSdkPromiseClient } from "../dist/index.js";
+import type { PutioSdkOptions, PutioSdkPromiseClient } from "../dist/index.js";
 
 type FixtureCheckStatus = "blocked" | "not_checked" | "passed";
 
+type FixtureDetailValue = boolean | number | string | null | undefined;
+
+type FixtureDetails = Readonly<Record<string, FixtureDetailValue>>;
+
 type FixtureCheck = {
-  readonly details?: Record<string, unknown>;
+  readonly details?: FixtureDetails;
   readonly name: string;
   readonly status: FixtureCheckStatus;
 };
@@ -34,23 +40,37 @@ if (buildResult.status !== 0) {
 
 const { createPutioSdkPromiseClient } = await import("../dist/index.js");
 
-const createClient = (config: PutioSdkConfigShape = {}): PutioSdkPromiseClient =>
+const createClient = (config: PutioSdkOptions = {}): PutioSdkPromiseClient =>
   createPutioSdkPromiseClient(config);
 
 const checks: FixtureCheck[] = [];
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
+const TypedErrorSummarySchema = Schema.Struct({
+  _tag: Schema.optional(Schema.String),
+  domain: Schema.optional(Schema.String),
+  operation: Schema.optional(Schema.String),
+  reason: Schema.optional(
+    Schema.Struct({
+      errorType: Schema.optional(Schema.String),
+    }),
+  ),
+  status: Schema.optional(Schema.Number),
+});
 
-const errorMessage = (error: unknown): string => {
-  if (isRecord(error)) {
-    const reason = isRecord(error.reason) ? error.reason : {};
+const decodeTypedErrorSummary = Schema.decodeUnknownOption(TypedErrorSummarySchema);
+
+const errorMessage = (cause: unknown): string => {
+  const summary = decodeTypedErrorSummary(cause);
+
+  if (Option.isSome(summary)) {
+    const { _tag, domain, operation, reason, status } = summary.value;
+
     const typedError = [
-      typeof error._tag === "string" ? error._tag : undefined,
-      typeof error.domain === "string" ? error.domain : undefined,
-      typeof error.operation === "string" ? error.operation : undefined,
-      typeof error.status === "number" ? String(error.status) : undefined,
-      typeof reason.errorType === "string" ? reason.errorType : undefined,
+      _tag,
+      domain,
+      operation,
+      status === undefined ? undefined : String(status),
+      reason?.errorType,
     ].filter((part) => part !== undefined);
 
     if (typedError.length > 0) {
@@ -58,23 +78,20 @@ const errorMessage = (error: unknown): string => {
     }
   }
 
-  if (error instanceof Error && error.message.length > 0) {
-    return error.message;
+  if (cause instanceof Error && cause.message.length > 0) {
+    return cause.message;
   }
 
-  return String(error);
+  return String(cause);
 };
 
-const assertCondition = (condition: unknown, message: string): void => {
+const assertCondition = (condition: boolean, message: string): void => {
   if (!condition) {
     throw new Error(message);
   }
 };
 
-const runCheck = async (
-  name: string,
-  fn: () => Promise<Record<string, unknown> | void>,
-): Promise<void> => {
+const runCheck = async (name: string, fn: () => Promise<FixtureDetails | void>): Promise<void> => {
   try {
     const details = await fn();
     checks.push(
@@ -100,7 +117,7 @@ const runCheck = async (
   }
 };
 
-const recordNotChecked = (name: string, details: Record<string, unknown>): void => {
+const recordNotChecked = (name: string, details: FixtureDetails): void => {
   checks.push({
     details,
     name,
@@ -109,9 +126,11 @@ const recordNotChecked = (name: string, details: Record<string, unknown>): void 
 };
 
 const tokens = readLiveTokens();
+
 const primaryClient = createClient({
   accessToken: tokens.firstPartyToken,
 });
+
 const publicClient = createClient();
 
 let secondaryClientPromise: Promise<PutioSdkPromiseClient> | null = null;
@@ -239,9 +258,11 @@ await runCheck("rss source fixture", async () => {
 
 await runCheck("payment owner fixture", async () => {
   const ownerToken = readOptionalSecret("PUTIO_TOKEN_PAYMENT_OWNER") ?? tokens.firstPartyToken;
+
   const ownerClient = createClient({
     accessToken: ownerToken,
   });
+
   const [account, payment] = await Promise.all([
     ownerClient.account.getInfo({}),
     ownerClient.payment.getInfo(),
@@ -274,6 +295,7 @@ await runCheck("payment sub-account fixture", async () => {
   const subAccountClient = createClient({
     accessToken: token,
   });
+
   const account = await subAccountClient.account.getInfo({});
 
   assertCondition(
@@ -288,20 +310,19 @@ await runCheck("payment sub-account fixture", async () => {
     });
     throw new Error("Expected sub-account payment preview to fail.");
   } catch (error) {
-    if (!isRecord(error)) {
-      throw error;
-    }
+    const summary = Option.getOrThrowWith(decodeTypedErrorSummary(error), () => error);
 
-    const reason = isRecord(error.reason) ? error.reason : {};
-
-    assertCondition(error._tag === "PutioOperationError", "Expected PutioOperationError.");
-    assertCondition(error.domain === "payment", "Expected payment domain.");
     assertCondition(
-      error.operation === "previewChangePlan",
+      Predicate.isTagged(summary, "PutioOperationError"),
+      "Expected PutioOperationError.",
+    );
+    assertCondition(summary.domain === "payment", "Expected payment domain.");
+    assertCondition(
+      summary.operation === "previewChangePlan",
       "Expected previewChangePlan operation.",
     );
     assertCondition(
-      reason.errorType === "PAYMENT_SUB_ACCOUNT_NOT_ALLOWED",
+      summary.reason?.errorType === "PAYMENT_SUB_ACCOUNT_NOT_ALLOWED",
       "Expected PAYMENT_SUB_ACCOUNT_NOT_ALLOWED.",
     );
   }

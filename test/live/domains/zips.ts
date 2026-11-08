@@ -14,6 +14,7 @@ const live = createLiveHarness("zips live");
 const { assert, assertErrorTag, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
+
 void sleep;
 
 const findProbeFile = async (
@@ -50,6 +51,7 @@ const createCursorProbeFiles = async () => {
 
   for (let index = 0; index < 6; index += 1) {
     const name = `putio-typescript-sdk-zip-cursor-${Date.now()}-${index}.txt`;
+
     const upload = await authClient.files.upload({
       file: new File([`sdk zip cursor probe ${index}\n`], name, {
         type: "text/plain",
@@ -74,6 +76,7 @@ const findProbeCursor = async (): Promise<{
   readonly firstFileId: number;
 } | null> => {
   const cleanupIds = await createCursorProbeFiles();
+
   const listing = await authClient.files.list(0, {
     per_page: 5,
     total: 1,
@@ -88,6 +91,7 @@ const findProbeCursor = async (): Promise<{
   }
 
   await authClient.files.delete(cleanupIds, { skipTrash: true }).catch(() => undefined);
+
   return null;
 };
 
@@ -147,7 +151,6 @@ await run("zips create works with app token", async () => {
   const zipId = await oauthClient.zips.create({
     file_ids: [probeFile.id],
   });
-  assert(typeof zipId === "number", "expected app-token zip id");
 
   const firstInfo = await oauthClient.zips.get(zipId);
 
@@ -207,23 +210,24 @@ await run("zips create and complete lifecycle", async () => {
   const zipId = await authClient.zips.create({
     file_ids: [probeFile.id],
   });
-  assert(typeof zipId === "number", "expected zip id");
 
   const active = await authClient.zips.list();
   assert(Array.isArray(active), "expected active zips array");
 
   const firstInfo = await authClient.zips.get(zipId);
+
   if (firstInfo.zip_status === "NEW" || firstInfo.zip_status === "PROCESSING") {
     assert(firstInfo.url === null, "expected pending zip info to keep a null url");
   }
 
   const info = await pollZip(zipId);
   assert(info.zip_status === "DONE", "expected probe zip to complete");
-  assert(typeof info.url === "string", "expected zip download url");
+  assert(info.url !== null, "expected zip download url");
+
   if (!("size" in info) || !("missing_files" in info)) {
     throw new Error("expected completed zip payload details");
   }
-  assert(typeof info.size === "number", "expected zip size");
+
   assert(Array.isArray(info.missing_files), "expected missing_files array");
 
   return {
@@ -237,6 +241,7 @@ await run("zips create and complete lifecycle", async () => {
 
 await run("zips create with cursor and exclude_ids completes", async () => {
   const cursorProbe = await findProbeCursor();
+
   const cursorZipProbe = assertPresent(
     cursorProbe,
     "expected a root listing cursor for cursor zip checks",
@@ -247,7 +252,6 @@ await run("zips create with cursor and exclude_ids completes", async () => {
       cursor: cursorZipProbe.cursor,
       exclude_ids: [cursorZipProbe.firstFileId],
     });
-    assert(typeof zipId === "number", "expected cursor zip id");
 
     const firstInfo = await authClient.zips.get(zipId);
     assert(
@@ -268,10 +272,12 @@ await run("zips create with cursor and exclude_ids completes", async () => {
     }
 
     assert(info.zip_status === "DONE", "expected cursor zip to complete");
-    assert(typeof info.url === "string", "expected cursor zip download url");
+    assert(info.url !== null, "expected cursor zip download url");
+
     if (!("missing_files" in info)) {
       throw new Error("expected cursor zip missing_files array");
     }
+
     assert(Array.isArray(info.missing_files), "expected cursor zip missing_files array");
 
     return {

@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Predicate, Schema } from "effect";
 
 const RouteMethodSchema = Schema.Literals(["DELETE", "GET", "PATCH", "POST", "PUT"]);
 const RouteClassificationSchema = Schema.Literals(["equivalent", "excluded", "investigate", "sdk"]);
@@ -37,25 +37,37 @@ export class RouteMatrixValidationError extends Error {
 
 const canonicalPathPattern =
   /^\/v2(?:\/(?!\.{1,2}(?:\/|$))(?:[a-z0-9._~-]+|:[A-Za-z][A-Za-z0-9]*))+(?:\/)?$/;
+
 const operationPattern = /^[a-z][A-Za-z0-9]*(?:\.[a-z][A-Za-z0-9]*)+$/;
 const sourcePattern = /^[A-Za-z0-9._/-]+\.py:[1-9][0-9]*$/;
+
 const followUpPattern =
   /^https:\/\/github\.com\/putdotio\/putio-sdk-typescript\/issues\/[1-9][0-9]*$/;
+
 const internalPrefixes = ["/v2/admin", "/v2/private"];
 
-const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null;
+const hasClientOperation = (
+  clients: RouteMatrixClientSurfaces,
+  surface: keyof RouteMatrixClientSurfaces,
+  operation: string,
+): boolean => {
+  let current = clients[surface];
 
-const resolveOperation = (surface: unknown, operation: string): unknown => {
-  let current = surface;
   for (const segment of operation.split(".")) {
-    if (!isRecord(current) || !Object.hasOwn(current, segment)) {
-      return undefined;
+    if (!Predicate.hasProperty(current, segment) || !Object.hasOwn(current, segment)) {
+      return false;
     }
+
     current = current[segment];
   }
-  return current;
+
+  return Predicate.isFunction(current);
 };
+
+const decodeRouteMatrixJson = Schema.decodeUnknownSync(Schema.fromJsonString(RouteMatrixSchema), {
+  errors: "all",
+  onExcessProperty: "error",
+});
 
 const validateClassification = (
   route: RouteMatrix["routes"][number],
@@ -84,15 +96,13 @@ const validateClassification = (
 };
 
 export const validateRouteMatrix = (
-  input: unknown,
+  matrixJson: string,
   clients: RouteMatrixClientSurfaces,
 ): RouteMatrix => {
   let matrix: RouteMatrix;
+
   try {
-    matrix = Schema.decodeUnknownSync(RouteMatrixSchema, {
-      errors: "all",
-      onExcessProperty: "error",
-    })(input);
+    matrix = decodeRouteMatrixJson(matrixJson);
   } catch (cause) {
     throw new RouteMatrixValidationError([`schema: ${String(cause)}`]);
   }
@@ -107,11 +117,13 @@ export const validateRouteMatrix = (
     if (routes.has(key)) {
       issues.push(`${location}: duplicate route`);
     }
+
     routes.add(key);
 
     if (!canonicalPathPattern.test(route.path)) {
       issues.push(`${location}: path must be a canonical /v2 path`);
     }
+
     if (
       internalPrefixes.some(
         (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
@@ -119,9 +131,11 @@ export const validateRouteMatrix = (
     ) {
       issues.push(`${location}: internal routes do not belong in the public matrix`);
     }
+
     if (route.rationale.trim().length === 0) {
       issues.push(`${location}: rationale must not be empty`);
     }
+
     if (
       !sourcePattern.test(route.source) ||
       route.source.startsWith("/") ||
@@ -140,10 +154,11 @@ export const validateRouteMatrix = (
       if (!operationPattern.test(route.operation)) {
         issues.push(`${location}: operation must be a dotted client method path`);
       } else {
-        if (typeof resolveOperation(clients.effect, route.operation) !== "function") {
+        if (!hasClientOperation(clients, "effect", route.operation)) {
           issues.push(`${location}: Effect client is missing ${route.operation}`);
         }
-        if (typeof resolveOperation(clients.promise, route.operation) !== "function") {
+
+        if (!hasClientOperation(clients, "promise", route.operation)) {
           issues.push(`${location}: Promise client is missing ${route.operation}`);
         }
       }

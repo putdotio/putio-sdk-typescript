@@ -33,10 +33,7 @@ await run(
       bootstrapped.firstParty.userId === bootstrapped.thirdParty.userId,
       "expected first-party and third-party tokens for the same user",
     );
-    assert(
-      typeof bootstrapped.thirdParty.app.id === "number" && bootstrapped.thirdParty.app.id > 0,
-      "expected owned third-party app id",
-    );
+    assert(bootstrapped.thirdParty.app.id > 0, "expected owned third-party app id");
 
     return {
       first_party_scope: bootstrapped.firstParty.scope,

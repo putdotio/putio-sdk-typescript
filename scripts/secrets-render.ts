@@ -1,5 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
+import { Option, Schema } from "effect";
+
 const [payloadPath, outputPath] = process.argv.slice(2);
 
 if (!payloadPath || !outputPath) {
@@ -18,20 +20,24 @@ const expectedKeys = [
   "PUTIO_TOKEN_THIRD_PARTY",
 ];
 
-const payload = JSON.parse(readFileSync(payloadPath, "utf8"));
+const decodeSecretPayload = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Record(Schema.String, Schema.String)),
+);
 
-if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-  throw new Error("decrypted payload must be a JSON object");
-}
+const payload = Option.getOrThrowWith(
+  decodeSecretPayload(readFileSync(payloadPath, "utf8")),
+  () => new Error("decrypted payload must be a JSON object of string values"),
+);
 
 const actualKeys = Object.keys(payload).sort();
+
 if (JSON.stringify(actualKeys) !== JSON.stringify(expectedKeys)) {
   throw new Error("decrypted payload key inventory does not match the SDK contract");
 }
 
 for (const value of Object.values(payload)) {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error("decrypted payload contains an empty or non-string value");
+  if (value.length === 0) {
+    throw new Error("decrypted payload contains an empty value");
   }
 
   if (
@@ -57,13 +63,17 @@ for (const key of [
 }
 
 const delimiters = ['"', "'", "`"];
-const render = (value) => {
+
+const render = (value: string): string => {
   const delimiter = delimiters.find((candidate) => !value.includes(candidate));
+
   if (!delimiter) {
     throw new Error("decrypted payload contains a value that cannot be rendered safely");
   }
+
   return `${delimiter}${value}${delimiter}`;
 };
 
 const dotenv = actualKeys.map((key) => `${key}=${render(payload[key])}`).join("\n");
+
 writeFileSync(outputPath, `${dotenv}\n`, { mode: 0o600 });

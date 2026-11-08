@@ -36,13 +36,14 @@ const readEnv = (key: string): string | undefined => {
   }
 
   const trimmed = value.trim();
+
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
 let packageEnvLoaded = false;
 
 export const loadEnvFiles = (envFilePaths: ReadonlyArray<string>): void => {
-  if (typeof process.loadEnvFile !== "function") {
+  if (!("loadEnvFile" in process)) {
     return;
   }
 
@@ -158,6 +159,7 @@ export const hydrateLiveTokenEnv = (): void => {
 
   if (!process.env.PUTIO_TOKEN_FIRST_PARTY) {
     const legacyToken = readOptionalSecret("PUTIO_AUTH_TOKEN");
+
     if (legacyToken) {
       process.env.PUTIO_TOKEN_FIRST_PARTY = legacyToken;
     }
@@ -165,6 +167,7 @@ export const hydrateLiveTokenEnv = (): void => {
 
   if (!process.env.PUTIO_TOKEN_THIRD_PARTY) {
     const legacyToken = readOptionalSecret("PUTIO_OAUTH_TOKEN");
+
     if (legacyToken) {
       process.env.PUTIO_TOKEN_THIRD_PARTY = legacyToken;
     }

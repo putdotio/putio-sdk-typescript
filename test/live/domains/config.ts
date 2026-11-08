@@ -1,3 +1,5 @@
+import { Schema } from "effect";
+
 import { assertPresent, createClients, createLiveHarness } from "../support/harness.js";
 
 const { oauthClient } = await createClients({
@@ -6,6 +8,7 @@ const { oauthClient } = await createClients({
 
 const now = new Date().toISOString();
 const probeKey = "putio-typescript-sdk-config-probe";
+
 const probeValue = {
   enabled: true,
   tags: ["config", "effect", "sdk"],
@@ -16,13 +19,13 @@ const probeValue = {
 const live = createLiveHarness("config live");
 const { assert, finish, run } = live;
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null;
+const ConfigProbeSchema = Schema.Struct({
+  tags: Schema.Array(Schema.String),
+  version: Schema.Number,
+});
 
 await run("config read returns JSON object", async () => {
   const config = await oauthClient.config.read();
-
-  assert(typeof config === "object" && config !== null, "expected config object");
 
   return {
     keys: Object.keys(config),
@@ -35,15 +38,9 @@ await run("config key roundtrip", async () => {
   await oauthClient.config.deleteKey(probeKey);
 
   const roundtripValue = assertPresent(roundtrip, "expected roundtrip object");
-  if (!isRecord(roundtripValue)) {
-    throw new Error("expected roundtrip record");
-  }
 
-  const roundtripObject = roundtripValue;
-  assert("version" in roundtripObject, "expected roundtrip version");
+  const roundtripObject = Schema.decodeUnknownSync(ConfigProbeSchema)(roundtripValue);
   assert(roundtripObject.version === probeValue.version, "expected roundtrip version");
-  assert("tags" in roundtripObject, "expected roundtrip tags");
-  assert(Array.isArray(roundtripObject.tags), "expected roundtrip tags");
 
   return {
     roundtrip: roundtripObject,

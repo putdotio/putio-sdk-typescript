@@ -1,10 +1,6 @@
 import { Effect, Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
-import {
-  PositiveIntegerSchema,
-  decodeAndRun,
-  makeCursorSelectionSchema,
-} from "../core/validation.js";
+import { PositiveIntegerSchema, decodeAndRun, cursorSelectionSchema } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
@@ -17,35 +13,43 @@ import {
   selectJsonField,
   type PutioSdkContext,
 } from "../core/http.js";
+
 export const ZipStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
+
 const ZipSummarySchema = Schema.Struct({
   created_at: Schema.String,
   id: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
 const ZipsListEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   zips: Schema.Array(ZipSummarySchema),
 });
+
 const ZipCreateEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   zip_id: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
 const ZipInfoPendingSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   url: Schema.Null,
   zip_status: Schema.Literals(["NEW", "PROCESSING"]),
 });
+
 const ZipInfoErrorSchema = Schema.Struct({
   error_msg: Schema.String,
   status: Schema.Literal("OK"),
   url: Schema.Null,
   zip_status: Schema.Literal("ERROR"),
 });
+
 const ZipMissingFileSchema = Schema.Struct({
   id: Schema.Int.check(Schema.isGreaterThan(0)),
   missing: Schema.Boolean,
   name: Schema.String,
 });
+
 const ZipInfoDoneSchema = Schema.Struct({
   id: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
   missing_files: Schema.Array(Schema.Union([Schema.String, ZipMissingFileSchema])),
@@ -54,19 +58,28 @@ const ZipInfoDoneSchema = Schema.Struct({
   url: Schema.String,
   zip_status: Schema.Literal("DONE"),
 });
+
 const ZipInfoSchema = Schema.Union([ZipInfoPendingSchema, ZipInfoErrorSchema, ZipInfoDoneSchema]);
+
 export type ZipSummary = Schema.Schema.Type<typeof ZipSummarySchema>;
+
 export type ZipCreateResponse = Schema.Schema.Type<typeof ZipCreateEnvelopeSchema>;
+
 export type ZipInfo = Schema.Schema.Type<typeof ZipInfoSchema>;
-const CreateZipInputSchema = makeCursorSelectionSchema("file_ids", "exclude_ids", {});
+
+const CreateZipInputSchema = cursorSelectionSchema("file_ids", "exclude_ids", {});
+
 export type CreateZipInput = Schema.Schema.Type<typeof CreateZipInputSchema>;
+
 const FilesReadScopeError = { errorType: "invalid_scope", statusCode: 401 as const };
 const FilesWriteScopeError = { errorType: "invalid_scope", statusCode: 401 as const };
+
 export const ListZipsErrorSpec = definePutioOperationErrorSpec({
   domain: "zips",
   operation: "list",
   knownErrors: [FilesReadScopeError],
 });
+
 export const CreateZipErrorSpec = definePutioOperationErrorSpec({
   domain: "zips",
   operation: "create",
@@ -77,6 +90,7 @@ export const CreateZipErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 403 as const },
   ],
 });
+
 export const GetZipErrorSpec = definePutioOperationErrorSpec({
   domain: "zips",
   operation: "get",
@@ -89,6 +103,7 @@ export const GetZipErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 500 as const },
   ],
 });
+
 export const CancelZipErrorSpec = definePutioOperationErrorSpec({
   domain: "zips",
   operation: "cancel",
@@ -99,10 +114,15 @@ export const CancelZipErrorSpec = definePutioOperationErrorSpec({
     { statusCode: 410 as const },
   ],
 });
+
 export type ListZipsError = PutioOperationFailure<typeof ListZipsErrorSpec>;
+
 export type CreateZipError = PutioOperationFailure<typeof CreateZipErrorSpec>;
+
 export type GetZipError = PutioOperationFailure<typeof GetZipErrorSpec>;
+
 export type CancelZipError = PutioOperationFailure<typeof CancelZipErrorSpec>;
+
 export const listZips = (): Effect.Effect<
   ReadonlyArray<ZipSummary>,
   ListZipsError,
@@ -112,6 +132,7 @@ export const listZips = (): Effect.Effect<
     method: "GET",
     path: "/v2/zips/list",
   }).pipe(selectJsonField("zips"), withOperationErrors(ListZipsErrorSpec));
+
 export const createZip = (
   input: CreateZipInput,
 ): Effect.Effect<number, CreateZipError, PutioSdkContext> =>
@@ -131,6 +152,7 @@ export const createZip = (
       path: "/v2/zips/create",
     }),
   ).pipe(selectJsonField("zip_id"), withOperationErrors(CreateZipErrorSpec));
+
 export const getZip = (id: number): Effect.Effect<ZipInfo, GetZipError, PutioSdkContext> =>
   decodeAndRun(PositiveIntegerSchema, id, (decodedId) =>
     requestJson(ZipInfoSchema, {
@@ -138,6 +160,7 @@ export const getZip = (id: number): Effect.Effect<ZipInfo, GetZipError, PutioSdk
       path: `/v2/zips/${encodePathSegment(decodedId)}`,
     }),
   ).pipe(withOperationErrors(GetZipErrorSpec));
+
 export const cancelZip = (id: number): Effect.Effect<void, CancelZipError, PutioSdkContext> =>
   decodeAndRun(PositiveIntegerSchema, id, (decodedId) =>
     requestJson(OkResponseSchema, {

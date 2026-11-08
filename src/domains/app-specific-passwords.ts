@@ -17,10 +17,12 @@ import {
 } from "../core/http.js";
 
 const AppSpecificPasswordIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
+
 const AppSpecificPasswordNoteSchema = Schema.Trim.check(
   Schema.isMinLength(1),
   Schema.isMaxLength(255),
 );
+
 const MaskedIpv4AddressPattern = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}XXX$/;
 const Ipv6HextetPattern = /^[\dA-Fa-f]{1,4}$/;
 
@@ -76,20 +78,19 @@ const ListAppSpecificPasswordsEnvelopeSchema = Schema.Struct({
 });
 
 export type AppSpecificPassword = Schema.Schema.Type<typeof AppSpecificPasswordSchema>;
+
 export type CreateAppSpecificPasswordInput = Schema.Schema.Type<
   typeof CreateAppSpecificPasswordInputSchema
 >;
+
 export type CreateAppSpecificPasswordResult = AppSpecificPassword & {
   readonly password: string;
 };
 
-const RestrictedAppSpecificPasswordError: {
-  readonly errorType: "invalid_scope";
-  readonly statusCode: 401;
-} = {
+const RestrictedAppSpecificPasswordError = {
   errorType: "invalid_scope",
   statusCode: 401,
-};
+} as const;
 
 const TooManyAppSpecificPasswordsErrorBodySchema = PutioErrorEnvelopeSchema.pipe(
   Schema.fieldsAssign({
@@ -135,12 +136,15 @@ export const DeleteAllAppSpecificPasswordsErrorSpec = definePutioOperationErrorS
 export type CreateAppSpecificPasswordError = PutioOperationFailure<
   typeof CreateAppSpecificPasswordErrorSpec
 >;
+
 export type ListAppSpecificPasswordsError = PutioOperationFailure<
   typeof ListAppSpecificPasswordsErrorSpec
 >;
+
 export type DeleteAppSpecificPasswordError = PutioOperationFailure<
   typeof DeleteAppSpecificPasswordErrorSpec
 >;
+
 export type DeleteAllAppSpecificPasswordsError = PutioOperationFailure<
   typeof DeleteAllAppSpecificPasswordsErrorSpec
 >;

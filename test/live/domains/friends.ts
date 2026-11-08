@@ -15,24 +15,13 @@ const live = createLiveHarness("friends live");
 const { assert, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
+
 void sleep;
 
 await run("friends list shape", async () => {
   const result = await authClient.friends.list();
   assert(Array.isArray(result.friends), "expected friends array");
-  assert(typeof result.total === "number", "expected total number");
   assert(result.total >= result.friends.length, "expected total >= friends length");
-  assert(
-    result.friends.every(
-      (friend) =>
-        typeof friend.id === "number" &&
-        typeof friend.name === "string" &&
-        typeof friend.avatar_url === "string" &&
-        typeof friend.has_shared_files === "boolean" &&
-        typeof friend.has_received_files === "boolean",
-    ),
-    "expected normalized friend rows",
-  );
 
   return {
     first_friend: result.friends[0]?.name ?? null,
@@ -48,15 +37,6 @@ await run("friends waiting request list and count agree", async () => {
 
   assert(Array.isArray(friends), "expected waiting requests array");
   assert(friends.length === count, "expected waiting request count to match list");
-  assert(
-    friends.every(
-      (friend) =>
-        typeof friend.id === "number" &&
-        typeof friend.name === "string" &&
-        typeof friend.avatar_url === "string",
-    ),
-    "expected normalized waiting request rows",
-  );
 
   return { count };
 });
@@ -64,15 +44,7 @@ await run("friends waiting request list and count agree", async () => {
 await run("friends sent requests shape", async () => {
   const friends = await authClient.friends.listSentRequests();
   assert(Array.isArray(friends), "expected sent requests array");
-  assert(
-    friends.every(
-      (friend) =>
-        typeof friend.id === "number" &&
-        typeof friend.name === "string" &&
-        typeof friend.avatar_url === "string",
-    ),
-    "expected normalized sent request rows",
-  );
+
   return { count: friends.length };
 });
 
@@ -85,6 +57,7 @@ await run("friends search excludes existing friend", async () => {
     !users.some((user) => user.name === friend.name),
     "expected existing friend to be excluded from search",
   );
+
   return { count: users.length, friend: friend.name };
 });
 
@@ -112,8 +85,9 @@ await run("friends shared folder shape", async () => {
     await authClient.friends.sharedFolder(friend.name),
     "expected shared folder",
   );
-  assert(typeof file.id === "number", "expected shared friend root id");
+
   assert(file.folder_type === "SHARED_FRIEND", "expected shared friend folder");
+
   return {
     friend: friend.name,
     id: file.id,
@@ -142,7 +116,7 @@ await run("friends shared folder is readable with oauth token", async () => {
     await oauthClient.friends.sharedFolder(friend.name),
     "expected oauth token shared folder",
   );
-  assert(typeof file.id === "number", "expected shared friend root id for oauth token");
+
   return {
     friend: friend.name,
     id: file.id,

@@ -10,6 +10,7 @@ import { writeLiveTokenCache } from "./live-token-cache.ts";
 describe("live token cache", () => {
   it("writes dotenv tokens with 0600 permissions", async () => {
     const directory = await mkdtemp(join(tmpdir(), "putio-sdk-live-tokens-"));
+
     try {
       const url = pathToFileURL(join(directory, ".env.live-tokens"));
       await writeLiveTokenCache(url, {

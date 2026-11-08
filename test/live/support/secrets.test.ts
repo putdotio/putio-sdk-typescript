@@ -17,6 +17,7 @@ describe("live secret env loading", () => {
     const cacheKey = "PUTIO_SDK_TEST_CACHE_PRECEDENCE";
     const localKey = "PUTIO_SDK_TEST_LOCAL_PRECEDENCE";
     const envKey = "PUTIO_SDK_TEST_ENV_FALLBACK";
+
     const originalValues = new Map(
       [directKey, cacheKey, localKey, envKey].map((key) => [key, process.env[key]]),
     );

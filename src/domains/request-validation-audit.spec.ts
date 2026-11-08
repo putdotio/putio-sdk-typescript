@@ -14,10 +14,13 @@ import { expectFailure, jsonResponse, runSdkExit } from "../../test/support/sdk-
 describe("request validation audit", () => {
   it("rejects excess properties at every legacy object-decoding boundary", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ status: "OK" });
     };
+
     const config = { accessToken: "token-123" };
 
     const failures = await Promise.all([

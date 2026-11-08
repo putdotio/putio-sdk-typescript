@@ -138,7 +138,7 @@ import {
   PutioSdk,
   createPutioSdkEffectClient,
   makePutioSdkLiveClientLayer,
-  makePutioSdkLiveLayer,
+  putioSdkLiveLayer,
 } from "@putdotio/sdk";
 
 const sdk = createPutioSdkEffectClient();
@@ -148,7 +148,7 @@ const program = sdk.files
     per_page: 20,
     total: 1,
   })
-  .pipe(Effect.provide(makePutioSdkLiveLayer({ accessToken: userAccessToken })));
+  .pipe(Effect.provide(putioSdkLiveLayer({ accessToken: userAccessToken })));
 
 const result = await Effect.runPromise(program);
 ```
@@ -163,8 +163,8 @@ const serviceProgram = Effect.gen(function* () {
 ```
 
 `makePutioSdkLiveClientLayer(...)` provides the SDK service, SDK config, and default fetch-backed transport.
-`makePutioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed transport.
-Use `makePutioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioHttpClient` service when you want to supply custom transport.
+`putioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed transport.
+Use `putioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioHttpClient` service when you want to supply custom transport.
 
 ## Client Shapes
 

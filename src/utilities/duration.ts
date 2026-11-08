@@ -1,9 +1,7 @@
-const normalizeNumber = (value: unknown): number => (typeof value === "number" ? value : 0);
-
 const formatPadded = (value: number): string => String(value).padStart(2, "0");
 
-export const secondsToDuration = (seconds: unknown): string => {
-  const normalizedSeconds = Math.floor(normalizeNumber(seconds));
+export const secondsToDuration = (seconds: number | null | undefined): string => {
+  const normalizedSeconds = Math.floor(seconds ?? 0);
 
   if (normalizedSeconds <= 0) {
     return "00:00";
@@ -27,8 +25,8 @@ export const secondsToDuration = (seconds: unknown): string => {
   return [minutes, remainingSeconds].map(formatPadded).join(":");
 };
 
-export const secondsToReadableDuration = (seconds: unknown): string => {
-  const normalizedSeconds = Math.floor(normalizeNumber(seconds));
+export const secondsToReadableDuration = (seconds: number | null | undefined): string => {
+  const normalizedSeconds = Math.floor(seconds ?? 0);
 
   if (normalizedSeconds <= 0) {
     return "N/A";
@@ -52,10 +50,12 @@ export const secondsToReadableDuration = (seconds: unknown): string => {
   if (normalizedSeconds >= 3_600) {
     const hours = Math.floor(normalizedSeconds / 3_600);
     const roundedMinutes = Math.round((normalizedSeconds - hours * 3_600) / 60);
+
     return roundedMinutes > 0 ? `${hours}h ${roundedMinutes}m` : `${hours}h`;
   }
 
   const roundedMinutes = Math.round(normalizedSeconds / 60);
   const remainingSeconds = normalizedSeconds - roundedMinutes * 60;
+
   return remainingSeconds > 0 ? `${roundedMinutes}m ${remainingSeconds}s` : `${roundedMinutes}m`;
 };

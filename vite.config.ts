@@ -1,25 +1,5 @@
 import { defineConfig } from "vite-plus";
 
-const coverageConfig = {
-  exclude: [
-    "src/**/*.test.*",
-    "src/**/*.spec.*",
-    "src/**/*.d.ts",
-    "src/test-support/**",
-    "dist/**",
-    "coverage/**",
-  ],
-  include: ["src/**/*.{ts,tsx}"],
-  provider: "v8",
-  reporter: ["text", "lcov"],
-  thresholds: {
-    branches: 90,
-    functions: 90,
-    lines: 90,
-    statements: 90,
-  },
-} as const;
-
 const agentIgnorePatterns = [
   ".agent/**",
   ".agents/**",
@@ -90,7 +70,25 @@ export default defineConfig({
     "*.{js,ts,tsx,mjs,cjs,cts}": "vp check --fix",
   },
   test: {
-    coverage: coverageConfig,
+    coverage: {
+      exclude: [
+        "src/**/*.test.*",
+        "src/**/*.spec.*",
+        "src/**/*.d.ts",
+        "src/test-support/**",
+        "dist/**",
+        "coverage/**",
+      ],
+      include: ["src/**/*.{ts,tsx}"],
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      thresholds: {
+        branches: 90,
+        functions: 90,
+        lines: 90,
+        statements: 90,
+      },
+    },
     exclude: ["test/live/**"],
     include: ["scripts/**/*.spec.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
   },

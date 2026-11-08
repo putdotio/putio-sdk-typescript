@@ -1,5 +1,7 @@
 import { createHmac } from "node:crypto";
 
+import { Schema } from "effect";
+
 import type {
   PutioBootstrapSecrets,
   PutioClientCredentials,
@@ -7,11 +9,16 @@ import type {
 } from "./secrets.ts";
 
 type PutioSdkPromiseClientFactory = typeof import("./client.ts").createPromiseClient;
+
 type PutioSdkPromiseClient = Awaited<ReturnType<PutioSdkPromiseClientFactory>>;
-type CreatePromiseClient = (config?: Record<string, unknown>) => Promise<PutioSdkPromiseClient>;
+
+type CreatePromiseClient = (
+  config?: Parameters<PutioSdkPromiseClientFactory>[0],
+) => Promise<PutioSdkPromiseClient>;
 
 const createSourcePromiseClient: CreatePromiseClient = async (config = {}) => {
   const { createPromiseClient } = await import("./client.ts");
+
   return createPromiseClient(config);
 };
 
@@ -23,12 +30,12 @@ type TokenScope =
   | "two_factor"
   | null;
 
-type TaggedOperationError = {
-  readonly _tag?: string;
-  readonly body?: {
-    readonly error_type?: string;
-  };
-};
+const CodeNotFoundErrorSchema = Schema.Struct({
+  _tag: Schema.Literal("PutioOperationError"),
+  body: Schema.Struct({
+    error_type: Schema.Literal("code_not_found"),
+  }),
+});
 
 export type BootstrappedToken = {
   readonly accessToken: string;
@@ -89,6 +96,7 @@ const generateTotpCode = (secret: string, now = Date.now()): string => {
 
   const digest = createHmac("sha1", decodeBase32(secret)).update(counterBuffer).digest();
   const offset = digest[digest.length - 1] & 0x0f;
+
   const code =
     (((digest[offset] & 0x7f) << 24) |
       (digest[offset + 1] << 16) |
@@ -115,17 +123,7 @@ const readFreshTotp = (secrets: PutioBootstrapSecrets): string => {
   return secrets.credentials.totp;
 };
 
-const isCodeNotFoundError = (error: unknown): boolean => {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-
-  const candidate = error as TaggedOperationError;
-
-  return (
-    candidate._tag === "PutioOperationError" && candidate.body?.error_type === "code_not_found"
-  );
-};
+const isCodeNotFoundError = Schema.is(CodeNotFoundErrorSchema);
 
 const verifyTwoFactorToken = async (
   accessToken: string,
@@ -137,6 +135,7 @@ const verifyTwoFactorToken = async (
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const verified = await sdk.auth.twoFactor.verifyTOTP(accessToken, readFreshTotp(secrets));
+
       return verified.token;
     } catch (error) {
       if (!isCodeNotFoundError(error) || attempt === 2) {
@@ -155,6 +154,7 @@ export const bootstrapFirstPartyToken = async (
   createClient: CreatePromiseClient = createSourcePromiseClient,
 ): Promise<BootstrappedToken> => {
   const sdk = await createClient();
+
   return bootstrapFirstPartyTokenWithCredentials(
     secrets.credentials,
     secrets.firstPartyClient,
@@ -189,7 +189,7 @@ export const bootstrapFirstPartyTokenWithCredentials = async (
         {
           credentials,
           firstPartyClient,
-        } as PutioBootstrapSecrets,
+        },
         createClient,
       );
       validation = await resolvedSdk.auth.validateToken(accessToken);
@@ -227,6 +227,7 @@ export const bootstrapThirdPartyToken = async (
   createClient: CreatePromiseClient = createSourcePromiseClient,
 ): Promise<BootstrappedToken & { readonly app: OAuthAppIdentity }> => {
   const sdk = await createClient();
+
   const authedSdk = await createClient({
     accessToken: firstPartyAccessToken,
   });
@@ -254,7 +255,7 @@ export const bootstrapThirdPartyToken = async (
   });
 
   const accessToken =
-    typeof appDetail.token === "string" && appDetail.token.length > 0
+    appDetail.token !== null && appDetail.token.length > 0
       ? appDetail.token
       : await authedSdk.oauth.regenerateToken(app.id);
 
@@ -281,6 +282,7 @@ export const bootstrapRuntimeTokens = async (
   createClient: CreatePromiseClient = createSourcePromiseClient,
 ): Promise<BootstrappedTokens> => {
   const firstParty = await bootstrapFirstPartyToken(secrets, createClient);
+
   const thirdParty = await bootstrapThirdPartyToken(
     firstParty.accessToken,
     secrets.thirdPartyClientId,

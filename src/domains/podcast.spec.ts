@@ -19,6 +19,7 @@ describe("podcast domain", () => {
           expect(request.url).toBe(
             "https://api.put.io/v2/podcast/links?parent_id=42&type=all%2Cmp4",
           );
+
           return jsonResponse({
             links: {
               all: "https://api.put.io/v2/podcast/feed/all",
@@ -45,6 +46,7 @@ describe("podcast domain", () => {
         podcast.getPodcastLinks({ parentId: 0 }),
         (request) => {
           expect(request.url).toBe("https://api.put.io/v2/podcast/links?parent_id=0");
+
           return jsonResponse({ links: {}, status: "OK", token: "podcast-token" });
         },
         { accessToken: "token-123" },
@@ -54,17 +56,21 @@ describe("podcast domain", () => {
 
   it("rejects invalid podcast link inputs before transport", async () => {
     let requestCount = 0;
+
     const handler = () => {
       requestCount += 1;
+
       return jsonResponse({ links: {}, status: "OK", token: "podcast-token" });
     };
 
     const invalidParentId = expectFailure(
       await runSdkExit(podcast.getPodcastLinks({ parentId: -1 }), handler),
     );
+
     const emptyTypes = expectFailure(
       await runSdkExit(podcast.getPodcastLinks({ parentId: 0, types: [] }), handler),
     );
+
     const invalidType = expectFailure(
       await runSdkExit(
         // @ts-expect-error JavaScript callers can still supply unknown feed types.

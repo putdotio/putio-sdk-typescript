@@ -1,3 +1,5 @@
+import { Predicate } from "effect";
+
 export interface HumanFileSizeOptions {
   readonly decimals?: number;
   readonly unitSeparator?: string;
@@ -10,8 +12,10 @@ export const toHumanFileSize = (
   options: HumanFileSizeOptions = {},
 ): string => {
   const { decimals = 1, unitSeparator = " " } = options;
-  const parsed =
-    typeof fileSizeInBytes === "string" ? Number.parseInt(fileSizeInBytes, 10) : fileSizeInBytes;
+
+  const parsed = Predicate.isString(fileSizeInBytes)
+    ? Number.parseInt(fileSizeInBytes, 10)
+    : fileSizeInBytes;
 
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return `0${unitSeparator}B`;
@@ -21,6 +25,7 @@ export const toHumanFileSize = (
     Math.floor(Math.log(parsed) / Math.log(1024)),
     FILE_SIZE_UNITS.length - 1,
   );
+
   const normalized = parsed / 1024 ** exponent;
   const fractionDigits = normalized % 1 === 0 ? 0 : decimals;
 

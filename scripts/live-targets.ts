@@ -19,6 +19,7 @@ export const resolveLiveTestTargets = (
   return targets.map((target) => {
     const resolvedTarget = resolve(cwd, target);
     const relativeTarget = relative(liveRoot, resolvedTarget);
+
     const isLiveTest =
       relativeTarget.endsWith(".test.ts") &&
       relativeTarget !== ".." &&

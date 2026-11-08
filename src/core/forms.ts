@@ -10,24 +10,25 @@ export const joinCsv = <TValue extends CsvValue>(
   values: ReadonlyArray<TValue> | undefined,
 ): string | undefined => (values && values.length > 0 ? values.join(",") : undefined);
 
-export const toCursorSelectionForm = <
-  TValue extends CsvValue,
-  const TIdsFieldName extends string = "file_ids",
->(
-  selection: CursorSelectionInput<TValue>,
-  idsFieldName?: TIdsFieldName,
-): {
+type CursorSelectionForm<TIdsFieldName extends string> = {
   readonly cursor?: string;
   readonly exclude_ids?: string;
-} & Record<TIdsFieldName, string | undefined> => {
-  const resolvedIdsFieldName = (idsFieldName ?? "file_ids") as TIdsFieldName;
+} & Record<TIdsFieldName, string | undefined>;
 
+export function toCursorSelectionForm<TValue extends CsvValue>(
+  selection: CursorSelectionInput<TValue>,
+): CursorSelectionForm<"file_ids">;
+export function toCursorSelectionForm<TValue extends CsvValue, const TIdsFieldName extends string>(
+  selection: CursorSelectionInput<TValue>,
+  idsFieldName: TIdsFieldName,
+): CursorSelectionForm<TIdsFieldName>;
+export function toCursorSelectionForm(
+  selection: CursorSelectionInput<CsvValue>,
+  idsFieldName = "file_ids",
+): CursorSelectionForm<string> {
   return {
     cursor: selection.cursor,
     exclude_ids: joinCsv(selection.excludeIds),
-    [resolvedIdsFieldName]: joinCsv(selection.ids),
-  } as {
-    readonly cursor?: string;
-    readonly exclude_ids?: string;
-  } & Record<TIdsFieldName, string | undefined>;
-};
+    [idsFieldName]: joinCsv(selection.ids),
+  };
+}

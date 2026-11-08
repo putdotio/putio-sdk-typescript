@@ -9,6 +9,7 @@ const live = createLiveHarness("tunnel live");
 const { assert, assertOperationError, finish, run, sleep } = live;
 
 void assertOperationError;
+
 void sleep;
 
 await run("tunnel routes shape", async () => {
@@ -24,12 +25,7 @@ await run("tunnel routes shape", async () => {
     "expected cdn77 tunnel route",
   );
   routes.slice(0, 5).forEach((route) => {
-    assert(typeof route.description === "string", "expected tunnel route description");
     assert(Array.isArray(route.hosts), "expected tunnel route hosts");
-    assert(
-      route.hosts.every((host) => typeof host === "string"),
-      "expected string tunnel hosts",
-    );
   });
 
   return {

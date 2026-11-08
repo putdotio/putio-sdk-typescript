@@ -13,6 +13,7 @@ if (targets.length === 0) {
 const resolvedTargets = resolveLiveTestTargets(targets);
 
 const tokens = readLiveTokens();
+
 const result = spawnSync(
   "vp",
   ["test", "run", "--config", "vitest.live.config.ts", ...resolvedTargets],

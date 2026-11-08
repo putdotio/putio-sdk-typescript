@@ -18,18 +18,22 @@ import {
 } from "../core/http.js";
 import { NonEmptyStringSchema, PositiveIntegerSchema } from "../core/validation.js";
 import { OAuthAppSchema, OAuthAppSessionSchema } from "./oauth.js";
+
 export const LoginResponseSchema = Schema.Struct({
   access_token: Schema.String,
   user_id: Schema.Int,
 });
+
 const OAuthAuthorizationCodeResponseSchema = Schema.Struct({
   access_token: Schema.String,
 });
+
 export const OAuthAuthorizationCodeExchangeErrorCodeSchema = Schema.Literals([
   "access_denied",
   "invalid_request",
   "unauthorized_client",
 ]);
+
 export class OAuthAuthorizationCodeExchangeError extends Schema.TaggedError<OAuthAuthorizationCodeExchangeError>()(
   "OAuthAuthorizationCodeExchangeError",
   {
@@ -37,6 +41,7 @@ export class OAuthAuthorizationCodeExchangeError extends Schema.TaggedError<OAut
     status: Schema.Literal(400),
   },
 ) {}
+
 const TokenScopeSchema = Schema.NullOr(
   Schema.Literals([
     "default",
@@ -46,54 +51,66 @@ const TokenScopeSchema = Schema.NullOr(
     "token_validate",
   ]),
 );
+
 export const ValidateTokenResponseSchema = Schema.Struct({
   result: Schema.Boolean,
   token_id: Schema.NullOr(Schema.Int),
   token_scope: TokenScopeSchema,
   user_id: Schema.NullOr(Schema.Int),
 });
+
 const RecoveryCodeEntrySchema = Schema.Struct({
   code: Schema.String,
   used_at: Schema.NullOr(Schema.String),
 });
+
 export const TwoFactorRecoveryCodesSchema = Schema.Struct({
   codes: Schema.Array(RecoveryCodeEntrySchema),
   created_at: Schema.String,
 });
+
 export const GenerateTOTPResponseSchema = Schema.Struct({
   recovery_codes: TwoFactorRecoveryCodesSchema,
   secret: Schema.String,
   uri: Schema.String,
 });
+
 export const VerifyTOTPResponseSchema = Schema.Struct({
   token: Schema.String,
   user_id: Schema.Int,
 });
+
 export const AuthorizationCodeSchema = Schema.Struct({
   code: Schema.String,
   qr_code_url: Schema.String,
 });
+
 const AuthorizationCodeEnvelopeSchema = Schema.Struct({
   code: Schema.String,
   qr_code_url: Schema.String,
   status: Schema.Literal("OK"),
 });
+
 const CodeMatchEnvelopeSchema = Schema.Struct({
   oauth_token: Schema.NullOr(Schema.String),
   status: Schema.Literal("OK"),
 });
+
 const LinkDeviceEnvelopeSchema = Schema.Struct({
   app: OAuthAppSchema,
   status: Schema.Literal("OK"),
 });
+
 const GrantsEnvelopeSchema = Schema.Struct({
   apps: Schema.Array(OAuthAppSchema),
   status: Schema.Literal("OK"),
 });
+
 const ClientsEnvelopeSchema = Schema.Struct({
   clients: Schema.Array(OAuthAppSessionSchema),
   status: Schema.Literal("OK"),
 });
+
 const VoucherEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   voucher: Schema.Struct({
@@ -101,6 +118,7 @@ const VoucherEnvelopeSchema = Schema.Struct({
     owner: Schema.NullOr(Schema.String),
   }),
 });
+
 const GiftCardEnvelopeSchema = Schema.Struct({
   gift_card: Schema.Struct({
     days: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
@@ -108,6 +126,7 @@ const GiftCardEnvelopeSchema = Schema.Struct({
   }),
   status: Schema.Literal("OK"),
 });
+
 const FamilyInviteEnvelopeSchema = Schema.Struct({
   invite: Schema.Struct({
     owner: Schema.String,
@@ -115,6 +134,7 @@ const FamilyInviteEnvelopeSchema = Schema.Struct({
   }),
   status: Schema.Literal("OK"),
 });
+
 const FriendInviteEnvelopeSchema = Schema.Struct({
   invite: Schema.Struct({
     inviter: Schema.String,
@@ -126,30 +146,37 @@ const FriendInviteEnvelopeSchema = Schema.Struct({
   }),
   status: Schema.Literal("OK"),
 });
+
 const ExistsEnvelopeSchema = Schema.Struct({
   exists: Schema.Boolean,
   status: Schema.Literal("OK"),
 });
+
 const ResetPasswordEnvelopeSchema = Schema.Struct({
   access_token: Schema.String,
   status: Schema.Literal("OK"),
 });
+
 const GenerateTOTPEnvelopeSchema = Schema.Struct({
   recovery_codes: TwoFactorRecoveryCodesSchema,
   secret: Schema.String,
   status: Schema.Literal("OK"),
   uri: Schema.String,
 });
+
 const VerifyTOTPEnvelopeSchema = Schema.Struct({
   status: Schema.Literal("OK"),
   token: Schema.String,
   user_id: Schema.Int,
 });
+
 const RecoveryCodesEnvelopeSchema = Schema.Struct({
   recovery_codes: TwoFactorRecoveryCodesSchema,
   status: Schema.Literal("OK"),
 });
+
 const AuthClientIdSchema = Schema.Union([NonEmptyStringSchema, PositiveIntegerSchema]);
+
 const LoginInputSchema = Schema.Struct({
   callbackUrl: Schema.optional(NonEmptyStringSchema),
   clientId: AuthClientIdSchema,
@@ -159,6 +186,7 @@ const LoginInputSchema = Schema.Struct({
   password: NonEmptyStringSchema,
   username: NonEmptyStringSchema,
 });
+
 export const RegisterInputSchema = Schema.Struct({
   client_id: AuthClientIdSchema,
   family_invite_code: Schema.optional(NonEmptyStringSchema),
@@ -171,39 +199,54 @@ export const RegisterInputSchema = Schema.Struct({
   username: NonEmptyStringSchema,
   voucher_code: Schema.optional(NonEmptyStringSchema),
 });
+
 export const OAuthAuthorizationCodeExchangeInputSchema = Schema.Struct({
   clientId: AuthClientIdSchema,
   clientSecret: NonEmptyStringSchema,
   code: NonEmptyStringSchema,
   redirectUri: Schema.optional(NonEmptyStringSchema),
 });
+
 const AuthExistsInputSchema = Schema.Struct({
   key: Schema.Literals(["mail", "username"]),
   value: NonEmptyStringSchema,
 });
+
 const AuthResetPasswordInputSchema = Schema.Struct({
   key: NonEmptyStringSchema,
   password: NonEmptyStringSchema,
 });
+
 const AuthGetCodeInputSchema = Schema.Struct({
   appId: AuthClientIdSchema,
   clientName: Schema.optional(NonEmptyStringSchema),
 });
+
 const AuthVerifyTotpInputSchema = Schema.Struct({
   code: NonEmptyStringSchema,
   twoFactorScopedToken: NonEmptyStringSchema,
 });
+
 export type LoginResponse = Schema.Schema.Type<typeof LoginResponseSchema>;
+
 export type ValidateTokenResponse = Schema.Schema.Type<typeof ValidateTokenResponseSchema>;
+
 export type TwoFactorRecoveryCodes = Schema.Schema.Type<typeof TwoFactorRecoveryCodesSchema>;
+
 export type GenerateTOTPResponse = Schema.Schema.Type<typeof GenerateTOTPResponseSchema>;
+
 export type VerifyTOTPResponse = Schema.Schema.Type<typeof VerifyTOTPResponseSchema>;
+
 export type RegisterInput = Schema.Schema.Type<typeof RegisterInputSchema>;
+
 export type LoginInput = Schema.Schema.Type<typeof LoginInputSchema>;
+
 export type AuthGetCodeInput = Schema.Schema.Type<typeof AuthGetCodeInputSchema>;
+
 export type OAuthAuthorizationCodeExchangeInput = Schema.Schema.Type<
   typeof OAuthAuthorizationCodeExchangeInputSchema
 >;
+
 export const LoginErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "login",
@@ -213,6 +256,7 @@ export const LoginErrorSpec = definePutioOperationErrorSpec({
     { errorType: "password_reset_required", statusCode: 403 as const },
   ],
 });
+
 export const RegisterErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "register",
@@ -236,21 +280,25 @@ export const RegisterErrorSpec = definePutioOperationErrorSpec({
     { errorType: "PLAN_NOT_FOUND", statusCode: 404 as const },
   ],
 });
+
 export const VoucherLookupErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "getVoucher",
   knownErrors: [{ errorType: "INVALID_VOUCHER_CODE", statusCode: 404 as const }],
 });
+
 export const GiftCardLookupErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "getGiftCard",
   knownErrors: [{ errorType: "INVALID_CONFIRMATION_CODE", statusCode: 404 as const }],
 });
+
 export const FamilyInviteLookupErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "getFamilyInvite",
   knownErrors: [{ errorType: "INVALID_FAMILY_INVITE_CODE", statusCode: 404 as const }],
 });
+
 export const FriendInviteLookupErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "getFriendInvite",
@@ -259,11 +307,13 @@ export const FriendInviteLookupErrorSpec = definePutioOperationErrorSpec({
     { errorType: "FRIEND_INVITE_INVALID_CODE", statusCode: 404 as const },
   ],
 });
+
 export const ForgotPasswordErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "forgotPassword",
   knownErrors: [{ statusCode: 404 as const }],
 });
+
 export const ResetPasswordErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "resetPassword",
@@ -272,36 +322,43 @@ export const ResetPasswordErrorSpec = definePutioOperationErrorSpec({
     { errorType: "PWNED_NEW_PASSWORD", statusCode: 400 as const },
   ],
 });
+
 export const LinkDeviceErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "linkDevice",
   knownErrors: [{ statusCode: 404 as const }],
 });
+
 export const GrantsErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "grants",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
+
 export const ClientsErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "clients",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
+
 export const RevokeOAuthGrantErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "revokeApp",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
+
 export const RevokeOAuthClientErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "revokeClient",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
+
 export const RevokeAllOAuthClientsErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "revokeAllClients",
   knownErrors: [{ errorType: "invalid_scope", statusCode: 401 as const }],
 });
+
 export const GenerateTOTPErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "generateTOTP",
@@ -310,6 +367,7 @@ export const GenerateTOTPErrorSpec = definePutioOperationErrorSpec({
     { errorType: "invalid_scope", statusCode: 401 as const },
   ],
 });
+
 export const VerifyTOTPErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "verifyTOTP",
@@ -320,6 +378,7 @@ export const VerifyTOTPErrorSpec = definePutioOperationErrorSpec({
     { errorType: "invalid_scope", statusCode: 401 as const },
   ],
 });
+
 export const RecoveryCodesErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "getRecoveryCodes",
@@ -328,6 +387,7 @@ export const RecoveryCodesErrorSpec = definePutioOperationErrorSpec({
     { errorType: "invalid_scope", statusCode: 401 as const },
   ],
 });
+
 export const RegenerateRecoveryCodesErrorSpec = definePutioOperationErrorSpec({
   domain: "auth",
   operation: "regenerateRecoveryCodes",
@@ -336,32 +396,51 @@ export const RegenerateRecoveryCodesErrorSpec = definePutioOperationErrorSpec({
     { errorType: "invalid_scope", statusCode: 401 as const },
   ],
 });
+
 export type LoginError = PutioOperationFailure<typeof LoginErrorSpec>;
+
 export type RegisterError = PutioOperationFailure<typeof RegisterErrorSpec>;
+
 export type VoucherLookupError = PutioOperationFailure<typeof VoucherLookupErrorSpec>;
+
 export type GiftCardLookupError = PutioOperationFailure<typeof GiftCardLookupErrorSpec>;
+
 export type FamilyInviteLookupError = PutioOperationFailure<typeof FamilyInviteLookupErrorSpec>;
+
 export type FriendInviteLookupError = PutioOperationFailure<typeof FriendInviteLookupErrorSpec>;
+
 export type ForgotPasswordError = PutioOperationFailure<typeof ForgotPasswordErrorSpec>;
+
 export type ResetPasswordError = PutioOperationFailure<typeof ResetPasswordErrorSpec>;
+
 export type LinkDeviceError = PutioOperationFailure<typeof LinkDeviceErrorSpec>;
+
 export type GrantsError = PutioOperationFailure<typeof GrantsErrorSpec>;
+
 export type ClientsError = PutioOperationFailure<typeof ClientsErrorSpec>;
+
 export type RevokeOAuthGrantError = PutioOperationFailure<typeof RevokeOAuthGrantErrorSpec>;
+
 export type RevokeOAuthClientError = PutioOperationFailure<typeof RevokeOAuthClientErrorSpec>;
+
 export type RevokeAllOAuthClientsError = PutioOperationFailure<
   typeof RevokeAllOAuthClientsErrorSpec
 >;
+
 export type GenerateTOTPError = PutioOperationFailure<typeof GenerateTOTPErrorSpec>;
+
 export type VerifyTOTPError = PutioOperationFailure<typeof VerifyTOTPErrorSpec>;
+
 export type RecoveryCodesError = PutioOperationFailure<typeof RecoveryCodesErrorSpec>;
+
 export type RegenerateRecoveryCodesError = PutioOperationFailure<
   typeof RegenerateRecoveryCodesErrorSpec
 >;
+
 const decodeAuthInput = <S extends Schema.Top, A, E, R>(
   operation: string,
   schema: S,
-  input: unknown,
+  input: S["Encoded"],
   run: (decoded: S["Type"]) => Effect.Effect<A, E, R>,
 ) =>
   Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(input).pipe(
@@ -377,6 +456,7 @@ const decodeAuthInput = <S extends Schema.Top, A, E, R>(
     ),
     Effect.flatMap(run),
   );
+
 export const buildAuthLoginUrl = (options: {
   readonly clientId: string | number;
   readonly redirectUri: string;
@@ -393,9 +473,11 @@ export const buildAuthLoginUrl = (options: {
     response_type: options.responseType ?? "token",
     state: options.state,
   });
+
 const isOAuthAuthorizationCodeExchangeErrorCode = Schema.is(
   OAuthAuthorizationCodeExchangeErrorCodeSchema,
 );
+
 const mapOAuthAuthorizationCodeExchangeError = (
   error: PutioSdkError,
 ): PutioSdkError | OAuthAuthorizationCodeExchangeError =>
@@ -407,6 +489,7 @@ const mapOAuthAuthorizationCodeExchangeError = (
         status: 400,
       })
     : error;
+
 export const exchangeOAuthAuthorizationCode = (
   input: OAuthAuthorizationCodeExchangeInput,
 ): Effect.Effect<string, PutioSdkError | OAuthAuthorizationCodeExchangeError, PutioSdkContext> =>
@@ -434,6 +517,7 @@ export const exchangeOAuthAuthorizationCode = (
         Effect.mapError(mapOAuthAuthorizationCodeExchangeError),
       ),
   );
+
 export const login = (
   input: LoginInput,
 ): Effect.Effect<LoginResponse, LoginError, PutioSdkContext> =>
@@ -455,6 +539,7 @@ export const login = (
       },
     }).pipe(selectJsonFields("access_token", "user_id")),
   ).pipe(withOperationErrors(LoginErrorSpec));
+
 export const logout = (): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
   PutioSdkError,
@@ -464,6 +549,7 @@ export const logout = (): Effect.Effect<
     method: "POST",
     path: "/v2/oauth/grants/logout",
   });
+
 export const register = (
   input: RegisterInput,
 ): Effect.Effect<
@@ -486,6 +572,7 @@ export const register = (
       path: "/v2/registration/register",
     }).pipe(selectJsonFields("access_token")),
   ).pipe(withOperationErrors(RegisterErrorSpec));
+
 export const exists = (
   key: "mail" | "username",
   value: string,
@@ -502,6 +589,7 @@ export const exists = (
       },
     }).pipe(selectJsonField("exists")),
   );
+
 export const getVoucher = (
   code: string,
 ): Effect.Effect<
@@ -518,6 +606,7 @@ export const getVoucher = (
       path: `/v2/registration/voucher/${encodePathSegment(decodedCode)}`,
     }).pipe(selectJsonField("voucher")),
   ).pipe(withOperationErrors(VoucherLookupErrorSpec));
+
 export const getGiftCard = (
   code: string,
 ): Effect.Effect<
@@ -534,6 +623,7 @@ export const getGiftCard = (
       path: `/v2/registration/gift_card/${encodePathSegment(decodedCode)}`,
     }).pipe(selectJsonField("gift_card")),
   ).pipe(withOperationErrors(GiftCardLookupErrorSpec));
+
 export const getFamilyInvite = (
   code: string,
 ): Effect.Effect<
@@ -550,6 +640,7 @@ export const getFamilyInvite = (
       path: `/v2/registration/family/${encodePathSegment(decodedCode)}`,
     }).pipe(selectJsonField("invite")),
   ).pipe(withOperationErrors(FamilyInviteLookupErrorSpec));
+
 export const getFriendInvite = (
   code: string,
 ): Effect.Effect<
@@ -566,6 +657,7 @@ export const getFriendInvite = (
       path: `/v2/registration/friend/${encodePathSegment(decodedCode)}`,
     }).pipe(selectJsonField("invite")),
   ).pipe(withOperationErrors(FriendInviteLookupErrorSpec));
+
 export const forgotPassword = (
   mail: string,
 ): Effect.Effect<
@@ -588,6 +680,7 @@ export const forgotPassword = (
       path: "/v2/registration/password/forgot",
     }),
   ).pipe(withOperationErrors(ForgotPasswordErrorSpec));
+
 export const resetPassword = (
   key: string,
   password: string,
@@ -615,6 +708,7 @@ export const resetPassword = (
         path: "/v2/registration/password/reset",
       }).pipe(selectJsonFields("access_token")),
   ).pipe(withOperationErrors(ResetPasswordErrorSpec));
+
 export const getCode = (
   input: AuthGetCodeInput,
 ): Effect.Effect<
@@ -635,6 +729,7 @@ export const getCode = (
       },
     }).pipe(selectJsonFields("code", "qr_code_url")),
   );
+
 export const checkCodeMatch = (
   code: string,
 ): Effect.Effect<string | null, PutioSdkError, PutioSdkContext> =>
@@ -647,6 +742,7 @@ export const checkCodeMatch = (
       path: `/v2/oauth2/oob/code/${encodePathSegment(decodedCode)}`,
     }).pipe(selectJsonField("oauth_token")),
   );
+
 export const linkDevice = (
   code: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OAuthAppSchema>, LinkDeviceError, PutioSdkContext> =>
@@ -662,6 +758,7 @@ export const linkDevice = (
       path: "/v2/oauth2/oob/code",
     }).pipe(selectJsonField("app")),
   ).pipe(withOperationErrors(LinkDeviceErrorSpec));
+
 export const grants = (): Effect.Effect<
   ReadonlyArray<Schema.Schema.Type<typeof OAuthAppSchema>>,
   GrantsError,
@@ -671,6 +768,7 @@ export const grants = (): Effect.Effect<
     method: "GET",
     path: "/v2/oauth/grants/",
   }).pipe(selectJsonField("apps"), withOperationErrors(GrantsErrorSpec));
+
 export const revokeApp = (
   id: number,
 ): Effect.Effect<
@@ -684,6 +782,7 @@ export const revokeApp = (
       path: `/v2/oauth/grants/${encodePathSegment(decodedId)}/delete`,
     }),
   ).pipe(withOperationErrors(RevokeOAuthGrantErrorSpec));
+
 export const clients = (): Effect.Effect<
   ReadonlyArray<Schema.Schema.Type<typeof OAuthAppSessionSchema>>,
   ClientsError,
@@ -693,6 +792,7 @@ export const clients = (): Effect.Effect<
     method: "GET",
     path: "/v2/oauth/clients/",
   }).pipe(selectJsonField("clients"), withOperationErrors(ClientsErrorSpec));
+
 export const revokeClient = (
   id: number,
 ): Effect.Effect<
@@ -706,6 +806,7 @@ export const revokeClient = (
       path: `/v2/oauth/clients/${encodePathSegment(decodedId)}/delete`,
     }),
   ).pipe(withOperationErrors(RevokeOAuthClientErrorSpec));
+
 export const revokeAllClients = (): Effect.Effect<
   Schema.Schema.Type<typeof OkResponseSchema>,
   RevokeAllOAuthClientsError,
@@ -715,6 +816,7 @@ export const revokeAllClients = (): Effect.Effect<
     method: "POST",
     path: "/v2/oauth/clients/delete-all",
   }).pipe(withOperationErrors(RevokeAllOAuthClientsErrorSpec));
+
 export const validateToken = (
   token: string,
 ): Effect.Effect<ValidateTokenResponse, PutioSdkError, PutioSdkContext> =>
@@ -730,6 +832,7 @@ export const validateToken = (
       },
     }),
   );
+
 export const generateTOTP = (): Effect.Effect<
   GenerateTOTPResponse,
   GenerateTOTPError,
@@ -746,6 +849,7 @@ export const generateTOTP = (): Effect.Effect<
     })),
     withOperationErrors(GenerateTOTPErrorSpec),
   );
+
 export const verifyTOTP = (
   twoFactorScopedToken: string,
   code: string,
@@ -777,6 +881,7 @@ export const verifyTOTP = (
         })),
       ),
   ).pipe(withOperationErrors(VerifyTOTPErrorSpec));
+
 export const getRecoveryCodes = (): Effect.Effect<
   TwoFactorRecoveryCodes,
   RecoveryCodesError,
@@ -786,6 +891,7 @@ export const getRecoveryCodes = (): Effect.Effect<
     method: "GET",
     path: "/v2/two_factor/recovery_codes",
   }).pipe(selectJsonField("recovery_codes"), withOperationErrors(RecoveryCodesErrorSpec));
+
 export const regenerateRecoveryCodes = (): Effect.Effect<
   TwoFactorRecoveryCodes,
   RegenerateRecoveryCodesError,

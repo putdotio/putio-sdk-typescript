@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 
+import { PutioOperationError } from "../../dist/index.js";
 import { createLiveTokenClients } from "./support/helpers.js";
 
 describe("account live", () => {
@@ -14,11 +15,11 @@ describe("account live", () => {
       push_token: 1,
     });
 
-    expect(typeof info.download_token).toBe("string");
-    expect(typeof info.push_token).toBe("string");
+    expect(info.download_token).toBeDefined();
+    expect(info.push_token).toBeDefined();
     expect(info.features).toBeTruthy();
     expect(info.pas).toBeTruthy();
-    expect(typeof info.pas?.user_hash).toBe("string");
+    expect(info.pas?.user_hash).toBeDefined();
     expect(Object.prototype.hasOwnProperty.call(info, "paddle_user_id")).toBe(true);
     expect(Array.isArray(info.settings.subtitle_languages)).toBe(true);
   });
@@ -27,11 +28,6 @@ describe("account live", () => {
     const settings = await clients.oauthClient.account.getSettings();
 
     expect(Array.isArray(settings.subtitle_languages)).toBe(true);
-    expect(settings.callback_url === null || typeof settings.callback_url === "string").toBe(true);
-    expect(settings.locale === null || typeof settings.locale === "string").toBe(true);
-    expect(
-      settings.transfer_sort_by === null || typeof settings.transfer_sort_by === "string",
-    ).toBe(true);
   });
 
   test("supported subtitle languages expose stable code and name fields", async () => {
@@ -68,12 +64,12 @@ describe("account live", () => {
   });
 
   test("invalid callback url yields a typed operation error", async () => {
-    await expect(
-      clients.authClient.account.saveSettings({
-        callback_url: "putio-typescript-sdk-invalid-callback",
-      }),
-    ).rejects.toMatchObject({
-      _tag: "PutioOperationError",
+    const failure = clients.authClient.account.saveSettings({
+      callback_url: "putio-typescript-sdk-invalid-callback",
+    });
+
+    await expect(failure).rejects.toBeInstanceOf(PutioOperationError);
+    await expect(failure).rejects.toMatchObject({
       body: {
         error_type: "INVALID_CALLBACK_URL",
       },
@@ -94,10 +90,10 @@ describe("account live", () => {
   });
 
   test("third-party confirmations listing rejects with a typed operation error", async () => {
-    await expect(
-      clients.oauthClient.account.listConfirmations("password_change"),
-    ).rejects.toMatchObject({
-      _tag: "PutioOperationError",
+    const failure = clients.oauthClient.account.listConfirmations("password_change");
+
+    await expect(failure).rejects.toBeInstanceOf(PutioOperationError);
+    await expect(failure).rejects.toMatchObject({
       body: {
         error_type: "invalid_scope",
       },

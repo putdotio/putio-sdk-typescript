@@ -76,7 +76,7 @@ const validMatrix = {
 
 describe("route matrix validation", () => {
   it("accepts every supported classification", () => {
-    expect(validateRouteMatrix(validMatrix, clients)).toEqual(validMatrix);
+    expect(validateRouteMatrix(JSON.stringify(validMatrix), clients)).toEqual(validMatrix);
   });
 
   it("rejects malformed, duplicate, internal, and absolute route evidence", () => {
@@ -109,12 +109,18 @@ describe("route matrix validation", () => {
       version: 1,
     };
 
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(RouteMatrixValidationError);
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(/duplicate route/);
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(/canonical \/v2 path/);
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(/internal routes/);
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(/rationale must not be empty/);
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(/backend-relative/);
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(
+      RouteMatrixValidationError,
+    );
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(/duplicate route/);
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(
+      /canonical \/v2 path/,
+    );
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(/internal routes/);
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(
+      /rationale must not be empty/,
+    );
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(/backend-relative/);
   });
 
   it("rejects invalid classification fields and missing client methods", () => {
@@ -136,12 +142,16 @@ describe("route matrix validation", () => {
       version: 1,
     };
 
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(/Effect client is missing/);
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(/Promise client is missing/);
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(
+      /Effect client is missing/,
+    );
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(
+      /Promise client is missing/,
+    );
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(
       /excluded routes cannot declare an operation/,
     );
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(
       /investigate routes require a repository issue URL/,
     );
   });
@@ -158,13 +168,15 @@ describe("route matrix validation", () => {
     };
 
     try {
-      validateRouteMatrix(invalid, clients);
+      validateRouteMatrix(JSON.stringify(invalid), clients);
       throw new Error("Expected route matrix validation to fail");
     } catch (error) {
       expect(error).toBeInstanceOf(RouteMatrixValidationError);
+
       if (!(error instanceof RouteMatrixValidationError)) {
         throw error;
       }
+
       expect(error.issues).toEqual([
         "routes[0] GET /v2/docs: excluded routes cannot declare an operation",
       ]);
@@ -182,6 +194,6 @@ describe("route matrix validation", () => {
       ],
     };
 
-    expect(() => validateRouteMatrix(invalid, clients)).toThrow(/operations/);
+    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(/operations/);
   });
 });

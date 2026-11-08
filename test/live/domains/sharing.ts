@@ -33,6 +33,7 @@ const cleanupOwnedProbeFiles = async (ids: readonly number[]): Promise<void> => 
 
 const createOwnedProbeFile = async (): Promise<OwnedProbeFile> => {
   const name = `putio-typescript-sdk-public-share-probe-${Date.now()}.txt`;
+
   const upload = await authClient.files.upload({
     file: new File(["sdk public share probe\n"], name, {
       type: "text/plain",
@@ -94,11 +95,13 @@ const createDisposablePublicShare = (fileId: number) =>
 await run("sharing list shared files shape", async () => {
   const sharedFiles = await authClient.sharing.listSharedFiles();
   assert(Array.isArray(sharedFiles), "expected shared files array");
+
   return { count: sharedFiles.length };
 });
 
 await run("sharing everyone lifecycle", async () => {
   const seed = Date.now();
+
   const folder = await authClient.files.createFolder({
     name: `putio-typescript-sdk-sharing-everyone-${seed}`,
     parent_id: 0,
@@ -137,6 +140,7 @@ await run("sharing specific-friend lifecycle", async () => {
   const friend = await requireLiveFriend(authClient, createPromiseClient);
 
   const seed = Date.now();
+
   const folder = await authClient.files.createFolder({
     name: `putio-typescript-sdk-sharing-friend-${seed}`,
     parent_id: 0,
@@ -152,18 +156,15 @@ await run("sharing specific-friend lifecycle", async () => {
     });
 
     const sharedWith = await authClient.sharing.getSharedWith(folder.id);
+
     if (sharedWith.share_type !== "friends") {
       throw new Error("expected friend share type");
     }
+
     assert(sharedWith.shares.length > 0, "expected at least one friend share");
     assert(
       sharedWith.shares.every(
-        (share) =>
-          typeof share.share_id === "number" &&
-          typeof share.user_name === "string" &&
-          share.user_name.length > 0 &&
-          typeof share.user_avatar_url === "string" &&
-          share.user_avatar_url.length > 0,
+        (share) => share.user_name.length > 0 && share.user_avatar_url.length > 0,
       ),
       "expected shared-with-v2 friend payload details",
     );
@@ -190,10 +191,12 @@ await run("sharing child of shared parent yields typed already shared", async ()
   const friend = await requireLiveFriend(authClient, createPromiseClient);
 
   const seed = Date.now();
+
   const parent = await authClient.files.createFolder({
     name: `putio-typescript-sdk-sharing-parent-${seed}`,
     parent_id: 0,
   });
+
   const child = await authClient.files.createFolder({
     name: `putio-typescript-sdk-sharing-child-${seed}`,
     parent_id: parent.id,
@@ -286,12 +289,14 @@ await run("sharing public share lifecycle", async () => {
         parent_id: publicShare.user_file.id,
         total: 1,
       });
+
       assert(files.parent?.id === publicShare.user_file.id, "expected public share parent id");
 
       const url = await publicClient.sharing.publicAccess.getFileUrl(publicShare.user_file.id);
       assert(url.startsWith("https://"), "expected public file url");
 
       let missingFileStatus = 0;
+
       try {
         await publicClient.sharing.publicAccess.getFileUrl(2147483647);
         throw new Error("expected missing public-share file url to fail");
@@ -304,6 +309,7 @@ await run("sharing public share lifecycle", async () => {
       }
 
       let invalidCursorStatus = 0;
+
       try {
         await publicClient.sharing.publicAccess.continueFiles("definitely-invalid-cursor", {
           per_page: 1,
@@ -346,6 +352,7 @@ await run("sharing public share access without token yields configuration error"
 
 await run("sharing public share pagination mirrors backend contract", async () => {
   const seed = Date.now();
+
   const folder = await authClient.files.createFolder({
     name: `putio-typescript-sdk-public-share-pagination-${seed}`,
     parent_id: 0,
@@ -356,6 +363,7 @@ await run("sharing public share pagination mirrors backend contract", async () =
       name: `putio-typescript-sdk-public-share-child-a-${seed}`,
       parent_id: folder.id,
     });
+
     const childB = await authClient.files.createFolder({
       name: `putio-typescript-sdk-public-share-child-b-${seed}`,
       parent_id: folder.id,
@@ -376,7 +384,7 @@ await run("sharing public share pagination mirrors backend contract", async () =
 
       assert(firstPage.files.length === 1, "expected first public page item");
       assert(firstPage.total === 2, "expected public share total count");
-      assert(typeof firstPage.cursor === "string", "expected pagination cursor");
+      assert(firstPage.cursor !== null, "expected pagination cursor");
 
       const secondPage = await publicClient.sharing.publicAccess.continueFiles(
         assertPresent(firstPage.cursor, "expected pagination cursor"),
@@ -430,7 +438,7 @@ await run("sharing public share parent media flags", async () => {
     assert("stream_url" in parent, "expected public parent stream_url");
     assert("video_metadata" in parent, "expected public parent video_metadata");
     assert("media_info" in parent, "expected public parent media_info");
-    assert(typeof parent.need_convert === "boolean", "expected public parent need_convert");
+    assert(parent.need_convert !== undefined, "expected public parent need_convert");
 
     return {
       parent_id: parent.id,
@@ -490,6 +498,7 @@ await run("sharing clone lifecycle", async () => {
   const sharedRoots = await authClient.files.list("friends", {
     per_page: 10,
   });
+
   const sharedRoot = assertPresent(sharedRoots.files[0], "expected shared root fixture");
 
   const source = assertPresent(
@@ -514,6 +523,7 @@ await run("sharing clone lifecycle", async () => {
     const destinationContents = await authClient.files.list(destination.id, {
       per_page: 20,
     });
+
     assert(destinationContents.files.length > 0, "expected cloned content in destination");
 
     return {

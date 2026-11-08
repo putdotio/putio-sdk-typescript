@@ -110,7 +110,11 @@ test("zips create works with app token", async () => {
     file_ids: [probeFile.id],
   });
 
-  await oauthClient.zips.get(zipId);
+  try {
+    await oauthClient.zips.get(zipId);
+  } finally {
+    await oauthClient.zips.cancel(zipId);
+  }
 });
 
 test("zips get missing id yields typed 410", async () => {

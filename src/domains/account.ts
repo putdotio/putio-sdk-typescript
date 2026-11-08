@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { decodeAndRun } from "../core/validation.js";
+import { decodeAndRun, decodeAndRunRedacted, NonEmptyStringSchema } from "../core/validation.js";
 import {
   PutioValidationError,
   definePutioOperationErrorSpec,
@@ -276,15 +276,6 @@ const failMissingField = (field: string): Effect.Effect<never, PutioValidationEr
     }),
   );
 
-const mapSensitiveAccountDecodeError = (operation: "destroy" | "saveSettings") => () =>
-  new PutioValidationError({
-    cause: {
-      domain: "account",
-      operation,
-      reason: "Invalid request input",
-    },
-  });
-
 const ensureAccountInfoFields = (
   effect: Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext>,
   query: AccountInfoQuery,
@@ -449,11 +440,10 @@ export const saveAccountSettings = (
   SaveAccountSettingsError,
   PutioSdkContext
 > =>
-  Schema.decodeUnknownEffect(SaveAccountSettingsPayloadSchema, {
-    onExcessProperty: "error",
-  })(payload).pipe(
-    Effect.mapError(mapSensitiveAccountDecodeError("saveSettings")),
-    Effect.flatMap((decodedPayload) =>
+  decodeAndRunRedacted("account", "saveSettings")(
+    SaveAccountSettingsPayloadSchema,
+    payload,
+    (decodedPayload) =>
       requestJson(OkResponseSchema, {
         body: {
           type: "json",
@@ -462,9 +452,7 @@ export const saveAccountSettings = (
         method: "POST",
         path: "/v2/account/settings",
       }),
-    ),
-    withOperationErrors(SaveAccountSettingsErrorSpec),
-  );
+  ).pipe(withOperationErrors(SaveAccountSettingsErrorSpec));
 
 export const clearAccount = (
   options: AccountClearOptions,
@@ -483,9 +471,10 @@ export const clearAccount = (
 export const destroyAccount = (
   currentPassword: string,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  Schema.decodeUnknownEffect(Schema.String.check(Schema.isMinLength(1)))(currentPassword).pipe(
-    Effect.mapError(mapSensitiveAccountDecodeError("destroy")),
-    Effect.flatMap((decodedPassword) =>
+  decodeAndRunRedacted("account", "destroy")(
+    NonEmptyStringSchema,
+    currentPassword,
+    (decodedPassword) =>
       requestJson(OkResponseSchema, {
         body: {
           type: "form",
@@ -496,7 +485,6 @@ export const destroyAccount = (
         method: "POST",
         path: "/v2/account/destroy",
       }),
-    ),
   );
 
 export const listAccountConfirmations = (

@@ -13,6 +13,7 @@ import {
   parseErrorBody,
   PutioConfigurationError,
   type PutioSdkError,
+  PutioValidationError,
   toPutioResponseError,
 } from "./errors.js";
 
@@ -126,9 +127,15 @@ export const encodePathSegment = (value: PutioPathSegment): string =>
 
 const absoluteUrlPattern = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i;
 
+const dotSegmentPattern = /^(?:\.|%2e){1,2}$/i;
+
 const normalizeApiPath = (path: string): string => {
   if (absoluteUrlPattern.test(path)) {
     throw mapConfigurationError("SDK API request paths must be relative to the configured baseUrl");
+  }
+
+  if (path.split("/").some((segment) => dotSegmentPattern.test(segment))) {
+    throw mapDecodeErrorToValidationError("SDK API request paths must not contain dot segments");
   }
 
   return path.startsWith("/") ? path : `/${path}`;
@@ -149,7 +156,9 @@ export const buildPutioUrl = (baseUrl: string | URL, path: string, query?: Putio
 };
 
 const mapUrlBuildError = (cause: unknown) =>
-  cause instanceof PutioConfigurationError ? cause : mapConfigurationError(cause);
+  cause instanceof PutioConfigurationError || cause instanceof PutioValidationError
+    ? cause
+    : mapConfigurationError(cause);
 
 export const OkResponseSchema = Schema.Struct({
   status: Schema.Literal("OK"),

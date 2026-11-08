@@ -131,9 +131,9 @@ export type ErrorLocalizer<E> =
   | MatchConditionLocalizer<E>
   | GenericErrorLocalizer;
 
-export type ErrorLocalizerFn = <E>(error: E) => LocalizedError;
+export type ErrorLocalizerFn<E = unknown> = (error: E) => LocalizedError;
 
-export const isErrorLocalizer = (fn: unknown): fn is ErrorLocalizerFn => {
+export const isErrorLocalizer = (fn: unknown): fn is ErrorLocalizerFn<Error> => {
   try {
     return Predicate.isFunction(fn) && fn(new Error("test")) instanceof LocalizedError;
   } catch {

@@ -254,44 +254,46 @@ const responseErrorFields = {
   status: Schema.Number,
 };
 
-const isPutioApiErrorValue = Schema.is(
-  Schema.Struct({ _tag: Schema.Literal("PutioApiError"), ...responseErrorFields }),
-);
+const PutioApiErrorValueSchema = Schema.Struct({
+  _tag: Schema.Literal("PutioApiError"),
+  ...responseErrorFields,
+});
 
-const isPutioAuthErrorValue = Schema.is(
-  Schema.Struct({ _tag: Schema.Literal("PutioAuthError"), ...responseErrorFields }),
-);
+const PutioAuthErrorValueSchema = Schema.Struct({
+  _tag: Schema.Literal("PutioAuthError"),
+  ...responseErrorFields,
+});
 
-const isPutioRateLimitErrorValue = Schema.is(
-  Schema.Struct({
-    _tag: Schema.Literal("PutioRateLimitError"),
-    ...responseErrorFields,
-    ...RateLimitHeaderFields,
-  }),
-);
+const PutioRateLimitErrorValueSchema = Schema.Struct({
+  _tag: Schema.Literal("PutioRateLimitError"),
+  ...responseErrorFields,
+  ...RateLimitHeaderFields,
+});
 
-const isPutioOperationErrorValue = Schema.is(
-  Schema.Struct({
-    _tag: Schema.Literal("PutioOperationError"),
-    ...responseErrorFields,
-    contract: PutioKnownOperationErrorContractSchema,
-    domain: Schema.String,
-    operation: Schema.String,
-    reason: PutioOperationErrorReasonSchema,
-  }),
-);
+const PutioOperationErrorValueSchema = Schema.Struct({
+  _tag: Schema.Literal("PutioOperationError"),
+  ...responseErrorFields,
+  contract: PutioKnownOperationErrorContractSchema,
+  domain: Schema.String,
+  operation: Schema.String,
+  reason: PutioOperationErrorReasonSchema,
+});
 
-export const isPutioApiError = (value: unknown): value is PutioApiError =>
-  isPutioApiErrorValue(value);
+export type PutioApiErrorValue = typeof PutioApiErrorValueSchema.Type;
 
-export const isPutioAuthError = (value: unknown): value is PutioAuthError =>
-  isPutioAuthErrorValue(value);
+export type PutioAuthErrorValue = typeof PutioAuthErrorValueSchema.Type;
 
-export const isPutioRateLimitError = (value: unknown): value is PutioRateLimitError =>
-  isPutioRateLimitErrorValue(value);
+export type PutioRateLimitErrorValue = typeof PutioRateLimitErrorValueSchema.Type;
 
-export const isPutioOperationError = (value: unknown): value is AnyPutioOperationError =>
-  isPutioOperationErrorValue(value);
+export type PutioOperationErrorValue = typeof PutioOperationErrorValueSchema.Type;
+
+export const isPutioApiError = Schema.is(PutioApiErrorValueSchema);
+
+export const isPutioAuthError = Schema.is(PutioAuthErrorValueSchema);
+
+export const isPutioRateLimitError = Schema.is(PutioRateLimitErrorValueSchema);
+
+export const isPutioOperationError = Schema.is(PutioOperationErrorValueSchema);
 
 export const fallbackPutioErrorEnvelope = (status: number): PutioErrorEnvelope => ({
   error_message: `put.io API request failed with status ${status}`,

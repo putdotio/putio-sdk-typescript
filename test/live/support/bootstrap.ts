@@ -163,6 +163,10 @@ export const bootstrapFirstPartyToken = async (
   }
 };
 
+export const revokeFirstPartyToken = async (accessToken: string): Promise<void> => {
+  await createPutioSdkPromiseClient({ accessToken }).auth.logout();
+};
+
 const bootstrapThirdPartyToken = async (firstPartyAccessToken: string, appId?: string) => {
   const sdk = createPutioSdkPromiseClient();
   const authedSdk = createPutioSdkPromiseClient({ accessToken: firstPartyAccessToken });

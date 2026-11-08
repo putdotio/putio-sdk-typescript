@@ -1257,7 +1257,7 @@ export function getFile<TQuery extends FileQuery>(input: {
   readonly id: number;
   readonly query: TQuery;
 }): Effect.Effect<FileResponseFor<TQuery>, GetFileError | PutioValidationError, PutioSdkContext>;
-export function getFile(input: { readonly id: number; readonly query?: FileQuery | null }) {
+export function getFile(input: { readonly id: number; readonly query?: FileQuery }) {
   return decodeAndRun(FileGetInputSchema, input, (decodedInput) => {
     const effect = requestJson(FileEnvelopeSchema, {
       method: "GET",

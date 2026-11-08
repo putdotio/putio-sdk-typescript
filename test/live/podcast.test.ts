@@ -1,12 +1,14 @@
-import { test } from "vite-plus/test";
+import { afterAll, test } from "vite-plus/test";
 
 import { createPutioSdkPromiseClient } from "../../dist/index.js";
-import { bootstrapFirstPartyToken } from "./support/bootstrap.js";
+import { bootstrapFirstPartyToken, revokeFirstPartyToken } from "./support/bootstrap.js";
 import { assert } from "./support/harness.js";
 import { readCredentialFixture } from "./support/secrets.js";
 
 const firstParty = await bootstrapFirstPartyToken(readCredentialFixture());
 const authClient = createPutioSdkPromiseClient({ accessToken: firstParty.accessToken });
+
+afterAll(() => revokeFirstPartyToken(firstParty.accessToken));
 
 test("podcast default links cover every feed type", async () => {
   const result = await authClient.podcast.getLinks({ parentId: 0 });

@@ -68,7 +68,7 @@
     "@arethetypeswrong/cli": "^0.18.2",
     "@oxlint/plugins": "1.91.0",
     "@types/node": "^26.1.0",
-    "@uinaf/oxlint-plugin-no-comments": "1.0.1",
+    "@uinaf/oxlint-plugin-no-comments": "1.1.0",
     "@vitest/coverage-v8": "catalog:",
     "fast-check": "^4.10.2",
     "knip": "^6.44.2",

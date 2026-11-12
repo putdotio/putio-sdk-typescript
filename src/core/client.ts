@@ -1,4 +1,14 @@
-import { Context, Effect, Layer, ManagedRuntime, Predicate, Schema, Struct } from "effect";
+import {
+  Cause,
+  Context,
+  Effect,
+  Exit,
+  Layer,
+  ManagedRuntime,
+  Predicate,
+  Schema,
+  Struct,
+} from "effect";
 
 import {
   clearAccount,
@@ -246,16 +256,40 @@ const disposePromiseClientRuntime = async (state: PutioSdkPromiseState): Promise
   await runtime?.dispose();
 };
 
+interface PutioSdkPromiseRunner {
+  readonly signal: AbortSignal | undefined;
+  readonly state: PutioSdkPromiseState;
+}
+
 const provideSdk = async <A, E>(
-  state: PutioSdkPromiseState,
+  { signal, state }: PutioSdkPromiseRunner,
   effect: Effect.Effect<A, E, PutioSdkContext>,
-): Promise<A> =>
-  getPromiseClientRuntime(state).runPromise(
-    Effect.provideService(effect, PutioSdkConfig, {
-      ...state.runtimeConfig,
-      accessToken: state.accessToken,
-    }),
-  );
+): Promise<A> => {
+  const runtime = getPromiseClientRuntime(state);
+
+  const configured = Effect.provideService(effect, PutioSdkConfig, {
+    ...state.runtimeConfig,
+    accessToken: state.accessToken,
+  });
+
+  if (signal === undefined) {
+    return runtime.runPromise(configured);
+  }
+
+  if (signal.aborted) {
+    throw signal.reason;
+  }
+
+  const exit = await runtime.runPromiseExit(configured, { signal });
+
+  if (Exit.isSuccess(exit)) {
+    return exit.value;
+  }
+
+  throw signal.aborted && Cause.hasInterruptsOnly(exit.cause)
+    ? signal.reason
+    : Cause.squash(exit.cause);
+};
 
 const snapshotUrl = (value: string | URL | undefined): string | URL | undefined =>
   Predicate.isString(value) || value === undefined ? value : new URL(value.href);
@@ -276,7 +310,7 @@ type SdkEffectOperation = (...args: never[]) => Effect.Effect<unknown, unknown, 
 class OperationEntry<T extends Operation> {
   constructor(
     readonly run: T,
-    readonly toPromise: (state: PutioSdkPromiseState) => (...args: Parameters<T>) => void,
+    readonly toPromise: (runner: PutioSdkPromiseRunner) => (...args: Parameters<T>) => void,
   ) {}
 }
 
@@ -290,9 +324,9 @@ type PureOperation<T extends Operation> = [EffectReturnMember<ReturnType<T>>] ex
 const effect = <T extends SdkEffectOperation>(operation: T): OperationEntry<T> =>
   new OperationEntry(
     operation,
-    (state) =>
+    (runner) =>
       (...args: Parameters<T>) =>
-        provideSdk(state, operation(...args)),
+        provideSdk(runner, operation(...args)),
   );
 
 const pure = <T extends Operation>(operation: T & PureOperation<T>): OperationEntry<T> =>
@@ -598,22 +632,8 @@ export const makePutioSdkEffectClientLayer = () =>
 export const makePutioSdkLiveClientLayer = (config: PutioSdkOptions) =>
   Layer.mergeAll(makePutioSdkEffectClientLayer(), putioSdkLiveLayer(config));
 
-export const createPutioSdkPromiseClient = (initialConfig: PutioSdkOptions = {}) => {
-  const config: PutioSdkPromiseState = {
-    accessToken: initialConfig.accessToken,
-    disposed: false,
-    runtime: undefined,
-    runtimeConfig: Struct.omit(
-      normalizePutioSdkOptions({
-        ...initialConfig,
-        baseUrl: snapshotUrl(initialConfig.baseUrl),
-        headers: snapshotHeaders(initialConfig.headers),
-        uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
-        webAppUrl: snapshotUrl(initialConfig.webAppUrl),
-      }),
-      ["accessToken"],
-    ),
-  };
+const createPromiseOperations = (state: PutioSdkPromiseState, signal: AbortSignal | undefined) => {
+  const config: PutioSdkPromiseRunner = { signal, state };
 
   function getInfo(query: {
     readonly download_token: 1;
@@ -704,10 +724,6 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkOptions = {})
     ) as PromiseOperationTree<SharedOperationTree>;
 
   return {
-    dispose: () => disposePromiseClientRuntime(config),
-    setAccessToken: (accessToken: string | undefined): void => {
-      config.accessToken = accessToken;
-    },
     ...operations,
     account: {
       ...operations.account,
@@ -718,7 +734,7 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkOptions = {})
       buildLoginUrl: (options: Parameters<typeof buildAuthLoginUrl>[0]) =>
         buildAuthLoginUrl({
           ...options,
-          webAppUrl: options.webAppUrl ?? config.runtimeConfig.webAppUrl,
+          webAppUrl: options.webAppUrl ?? state.runtimeConfig.webAppUrl,
         }),
     },
     config: {
@@ -734,6 +750,36 @@ export const createPutioSdkPromiseClient = (initialConfig: PutioSdkOptions = {})
       get: getFileById,
       getChild: getChildByName,
     },
+  };
+};
+
+export type PutioSdkPromiseOperations = ReturnType<typeof createPromiseOperations>;
+
+export const createPutioSdkPromiseClient = (initialConfig: PutioSdkOptions = {}) => {
+  const state: PutioSdkPromiseState = {
+    accessToken: initialConfig.accessToken,
+    disposed: false,
+    runtime: undefined,
+    runtimeConfig: Struct.omit(
+      normalizePutioSdkOptions({
+        ...initialConfig,
+        baseUrl: snapshotUrl(initialConfig.baseUrl),
+        headers: snapshotHeaders(initialConfig.headers),
+        uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
+        webAppUrl: snapshotUrl(initialConfig.webAppUrl),
+      }),
+      ["accessToken"],
+    ),
+  };
+
+  return {
+    dispose: () => disposePromiseClientRuntime(state),
+    setAccessToken: (accessToken: string | undefined): void => {
+      state.accessToken = accessToken;
+    },
+    withSignal: (signal: AbortSignal): PutioSdkPromiseOperations =>
+      createPromiseOperations(state, signal),
+    ...createPromiseOperations(state, undefined),
   };
 };
 

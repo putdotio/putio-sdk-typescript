@@ -131,7 +131,121 @@ describe("sdk client factories", () => {
       "dispose",
       "files.createUploadFormData",
       "setAccessToken",
+      "withSignal",
     ]);
+  });
+
+  it("binds the whole Promise operation surface to a signal without the lifecycle methods", () => {
+    const client = createPutioSdkPromiseClient();
+    const lifecyclePaths = new Set(["dispose", "setAccessToken", "withSignal"]);
+
+    expect(collectFunctionPaths(client.withSignal(new AbortController().signal))).toEqual(
+      collectFunctionPaths(client).filter((path) => !lifecyclePaths.has(path)),
+    );
+  });
+
+  it("aborts the in-flight fetch and rejects with the signal's reason", async () => {
+    const fetchSignals: Array<AbortSignal | null | undefined> = [];
+
+    const fetchMock = vi.fn<typeof fetch>((_input, init) => {
+      fetchSignals.push(init?.signal);
+
+      return new Promise<Response>(() => {});
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
+    const controller = new AbortController();
+    const bound = client.withSignal(controller.signal);
+
+    const pending = [
+      bound.account.getInfo({ download_token: 1 }),
+      bound.files.get({ id: 9 }),
+      bound.config.getKeyWith("theme", Schema.String),
+      bound.transfers.list(),
+    ];
+
+    const settled = Promise.allSettled(pending);
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(pending.length);
+    });
+    expect(fetchSignals.map((signal) => signal?.aborted)).toEqual([false, false, false, false]);
+
+    const reason = new Error("caller gave up");
+    controller.abort(reason);
+
+    expect(await settled).toEqual(pending.map(() => ({ reason, status: "rejected" })));
+    expect(fetchSignals.map((signal) => signal?.aborted)).toEqual([true, true, true, true]);
+
+    await client.dispose();
+  });
+
+  it("rejects with the platform abort and timeout errors when the signal carries no custom reason", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(() => new Promise<Response>(() => {})),
+    );
+    const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
+    const controller = new AbortController();
+    const aborted = client.withSignal(controller.signal).transfers.list();
+    const timedOut = client.withSignal(AbortSignal.timeout(1)).transfers.list();
+
+    controller.abort();
+
+    await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+    await expect(timedOut).rejects.toMatchObject({ name: "TimeoutError" });
+
+    await client.dispose();
+  });
+
+  it("rejects with the reason of an already aborted signal without calling fetch", async () => {
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise<Response>(() => {}));
+
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
+    const reason = new Error("aborted before the call");
+    const bound = client.withSignal(AbortSignal.abort(reason));
+
+    await expect(bound.transfers.list()).rejects.toBe(reason);
+    await expect(bound.account.getInfo()).rejects.toBe(reason);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await client.dispose();
+  });
+
+  it("keeps results, SDK errors, and client state when the signal never aborts", async () => {
+    const authorizations: Array<string | null> = [];
+
+    const fetchMock = vi.fn<typeof fetch>(async (_input, init) => {
+      authorizations.push(new Headers(init?.headers).get("authorization"));
+
+      return new Response(JSON.stringify({ status: "OK" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createPutioSdkPromiseClient({ accessToken: "initial-token" });
+    const controller = new AbortController();
+    const bound = client.withSignal(controller.signal);
+
+    await expect(bound.config.deleteKey("initial")).resolves.toEqual({ status: "OK" });
+    client.setAccessToken("replacement-token");
+    await expect(bound.config.deleteKey("replacement")).resolves.toEqual({ status: "OK" });
+    client.setAccessToken(undefined);
+    await expect(bound.config.deleteKey("cleared")).rejects.toBeInstanceOf(PutioConfigurationError);
+    expect(authorizations).toEqual(["Token initial-token", "Token replacement-token"]);
+
+    controller.abort();
+    client.setAccessToken("replacement-token");
+    await expect(client.config.deleteKey("unbound")).resolves.toEqual({ status: "OK" });
+
+    await client.dispose();
+    await expect(bound.config.deleteKey("disposed")).rejects.toBeInstanceOf(
+      PutioConfigurationError,
+    );
   });
 
   it("supports representative Promise-client workflows without live IO", async () => {

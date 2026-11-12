@@ -165,6 +165,27 @@ Effect is the canonical typed surface; the Promise client adapts it to standard 
 
 Interrupting an Effect during fetch or body reads aborts the underlying request.
 
+### Cancelling Promise requests
+
+`sdk.withSignal(signal)` returns the same operations bound to an `AbortSignal`. It shares the
+client's runtime and access token, and leaves `dispose` and `setAccessToken` on the client.
+
+```ts
+const controller = new AbortController();
+const transfers = sdk.withSignal(controller.signal).transfers.list();
+
+controller.abort();
+await transfers;
+
+await sdk.withSignal(AbortSignal.timeout(5_000)).account.getInfo();
+```
+
+- Aborting cancels the underlying fetch and rejects the promise with `signal.reason`: an
+  `AbortError` `DOMException` by default, a `TimeoutError` from `AbortSignal.timeout(...)`, or the
+  value passed to `controller.abort(reason)`.
+- A signal that is already aborted rejects the same way without sending a request.
+- A request that fails before the abort still rejects with its SDK error.
+
 ## Namespaces
 
 Both clients expose the namespaces of `sharedOperationTree` in
@@ -301,7 +322,7 @@ const sdk = createPutioSdkPromiseClient({
 export const useAccountInfo = () =>
   useQuery({
     queryKey: ["account", "info"],
-    queryFn: () => sdk.account.getInfo({ download_token: 1 }),
+    queryFn: ({ signal }) => sdk.withSignal(signal).account.getInfo({ download_token: 1 }),
   });
 ```
 

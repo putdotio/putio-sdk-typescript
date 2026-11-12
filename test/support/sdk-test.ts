@@ -65,7 +65,7 @@ const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientService
   },
 });
 
-const provideSdkTest = <A, E>(
+export const provideSdk = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
   handler: MockRequestHandler,
   config: PutioSdkOptions = {},
@@ -75,27 +75,10 @@ const provideSdkTest = <A, E>(
     Effect.provide(putioSdkLayer(config)),
   );
 
-export const runSdkEffect = <A, E>(
-  effect: Effect.Effect<A, E, PutioSdkContext>,
-  handler: MockRequestHandler,
-  config: PutioSdkOptions = {},
-) => Effect.runPromise(provideSdkTest(effect, handler, config));
-
-export const runSdkExit = <A, E>(
-  effect: Effect.Effect<A, E, PutioSdkContext>,
-  handler: MockRequestHandler,
-  config: PutioSdkOptions = {},
-) => Effect.runPromiseExit(provideSdkTest(effect, handler, config));
-
-export const runConfigEffect = <A, E>(
+export const provideConfig = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkConfig>,
   config: PutioSdkOptions = {},
-) => Effect.runPromise(effect.pipe(Effect.provide(putioSdkLayer(config))));
-
-export const runConfigExit = <A, E>(
-  effect: Effect.Effect<A, E, PutioSdkConfig>,
-  config: PutioSdkOptions = {},
-) => Effect.runPromiseExit(effect.pipe(Effect.provide(putioSdkLayer(config))));
+) => effect.pipe(Effect.provide(putioSdkLayer(config)));
 
 export const getAuthorizationHeader = (request: PutioHttpRequest) =>
   request.headers.get("authorization") ?? undefined;

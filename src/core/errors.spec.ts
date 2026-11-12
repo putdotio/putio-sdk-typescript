@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 
 import { expectFailure } from "../../test/support/sdk-test.js";
 
@@ -179,37 +179,39 @@ describe("sdk core errors", () => {
     ).toBe(false);
   });
 
-  it("keeps protocol response errors schema-decodable", async () => {
-    const encoded = Schema.encodeSync(PutioRateLimitError)(
-      new PutioRateLimitError({
+  it.effect("keeps protocol response errors schema-decodable", () =>
+    Effect.gen(function* () {
+      const encoded = Schema.encodeSync(PutioRateLimitError)(
+        new PutioRateLimitError({
+          action: "captcha-needed",
+          body: {
+            error_message: "Too many requests",
+            error_type: "TooManyRequests",
+            status_code: 429,
+          },
+          retryAfter: "12",
+          retryAfterSeconds: 12,
+          status: 429,
+        }),
+      );
+
+      const decoded = yield* Schema.decodeUnknownEffect(PutioRateLimitError)(
+        JSON.parse(JSON.stringify(encoded)),
+      );
+
+      expect(decoded).toBeInstanceOf(PutioRateLimitError);
+      expect(decoded).toMatchObject({
         action: "captcha-needed",
-        body: {
-          error_message: "Too many requests",
-          error_type: "TooManyRequests",
-          status_code: 429,
-        },
         retryAfter: "12",
         retryAfterSeconds: 12,
         status: 429,
-      }),
-    );
+      });
+    }),
+  );
 
-    const decoded = await Effect.runPromise(
-      Schema.decodeUnknownEffect(PutioRateLimitError)(JSON.parse(JSON.stringify(encoded))),
-    );
-
-    expect(decoded).toBeInstanceOf(PutioRateLimitError);
-    expect(decoded).toMatchObject({
-      action: "captcha-needed",
-      retryAfter: "12",
-      retryAfterSeconds: 12,
-      status: 429,
-    });
-  });
-
-  it("parses a valid API error body", async () => {
-    const body = await Effect.runPromise(
-      parseErrorBody(400)({
+  it.effect("parses a valid API error body", () =>
+    Effect.gen(function* () {
+      const body = yield* parseErrorBody(400)({
         details: { field: "name" },
         error_id: null,
         error_message: "Bad request",
@@ -218,131 +220,139 @@ describe("sdk core errors", () => {
         extra: { field: "name", limit: 10 },
         status: "ERROR",
         status_code: 400,
-      }),
-    );
+      });
 
-    expect(body).toEqual({
-      details: { field: "name" },
-      error_id: null,
-      error_message: "Bad request",
-      error_type: "BadRequest",
-      error_uri: "http://api.put.io/v2/docs",
-      extra: { field: "name", limit: 10 },
-      status: "ERROR",
-      status_code: 400,
-    });
-  });
+      expect(body).toEqual({
+        details: { field: "name" },
+        error_id: null,
+        error_message: "Bad request",
+        error_type: "BadRequest",
+        error_uri: "http://api.put.io/v2/docs",
+        extra: { field: "name", limit: 10 },
+        status: "ERROR",
+        status_code: 400,
+      });
+    }),
+  );
 
-  it("falls back when the API error body is invalid", async () => {
-    const body = await Effect.runPromise(parseErrorBody(418)("not-an-envelope"));
+  it.effect("falls back when the API error body is invalid", () =>
+    Effect.gen(function* () {
+      const body = yield* parseErrorBody(418)("not-an-envelope");
 
-    expect(body).toEqual({
-      error_message: "put.io API request failed with status 418",
-      status_code: 418,
-    });
-  });
+      expect(body).toEqual({
+        error_message: "put.io API request failed with status 418",
+        status_code: 418,
+      });
+    }),
+  );
 
-  it("wraps matched API errors in a typed operation error by error_type", async () => {
-    const spec = definePutioOperationErrorSpec({
-      domain: "files",
-      operation: "move",
-      knownErrors: [{ errorType: "FILE_LOST" }] as const,
-    });
+  it.effect("wraps matched API errors in a typed operation error by error_type", () =>
+    Effect.gen(function* () {
+      const spec = definePutioOperationErrorSpec({
+        domain: "files",
+        operation: "move",
+        knownErrors: [{ errorType: "FILE_LOST" }] as const,
+      });
 
-    const exit = await Effect.runPromiseExit(
-      withOperationErrors(
+      const exit = yield* Effect.exit(
+        withOperationErrors(
+          Effect.fail(
+            new PutioApiError({
+              status: 400,
+              body: {
+                error_message: "File was lost",
+                error_type: "FILE_LOST",
+                status_code: 400,
+              },
+            }),
+          ),
+          spec,
+        ),
+      );
+
+      const error = expectFailure(exit);
+      expect(error).toBeInstanceOf(PutioOperationError);
+      expect(isPutioOperationError(error)).toBe(true);
+      expect(error).toMatchObject({
+        domain: "files",
+        operation: "move",
+        reason: {
+          kind: "error_type",
+          errorType: "FILE_LOST",
+        },
+      });
+    }),
+  );
+
+  it.effect("requires both error_type and status_code when a contract declares both", () =>
+    Effect.gen(function* () {
+      const spec = definePutioOperationErrorSpec({
+        domain: "files",
+        operation: "move",
+        knownErrors: [{ errorType: "FILE_LOST", statusCode: 404 }] as const,
+      });
+
+      const originalError = new PutioApiError({
+        status: 409,
+        body: {
+          error_message: "File was lost",
+          error_type: "FILE_LOST",
+          status_code: 409,
+        },
+      });
+
+      const exit = yield* Effect.exit(withOperationErrors(Effect.fail(originalError), spec));
+
+      expect(expectFailure(exit)).toBe(originalError);
+    }),
+  );
+
+  it.effect("wraps matched auth errors by status code in the pipeable form", () =>
+    Effect.gen(function* () {
+      const spec = definePutioOperationErrorSpec({
+        domain: "files",
+        operation: "delete",
+        knownErrors: [{ statusCode: 403 }] as const,
+      });
+
+      const exit = yield* Effect.exit(
         Effect.fail(
-          new PutioApiError({
-            status: 400,
+          new PutioAuthError({
+            status: 403,
             body: {
-              error_message: "File was lost",
-              error_type: "FILE_LOST",
-              status_code: 400,
+              error_message: "Forbidden",
+              status_code: 403,
             },
           }),
-        ),
-        spec,
-      ),
-    );
+        ).pipe(withOperationErrors(spec)),
+      );
 
-    const error = expectFailure(exit);
-    expect(error).toBeInstanceOf(PutioOperationError);
-    expect(isPutioOperationError(error)).toBe(true);
-    expect(error).toMatchObject({
-      domain: "files",
-      operation: "move",
-      reason: {
-        kind: "error_type",
-        errorType: "FILE_LOST",
-      },
-    });
-  });
+      const error = expectFailure(exit);
+      expect(error).toBeInstanceOf(PutioOperationError);
+      expect(error).toMatchObject({
+        domain: "files",
+        operation: "delete",
+        reason: {
+          kind: "status_code",
+          statusCode: 403,
+        },
+      });
+    }),
+  );
 
-  it("requires both error_type and status_code when a contract declares both", async () => {
-    const spec = definePutioOperationErrorSpec({
-      domain: "files",
-      operation: "move",
-      knownErrors: [{ errorType: "FILE_LOST", statusCode: 404 }] as const,
-    });
+  it.effect("leaves non-matchable errors alone", () =>
+    Effect.gen(function* () {
+      const transportError = new PutioTransportError({ cause: "network" });
 
-    const originalError = new PutioApiError({
-      status: 409,
-      body: {
-        error_message: "File was lost",
-        error_type: "FILE_LOST",
-        status_code: 409,
-      },
-    });
+      const spec = definePutioOperationErrorSpec({
+        domain: "files",
+        operation: "list",
+        knownErrors: [{ errorType: "FILE_LOST" }] as const,
+      });
 
-    const exit = await Effect.runPromiseExit(withOperationErrors(Effect.fail(originalError), spec));
+      const exit = yield* Effect.exit(withOperationErrors(Effect.fail(transportError), spec));
 
-    expect(expectFailure(exit)).toBe(originalError);
-  });
-
-  it("wraps matched auth errors by status code in the pipeable form", async () => {
-    const spec = definePutioOperationErrorSpec({
-      domain: "files",
-      operation: "delete",
-      knownErrors: [{ statusCode: 403 }] as const,
-    });
-
-    const exit = await Effect.runPromiseExit(
-      Effect.fail(
-        new PutioAuthError({
-          status: 403,
-          body: {
-            error_message: "Forbidden",
-            status_code: 403,
-          },
-        }),
-      ).pipe(withOperationErrors(spec)),
-    );
-
-    const error = expectFailure(exit);
-    expect(error).toBeInstanceOf(PutioOperationError);
-    expect(error).toMatchObject({
-      domain: "files",
-      operation: "delete",
-      reason: {
-        kind: "status_code",
-        statusCode: 403,
-      },
-    });
-  });
-
-  it("leaves non-matchable errors alone", async () => {
-    const transportError = new PutioTransportError({ cause: "network" });
-
-    const spec = definePutioOperationErrorSpec({
-      domain: "files",
-      operation: "list",
-      knownErrors: [{ errorType: "FILE_LOST" }] as const,
-    });
-
-    const exit = await Effect.runPromiseExit(
-      withOperationErrors(Effect.fail(transportError), spec),
-    );
-
-    expect(expectFailure(exit)).toBe(transportError);
-  });
+      expect(expectFailure(exit)).toBe(transportError);
+    }),
+  );
 });

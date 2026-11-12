@@ -1428,6 +1428,11 @@ export const renameFile = (
     }),
   ).pipe(withOperationErrors(RenameFileErrorSpec));
 
+const FilesDeleteInputSchema = Schema.Struct({
+  ids: FilesIdsInputSchema,
+  options: FilesDeleteOptionsSchema,
+});
+
 export const deleteFiles = (
   ids: ReadonlyArray<number>,
   options: {
@@ -1440,27 +1445,29 @@ export const deleteFiles = (
   PutioSdkError,
   PutioSdkContext
 > =>
-  decodeAndRun(
-    Schema.Struct({ ids: FilesIdsInputSchema, options: FilesDeleteOptionsSchema }),
-    { ids, options },
-    (decodedInput) =>
-      requestJson(FileDeleteResultEnvelopeSchema, {
-        body: {
-          type: "form",
-          value: {
-            file_ids: joinCsv(decodedInput.ids),
-          },
+  decodeAndRun(FilesDeleteInputSchema, { ids, options }, (decodedInput) =>
+    requestJson(FileDeleteResultEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: {
+          file_ids: joinCsv(decodedInput.ids),
         },
-        method: "POST",
-        path: "/v2/files/delete",
-        query: {
-          partial_delete: decodedInput.options.partialDelete,
-          skip_nonexistents: true,
-          skip_owner_check: decodedInput.options.ignoreFileOwner,
-          skip_trash: decodedInput.options.skipTrash,
-        },
-      }),
+      },
+      method: "POST",
+      path: "/v2/files/delete",
+      query: {
+        partial_delete: decodedInput.options.partialDelete,
+        skip_nonexistents: true,
+        skip_owner_check: decodedInput.options.ignoreFileOwner,
+        skip_trash: decodedInput.options.skipTrash,
+      },
+    }),
   );
+
+const FilesSelectionDeleteInputSchema = Schema.Struct({
+  options: FilesSelectionDeleteOptionsSchema,
+  selection: FilesBulkSelectionSchema,
+});
 
 export const deleteFileSelection = (
   selection: FilesBulkSelection,
@@ -1473,26 +1480,20 @@ export const deleteFileSelection = (
   PutioSdkError,
   PutioSdkContext
 > =>
-  decodeAndRun(
-    Schema.Struct({
-      options: FilesSelectionDeleteOptionsSchema,
-      selection: FilesBulkSelectionSchema,
+  decodeAndRun(FilesSelectionDeleteInputSchema, { options, selection }, (decodedInput) =>
+    requestJson(FileDeleteResultEnvelopeSchema, {
+      body: {
+        type: "form",
+        value: toCursorSelectionForm(decodedInput.selection),
+      },
+      method: "POST",
+      path: "/v2/files/delete",
+      query: {
+        partial_delete: decodedInput.options.partialDelete,
+        skip_nonexistents: true,
+        skip_trash: decodedInput.options.skipTrash,
+      },
     }),
-    { options, selection },
-    (decodedInput) =>
-      requestJson(FileDeleteResultEnvelopeSchema, {
-        body: {
-          type: "form",
-          value: toCursorSelectionForm(decodedInput.selection),
-        },
-        method: "POST",
-        path: "/v2/files/delete",
-        query: {
-          partial_delete: decodedInput.options.partialDelete,
-          skip_nonexistents: true,
-          skip_trash: decodedInput.options.skipTrash,
-        },
-      }),
   );
 
 export const moveFiles = (
@@ -1551,71 +1552,70 @@ export const getDownloadUrl = (
     }),
   ).pipe(selectJsonField("url"), withOperationErrors(DownloadUrlErrorSpec));
 
+const FileApiDownloadUrlInputSchema = Schema.Struct({
+  fileId: PositiveFileIdSchema,
+  options: FileApiDownloadUrlOptionsSchema,
+});
+
 export const getApiDownloadUrl = (
   fileId: number,
   options: FileApiDownloadUrlOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
-  decodeAndRun(
-    Schema.Struct({
-      fileId: PositiveFileIdSchema,
-      options: FileApiDownloadUrlOptionsSchema,
-    }),
-    { fileId, options },
-    (decoded) =>
-      resolveApiBaseUrl.pipe(
-        Effect.map((baseUrl) => buildFileApiDownloadUrl(baseUrl, decoded.fileId, decoded.options)),
-      ),
+  decodeAndRun(FileApiDownloadUrlInputSchema, { fileId, options }, (decoded) =>
+    resolveApiBaseUrl.pipe(
+      Effect.map((baseUrl) => buildFileApiDownloadUrl(baseUrl, decoded.fileId, decoded.options)),
+    ),
   );
+
+const FileApiContentUrlInputSchema = Schema.Struct({
+  fileId: PositiveFileIdSchema,
+  options: FileDirectAccessOptionsSchema,
+});
 
 export const getApiContentUrl = (
   fileId: number,
   options: FileDirectAccessOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
-  decodeAndRun(
-    Schema.Struct({
-      fileId: PositiveFileIdSchema,
-      options: FileDirectAccessOptionsSchema,
-    }),
-    { fileId, options },
-    (decoded) =>
-      resolveApiBaseUrl.pipe(
-        Effect.map((baseUrl) => buildFileApiContentUrl(baseUrl, decoded.fileId, decoded.options)),
-      ),
+  decodeAndRun(FileApiContentUrlInputSchema, { fileId, options }, (decoded) =>
+    resolveApiBaseUrl.pipe(
+      Effect.map((baseUrl) => buildFileApiContentUrl(baseUrl, decoded.fileId, decoded.options)),
+    ),
   );
+
+const FileApiMp4DownloadUrlInputSchema = Schema.Struct({
+  fileId: PositiveFileIdSchema,
+  options: FileApiMp4DownloadUrlOptionsSchema,
+});
 
 export const getApiMp4DownloadUrl = (
   fileId: number,
   options: FileApiMp4DownloadUrlOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
-  decodeAndRun(
-    Schema.Struct({
-      fileId: PositiveFileIdSchema,
-      options: FileApiMp4DownloadUrlOptionsSchema,
-    }),
-    { fileId, options },
-    (decoded) =>
-      resolveApiBaseUrl.pipe(
-        Effect.map((baseUrl) =>
-          buildFileApiMp4DownloadUrl(baseUrl, decoded.fileId, decoded.options),
-        ),
-      ),
+  decodeAndRun(FileApiMp4DownloadUrlInputSchema, { fileId, options }, (decoded) =>
+    resolveApiBaseUrl.pipe(
+      Effect.map((baseUrl) => buildFileApiMp4DownloadUrl(baseUrl, decoded.fileId, decoded.options)),
+    ),
   );
+
+const FileHlsStreamUrlInputSchema = Schema.Struct({
+  fileId: PositiveFileIdSchema,
+  options: FileHlsStreamUrlOptionsSchema,
+});
 
 export const getHlsStreamUrl = (
   fileId: number,
   options: FileHlsStreamUrlOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
-  decodeAndRun(
-    Schema.Struct({
-      fileId: PositiveFileIdSchema,
-      options: FileHlsStreamUrlOptionsSchema,
-    }),
-    { fileId, options },
-    (decoded) =>
-      resolveApiBaseUrl.pipe(
-        Effect.map((baseUrl) => buildFileHlsStreamUrl(baseUrl, decoded.fileId, decoded.options)),
-      ),
+  decodeAndRun(FileHlsStreamUrlInputSchema, { fileId, options }, (decoded) =>
+    resolveApiBaseUrl.pipe(
+      Effect.map((baseUrl) => buildFileHlsStreamUrl(baseUrl, decoded.fileId, decoded.options)),
+    ),
   );
+
+const FileHlsMasterPlaylistInputSchema = Schema.Struct({
+  fileId: PositiveFileIdSchema,
+  options: FileHlsMasterPlaylistOptionsSchema,
+});
 
 /**
  * Fetches the HLS master playlist the player would load, so callers can
@@ -1627,39 +1627,32 @@ export const getHlsMasterPlaylist = (
   fileId: number,
   options: FileHlsMasterPlaylistOptions = {},
 ): Effect.Effect<string, GetHlsMasterPlaylistError | PutioValidationError, PutioSdkContext> =>
-  decodeAndRun(
-    Schema.Struct({
-      fileId: PositiveFileIdSchema,
-      options: FileHlsMasterPlaylistOptionsSchema,
+  decodeAndRun(FileHlsMasterPlaylistInputSchema, { fileId, options }, (decoded) =>
+    requestText({
+      headers: { accept: "application/vnd.apple.mpegurl, application/x-mpegURL, */*" },
+      method: "GET",
+      path: `/v2/files/${encodePathSegment(decoded.fileId)}/hls/media.m3u8`,
+      query: {
+        max_subtitle_count: decoded.options.maxSubtitleCount,
+        original: toOriginalFlag(decoded.options.playOriginal),
+        subtitle_languages: joinCsv(decoded.options.subtitleLanguages),
+      },
     }),
-    { fileId, options },
-    (decoded) =>
-      requestText({
-        headers: { accept: "application/vnd.apple.mpegurl, application/x-mpegURL, */*" },
-        method: "GET",
-        path: `/v2/files/${encodePathSegment(decoded.fileId)}/hls/media.m3u8`,
-        query: {
-          max_subtitle_count: decoded.options.maxSubtitleCount,
-          original: toOriginalFlag(decoded.options.playOriginal),
-          subtitle_languages: joinCsv(decoded.options.subtitleLanguages),
-        },
-      }),
   ).pipe(withOperationErrors(GetHlsMasterPlaylistErrorSpec));
+
+const FileXspfPlaylistUrlInputSchema = Schema.Struct({
+  fileId: PositiveFileIdSchema,
+  options: FileXspfPlaylistUrlOptionsSchema,
+});
 
 export const getXspfPlaylistUrl = (
   fileId: number,
   options: FileXspfPlaylistUrlOptions,
 ): Effect.Effect<string, PutioSdkError, PutioSdkConfig> =>
-  decodeAndRun(
-    Schema.Struct({
-      fileId: PositiveFileIdSchema,
-      options: FileXspfPlaylistUrlOptionsSchema,
-    }),
-    { fileId, options },
-    (decoded) =>
-      resolveApiBaseUrl.pipe(
-        Effect.map((baseUrl) => buildFileXspfPlaylistUrl(baseUrl, decoded.fileId, decoded.options)),
-      ),
+  decodeAndRun(FileXspfPlaylistUrlInputSchema, { fileId, options }, (decoded) =>
+    resolveApiBaseUrl.pipe(
+      Effect.map((baseUrl) => buildFileXspfPlaylistUrl(baseUrl, decoded.fileId, decoded.options)),
+    ),
   );
 
 export const listFileSubtitles = (
@@ -1875,29 +1868,31 @@ export const findNextVideo = (
     }),
   ).pipe(selectJsonField("next_video"));
 
+const FileUploadCallInputSchema = Schema.Struct({
+  input: FileUploadInputSchema,
+  options: FileUploadOptionsSchema,
+});
+
 export const createFileUploadRequest = (
   input: FileUploadInput,
   options: {
     readonly oauthToken?: string;
   } = {},
 ): Effect.Effect<FileUploadRequestDescriptor, PutioSdkError, PutioSdkConfig> =>
-  decodeAndRun(
-    Schema.Struct({ input: FileUploadInputSchema, options: FileUploadOptionsSchema }),
-    { input, options },
-    (decoded) =>
-      resolveRouteContext(decoded.options.oauthToken).pipe(
-        Effect.map(({ config, token }) => ({
-          body: createFileUploadFormData(decoded.input),
-          method: "POST" as const,
-          url: buildPutioUrl(
-            config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
-            "/v2/files/upload",
-            {
-              oauth_token: token,
-            },
-          ),
-        })),
-      ),
+  decodeAndRun(FileUploadCallInputSchema, { input, options }, (decoded) =>
+    resolveRouteContext(decoded.options.oauthToken).pipe(
+      Effect.map(({ config, token }) => ({
+        body: createFileUploadFormData(decoded.input),
+        method: "POST" as const,
+        url: buildPutioUrl(
+          config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
+          "/v2/files/upload",
+          {
+            oauth_token: token,
+          },
+        ),
+      })),
+    ),
   );
 
 export const uploadFile = (
@@ -1906,27 +1901,24 @@ export const uploadFile = (
     readonly oauthToken?: string;
   } = {},
 ): Effect.Effect<FileUploadResult, FileUploadError | PutioValidationError, PutioSdkContext> =>
-  decodeAndRun(
-    Schema.Struct({ input: FileUploadInputSchema, options: FileUploadOptionsSchema }),
-    { input, options },
-    (decoded) =>
-      resolveRouteContext(decoded.options.oauthToken).pipe(
-        Effect.flatMap(({ config, token }) =>
-          requestJson(FileUploadEnvelopeSchema, {
-            auth: {
-              type: "none",
-            },
-            baseUrl: config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
-            body: {
-              type: "form-data",
-              value: createFileUploadFormData(decoded.input),
-            },
-            method: "POST",
-            path: "/v2/files/upload",
-            query: {
-              oauth_token: token,
-            },
-          }),
-        ),
+  decodeAndRun(FileUploadCallInputSchema, { input, options }, (decoded) =>
+    resolveRouteContext(decoded.options.oauthToken).pipe(
+      Effect.flatMap(({ config, token }) =>
+        requestJson(FileUploadEnvelopeSchema, {
+          auth: {
+            type: "none",
+          },
+          baseUrl: config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
+          body: {
+            type: "form-data",
+            value: createFileUploadFormData(decoded.input),
+          },
+          method: "POST",
+          path: "/v2/files/upload",
+          query: {
+            oauth_token: token,
+          },
+        }),
       ),
+    ),
   ).pipe(Effect.flatMap(toUploadResult), withOperationErrors(FileUploadErrorSpec));

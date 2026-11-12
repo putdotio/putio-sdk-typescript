@@ -246,6 +246,15 @@ export const queryOAuthApps = (): Effect.Effect<
     path: "/v2/oauth/apps",
   }).pipe(selectJsonField("apps"), withOperationErrors(QueryOAuthAppsErrorSpec));
 
+const OAuthAppGetInputSchema = Schema.Struct({
+  id: OAuthAppIdSchema,
+  options: Schema.optional(
+    Schema.Struct({
+      edit: Schema.optional(Schema.Boolean),
+    }),
+  ),
+});
+
 export const getOAuthApp = (
   id: number,
   options?: {
@@ -256,49 +265,37 @@ export const getOAuthApp = (
   GetOAuthAppError,
   PutioSdkContext
 > =>
-  decodeAndRun(
-    Schema.Struct({
-      id: OAuthAppIdSchema,
-      options: Schema.optional(
-        Schema.Struct({
-          edit: Schema.optional(Schema.Boolean),
-        }),
-      ),
+  decodeAndRun(OAuthAppGetInputSchema, { id, options }, (decodedInput) =>
+    requestJson(OAuthAppWithTokenSchema, {
+      method: "GET",
+      path: decodedInput.options?.edit
+        ? `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}/edit`
+        : `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}`,
     }),
-    { id, options },
-    (decodedInput) =>
-      requestJson(OAuthAppWithTokenSchema, {
-        method: "GET",
-        path: decodedInput.options?.edit
-          ? `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}/edit`
-          : `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}`,
-      }),
   ).pipe(withOperationErrors(GetOAuthAppErrorSpec));
+
+const OAuthAppSetIconInputSchema = Schema.Struct({
+  id: OAuthAppIdSchema,
+  input: OAuthSetIconInputSchema,
+});
 
 export const setOAuthAppIcon = (
   id: number,
   input: OAuthSetIconInput,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
-  decodeAndRun(
-    Schema.Struct({
-      id: OAuthAppIdSchema,
-      input: OAuthSetIconInputSchema,
-    }),
-    { id, input },
-    (decodedInput) => {
-      const formData = new FormData();
-      formData.append("icon", decodedInput.input.icon);
+  decodeAndRun(OAuthAppSetIconInputSchema, { id, input }, (decodedInput) => {
+    const formData = new FormData();
+    formData.append("icon", decodedInput.input.icon);
 
-      return requestJson(OkResponseSchema, {
-        body: {
-          type: "form-data",
-          value: formData,
-        },
-        method: "POST",
-        path: `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}/icon`,
-      });
-    },
-  );
+    return requestJson(OkResponseSchema, {
+      body: {
+        type: "form-data",
+        value: formData,
+      },
+      method: "POST",
+      path: `/v2/oauth/apps/${encodePathSegment(decodedInput.id)}/icon`,
+    });
+  });
 
 export const createOAuthApp = (
   input: OAuthAppCreateInput,

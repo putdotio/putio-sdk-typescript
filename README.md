@@ -237,7 +237,7 @@ try {
   }
 
   if (isPutioRateLimitError(error)) {
-    console.log(error.retryAfter);
+    console.log(error.retryAfterSeconds);
   }
 }
 ```

@@ -1,4 +1,4 @@
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Tracer } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
 import { expectFailure, runSdkEffect, runSdkExit } from "../../test/support/sdk-test.js";
@@ -572,6 +572,58 @@ describe("sdk core http", () => {
     );
 
     expect(result).toBeUndefined();
+  });
+
+  it("discards the body of a successful void response", async () => {
+    const response = new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+
+    await runSdkEffect(
+      requestVoid({ method: "POST", path: "/v2/test", auth: { type: "none" } }),
+      () => response,
+    );
+
+    expect(response.bodyUsed).toBe(true);
+  });
+
+  it("treats a void response whose body cannot be read as success", async () => {
+    const response = new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+    await response.arrayBuffer();
+
+    const result = await runSdkEffect(
+      requestVoid({ method: "POST", path: "/v2/test", auth: { type: "none" } }),
+      () => response,
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it("traces requests under a static span that carries only the HTTP method", async () => {
+    const spans: Array<Tracer.NativeSpan> = [];
+
+    const tracer = Tracer.make({
+      span: (options) => {
+        const span = new Tracer.NativeSpan(options);
+        spans.push(span);
+
+        return span;
+      },
+    });
+
+    await runSdkEffect(
+      requestJson(OkResponseSchema, {
+        body: { type: "form", value: { code: "body-secret" } },
+        headers: { "x-test": "header-secret" },
+        method: "POST",
+        path: "/v2/account/voucher/path-secret",
+        query: { oauth_token: "query-secret" },
+      }).pipe(Effect.withTracer(tracer)),
+      () => new Response(JSON.stringify({ status: "OK" }), { status: 200 }),
+      { accessToken: "token-secret" },
+    );
+
+    expect(spans.map((span) => [span.name, Object.fromEntries(span.attributes)])).toEqual([
+      ["PutioSdk.executeRequest", { "http.request.method": "POST" }],
+    ]);
   });
 
   it("maps failed void responses to sdk errors", async () => {

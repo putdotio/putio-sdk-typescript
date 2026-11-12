@@ -282,59 +282,61 @@ const withBody = (body: PutioRequestBody): Effect.Effect<BodyInit | undefined, P
   }
 };
 
-const makeRequest = (
+const makeRequest = Effect.fnUntraced(function* (
   url: string,
   options: PutioRequestOptions,
   configHeaders: HeadersInit | undefined,
   authorization?: string,
-) =>
-  Effect.gen(function* () {
-    const headers = new Headers(configHeaders);
-    headers.delete("authorization");
-    new Headers(options.headers).forEach((value, name) => headers.set(name, value));
+) {
+  const headers = new Headers(configHeaders);
+  headers.delete("authorization");
+  new Headers(options.headers).forEach((value, name) => headers.set(name, value));
 
-    const body = options.body ?? { type: "none" as const };
+  const body = options.body ?? { type: "none" as const };
 
-    if (!headers.has("accept")) {
-      headers.set("accept", "application/json");
-    }
+  if (!headers.has("accept")) {
+    headers.set("accept", "application/json");
+  }
 
-    if (authorization) {
-      headers.set("authorization", authorization);
-    }
+  if (authorization) {
+    headers.set("authorization", authorization);
+  }
 
-    if (body.type === "json" && !headers.has("content-type")) {
-      headers.set("content-type", "application/json");
-    }
+  if (body.type === "json" && !headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
 
-    return {
-      body: yield* withBody(body),
-      headers,
-      method: options.method,
-      url,
-    };
+  return {
+    body: yield* withBody(body),
+    headers,
+    method: options.method,
+    url,
+  };
+});
+
+const executeRequest = Effect.fn("PutioSdk.executeRequest")(function* (
+  options: PutioRequestOptions,
+) {
+  yield* Effect.annotateCurrentSpan("http.request.method", options.method);
+
+  const config = yield* PutioSdkConfig;
+  const httpClient = yield* PutioHttpClient;
+  const authorization = yield* resolveAuthorization(config, options.auth);
+
+  const url = yield* Effect.try({
+    try: () =>
+      buildPutioUrl(
+        options.baseUrl ?? config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
+        options.path,
+        options.query,
+      ),
+    catch: mapUrlBuildError,
   });
 
-const executeRequest = (options: PutioRequestOptions) =>
-  Effect.gen(function* () {
-    const config = yield* PutioSdkConfig;
-    const httpClient = yield* PutioHttpClient;
-    const authorization = yield* resolveAuthorization(config, options.auth);
+  const request = yield* makeRequest(url, options, config.headers, authorization);
 
-    const url = yield* Effect.try({
-      try: () =>
-        buildPutioUrl(
-          options.baseUrl ?? config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
-          options.path,
-          options.query,
-        ),
-      catch: mapUrlBuildError,
-    });
-
-    const request = yield* makeRequest(url, options, config.headers, authorization);
-
-    return yield* httpClient.execute(request);
-  });
+  return yield* httpClient.execute(request);
+});
 
 export const requestJson = <S extends Schema.Top>(
   schema: S,
@@ -384,7 +386,7 @@ export const requestVoid = (
   executeRequest(options).pipe(
     Effect.flatMap((response) =>
       isSuccessStatus(response.status)
-        ? Effect.void
+        ? Effect.ignore(response.arrayBuffer)
         : decodeFailure(response, response.headers).pipe(Effect.flatMap(Effect.fail)),
     ),
   );

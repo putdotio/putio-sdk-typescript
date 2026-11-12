@@ -1,4 +1,13 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>putdotio/.github:renovate-vite-plus"]
+  "extends": ["github>putdotio/.github:renovate-vite-plus"],
+  "packageRules": [
+    {
+      "description": "effect is a runtime dependency and public surface: its bump must publish, so it takes a releasing commit type",
+      "matchPackageNames": ["effect"],
+      "matchDepTypes": ["dependencies"],
+      "semanticCommitType": "fix",
+      "semanticCommitScope": "deps"
+    }
+  ]
 }

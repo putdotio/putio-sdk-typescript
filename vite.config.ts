@@ -31,12 +31,20 @@ export default defineConfig({
       { name: "uinaf", specifier: "@uinaf/oxlint-plugin-no-comments" },
     ],
     extends: [correctness, strict],
+    overrides: [
+      {
+        files: ["src/core/client.ts", "src/domains/ops.spec.ts"],
+        rules: {
+          "effecttsgo/any-unknown-in-error-context": "off",
+        },
+      },
+    ],
     options: {
       typeAware: true,
       typeCheck: true,
     },
     rules: {
-      "effecttsgo/any-unknown-in-error-context": "off",
+      "effecttsgo/any-unknown-in-error-context": "error",
       "effecttsgo/lazy-effect": "off",
       "effecttsgo/schema-class-missing-brand": "off",
       "effecttsgo/schema-number": "off",

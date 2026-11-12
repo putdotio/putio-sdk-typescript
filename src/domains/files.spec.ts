@@ -1027,6 +1027,24 @@ describe("files domain", () => {
     expect(descriptorFailure).toBeInstanceOf(PutioValidationError);
   });
 
+  it("tags search continuation failures with its own operation", async () => {
+    const handler = () =>
+      jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 });
+
+    const [first, next] = await Promise.all([
+      runSdkExit(files.searchFiles({ query: "sdk" }), handler, { accessToken: "token-123" }),
+      runSdkExit(files.continueSearch("cursor"), handler, { accessToken: "token-123" }),
+    ]);
+
+    expect(expectFailure(first)).toMatchObject({ domain: "files", operation: "search" });
+    expect(expectFailure(next)).toBeInstanceOf(PutioOperationError);
+    expect(expectFailure(next)).toMatchObject({
+      domain: "files",
+      operation: "continueSearch",
+      status: 400,
+    });
+  });
+
   it("rejects invalid file read inputs before transport", async () => {
     let requestCount = 0;
 

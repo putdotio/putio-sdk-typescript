@@ -90,7 +90,7 @@ export type CreateDownloadLinksError = PutioOperationFailure<typeof CreateDownlo
 export type GetDownloadLinksError = PutioOperationFailure<typeof GetDownloadLinksErrorSpec>;
 
 export const createDownloadLinks = (
-  input: DownloadLinksCreateInput = {},
+  input: DownloadLinksCreateInput,
 ): Effect.Effect<
   {
     readonly id: number;

@@ -487,10 +487,14 @@ export const destroyAccount = (
       }),
   );
 
+const OptionalAccountConfirmationSubjectSchema = Schema.UndefinedOr(
+  AccountConfirmationSubjectSchema,
+);
+
 export const listAccountConfirmations = (
   subject?: AccountConfirmation["subject"],
 ): Effect.Effect<ReadonlyArray<AccountConfirmation>, AccountConfirmationsError, PutioSdkContext> =>
-  decodeAndRun(Schema.UndefinedOr(AccountConfirmationSubjectSchema), subject, (decodedSubject) =>
+  decodeAndRun(OptionalAccountConfirmationSubjectSchema, subject, (decodedSubject) =>
     requestJson(AccountConfirmationsEnvelopeSchema, {
       method: "GET",
       path: "/v2/account/confirmation/list",

@@ -172,6 +172,7 @@ const RateLimitHeaderFields = {
   limit: Schema.optional(Schema.String),
   remaining: Schema.optional(Schema.String),
   retryAfter: Schema.optional(Schema.String),
+  retryAfterSeconds: Schema.optional(Schema.Number),
   reset: Schema.optional(Schema.String),
 };
 
@@ -303,14 +304,45 @@ export const fallbackPutioErrorEnvelope = (status: number): PutioErrorEnvelope =
 const getHeader = (headers: Headers, name: string): string | undefined =>
   headers.get(name) ?? undefined;
 
-export const responseRateLimitHeaders = (headers: Headers) => ({
-  action: getHeader(headers, "x-ratelimit-action"),
-  id: getHeader(headers, "x-ratelimit-id"),
-  limit: getHeader(headers, "x-ratelimit-limit"),
-  remaining: getHeader(headers, "x-ratelimit-remaining"),
-  retryAfter: getHeader(headers, "retry-after"),
-  reset: getHeader(headers, "x-ratelimit-reset"),
-});
+const deltaSecondsPattern = /^\d+$/;
+
+const httpDatePattern = /[a-z]/i;
+
+const parseRetryAfterSeconds = (value: string | undefined): number | undefined => {
+  const trimmed = value?.trim();
+
+  if (trimmed === undefined) {
+    return undefined;
+  }
+
+  if (deltaSecondsPattern.test(trimmed)) {
+    const seconds = Number(trimmed);
+
+    return Number.isSafeInteger(seconds) ? seconds : undefined;
+  }
+
+  if (!httpDatePattern.test(trimmed)) {
+    return undefined;
+  }
+
+  const retryAt = Date.parse(trimmed);
+
+  return Number.isNaN(retryAt) ? undefined : Math.max(0, Math.ceil((retryAt - Date.now()) / 1000));
+};
+
+export const responseRateLimitHeaders = (headers: Headers) => {
+  const retryAfter = getHeader(headers, "retry-after");
+
+  return {
+    action: getHeader(headers, "x-ratelimit-action"),
+    id: getHeader(headers, "x-ratelimit-id"),
+    limit: getHeader(headers, "x-ratelimit-limit"),
+    remaining: getHeader(headers, "x-ratelimit-remaining"),
+    retryAfter,
+    retryAfterSeconds: parseRetryAfterSeconds(retryAfter),
+    reset: getHeader(headers, "x-ratelimit-reset"),
+  };
+};
 
 export const mapDecodeErrorToValidationError = (cause: unknown) =>
   new PutioValidationError({ cause });

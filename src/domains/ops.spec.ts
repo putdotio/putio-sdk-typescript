@@ -1383,6 +1383,24 @@ describe("operational domain boundaries", () => {
     expect(requestCount).toBe(0);
   });
 
+  it("tags transfer continuation failures with its own operation", async () => {
+    const handler = () =>
+      jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 });
+
+    const [first, next] = await Promise.all([
+      runSdkExit(transfers.listTransfers(), handler, { accessToken: "token-123" }),
+      runSdkExit(transfers.continueTransfers("cursor"), handler, { accessToken: "token-123" }),
+    ]);
+
+    expect(expectFailure(first)).toMatchObject({ domain: "transfers", operation: "list" });
+    expect(expectFailure(next)).toBeInstanceOf(PutioOperationError);
+    expect(expectFailure(next)).toMatchObject({
+      domain: "transfers",
+      operation: "continue",
+      status: 400,
+    });
+  });
+
   it("maps representative operation failures in operational domains", async () => {
     const failure = await runSdkExit(
       sharing.getPublicShareFileUrl(7),

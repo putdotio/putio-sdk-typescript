@@ -671,7 +671,11 @@ describe("supporting domain boundaries", () => {
     };
 
     const failures = await Promise.all([
-      runSdkExit(downloadLinks.createDownloadLinks(), handler),
+      runSdkExit(
+        // @ts-expect-error A selection is required: the backend rejects an empty one.
+        downloadLinks.createDownloadLinks(),
+        handler,
+      ),
       runSdkExit(downloadLinks.createDownloadLinks({ cursor: "" }), handler),
       runSdkExit(downloadLinks.createDownloadLinks({ ids: [] }), handler),
       runSdkExit(downloadLinks.createDownloadLinks({ ids: [0] }), handler),

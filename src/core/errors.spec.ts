@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { expectFailure } from "../../test/support/sdk-test.js";
 
@@ -23,6 +23,10 @@ import {
 } from "./errors.js";
 
 describe("sdk core errors", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("builds a fallback error envelope from the status code", () => {
     expect(fallbackPutioErrorEnvelope(503)).toEqual({
       error_message: "put.io API request failed with status 503",
@@ -46,7 +50,44 @@ describe("sdk core errors", () => {
       limit: "10",
       remaining: "0",
       retryAfter: "12",
+      retryAfterSeconds: 12,
       reset: "1773496255",
+    });
+  });
+
+  it("parses Retry-After as delta-seconds or an HTTP-date and keeps the raw header", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-17T00:00:00Z"));
+
+    const parse = (retryAfter: string) => {
+      const error = toPutioResponseError(429, new Headers({ "retry-after": retryAfter }), {});
+
+      return error instanceof PutioRateLimitError
+        ? { retryAfter: error.retryAfter, retryAfterSeconds: error.retryAfterSeconds }
+        : undefined;
+    };
+
+    expect(parse("0")).toEqual({ retryAfter: "0", retryAfterSeconds: 0 });
+    expect(parse(" 120 ")).toEqual({ retryAfter: "120", retryAfterSeconds: 120 });
+    expect(parse("Tue, 17 Mar 2026 00:01:30 GMT")).toEqual({
+      retryAfter: "Tue, 17 Mar 2026 00:01:30 GMT",
+      retryAfterSeconds: 90,
+    });
+    expect(parse("Mon, 16 Mar 2026 23:59:00 GMT")).toEqual({
+      retryAfter: "Mon, 16 Mar 2026 23:59:00 GMT",
+      retryAfterSeconds: 0,
+    });
+
+    for (const unparseable of ["-5", "1.5", "soon", "99999999999999999999"]) {
+      expect(parse(unparseable)).toEqual({
+        retryAfter: unparseable,
+        retryAfterSeconds: undefined,
+      });
+    }
+
+    expect(toPutioResponseError(429, new Headers(), {})).toMatchObject({
+      retryAfter: undefined,
+      retryAfterSeconds: undefined,
     });
   });
 
@@ -140,6 +181,7 @@ describe("sdk core errors", () => {
           status_code: 429,
         },
         retryAfter: "12",
+        retryAfterSeconds: 12,
         status: 429,
       }),
     );
@@ -152,6 +194,7 @@ describe("sdk core errors", () => {
     expect(decoded).toMatchObject({
       action: "captcha-needed",
       retryAfter: "12",
+      retryAfterSeconds: 12,
       status: 429,
     });
   });

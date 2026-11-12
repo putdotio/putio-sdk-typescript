@@ -1,4 +1,4 @@
-import { PutioOperationError, PutioValidationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError, PutioContractError } from "../core/errors.js";
 import { Cause, Effect, Exit, Schema, SchemaIssue, SchemaParser } from "effect";
 import { runInNewContext } from "node:vm";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -492,7 +492,7 @@ describe("supporting domain boundaries", () => {
       );
 
       expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
+        failures.map(() => expect.any(PutioContractError)),
       );
 
       let fullConfigRequestCount = 0;
@@ -511,7 +511,7 @@ describe("supporting domain boundaries", () => {
         ),
       );
 
-      expect(fullConfigFailure).toBeInstanceOf(PutioValidationError);
+      expect(fullConfigFailure).toBeInstanceOf(PutioContractError);
       expect(fullConfigRequestCount).toBe(1);
 
       let envelopeGetterCalls = 0;
@@ -572,10 +572,10 @@ describe("supporting domain boundaries", () => {
         ),
       );
 
-      expect(valueEnvelopeFailure).toBeInstanceOf(PutioValidationError);
-      expect(configEnvelopeFailure).toBeInstanceOf(PutioValidationError);
-      expect(typedValueFailure).toBeInstanceOf(PutioValidationError);
-      expect(typedConfigFailure).toBeInstanceOf(PutioValidationError);
+      expect(valueEnvelopeFailure).toBeInstanceOf(PutioContractError);
+      expect(configEnvelopeFailure).toBeInstanceOf(PutioContractError);
+      expect(typedValueFailure).toBeInstanceOf(PutioContractError);
+      expect(typedConfigFailure).toBeInstanceOf(PutioContractError);
       expect(envelopeGetterCalls).toBe(0);
     }),
   );

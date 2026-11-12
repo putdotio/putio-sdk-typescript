@@ -1,5 +1,5 @@
 import { Effect, Exit } from "effect";
-import { PutioOperationError, PutioValidationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError, PutioContractError } from "../core/errors.js";
 import { describe, expect, it } from "@effect/vitest";
 
 import * as files from "./files.js";
@@ -79,7 +79,7 @@ describe("files domain", () => {
         ),
       );
 
-      expect(expectFailure(exit)).toBeInstanceOf(PutioValidationError);
+      expect(expectFailure(exit)).toBeInstanceOf(PutioContractError);
     }),
   );
 
@@ -743,21 +743,17 @@ describe("files domain", () => {
       );
 
       const validationError = expectFailure(validationExit);
-      expect(validationError).toBeInstanceOf(PutioValidationError);
+      expect(validationError).toBeInstanceOf(PutioContractError);
       expect(validationError).toMatchObject({
-        cause: 'Expected put.io to include "stream_url" because it was requested',
+        missingField: "stream_url",
       });
 
-      for (const [query, expectedCause] of [
-        [
-          { media_metadata: 1 },
-          'Expected put.io to include "media_metadata" because it was requested',
-        ],
-        [
-          { codecs: 1 },
-          'Expected put.io to include "content_type_and_codecs" because it was requested',
-        ],
-        [{ media_info: 1 }, 'Expected put.io to include "media_info" because it was requested'],
+      for (const [query, expectedField, file] of [
+        [{ media_metadata: 1 }, "media_metadata", baseFile],
+        [{ codecs: 1 }, "content_type_and_codecs", baseFile],
+        [{ media_info: 1 }, "media_info", baseFile],
+        [{ mp4_status: 1 }, "mp4_size", baseFile],
+        [{ mp4_stream_url: 1 }, "need_convert", { ...baseFile, mp4_size: null }],
       ] as const) {
         const missingExit = yield* Effect.exit(
           provideSdk(
@@ -767,16 +763,16 @@ describe("files domain", () => {
             }),
             () =>
               jsonResponse({
-                file: baseFile,
+                file,
                 status: "OK",
               }),
             { accessToken: "token-123" },
           ),
         );
 
-        expect(expectFailure(missingExit)).toBeInstanceOf(PutioValidationError);
+        expect(expectFailure(missingExit)).toBeInstanceOf(PutioContractError);
         expect(expectFailure(missingExit)).toMatchObject({
-          cause: expectedCause,
+          missingField: expectedField,
         });
       }
 
@@ -1586,7 +1582,7 @@ describe("files domain", () => {
         ),
       );
 
-      expect(expectFailure(emptyUpload)).toBeInstanceOf(PutioValidationError);
+      expect(expectFailure(emptyUpload)).toBeInstanceOf(PutioContractError);
     }),
   );
 });

@@ -1,7 +1,12 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 
-import { PutioAuthError, PutioOperationError, PutioValidationError } from "../core/errors.js";
+import {
+  PutioAuthError,
+  PutioOperationError,
+  PutioValidationError,
+  PutioContractError,
+} from "../core/errors.js";
 import {
   expectFailure,
   getFormBody,
@@ -123,7 +128,7 @@ describe("app-specific password boundaries", () => {
           ),
         );
 
-        expect(failure).toBeInstanceOf(PutioValidationError);
+        expect(failure).toBeInstanceOf(PutioContractError);
       }),
   );
 

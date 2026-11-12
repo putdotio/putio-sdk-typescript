@@ -1,7 +1,11 @@
 import { Effect, Schema } from "effect";
-import { decodeAndRun, decodeAndRunRedacted, NonEmptyStringSchema } from "../core/validation.js";
 import {
-  PutioValidationError,
+  decodeAndRun,
+  decodeAndRunRedacted,
+  failMissingField,
+  NonEmptyStringSchema,
+} from "../core/validation.js";
+import {
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
@@ -269,17 +273,10 @@ export type AccountInfoResponseFor<TQuery extends AccountInfoQuery> = AccountInf
       }
     : {});
 
-const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
-  Effect.fail(
-    new PutioValidationError({
-      cause: `Expected put.io to include "${field}" because it was requested`,
-    }),
-  );
-
 const ensureAccountInfoFields = (
   effect: Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext>,
   query: AccountInfoQuery,
-): Effect.Effect<AccountInfoBroad, PutioSdkError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext> =>
   Effect.gen(function* () {
     const info = yield* effect;
 

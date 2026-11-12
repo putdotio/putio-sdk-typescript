@@ -211,6 +211,20 @@ polyfills or adapters instead of patching the SDK surface.
 Backend error bodies parse into `PutioErrorEnvelopeSchema` in
 [src/core/errors.ts](./src/core/errors.ts); current backend errors carry metadata in `extra`.
 
+Each error tag names who has to act, and each has an `isPutio*` guard:
+
+| Tag                                                      | Meaning                                                            | Who acts               |
+| -------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------- |
+| `PutioValidationError`                                   | The arguments you passed are invalid; no request was sent          | You fix the call       |
+| `PutioConfigurationError`                                | The client options are missing or invalid, such as no access token | You fix the setup      |
+| `PutioContractError`                                     | A 2xx response was not JSON or did not match the expected shape    | Report it; retry later |
+| `PutioTransportError`                                    | The request or the response body read failed                       | Retry                  |
+| `PutioApiError`, `PutioAuthError`, `PutioRateLimitError` | put.io answered with an error status                               | Read `status`, `body`  |
+| `PutioOperationError`                                    | An error status the operation documents                            | Branch on `operation`  |
+
+`PutioContractError.missingField` names a field you requested with a query flag, such as
+`stream_url`, that the response left out.
+
 Promise consumers receive tagged SDK error objects:
 
 ```ts

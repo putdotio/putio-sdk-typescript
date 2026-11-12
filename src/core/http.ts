@@ -8,8 +8,9 @@ import {
 import {
   fallbackPutioErrorEnvelope,
   mapConfigurationError,
-  mapDecodeErrorToValidationError,
+  mapContractError,
   mapTransportError,
+  mapValidationError,
   parseErrorBody,
   PutioConfigurationError,
   type PutioSdkError,
@@ -77,6 +78,8 @@ export const makePutioFetchLayer = (
   fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
 ) => Layer.succeed(PutioHttpClient, makePutioFetchClient(fetchImplementation));
 
+const decodeJsonText = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
+
 export const makePutioFetchClient = (
   fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
 ): PutioHttpClientService => ({
@@ -100,22 +103,22 @@ export const makePutioFetchClient = (
         return {
           arrayBuffer: read(() => response.arrayBuffer()),
           headers: response.headers,
-          json: isSuccessStatus(response.status)
-            ? read(() => response.json())
-            : read(() => response.text()).pipe(
-                Effect.flatMap((text) =>
-                  Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
-                    Effect.mapError(() =>
-                      toPutioResponseError(
+          json: read(() => response.text()).pipe(
+            Effect.flatMap((text) =>
+              decodeJsonText(text).pipe(
+                Effect.mapError(() =>
+                  isSuccessStatus(response.status)
+                    ? mapContractError(new SyntaxError("The HTTP response body is not valid JSON"))
+                    : toPutioResponseError(
                         response.status,
                         response.headers,
                         fallbackPutioErrorEnvelope(response.status),
                         new SyntaxError("The HTTP error response body is not valid JSON"),
                       ),
-                    ),
-                  ),
                 ),
               ),
+            ),
+          ),
           status: response.status,
         };
       });
@@ -137,7 +140,7 @@ const normalizeApiPath = (path: string): string => {
   }
 
   if (parserRewrittenPattern.test(path)) {
-    throw mapDecodeErrorToValidationError(
+    throw mapValidationError(
       "SDK API request paths must not contain backslashes, control characters, or edge spaces",
     );
   }
@@ -145,7 +148,7 @@ const normalizeApiPath = (path: string): string => {
   const [pathname = ""] = path.split(/[?#]/, 1);
 
   if (pathname.split("/").some((segment) => dotSegmentPattern.test(segment))) {
-    throw mapDecodeErrorToValidationError("SDK API request paths must not contain dot segments");
+    throw mapValidationError("SDK API request paths must not contain dot segments");
   }
 
   return path.startsWith("/") ? path : `/${path}`;
@@ -203,9 +206,7 @@ const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 const decodeSuccessJson = <S extends Schema.Top>(schema: S, response: PutioHttpResponse) =>
   response.json.pipe(
     Effect.flatMap((json) =>
-      Schema.decodeUnknownEffect(schema)(json).pipe(
-        Effect.mapError(mapDecodeErrorToValidationError),
-      ),
+      Schema.decodeUnknownEffect(schema)(json).pipe(Effect.mapError(mapContractError)),
     ),
   );
 
@@ -267,7 +268,7 @@ const withBody = (body: PutioRequestBody): Effect.Effect<BodyInit | undefined, P
     case "json":
       return Effect.try({
         try: () => JSON.stringify(body.value),
-        catch: mapDecodeErrorToValidationError,
+        catch: mapValidationError,
       });
     case "form":
       return Effect.succeed(

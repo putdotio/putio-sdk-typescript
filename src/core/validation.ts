@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 
-import { mapDecodeErrorToValidationError, PutioValidationError } from "./errors.js";
+import { mapValidationError, PutioContractError, PutioValidationError } from "./errors.js";
 
 export const PositiveIntegerSchema = Schema.Int.check(Schema.isGreaterThan(0));
 export const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
@@ -11,7 +11,7 @@ export const decodeAndRun = <S extends Schema.Top, A, E, R>(
   run: (decoded: S["Type"]) => Effect.Effect<A, E, R>,
 ) =>
   Schema.decodeUnknownEffect(schema, { onExcessProperty: "error" })(input).pipe(
-    Effect.mapError(mapDecodeErrorToValidationError),
+    Effect.mapError(mapValidationError),
     Effect.flatMap(run),
   );
 
@@ -31,6 +31,9 @@ export const decodeAndRunRedacted =
       ),
       Effect.flatMap(run),
     );
+
+export const failMissingField = (field: string): Effect.Effect<never, PutioContractError> =>
+  Effect.fail(new PutioContractError({ missingField: field }));
 
 type CursorOrIdsSelection = {
   readonly cursor?: string;

@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { PutioOperationError, PutioValidationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError, PutioContractError } from "../core/errors.js";
 import {
   clearAccount,
   destroyAccount,
@@ -162,14 +162,14 @@ describe("account domain", () => {
       );
 
       const error = expectFailure(exit);
-      expect(error).toBeInstanceOf(PutioValidationError);
+      expect(error).toBeInstanceOf(PutioContractError);
       expect(error).toMatchObject({
-        cause: 'Expected put.io to include "push_token" because it was requested',
+        missingField: "push_token",
       });
 
-      for (const [query, expectedCause] of [
-        [{ features: 1 }, 'Expected put.io to include "features" because it was requested'],
-        [{ profitwell: 1 }, 'Expected put.io to include "paddle_user_id" because it was requested'],
+      for (const [query, expectedField] of [
+        [{ features: 1 }, "features"],
+        [{ profitwell: 1 }, "paddle_user_id"],
       ] as const) {
         const missingExit = yield* Effect.exit(
           provideSdk(
@@ -183,9 +183,9 @@ describe("account domain", () => {
           ),
         );
 
-        expect(expectFailure(missingExit)).toBeInstanceOf(PutioValidationError);
+        expect(expectFailure(missingExit)).toBeInstanceOf(PutioContractError);
         expect(expectFailure(missingExit)).toMatchObject({
-          cause: expectedCause,
+          missingField: expectedField,
         });
       }
     }),
@@ -446,7 +446,7 @@ describe("account domain", () => {
         ),
       );
 
-      expect(expectFailure(invalidExit)).toBeInstanceOf(PutioValidationError);
+      expect(expectFailure(invalidExit)).toBeInstanceOf(PutioContractError);
     }),
   );
 

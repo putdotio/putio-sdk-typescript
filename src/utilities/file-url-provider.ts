@@ -1,6 +1,6 @@
 import { Predicate, Result, Schema } from "effect";
 
-import { mapDecodeErrorToValidationError } from "../core/errors.js";
+import { mapValidationError } from "../core/errors.js";
 import { joinCsv } from "../core/forms.js";
 import { buildPutioUrl, encodePathSegment, type PutioQuery } from "../core/http.js";
 import type { FileBroad } from "../domains/files.js";
@@ -30,7 +30,7 @@ const decodeOptions = (options: FileUrlProviderOptions): FileUrlProviderOptions 
   })(options);
 
   if (Result.isFailure(decoded)) {
-    throw mapDecodeErrorToValidationError(decoded.failure);
+    throw mapValidationError(decoded.failure);
   }
 
   return decoded.success;

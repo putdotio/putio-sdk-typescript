@@ -3,7 +3,8 @@ import { DEFAULT_PUTIO_API_BASE_URL, DEFAULT_PUTIO_UPLOAD_BASE_URL } from "../co
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
 import {
   mapConfigurationError,
-  PutioValidationError,
+  PutioContractError,
+  type PutioValidationError,
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
@@ -26,6 +27,7 @@ import {
   PositiveIntegerSchema,
   decodeAndRun,
   cursorSelectionSchema,
+  failMissingField,
 } from "../core/validation.js";
 
 const RequestedFlag = Schema.Literal(1);
@@ -963,13 +965,6 @@ export type FileWatchStatusError = PutioOperationFailure<typeof FileWatchStatusE
 
 export type FileUploadError = PutioOperationFailure<typeof FileUploadErrorSpec>;
 
-const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
-  Effect.fail(
-    new PutioValidationError({
-      cause: `Expected put.io to include "${field}" because it was requested`,
-    }),
-  );
-
 const hasStreamUrl = (
   value: FileBroad,
 ): value is FileBroad & {
@@ -1072,7 +1067,7 @@ const toOriginalFlag = (playOriginal: boolean | undefined) =>
 
 const toUploadResult = (
   value: FileUploadEnvelope,
-): Effect.Effect<FileUploadResult, PutioValidationError> => {
+): Effect.Effect<FileUploadResult, PutioContractError> => {
   if (value.file) {
     return Effect.succeed({ file: value.file, type: "file" });
   }
@@ -1082,7 +1077,7 @@ const toUploadResult = (
   }
 
   return Effect.fail(
-    new PutioValidationError({
+    new PutioContractError({
       cause: 'Expected put.io upload response to contain either "file" or "transfer"',
     }),
   );
@@ -1170,7 +1165,7 @@ export const createFileUploadFormData = (input: FileUploadInput): FormData => {
 const ensureFileQueryFields = <E>(
   effect: Effect.Effect<FileBroad, E, PutioSdkContext>,
   query: FileQuery,
-): Effect.Effect<FileBroad, E | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<FileBroad, E | PutioContractError, PutioSdkContext> =>
   Effect.gen(function* () {
     const file = yield* effect;
 
@@ -1179,9 +1174,7 @@ const ensureFileQueryFields = <E>(
     }
 
     if ((query.mp4_status === 1 || query.mp4_stream_url === 1) && !hasMp4StatusFields(file)) {
-      return yield* failMissingField(
-        query.mp4_stream_url === 1 ? "mp4_size/need_convert" : "mp4_size",
-      );
+      return yield* failMissingField("mp4_size" in file ? "need_convert" : "mp4_size");
     }
 
     if (query.mp4_stream_url === 1 && !hasMp4StreamUrlWhenAvailable(file)) {

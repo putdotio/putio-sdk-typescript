@@ -38,13 +38,13 @@ export const OAuthAuthorizationCodeExchangeErrorCodeSchema = Schema.Literals([
   "unauthorized_client",
 ]);
 
-export class OAuthAuthorizationCodeExchangeError extends Schema.TaggedError<OAuthAuthorizationCodeExchangeError>()(
-  "OAuthAuthorizationCodeExchangeError",
-  {
-    code: OAuthAuthorizationCodeExchangeErrorCodeSchema,
-    status: Schema.Literal(400),
-  },
-) {}
+export class OAuthAuthorizationCodeExchangeError extends Schema.TaggedError<
+  OAuthAuthorizationCodeExchangeError,
+  { readonly brand: unique symbol }
+>()("OAuthAuthorizationCodeExchangeError", {
+  code: OAuthAuthorizationCodeExchangeErrorCodeSchema,
+  status: Schema.Literal(400),
+}) {}
 
 const TokenScopeSchema = Schema.NullOr(
   Schema.Literals([

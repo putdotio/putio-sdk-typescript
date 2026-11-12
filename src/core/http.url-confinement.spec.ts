@@ -118,25 +118,38 @@ describe("request URL confinement", () => {
     );
   });
 
-  it("sends the access token only to the configured origin", async () => {
+  it("sends the access token only to the origin the request names", async () => {
     await fc.assert(
-      fc.asyncProperty(fc.constantFrom(...bases), tokenTail, async (base, tail) => {
-        const sent: Array<string> = [];
+      fc.asyncProperty(
+        fc.constantFrom(...bases),
+        fc.option(fc.constantFrom(...bases), { nil: undefined }),
+        fc.constantFrom(undefined, { token: "token-456", type: "token" } as const),
+        tokenTail,
+        async (configBase, requestBase, auth, tail) => {
+          const sent: Array<string> = [];
 
-        await Effect.runPromiseExit(
-          provideSdk(
-            requestJson(OkResponseSchema, { method: "GET", path: `/${tail}` }),
-            (request) => {
-              if (request.headers.has("authorization")) sent.push(request.url);
+          await Effect.runPromiseExit(
+            provideSdk(
+              requestJson(OkResponseSchema, {
+                auth,
+                baseUrl: requestBase,
+                method: "GET",
+                path: `/${tail}`,
+              }),
+              (request) => {
+                if (request.headers.has("authorization")) sent.push(request.url);
 
-              return jsonResponse({ status: "OK" });
-            },
-            { accessToken: "token-123", baseUrl: base },
-          ),
-        );
+                return jsonResponse({ status: "OK" });
+              },
+              { accessToken: "token-123", baseUrl: configBase },
+            ),
+          );
 
-        for (const url of sent) expect(new URL(url).origin).toBe(new URL(base).origin);
-      }),
+          const expectedOrigin = new URL(requestBase ?? configBase).origin;
+
+          for (const url of sent) expect(new URL(url).origin).toBe(expectedOrigin);
+        },
+      ),
       { numRuns: 2000 },
     );
   });

@@ -1,16 +1,27 @@
-import { Effect, Predicate, Schema } from "effect";
-import { afterEach, describe, expect, it, vi } from "@effect/vitest";
+import { Effect, Layer, Predicate, Redacted, Schema } from "effect";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "@effect/vitest";
 
 import { publicContractFixtures } from "../../test/fixtures/public-contracts.js";
+import { jsonResponse, provideMockTransport } from "../../test/support/sdk-test.js";
 import {
   PutioSdk,
   createPutioSdkEffectClient,
   createPutioSdkPromiseClient,
   makePutioSdkEffectClientLayer,
   makePutioSdkLiveClientLayer,
+  type PutioSdkService,
 } from "./client.js";
+import type {
+  FileBreadcrumb,
+  FileBroad,
+  FileListResponse,
+  FileListResponseFor,
+  FileQuery,
+  FilesListQuery,
+} from "../domains/files.js";
+import type { TransfersListResponse, TransfersListResponseFor } from "../domains/transfers.js";
 import { PutioAuthError, PutioConfigurationError, PutioOperationError } from "./errors.js";
-import { PutioSdkConfig } from "./http.js";
+import { PutioHttpClient, PutioSdkConfig, putioSdkLayer } from "./http.js";
 
 interface ClientSurface {
   readonly [key: string]: ClientSurface | ((...args: never[]) => void);
@@ -25,6 +36,8 @@ const collectFunctionPaths = (surface: ClientSurface, parentPath = ""): Readonly
 
 const requestUrl = (input: RequestInfo | URL): URL =>
   new URL(input instanceof Request ? input.url : input);
+
+const withoutRequirements = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A, E> => effect;
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -66,19 +79,99 @@ describe("sdk client factories", () => {
     expect(second.auth.twoFactor.generateTOTP).toBe(generateTOTP);
   });
 
-  it.effect("provides the Effect client as an Effect service", () =>
+  it.effect("runs service operations with only the PutioSdk service in context", () =>
     Effect.gen(function* () {
-      const program = Effect.service(PutioSdk).pipe(
-        Effect.provide(makePutioSdkEffectClientLayer()),
+      const authorizations: Array<string | null> = [];
+
+      const layer = makePutioSdkEffectClientLayer().pipe(
+        Layer.provide(putioSdkLayer({ accessToken: "token-123" })),
+        provideMockTransport((request) => {
+          authorizations.push(request.headers.get("authorization"));
+
+          return jsonResponse({ status: "OK", value: "dark" });
+        }),
       );
 
-      expect(yield* program).toMatchObject({
-        files: {
-          list: expect.any(Function),
-        },
-      });
+      const program = withoutRequirements(
+        Effect.gen(function* () {
+          const sdk = yield* PutioSdk;
+
+          const downloadToken = sdk.account
+            .getInfo({ download_token: 1 })
+            .pipe(Effect.map((info) => info.download_token));
+
+          const streamUrl = sdk.files
+            .get({ id: 1, query: { stream_url: 1 } })
+            .pipe(Effect.map((file) => file.stream_url));
+
+          expect([downloadToken, streamUrl].every(Effect.isEffect)).toBe(true);
+          yield* sdk.events.clear();
+
+          return yield* sdk.config.getKeyWith("theme", Schema.String);
+        }).pipe(Effect.provide(layer)),
+      );
+
+      expect(yield* program).toBe("dark");
+      expect(authorizations).toEqual(["Token token-123", "Token token-123"]);
     }),
   );
+
+  it.effect("lets a test substitute the PutioSdk service alone", () =>
+    Effect.gen(function* () {
+      const real = yield* Effect.service(PutioSdk).pipe(
+        Effect.provide(
+          makePutioSdkEffectClientLayer().pipe(
+            Layer.provide(putioSdkLayer({})),
+            provideMockTransport(() => jsonResponse({ status: "OK" })),
+          ),
+        ),
+      );
+
+      const fake = PutioSdk.of({
+        ...real,
+        events: { ...real.events, clear: () => Effect.succeed({ status: "OK" as const }) },
+      });
+
+      const program = withoutRequirements(
+        Effect.gen(function* () {
+          const sdk = yield* PutioSdk;
+
+          return yield* sdk.events.clear();
+        }).pipe(Effect.provideService(PutioSdk, fake)),
+      );
+
+      expect(yield* program).toEqual({ status: "OK" });
+    }),
+  );
+
+  it.effect("builds login URLs from the configured web app URL in the service", () =>
+    Effect.gen(function* () {
+      const sdk = yield* Effect.service(PutioSdk).pipe(
+        Effect.provide(
+          makePutioSdkEffectClientLayer().pipe(
+            Layer.provide(putioSdkLayer({ webAppUrl: "https://web.example.test" })),
+            provideMockTransport(() => jsonResponse({ status: "OK" })),
+          ),
+        ),
+      );
+
+      const url = sdk.auth.buildLoginUrl({
+        clientId: 1,
+        redirectUri: "https://app.example.test/callback",
+        state: "state-1",
+      });
+
+      expect(new URL(url).origin).toBe("https://web.example.test");
+    }),
+  );
+
+  it("names service keys after the package", () => {
+    expect([PutioSdk.key, PutioSdkConfig.key, PutioHttpClient.key]).toEqual([
+      "@putdotio/sdk/PutioSdk",
+      "@putdotio/sdk/PutioSdkConfig",
+      "@putdotio/sdk/PutioHttpClient",
+    ]);
+  });
 
   it.effect("provides the Effect client, SDK config, and live transport as one layer", () =>
     Effect.gen(function* () {
@@ -98,7 +191,7 @@ describe("sdk client factories", () => {
       );
 
       expect(yield* program).toMatchObject({
-        accessToken: "token-123",
+        accessToken: Redacted.make("token-123"),
         baseUrl: "https://api.put.io",
       });
     }),
@@ -477,6 +570,28 @@ describe("sdk client factories", () => {
     await client.dispose();
   });
 
+  it("accepts redacted access tokens in the Promise client", async () => {
+    const authorizations: Array<string | null> = [];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(async (_input, init) => {
+        authorizations.push(new Headers(init?.headers).get("authorization"));
+
+        return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+      }),
+    );
+    const client = createPutioSdkPromiseClient({ accessToken: Redacted.make("initial-secret") });
+
+    await client.config.deleteKey("initial");
+    client.setAccessToken(Redacted.make("next-secret"));
+    await client.config.deleteKey("next");
+
+    expect(authorizations).toEqual(["Token initial-secret", "Token next-secret"]);
+
+    await client.dispose();
+  });
+
   it("updates the Promise access token before and after runtime creation", async () => {
     const authorizations: Array<string | null> = [];
 
@@ -637,5 +752,72 @@ describe("sdk client factories", () => {
     await client.dispose();
 
     await expect(client.account.getSettings()).rejects.toBeInstanceOf(PutioConfigurationError);
+  });
+
+  it("types conditioned list results the same in the Promise client and the service", () => {
+    const client = createPutioSdkPromiseClient();
+
+    const service = (sdk: PutioSdkService) => ({
+      files: sdk.files.list(0, { breadcrumbs: 1 }),
+      filesBroad: sdk.files.list(0),
+      shared: sdk.sharing.publicAccess.listFiles({ breadcrumbs: 1 }),
+      transfers: sdk.transfers.list({ per_page: 20 }),
+      transfersBroad: sdk.transfers.list(),
+    });
+
+    type Service = ReturnType<typeof service>;
+
+    expectTypeOf(client.files.list<{ readonly breadcrumbs: 1 }>).returns.resolves.toEqualTypeOf<
+      FileListResponseFor<{ readonly breadcrumbs: 1 }>
+    >();
+    expectTypeOf(
+      client.sharing.publicAccess.listFiles<{ readonly breadcrumbs: 1 }>,
+    ).returns.resolves.toEqualTypeOf<FileListResponseFor<{ readonly breadcrumbs: 1 }>>();
+    expectTypeOf(
+      client.transfers.list<{ readonly per_page: number }>,
+    ).returns.resolves.toEqualTypeOf<TransfersListResponseFor<{ readonly per_page: number }>>();
+    expectTypeOf(client.transfers.list<{ readonly per_page: number }>)
+      .returns.resolves.toHaveProperty("total")
+      .toEqualTypeOf<number>();
+    expectTypeOf(client.files.list<FilesListQuery>).returns.resolves.toEqualTypeOf<
+      FileListResponseFor<FilesListQuery>
+    >();
+
+    expectTypeOf<Effect.Success<Service["files"]>["breadcrumbs"]>().toEqualTypeOf<
+      ReadonlyArray<FileBreadcrumb>
+    >();
+    expectTypeOf<Effect.Success<Service["filesBroad"]>>().toEqualTypeOf<FileListResponse>();
+    expectTypeOf<Effect.Success<Service["shared"]>["breadcrumbs"]>().toEqualTypeOf<
+      ReadonlyArray<FileBreadcrumb>
+    >();
+    expectTypeOf<Effect.Success<Service["transfers"]>["cursor"]>().toEqualTypeOf<string | null>();
+    expectTypeOf<Effect.Success<Service["transfers"]>["total"]>().toEqualTypeOf<number>();
+    expectTypeOf<
+      Effect.Success<Service["transfersBroad"]>
+    >().toEqualTypeOf<TransfersListResponse>();
+    expectTypeOf<Effect.Services<Service["files"]>>().toEqualTypeOf<never>();
+  });
+
+  it("accepts an optional file query in the Promise client and the service", () => {
+    const client = createPutioSdkPromiseClient();
+
+    const promised = (query: FileQuery | undefined) => ({
+      get: client.files.get({ id: 1, query }),
+      getChild: client.files.getChild({ name: "a", parentId: 0, query }),
+    });
+
+    const service = (sdk: PutioSdkService, query: FileQuery | undefined) => ({
+      get: sdk.files.get({ id: 1, query }),
+      getChild: sdk.files.getChild({ name: "a", parentId: 0, query }),
+    });
+
+    type Promised = ReturnType<typeof promised>;
+
+    type Service = ReturnType<typeof service>;
+
+    expectTypeOf<Awaited<Promised["get"]>>().toEqualTypeOf<FileBroad>();
+    expectTypeOf<Awaited<Promised["getChild"]>>().toEqualTypeOf<FileBroad>();
+    expectTypeOf<Effect.Success<Service["get"]>>().toEqualTypeOf<FileBroad>();
+    expectTypeOf<Effect.Success<Service["getChild"]>>().toEqualTypeOf<FileBroad>();
   });
 });

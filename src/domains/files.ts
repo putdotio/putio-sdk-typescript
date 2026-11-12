@@ -1,9 +1,8 @@
 import { Effect, Schema } from "effect";
-import { DEFAULT_PUTIO_API_BASE_URL, DEFAULT_PUTIO_UPLOAD_BASE_URL } from "../core/defaults.js";
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
 import {
   mapConfigurationError,
-  PutioValidationError,
+  PutioContractError,
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
@@ -18,14 +17,19 @@ import {
   requestText,
   requestVoid,
   selectJsonField,
-  type PutioSdkOptions,
+  type PutioSdkResolvedConfig,
   type PutioSdkContext,
 } from "../core/http.js";
+import { revealAccessToken } from "../core/secrets.js";
 import {
   NonEmptyStringSchema,
+  NonNegativeNumberSchema,
   PositiveIntegerSchema,
   decodeAndRun,
   cursorSelectionSchema,
+  type CursorSelection,
+  failMissingField,
+  requireRequestedBreadcrumbs,
 } from "../core/validation.js";
 
 const RequestedFlag = Schema.Literal(1);
@@ -87,18 +91,16 @@ export const FileTouchInputSchema = Schema.Struct({
 });
 
 export const FileMediaMetadataSchema = Schema.Struct({
-  aspect_ratio: Schema.optional(
-    Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
-  ),
+  aspect_ratio: Schema.optional(Schema.NullOr(NonNegativeNumberSchema)),
   codec: Schema.optional(Schema.NullOr(Schema.String)),
-  duration: Schema.optional(Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)))),
+  duration: Schema.optional(Schema.NullOr(NonNegativeNumberSchema)),
   height: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   width: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
 });
 
 export const FileMediaInfoFormatSchema = Schema.Struct({
-  bit_rate: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
-  duration: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
+  bit_rate: Schema.optional(NonNegativeNumberSchema),
+  duration: Schema.optional(NonNegativeNumberSchema),
   name: Schema.optional(Schema.String),
 });
 
@@ -140,8 +142,8 @@ export const FileBaseSchema = Schema.Struct({
   parent_id: Schema.NullOr(Schema.Int),
   screenshot: Schema.NullOr(Schema.String),
   sha1: Schema.optional(Schema.NullOr(Schema.String)),
-  size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-  start_from: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
+  size: NonNegativeNumberSchema,
+  start_from: Schema.optional(NonNegativeNumberSchema),
   updated_at: Schema.String,
 });
 
@@ -150,7 +152,7 @@ export const FileBroadSchema = FileBaseSchema.pipe(
     content_type_and_codecs: Schema.optional(Schema.NullOr(Schema.String)),
     media_info: Schema.optional(Schema.NullOr(FileMediaInfoSchema)),
     media_metadata: Schema.optional(Schema.NullOr(FileMediaMetadataSchema)),
-    mp4_size: Schema.optional(Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)))),
+    mp4_size: Schema.optional(Schema.NullOr(NonNegativeNumberSchema)),
     mp4_stream_url: Schema.optional(Schema.NullOr(Schema.String)),
     need_convert: Schema.optional(Schema.Boolean),
     sender_name: Schema.optional(Schema.String),
@@ -277,11 +279,11 @@ const FileRenameInputSchema = Schema.Struct({
 
 const FileStartFromSetInputSchema = Schema.Struct({
   file_id: PositiveFileIdSchema,
-  time: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  time: NonNegativeNumberSchema,
 });
 
 const FileStartFromEnvelopeSchema = Schema.Struct({
-  start_from: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  start_from: NonNegativeNumberSchema,
   status: Schema.Literal("OK"),
 });
 
@@ -313,20 +315,20 @@ const FileConversionNotAvailableSchema = Schema.Struct({
 
 const FileConversionInQueueSchema = Schema.Struct({
   id: Schema.Int,
-  percent_done: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
+  percent_done: Schema.optional(NonNegativeNumberSchema),
   status: Schema.Literal("IN_QUEUE"),
 });
 
 const FileConversionConvertingSchema = Schema.Struct({
   id: Schema.Int,
-  percent_done: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  percent_done: NonNegativeNumberSchema,
   status: Schema.Literal("CONVERTING"),
 });
 
 const FileConversionCompletedSchema = Schema.Struct({
   id: Schema.Int,
-  percent_done: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-  size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  percent_done: NonNegativeNumberSchema,
+  size: NonNegativeNumberSchema,
   status: Schema.Literal("COMPLETED"),
 });
 
@@ -426,15 +428,7 @@ const FileExtractionsEnvelopeSchema = Schema.Struct({
   status: Schema.optional(Schema.Literal("OK")),
 });
 
-const FilesBulkSelectionSchema = Schema.Struct({
-  cursor: Schema.optional(NonEmptyStringSchema),
-  excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
-  ids: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
-}).check(
-  Schema.makeFilter((input) => input.cursor !== undefined || input.ids !== undefined, {
-    expected: "a non-empty cursor or file ID selection",
-  }),
-);
+const FilesBulkSelectionSchema = cursorSelectionSchema({});
 
 const FilesDeleteOptionsSchema = Schema.Struct({
   ignoreFileOwner: Schema.optional(Schema.Boolean),
@@ -570,6 +564,14 @@ export type FileListContinuationResponse = Schema.Schema.Type<
   typeof FilesListContinueEnvelopeSchema
 >;
 
+export type FileListResponseFor<TQuery extends { readonly breadcrumbs?: 1 | undefined }> =
+  FileListResponse &
+    (TQuery["breadcrumbs"] extends 1
+      ? {
+          readonly breadcrumbs: ReadonlyArray<FileBreadcrumb>;
+        }
+      : {});
+
 export type FileSearchResponse = Schema.Schema.Type<typeof FilesSearchEnvelopeSchema>;
 
 export type FileCreateFolderInput = Schema.Schema.Type<typeof FileCreateFolderInputSchema>;
@@ -590,11 +592,9 @@ export type FileSubtitle = Schema.Schema.Type<typeof FileSubtitleSchema>;
 
 export type FilesMoveError = Schema.Schema.Type<typeof FilesMoveErrorSchema>;
 
-type FilesBulkSelectionFields = Schema.Schema.Type<typeof FilesBulkSelectionSchema>;
-
-export type FilesBulkSelection =
-  | (FilesBulkSelectionFields & { readonly cursor: string })
-  | (FilesBulkSelectionFields & { readonly ids: ReadonlyArray<number> });
+export type FilesBulkSelection = CursorSelection<
+  Schema.Schema.Type<typeof FilesBulkSelectionSchema>
+>;
 
 export type FileUploadTransfer = Schema.Schema.Type<typeof FileUploadTransferSchema>;
 
@@ -613,16 +613,16 @@ export type FileUploadResult =
 export type FileDirectAccessOptions = {
   /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
   readonly downloadToken: string;
-  readonly useTunnel?: boolean;
+  readonly useTunnel?: boolean | undefined;
 };
 
 export type FileApiDownloadUrlOptions = FileDirectAccessOptions & {
-  readonly name?: string;
+  readonly name?: string | undefined;
 };
 
 export type FileApiMp4DownloadUrlOptions = FileDirectAccessOptions & {
-  readonly convert?: boolean;
-  readonly name?: string;
+  readonly convert?: boolean | undefined;
+  readonly name?: string | undefined;
 };
 
 export type FileHlsMasterPlaylistOptions = Schema.Schema.Type<
@@ -630,11 +630,11 @@ export type FileHlsMasterPlaylistOptions = Schema.Schema.Type<
 >;
 
 export type FileHlsStreamUrlOptions = {
-  readonly maxSubtitleCount?: number;
+  readonly maxSubtitleCount?: number | undefined;
   /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
   readonly downloadToken: string;
-  readonly playOriginal?: boolean;
-  readonly subtitleLanguages?: ReadonlyArray<string>;
+  readonly playOriginal?: boolean | undefined;
+  readonly subtitleLanguages?: ReadonlyArray<string> | undefined;
 };
 
 export type FileXspfPlaylistUrlOptions = {
@@ -644,8 +644,8 @@ export type FileXspfPlaylistUrlOptions = {
 
 export type FileUploadInput = {
   readonly file: Blob;
-  readonly fileName?: string;
-  readonly parentId?: number;
+  readonly fileName?: string | undefined;
+  readonly parentId?: number | undefined;
 };
 
 export type FileUploadRequestDescriptor = {
@@ -798,6 +798,15 @@ export const SearchFilesErrorSpec = definePutioOperationErrorSpec({
   ],
 });
 
+export const ContinueSearchErrorSpec = definePutioOperationErrorSpec({
+  domain: "files",
+  operation: "continueSearch",
+  knownErrors: [
+    { errorType: "invalid_scope", statusCode: 401 as const },
+    { statusCode: 400 as const },
+  ],
+});
+
 export const CreateFolderErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "createFolder",
@@ -939,6 +948,8 @@ export type CanWriteFileError = PutioOperationFailure<typeof CanWriteFileErrorSp
 
 export type SearchFilesError = PutioOperationFailure<typeof SearchFilesErrorSpec>;
 
+export type ContinueSearchError = PutioOperationFailure<typeof ContinueSearchErrorSpec>;
+
 export type CreateFolderError = PutioOperationFailure<typeof CreateFolderErrorSpec>;
 
 export type RenameFileError = PutioOperationFailure<typeof RenameFileErrorSpec>;
@@ -962,13 +973,6 @@ export type FileExtractionsError = PutioOperationFailure<typeof FileExtractionsE
 export type FileWatchStatusError = PutioOperationFailure<typeof FileWatchStatusErrorSpec>;
 
 export type FileUploadError = PutioOperationFailure<typeof FileUploadErrorSpec>;
-
-const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
-  Effect.fail(
-    new PutioValidationError({
-      cause: `Expected put.io to include "${field}" because it was requested`,
-    }),
-  );
 
 const hasStreamUrl = (
   value: FileBroad,
@@ -1037,7 +1041,7 @@ const resolveRouteContext = (
   token?: string,
 ): Effect.Effect<
   {
-    readonly config: PutioSdkOptions;
+    readonly config: PutioSdkResolvedConfig;
     readonly token: string;
   },
   PutioSdkError,
@@ -1045,25 +1049,26 @@ const resolveRouteContext = (
 > =>
   Effect.gen(function* () {
     const config = yield* PutioSdkConfig;
-    const resolvedToken = token ?? config.accessToken;
 
-    if (resolvedToken) {
-      return {
-        config,
-        token: resolvedToken,
-      };
+    const resolvedToken = token ?? (yield* revealAccessToken(config.accessToken));
+
+    if (resolvedToken === undefined) {
+      return yield* mapConfigurationError(
+        "This helper requires a token, but neither an override nor PutioSdkConfig.accessToken was provided",
+      );
     }
 
-    return yield* mapConfigurationError(
-      "This helper requires a token, but neither an override nor PutioSdkConfig.accessToken was provided",
-    );
+    return {
+      config,
+      token: resolvedToken,
+    };
   });
 
 const resolveApiBaseUrl: Effect.Effect<string | URL, never, PutioSdkConfig> = Effect.gen(
   function* () {
     const config = yield* PutioSdkConfig;
 
-    return config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL;
+    return config.baseUrl;
   },
 );
 
@@ -1072,7 +1077,7 @@ const toOriginalFlag = (playOriginal: boolean | undefined) =>
 
 const toUploadResult = (
   value: FileUploadEnvelope,
-): Effect.Effect<FileUploadResult, PutioValidationError> => {
+): Effect.Effect<FileUploadResult, PutioContractError> => {
   if (value.file) {
     return Effect.succeed({ file: value.file, type: "file" });
   }
@@ -1082,7 +1087,7 @@ const toUploadResult = (
   }
 
   return Effect.fail(
-    new PutioValidationError({
+    new PutioContractError({
       cause: 'Expected put.io upload response to contain either "file" or "transfer"',
     }),
   );
@@ -1170,7 +1175,7 @@ export const createFileUploadFormData = (input: FileUploadInput): FormData => {
 const ensureFileQueryFields = <E>(
   effect: Effect.Effect<FileBroad, E, PutioSdkContext>,
   query: FileQuery,
-): Effect.Effect<FileBroad, E | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<FileBroad, E | PutioContractError, PutioSdkContext> =>
   Effect.gen(function* () {
     const file = yield* effect;
 
@@ -1179,9 +1184,7 @@ const ensureFileQueryFields = <E>(
     }
 
     if ((query.mp4_status === 1 || query.mp4_stream_url === 1) && !hasMp4StatusFields(file)) {
-      return yield* failMissingField(
-        query.mp4_stream_url === 1 ? "mp4_size/need_convert" : "mp4_size",
-      );
+      return yield* failMissingField("mp4_size" in file ? "need_convert" : "mp4_size");
     }
 
     if (query.mp4_stream_url === 1 && !hasMp4StreamUrlWhenAvailable(file)) {
@@ -1207,11 +1210,16 @@ const ensureFileQueryFields = <E>(
     return file;
   });
 
-export const queryFiles = (
+export function queryFiles<TQuery extends FilesListQuery>(
   parent: number | "friends",
-  query: FilesListQuery = {},
-): Effect.Effect<FileListResponse, QueryFilesError, PutioSdkContext> =>
-  decodeAndRun(FilesListInputSchema, { parent, query }, (decodedInput) =>
+  query: TQuery,
+): Effect.Effect<FileListResponseFor<TQuery>, QueryFilesError, PutioSdkContext>;
+export function queryFiles(
+  parent: number | "friends",
+  query?: FilesListQuery,
+): Effect.Effect<FileListResponse, QueryFilesError, PutioSdkContext>;
+export function queryFiles(parent: number | "friends", query: FilesListQuery = {}) {
+  return decodeAndRun(FilesListInputSchema, { parent, query }, (decodedInput) =>
     requestJson(FilesListEnvelopeSchema, {
       method: "GET",
       path:
@@ -1225,8 +1233,9 @@ export const queryFiles = (
               ...decodedInput.query,
               parent_id: decodedInput.parent,
             },
-    }),
+    }).pipe(requireRequestedBreadcrumbs(decodedInput.query)),
   ).pipe(withOperationErrors(QueryFilesErrorSpec));
+}
 
 export const continueFiles = (
   cursor: string,
@@ -1250,12 +1259,16 @@ export const continueFiles = (
 
 export function getFile(input: {
   readonly id: number;
-}): Effect.Effect<FileCore, GetFileError | PutioValidationError, PutioSdkContext>;
+}): Effect.Effect<FileCore, GetFileError, PutioSdkContext>;
 export function getFile<TQuery extends FileQuery>(input: {
   readonly id: number;
   readonly query: TQuery;
-}): Effect.Effect<FileResponseFor<TQuery>, GetFileError | PutioValidationError, PutioSdkContext>;
-export function getFile(input: { readonly id: number; readonly query?: FileQuery }) {
+}): Effect.Effect<FileResponseFor<TQuery>, GetFileError, PutioSdkContext>;
+export function getFile(input: {
+  readonly id: number;
+  readonly query?: FileQuery | undefined;
+}): Effect.Effect<FileBroad, GetFileError, PutioSdkContext>;
+export function getFile(input: { readonly id: number; readonly query?: FileQuery | undefined }) {
   return decodeAndRun(FileGetInputSchema, input, (decodedInput) => {
     const effect = requestJson(FileEnvelopeSchema, {
       method: "GET",
@@ -1272,16 +1285,15 @@ export function getFile(input: { readonly id: number; readonly query?: FileQuery
 export function getFileChild(input: {
   readonly name: string;
   readonly parentId: number;
-}): Effect.Effect<FileCore, GetFileChildError | PutioValidationError, PutioSdkContext>;
+}): Effect.Effect<FileCore, GetFileChildError, PutioSdkContext>;
 export function getFileChild<TQuery extends FileQuery>(input: {
   readonly name: string;
   readonly parentId: number;
   readonly query: TQuery;
-}): Effect.Effect<
-  FileResponseFor<TQuery>,
-  GetFileChildError | PutioValidationError,
-  PutioSdkContext
->;
+}): Effect.Effect<FileResponseFor<TQuery>, GetFileChildError, PutioSdkContext>;
+export function getFileChild(
+  input: FileGetChildInput,
+): Effect.Effect<FileBroad, GetFileChildError, PutioSdkContext>;
 export function getFileChild(input: FileGetChildInput) {
   return decodeAndRun(FileGetChildInputSchema, input, (decodedInput) => {
     const effect = requestJson(FileEnvelopeSchema, {
@@ -1301,7 +1313,7 @@ export function getFileChild(input: FileGetChildInput) {
 
 export const copyFile = (
   input: FileCopyInput,
-): Effect.Effect<FileBroad, CopyFileError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<FileBroad, CopyFileError, PutioSdkContext> =>
   decodeAndRun(FileCopyInputSchema, input, (decodedInput) =>
     requestJson(FileEnvelopeSchema, {
       body: {
@@ -1319,7 +1331,7 @@ export const copyFile = (
 
 export const touchFiles = (
   input: FileTouchInput,
-): Effect.Effect<void, TouchFilesError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<void, TouchFilesError, PutioSdkContext> =>
   decodeAndRun(FileTouchInputSchema, input, (decodedInput) =>
     requestJson(OkResponseSchema, {
       body: {
@@ -1336,7 +1348,7 @@ export const touchFiles = (
 
 export const canWriteFile = (
   fileId: number,
-): Effect.Effect<number, CanWriteFileError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<number, CanWriteFileError, PutioSdkContext> =>
   decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
     requestJson(FileCanWriteEnvelopeSchema, {
       method: "GET",
@@ -1360,7 +1372,7 @@ export const continueSearch = (
   query: {
     readonly per_page?: number;
   } = {},
-): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
+): Effect.Effect<FileSearchResponse, ContinueSearchError, PutioSdkContext> =>
   decodeAndRun(FilesContinueInputSchema, { cursor, query }, (decodedInput) =>
     requestJson(FilesSearchEnvelopeSchema, {
       body: {
@@ -1373,7 +1385,7 @@ export const continueSearch = (
       path: "/v2/files/search/continue",
       query: decodedInput.query,
     }),
-  ).pipe(withOperationErrors(SearchFilesErrorSpec));
+  ).pipe(withOperationErrors(ContinueSearchErrorSpec));
 
 export const setFileSort = (
   input: FileSetSortInput,
@@ -1624,7 +1636,7 @@ const FileHlsMasterPlaylistInputSchema = Schema.Struct({
 export const getHlsMasterPlaylist = (
   fileId: number,
   options: FileHlsMasterPlaylistOptions = {},
-): Effect.Effect<string, GetHlsMasterPlaylistError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<string, GetHlsMasterPlaylistError, PutioSdkContext> =>
   decodeAndRun(FileHlsMasterPlaylistInputSchema, { fileId, options }, (decoded) =>
     requestText({
       headers: { accept: "application/vnd.apple.mpegurl, application/x-mpegURL, */*" },
@@ -1882,13 +1894,9 @@ export const createFileUploadRequest = (
       Effect.map(({ config, token }) => ({
         body: createFileUploadFormData(decoded.input),
         method: "POST" as const,
-        url: buildPutioUrl(
-          config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
-          "/v2/files/upload",
-          {
-            oauth_token: token,
-          },
-        ),
+        url: buildPutioUrl(config.uploadBaseUrl, "/v2/files/upload", {
+          oauth_token: token,
+        }),
       })),
     ),
   );
@@ -1898,7 +1906,7 @@ export const uploadFile = (
   options: {
     readonly oauthToken?: string;
   } = {},
-): Effect.Effect<FileUploadResult, FileUploadError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<FileUploadResult, FileUploadError, PutioSdkContext> =>
   decodeAndRun(FileUploadCallInputSchema, { input, options }, (decoded) =>
     resolveRouteContext(decoded.options.oauthToken).pipe(
       Effect.flatMap(({ config, token }) =>
@@ -1906,7 +1914,7 @@ export const uploadFile = (
           auth: {
             type: "none",
           },
-          baseUrl: config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
+          baseUrl: config.uploadBaseUrl,
           body: {
             type: "form-data",
             value: createFileUploadFormData(decoded.input),

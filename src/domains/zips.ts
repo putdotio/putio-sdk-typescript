@@ -1,6 +1,11 @@
 import { Effect, Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
+import {
+  NonNegativeNumberSchema,
+  NonEmptyStringSchema,
+  PositiveIntegerSchema,
+  decodeAndRun,
+} from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
@@ -53,7 +58,7 @@ const ZipMissingFileSchema = Schema.Struct({
 const ZipInfoDoneSchema = Schema.Struct({
   id: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
   missing_files: Schema.Array(Schema.Union([Schema.String, ZipMissingFileSchema])),
-  size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  size: NonNegativeNumberSchema,
   status: Schema.Literal("OK"),
   url: Schema.String,
   zip_status: Schema.Literal("DONE"),
@@ -77,7 +82,11 @@ const CreateZipInputSchema = Schema.Struct({
   }),
 );
 
-export type CreateZipInput = Schema.Schema.Type<typeof CreateZipInputSchema>;
+type CreateZipFields = Schema.Schema.Type<typeof CreateZipInputSchema>;
+
+export type CreateZipInput =
+  | (CreateZipFields & { readonly cursor: string })
+  | (CreateZipFields & { readonly file_ids: ReadonlyArray<number> });
 
 const RestrictedScopeError = { errorType: "invalid_scope", statusCode: 401 as const };
 

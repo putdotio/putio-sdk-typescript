@@ -1,12 +1,26 @@
 import { Effect, Schema } from "effect";
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
+import {
+  NonEmptyStringSchema,
+  PositiveIntegerSchema,
+  cursorSelectionSchema,
+  decodeAndRun,
+  requireRequestedBreadcrumbs,
+} from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
 } from "../core/errors.js";
-import { FileBroadSchema, FilesListEnvelopeSchema } from "./files.js";
+import {
+  FileBroadSchema,
+  FileSortSchema,
+  FileTypeSchema,
+  FilesListEnvelopeSchema,
+  type FileListResponse,
+  type FileListResponseFor,
+  type FilesBulkSelection,
+} from "./files.js";
 import {
   OkResponseSchema,
   encodePathSegment,
@@ -18,10 +32,7 @@ import {
 
 export const SharingCloneStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
 
-export const SharingCloneInputSchema = Schema.Struct({
-  cursor: Schema.optional(NonEmptyStringSchema),
-  excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
-  ids: Schema.optional(Schema.Array(PositiveIntegerSchema)),
+export const SharingCloneInputSchema = cursorSelectionSchema({
   parentId: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
 
@@ -51,10 +62,7 @@ export const SharedFileSchema = FileBroadSchema.pipe(
   }),
 );
 
-export const SharingShareInputSchema = Schema.Struct({
-  cursor: Schema.optional(NonEmptyStringSchema),
-  excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
-  ids: Schema.optional(Schema.Array(PositiveIntegerSchema)),
+export const SharingShareInputSchema = cursorSelectionSchema({
   target: Schema.Union([
     Schema.Struct({
       type: Schema.Literal("everyone"),
@@ -106,7 +114,7 @@ export const PublicShareSchema = Schema.Struct({
   push_token: Schema.String,
   token: Schema.String,
   user_file: Schema.Struct({
-    file_type: Schema.String,
+    file_type: FileTypeSchema,
     id: Schema.Int,
     name: Schema.String,
   }),
@@ -140,8 +148,8 @@ export const PublicShareListQuerySchema = Schema.Struct({
   mp4_status_parent: Schema.optional(Schema.Literal(1)),
   parent_id: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   per_page: Schema.optional(Schema.Int.check(Schema.isGreaterThan(0))),
-  sort: Schema.optional(Schema.String),
-  sort_by: Schema.optional(Schema.String),
+  sort: Schema.optional(FileSortSchema),
+  sort_by: Schema.optional(FileSortSchema),
   stream_url_parent: Schema.optional(Schema.Literal(1)),
   total: Schema.optional(Schema.Literal(1)),
   video_metadata_parent: Schema.optional(Schema.Literal(1)),
@@ -154,7 +162,8 @@ const PublicShareContinueInputSchema = Schema.Struct({
   }),
 });
 
-export type SharingCloneInput = Schema.Schema.Type<typeof SharingCloneInputSchema>;
+export type SharingCloneInput = FilesBulkSelection &
+  Pick<Schema.Schema.Type<typeof SharingCloneInputSchema>, "parentId">;
 
 export type SharingCloneInfo = Schema.Schema.Type<typeof SharingCloneInfoSchema>;
 
@@ -164,7 +173,8 @@ export type SharedFileShare = Schema.Schema.Type<typeof SharedFileShareSchema>;
 
 export type SharedFileSharedWith = Schema.Schema.Type<typeof SharedFileSharedWithSchema>;
 
-export type SharingShareInput = Schema.Schema.Type<typeof SharingShareInputSchema>;
+export type SharingShareInput = FilesBulkSelection &
+  Pick<Schema.Schema.Type<typeof SharingShareInputSchema>, "target">;
 
 export type SharingUnshareInput = Schema.Schema.Type<typeof SharingUnshareInputSchema>;
 
@@ -337,7 +347,7 @@ const toShareTarget = (target: SharingShareInput["target"]): string =>
   target.type === "everyone" ? "everyone" : target.friendNames.join(",");
 
 export const cloneSharedFiles = (
-  input: SharingCloneInput = {},
+  input: SharingCloneInput,
 ): Effect.Effect<
   {
     readonly id: number;
@@ -466,20 +476,21 @@ export const getPublicShare = (): Effect.Effect<
     path: "/v2/public_share",
   }).pipe(selectJsonField("public_share"), withOperationErrors(GetPublicShareErrorSpec));
 
-export const listPublicShareFiles = (
-  query: PublicShareListQuery = {},
-): Effect.Effect<
-  Schema.Schema.Type<typeof FilesListEnvelopeSchema>,
-  ListPublicShareFilesError,
-  PutioSdkContext
-> =>
-  decodeAndRun(PublicShareListQuerySchema, query, (decodedQuery) =>
+export function listPublicShareFiles<TQuery extends PublicShareListQuery>(
+  query: TQuery,
+): Effect.Effect<FileListResponseFor<TQuery>, ListPublicShareFilesError, PutioSdkContext>;
+export function listPublicShareFiles(
+  query?: PublicShareListQuery,
+): Effect.Effect<FileListResponse, ListPublicShareFilesError, PutioSdkContext>;
+export function listPublicShareFiles(query: PublicShareListQuery = {}) {
+  return decodeAndRun(PublicShareListQuerySchema, query, (decodedQuery) =>
     requestJson(FilesListEnvelopeSchema, {
       method: "GET",
       path: "/v2/public_share/files/list",
       query: decodedQuery,
-    }),
+    }).pipe(requireRequestedBreadcrumbs(decodedQuery)),
   ).pipe(withOperationErrors(ListPublicShareFilesErrorSpec));
+}
 
 export const continuePublicShareFiles = (
   cursor: string,

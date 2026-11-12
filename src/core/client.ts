@@ -1,14 +1,4 @@
-import {
-  Cause,
-  Context,
-  Effect,
-  Exit,
-  Layer,
-  ManagedRuntime,
-  Predicate,
-  Schema,
-  Struct,
-} from "effect";
+import { Cause, Context, Effect, Exit, Layer, ManagedRuntime, Predicate, Schema } from "effect";
 
 import {
   clearAccount,
@@ -20,10 +10,9 @@ import {
   saveAccountSettings,
 } from "../domains/account.js";
 import type {
-  AccountInfoBase,
   AccountInfoBroad,
   AccountInfoQuery,
-  PasInfo,
+  AccountInfoResponseFor,
 } from "../domains/account.js";
 import {
   createAppSpecificPassword,
@@ -123,7 +112,15 @@ import {
   touchFiles,
   uploadFile,
 } from "../domains/files.js";
-import type { FileCore, FileQuery, FileResponseFor, FileVideoMetadata } from "../domains/files.js";
+import type {
+  FileBroad,
+  FileCore,
+  FileListResponse,
+  FileListResponseFor,
+  FileQuery,
+  FileResponseFor,
+  FilesListQuery,
+} from "../domains/files.js";
 import { createFriendInvite, listFriendInvites } from "../domains/friend-invites.js";
 import {
   approveFriendRequest,
@@ -137,8 +134,19 @@ import {
   searchFriends,
   sendFriendRequest,
 } from "../domains/friends.js";
-import { normalizePutioSdkOptions, PutioSdkConfig, putioSdkLiveLayer } from "./http.js";
-import type { PutioSdkOptions, PutioSdkContext } from "./http.js";
+import {
+  normalizePutioSdkOptions,
+  PutioHttpClient,
+  PutioSdkConfig,
+  putioSdkLiveLayer,
+} from "./http.js";
+import type {
+  PutioHttpClientService,
+  PutioSdkContext,
+  PutioSdkOptions,
+  PutioSdkResolvedConfig,
+  PutioSecret,
+} from "./http.js";
 import {
   buildOAuthAppIconUrl,
   buildOAuthAuthorizeUrl,
@@ -199,6 +207,7 @@ import {
   shareFiles,
   unshareFile,
 } from "../domains/sharing.js";
+import type { PublicShareListQuery } from "../domains/sharing.js";
 import {
   continueTrash,
   deleteTrash,
@@ -223,18 +232,20 @@ import {
   retryTransfer,
   stopTransferRecording,
 } from "../domains/transfers.js";
+import type {
+  TransfersListQuery,
+  TransfersListResponse,
+  TransfersListResponseFor,
+} from "../domains/transfers.js";
 import { removeRateLimitBan } from "../domains/rate-limits.js";
 import { listTunnelRoutes } from "../domains/tunnel.js";
 import { cancelZip, createZip, getZip, listZips } from "../domains/zips.js";
 import { mapConfigurationError } from "./errors.js";
 
-type PutioSdkPromiseRuntimeConfig = Omit<PutioSdkOptions, "accessToken">;
-
 interface PutioSdkPromiseState {
-  accessToken: string | undefined;
+  config: PutioSdkResolvedConfig;
   disposed: boolean;
   runtime: ManagedRuntime.ManagedRuntime<PutioSdkContext, never> | undefined;
-  readonly runtimeConfig: PutioSdkPromiseRuntimeConfig;
 }
 
 const getPromiseClientRuntime = (state: PutioSdkPromiseState) => {
@@ -244,7 +255,9 @@ const getPromiseClientRuntime = (state: PutioSdkPromiseState) => {
     );
   }
 
-  state.runtime ??= ManagedRuntime.make(putioSdkLiveLayer(state.runtimeConfig));
+  state.runtime ??= ManagedRuntime.make(
+    putioSdkLiveLayer({ ...state.config, accessToken: undefined }),
+  );
 
   return state.runtime;
 };
@@ -266,11 +279,7 @@ const provideSdk = async <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,
 ): Promise<A> => {
   const runtime = getPromiseClientRuntime(state);
-
-  const configured = Effect.provideService(effect, PutioSdkConfig, {
-    ...state.runtimeConfig,
-    accessToken: state.accessToken,
-  });
+  const configured = Effect.provideService(effect, PutioSdkConfig, state.config);
 
   if (signal === undefined) {
     return runtime.runPromise(configured);
@@ -297,20 +306,153 @@ const snapshotUrl = (value: string | URL | undefined): string | URL | undefined 
 const snapshotHeaders = (value: HeadersInit | undefined): HeadersInit | undefined =>
   value === undefined ? undefined : [...new Headers(value)];
 
-type PromiseOperation<T> = T extends (...args: infer Args) => infer Result
-  ? Result extends Effect.Effect<infer Success, infer _Error, infer _Requirements>
-    ? (...args: Args) => Promise<Success>
-    : T
-  : never;
+interface OperationKind {
+  readonly Success: unknown;
+  readonly Failure: unknown;
+  readonly Requirements: unknown;
+  readonly Result: unknown;
+}
+
+interface ContextualEffectKind extends OperationKind {
+  readonly Result: Effect.Effect<this["Success"], this["Failure"], this["Requirements"]>;
+}
+
+interface ProvidedEffectKind extends OperationKind {
+  readonly Result: Effect.Effect<
+    this["Success"],
+    this["Failure"],
+    Exclude<this["Requirements"], PutioSdkContext>
+  >;
+}
+
+interface PromiseKind extends OperationKind {
+  readonly Result: Promise<this["Success"]>;
+}
+
+type OperationResult<Kind extends OperationKind, Success, Failure, Requirements> = (Kind & {
+  readonly Success: Success;
+  readonly Failure: Failure;
+  readonly Requirements: Requirements;
+})["Result"];
 
 type Operation = (...args: never[]) => void;
 
-type SdkEffectOperation = (...args: never[]) => Effect.Effect<unknown, unknown, PutioSdkContext>;
+type SdkEffect = Effect.Effect<unknown, unknown, PutioSdkContext>;
+
+type SdkEffectOperation = (...args: never[]) => SdkEffect;
+
+type ResultOf<
+  Kind extends OperationKind,
+  TOperation extends SdkEffectOperation,
+  Success,
+> = OperationResult<
+  Kind,
+  Success,
+  Effect.Error<ReturnType<TOperation>>,
+  Effect.Services<ReturnType<TOperation>>
+>;
+
+interface AccountGetInfo<Kind extends OperationKind> {
+  <TQuery extends AccountInfoQuery>(
+    query: TQuery,
+  ): ResultOf<Kind, typeof getAccountInfo, AccountInfoResponseFor<TQuery>>;
+  (query?: AccountInfoQuery): ResultOf<Kind, typeof getAccountInfo, AccountInfoBroad>;
+}
+
+interface ConfigGetKeyWith<Kind extends OperationKind> {
+  <A>(
+    key: string,
+    schema: Schema.ConstraintDecoder<A, never>,
+  ): ResultOf<Kind, typeof getConfigKeyWith, A>;
+}
+
+interface ConfigReadWith<Kind extends OperationKind> {
+  <A>(schema: Schema.ConstraintDecoder<A, never>): ResultOf<Kind, typeof readConfigWith, A>;
+}
+
+interface FileGet<Kind extends OperationKind> {
+  (input: { readonly id: number }): ResultOf<Kind, typeof getFile, FileCore>;
+  <TQuery extends FileQuery>(input: {
+    readonly id: number;
+    readonly query: TQuery;
+  }): ResultOf<Kind, typeof getFile, FileResponseFor<TQuery>>;
+  (input: {
+    readonly id: number;
+    readonly query?: FileQuery | undefined;
+  }): ResultOf<Kind, typeof getFile, FileBroad>;
+}
+
+interface FileGetChild<Kind extends OperationKind> {
+  (input: {
+    readonly name: string;
+    readonly parentId: number;
+  }): ResultOf<Kind, typeof getFileChild, FileCore>;
+  <TQuery extends FileQuery>(input: {
+    readonly name: string;
+    readonly parentId: number;
+    readonly query: TQuery;
+  }): ResultOf<Kind, typeof getFileChild, FileResponseFor<TQuery>>;
+  (input: {
+    readonly name: string;
+    readonly parentId: number;
+    readonly query?: FileQuery | undefined;
+  }): ResultOf<Kind, typeof getFileChild, FileBroad>;
+}
+
+interface FileList<Kind extends OperationKind> {
+  <TQuery extends FilesListQuery>(
+    parent: number | "friends",
+    query: TQuery,
+  ): ResultOf<Kind, typeof queryFiles, FileListResponseFor<TQuery>>;
+  (
+    parent: number | "friends",
+    query?: FilesListQuery,
+  ): ResultOf<Kind, typeof queryFiles, FileListResponse>;
+}
+
+interface PublicShareListFiles<Kind extends OperationKind> {
+  <TQuery extends PublicShareListQuery>(
+    query: TQuery,
+  ): ResultOf<Kind, typeof listPublicShareFiles, FileListResponseFor<TQuery>>;
+  (query?: PublicShareListQuery): ResultOf<Kind, typeof listPublicShareFiles, FileListResponse>;
+}
+
+interface TransferList<Kind extends OperationKind> {
+  <TQuery extends TransfersListQuery>(
+    query: TQuery,
+  ): ResultOf<Kind, typeof listTransfers, TransfersListResponseFor<TQuery>>;
+  (query?: TransfersListQuery): ResultOf<Kind, typeof listTransfers, TransfersListResponse>;
+}
+
+interface SignedOperations<Kind extends OperationKind> {
+  account: {
+    getInfo: AccountGetInfo<Kind>;
+  };
+  config: {
+    getKeyWith: ConfigGetKeyWith<Kind>;
+    readWith: ConfigReadWith<Kind>;
+  };
+  files: {
+    get: FileGet<Kind>;
+    getChild: FileGetChild<Kind>;
+    list: FileList<Kind>;
+  };
+  sharing: {
+    publicAccess: {
+      listFiles: PublicShareListFiles<Kind>;
+    };
+  };
+  transfers: {
+    list: TransferList<Kind>;
+  };
+}
+
+type ProvideSdkEffect = (effect: SdkEffect) => void;
 
 class OperationEntry<T extends Operation> {
   constructor(
     readonly run: T,
-    readonly toPromise: (runner: PutioSdkPromiseRunner) => (...args: Parameters<T>) => void,
+    readonly bind: (provide: ProvideSdkEffect) => (...args: Parameters<T>) => void,
   ) {}
 }
 
@@ -324,9 +466,9 @@ type PureOperation<T extends Operation> = [EffectReturnMember<ReturnType<T>>] ex
 const effect = <T extends SdkEffectOperation>(operation: T): OperationEntry<T> =>
   new OperationEntry(
     operation,
-    (runner) =>
+    (provide) =>
       (...args: Parameters<T>) =>
-        provideSdk(runner, operation(...args)),
+        provide(operation(...args)),
   );
 
 const pure = <T extends Operation>(operation: T & PureOperation<T>): OperationEntry<T> =>
@@ -347,11 +489,23 @@ type EffectOperationTree<T> =
       ? { [Key in keyof T]: EffectOperationTree<T[Key]> }
       : never;
 
-type PromiseOperationTree<T> =
+type OperationFor<Kind extends OperationKind, T> = T extends (...args: infer Args) => infer Result
+  ? Result extends Effect.Effect<infer Success, infer Failure, infer Requirements>
+    ? (...args: Args) => OperationResult<Kind, Success, Failure, Requirements>
+    : T
+  : never;
+
+type OperationTreeFor<Kind extends OperationKind, T, Signed> =
   T extends OperationEntry<infer TOperation>
-    ? PromiseOperation<TOperation>
+    ? OperationFor<Kind, TOperation>
     : T extends object
-      ? { [Key in keyof T]: PromiseOperationTree<T[Key]> }
+      ? {
+          [Key in keyof T]: Key extends keyof Signed
+            ? Signed[Key] extends Operation
+              ? Signed[Key]
+              : OperationTreeFor<Kind, T[Key], Signed[Key]>
+            : OperationTreeFor<Kind, T[Key], unknown>;
+        }
       : never;
 
 const mapOperationTree = (
@@ -375,7 +529,7 @@ const sharedOperationTree = {
     },
     clear: effect(clearAccount),
     destroy: effect(destroyAccount),
-    getInfo: effect(getAccountInfo),
+    getInfo: effect(getAccountInfo satisfies AccountGetInfo<ContextualEffectKind>),
     getSettings: effect(getAccountSettings),
     listSubtitleLanguages: effect(listAccountSubtitleLanguages),
     listConfirmations: effect(listAccountConfirmations),
@@ -413,9 +567,9 @@ const sharedOperationTree = {
   config: {
     deleteKey: effect(deleteConfigKey),
     getKey: effect(getConfigKey),
-    getKeyWith: effect(getConfigKeyWith),
+    getKeyWith: effect(getConfigKeyWith satisfies ConfigGetKeyWith<ContextualEffectKind>),
     read: effect(readConfig),
-    readWith: effect(readConfigWith),
+    readWith: effect(readConfigWith satisfies ConfigReadWith<ContextualEffectKind>),
     setKey: effect(setConfigKey),
     write: effect(writeConfig),
   },
@@ -463,15 +617,15 @@ const sharedOperationTree = {
     getApiContentUrl: effect(getApiContentUrl),
     getApiDownloadUrl: effect(getApiDownloadUrl),
     getApiMp4DownloadUrl: effect(getApiMp4DownloadUrl),
-    get: effect(getFile),
-    getChild: effect(getFileChild),
+    get: effect(getFile satisfies FileGet<ContextualEffectKind>),
+    getChild: effect(getFileChild satisfies FileGetChild<ContextualEffectKind>),
     getDownloadUrl: effect(getDownloadUrl),
     getHlsMasterPlaylist: effect(getHlsMasterPlaylist),
     getHlsStreamUrl: effect(getHlsStreamUrl),
     getXspfPlaylistUrl: effect(getXspfPlaylistUrl),
     getMp4Status: effect(getMp4Status),
     getStartFrom: effect(getStartFrom),
-    list: effect(queryFiles),
+    list: effect(queryFiles satisfies FileList<ContextualEffectKind>),
     listActiveConversions: effect(listActiveMp4Conversions),
     listExtractions: effect(listFileExtractions),
     listSubtitles: effect(listFileSubtitles),
@@ -568,7 +722,7 @@ const sharedOperationTree = {
       continueFiles: effect(continuePublicShareFiles),
       get: effect(getPublicShare),
       getFileUrl: effect(getPublicShareFileUrl),
-      listFiles: effect(listPublicShareFiles),
+      listFiles: effect(listPublicShareFiles satisfies PublicShareListFiles<ContextualEffectKind>),
     },
     publicShares: {
       create: effect(createPublicShare),
@@ -599,7 +753,7 @@ const sharedOperationTree = {
     get: effect(getTransfer),
     getTorrent: effect(getTransferTorrent),
     info: effect(getTransferInfo),
-    list: effect(listTransfers),
+    list: effect(listTransfers satisfies TransferList<ContextualEffectKind>),
     reannounce: effect(reannounceTransfer),
     remove: effect(removeTransfers),
     retry: effect(retryTransfer),
@@ -615,6 +769,22 @@ const sharedOperationTree = {
 
 type SharedOperationTree = typeof sharedOperationTree;
 
+type BoundOperationTree<Kind extends OperationKind> = OperationTreeFor<
+  Kind,
+  SharedOperationTree,
+  SignedOperations<Kind>
+>;
+
+const bindOperationTree = <Kind extends OperationKind>(
+  provide: ProvideSdkEffect,
+): BoundOperationTree<Kind> =>
+  // SAFETY: mapOperationTree keeps every key of sharedOperationTree and replaces each entry with its own `run` passed through `provide`, and each caller names the Kind that its `provide` returns.
+  mapOperationTree(sharedOperationTree, (entry) => entry.bind(provide)) as BoundOperationTree<Kind>;
+
+const buildLoginUrlFrom =
+  (webAppUrl: string | URL) => (options: Parameters<typeof buildAuthLoginUrl>[0]) =>
+    buildAuthLoginUrl({ ...options, webAppUrl: options.webAppUrl ?? webAppUrl });
+
 export const createPutioSdkEffectClient = (): EffectOperationTree<SharedOperationTree> =>
   // SAFETY: mapOperationTree keeps every key of sharedOperationTree and replaces each entry with its own `run`.
   mapOperationTree(
@@ -624,131 +794,59 @@ export const createPutioSdkEffectClient = (): EffectOperationTree<SharedOperatio
 
 export type PutioSdkEffectClient = ReturnType<typeof createPutioSdkEffectClient>;
 
-export class PutioSdk extends Context.Service<PutioSdk, PutioSdkEffectClient>()("PutioSdk") {}
+const makePutioSdkService = (
+  config: PutioSdkResolvedConfig,
+  httpClient: PutioHttpClientService,
+) => {
+  const context = Context.make(PutioSdkConfig, config).pipe(
+    Context.add(PutioHttpClient, httpClient),
+  );
 
-export const makePutioSdkEffectClientLayer = () =>
-  Layer.succeed(PutioSdk, createPutioSdkEffectClient());
-
-export const makePutioSdkLiveClientLayer = (config: PutioSdkOptions) =>
-  Layer.mergeAll(makePutioSdkEffectClientLayer(), putioSdkLiveLayer(config));
-
-const createPromiseOperations = (state: PutioSdkPromiseState, signal: AbortSignal | undefined) => {
-  const config: PutioSdkPromiseRunner = { signal, state };
-
-  function getInfo(query: {
-    readonly download_token: 1;
-    readonly pas: 1;
-  }): Promise<AccountInfoBase & { readonly download_token: string; readonly pas: PasInfo }>;
-  function getInfo(query: {
-    readonly download_token: 1;
-  }): Promise<AccountInfoBase & { readonly download_token: string }>;
-  function getInfo(query: {
-    readonly features: 1;
-  }): Promise<AccountInfoBase & { readonly features: Record<string, boolean> }>;
-  function getInfo(query: {
-    readonly intercom: 1;
-    readonly platform?: "web" | "ios";
-  }): Promise<AccountInfoBase & { readonly user_hash?: string }>;
-  function getInfo(query: {
-    readonly pas: 1;
-  }): Promise<AccountInfoBase & { readonly pas: PasInfo }>;
-  function getInfo(query: {
-    readonly profitwell: 1;
-  }): Promise<AccountInfoBase & { readonly paddle_user_id: number | string | null }>;
-  function getInfo(query: {
-    readonly push_token: 1;
-  }): Promise<AccountInfoBase & { readonly push_token: string }>;
-  function getInfo(): Promise<AccountInfoBroad>;
-  function getInfo(query: AccountInfoQuery): Promise<AccountInfoBroad>;
-  function getInfo(query: AccountInfoQuery = {}) {
-    return provideSdk(config, getAccountInfo(query));
-  }
-
-  function getFileById(input: {
-    readonly id: number;
-    readonly query: { readonly stream_url: 1; readonly video_metadata: 1 };
-  }): Promise<
-    FileCore & {
-      readonly stream_url: string | null;
-      readonly video_metadata: FileVideoMetadata;
-    }
-  >;
-  function getFileById(input: {
-    readonly id: number;
-    readonly query: { readonly mp4_stream_url: 1 };
-  }): Promise<
-    FileCore &
-      (
-        | {
-            readonly is_mp4_available: true;
-            readonly mp4_stream_url: string | null;
-            readonly mp4_size: number | null;
-            readonly need_convert: boolean;
-          }
-        | {
-            readonly is_mp4_available: false;
-            readonly mp4_size: number | null;
-            readonly need_convert: boolean;
-          }
-      )
-  >;
-  function getFileById(input: {
-    readonly id: number;
-    readonly query?: FileQuery;
-  }): Promise<FileCore>;
-  function getFileById(input: { readonly id: number; readonly query?: FileQuery }) {
-    return provideSdk(config, getFile(input));
-  }
-
-  function getChildByName(input: {
-    readonly name: string;
-    readonly parentId: number;
-  }): Promise<FileCore>;
-  function getChildByName<TQuery extends FileQuery>(input: {
-    readonly name: string;
-    readonly parentId: number;
-    readonly query: TQuery;
-  }): Promise<FileResponseFor<TQuery>>;
-  function getChildByName(input: {
-    readonly name: string;
-    readonly parentId: number;
-    readonly query?: FileQuery;
-  }) {
-    return provideSdk(config, getFileChild(input));
-  }
-
-  const operations =
-    // SAFETY: mapOperationTree keeps every key of sharedOperationTree and replaces each entry with the Promise adapter built for its own `run`.
-    mapOperationTree(sharedOperationTree, (entry) =>
-      entry.toPromise(config),
-    ) as PromiseOperationTree<SharedOperationTree>;
+  const operations = bindOperationTree<ProvidedEffectKind>((operation) =>
+    Effect.provideContext(operation, context),
+  );
 
   return {
     ...operations,
-    account: {
-      ...operations.account,
-      getInfo,
-    },
     auth: {
       ...operations.auth,
-      buildLoginUrl: (options: Parameters<typeof buildAuthLoginUrl>[0]) =>
-        buildAuthLoginUrl({
-          ...options,
-          webAppUrl: options.webAppUrl ?? state.runtimeConfig.webAppUrl,
-        }),
+      buildLoginUrl: buildLoginUrlFrom(config.webAppUrl),
     },
-    config: {
-      ...operations.config,
-      getKeyWith: <A>(key: string, schema: Schema.ConstraintDecoder<A, never>): Promise<A> =>
-        provideSdk(config, getConfigKeyWith(key, schema)),
-      readWith: <A>(schema: Schema.ConstraintDecoder<A, never>): Promise<A> =>
-        provideSdk(config, readConfigWith(schema)),
+  };
+};
+
+export type PutioSdkService = ReturnType<typeof makePutioSdkService>;
+
+export class PutioSdk extends Context.Service<PutioSdk, PutioSdkService>()(
+  "@putdotio/sdk/PutioSdk",
+) {}
+
+export const makePutioSdkEffectClientLayer = (): Layer.Layer<PutioSdk, never, PutioSdkContext> =>
+  Layer.effect(PutioSdk)(
+    Effect.gen(function* () {
+      return makePutioSdkService(yield* PutioSdkConfig, yield* PutioHttpClient);
+    }),
+  );
+
+export const makePutioSdkLiveClientLayer = (
+  config: PutioSdkOptions,
+): Layer.Layer<PutioSdk | PutioSdkContext> =>
+  Layer.provideMerge(makePutioSdkEffectClientLayer(), putioSdkLiveLayer(config));
+
+const createPromiseOperations = (state: PutioSdkPromiseState, signal: AbortSignal | undefined) => {
+  const runner: PutioSdkPromiseRunner = { signal, state };
+
+  const operations = bindOperationTree<PromiseKind>((operation) => provideSdk(runner, operation));
+
+  return {
+    ...operations,
+    auth: {
+      ...operations.auth,
+      buildLoginUrl: buildLoginUrlFrom(state.config.webAppUrl),
     },
     files: {
       ...operations.files,
       createUploadFormData: createFileUploadFormData,
-      get: getFileById,
-      getChild: getChildByName,
     },
   };
 };
@@ -757,25 +855,21 @@ export type PutioSdkPromiseOperations = ReturnType<typeof createPromiseOperation
 
 export const createPutioSdkPromiseClient = (initialConfig: PutioSdkOptions = {}) => {
   const state: PutioSdkPromiseState = {
-    accessToken: initialConfig.accessToken,
+    config: normalizePutioSdkOptions({
+      ...initialConfig,
+      baseUrl: snapshotUrl(initialConfig.baseUrl),
+      headers: snapshotHeaders(initialConfig.headers),
+      uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
+      webAppUrl: snapshotUrl(initialConfig.webAppUrl),
+    }),
     disposed: false,
     runtime: undefined,
-    runtimeConfig: Struct.omit(
-      normalizePutioSdkOptions({
-        ...initialConfig,
-        baseUrl: snapshotUrl(initialConfig.baseUrl),
-        headers: snapshotHeaders(initialConfig.headers),
-        uploadBaseUrl: snapshotUrl(initialConfig.uploadBaseUrl),
-        webAppUrl: snapshotUrl(initialConfig.webAppUrl),
-      }),
-      ["accessToken"],
-    ),
   };
 
   return {
     dispose: () => disposePromiseClientRuntime(state),
-    setAccessToken: (accessToken: string | undefined): void => {
-      state.accessToken = accessToken;
+    setAccessToken: (accessToken: PutioSecret | undefined): void => {
+      state.config = normalizePutioSdkOptions({ ...state.config, accessToken });
     },
     withSignal: (signal: AbortSignal): PutioSdkPromiseOperations =>
       createPromiseOperations(state, signal),

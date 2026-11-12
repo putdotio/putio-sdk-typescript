@@ -2,20 +2,29 @@ import { Effect, Schema } from "effect";
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 
 import { expectFailure } from "../../test/support/sdk-test.js";
+import { failMissingField } from "./validation.js";
 
 import {
   PutioApiError,
   PutioAuthError,
+  PutioConfigurationError,
+  PutioContractError,
   PutioRateLimitError,
   PutioTransportError,
   PutioOperationError,
+  PutioValidationError,
+  type PutioSdkError,
   definePutioOperationErrorSpec,
   fallbackPutioErrorEnvelope,
   isPutioApiError,
   isPutioAuthError,
+  isPutioConfigurationError,
+  isPutioContractError,
   isPutioErrorEnvelope,
   isPutioOperationError,
   isPutioRateLimitError,
+  isPutioTransportError,
+  isPutioValidationError,
   toPutioResponseError,
   parseErrorBody,
   responseRateLimitHeaders,
@@ -178,6 +187,74 @@ describe("sdk core errors", () => {
       ),
     ).toBe(false);
   });
+
+  it("narrows each cause-carrying SDK error to its own guard", () => {
+    const errors = {
+      PutioConfigurationError: new PutioConfigurationError({ cause: "missing token" }),
+      PutioContractError: new PutioContractError({ missingField: "stream_url" }),
+      PutioTransportError: new PutioTransportError({ cause: new TypeError("offline") }),
+      PutioValidationError: new PutioValidationError({ cause: "bad input" }),
+    };
+
+    const guards = {
+      PutioConfigurationError: isPutioConfigurationError,
+      PutioContractError: isPutioContractError,
+      PutioTransportError: isPutioTransportError,
+      PutioValidationError: isPutioValidationError,
+    };
+
+    for (const [guardTag, guard] of Object.entries(guards)) {
+      for (const [errorTag, error] of Object.entries(errors)) {
+        expect(guard(error)).toBe(guardTag === errorTag);
+      }
+    }
+
+    expect(isPutioContractError(new PutioContractError({}))).toBe(true);
+    expect(
+      isPutioContractError(Object.assign(new PutioContractError({}), { missingField: 1 })),
+    ).toBe(false);
+  });
+
+  it("guards response errors with the status schema of their classes", () => {
+    const fields = { body: { status_code: 500 }, status: 500 };
+    const fractionalStatus = { status: 500.5 };
+
+    const operationError = new PutioOperationError({
+      ...fields,
+      contract: { statusCode: 500 },
+      domain: "files",
+      operation: "list",
+      reason: { kind: "status_code", statusCode: 500 },
+    });
+
+    expect(isPutioOperationError(operationError)).toBe(true);
+
+    for (const [guard, error] of [
+      [isPutioApiError, new PutioApiError(fields)],
+      [isPutioAuthError, new PutioAuthError(fields)],
+      [isPutioRateLimitError, new PutioRateLimitError(fields)],
+      [isPutioOperationError, operationError],
+    ] as const) {
+      expect(guard(Object.assign(error, fractionalStatus))).toBe(false);
+    }
+  });
+
+  it.effect("fails with the missing conditioned field as typed data", () =>
+    Effect.gen(function* () {
+      const error = expectFailure(yield* Effect.exit(failMissingField("stream_url")));
+
+      expect(error).toBeInstanceOf(PutioContractError);
+      expect(error.missingField).toBe("stream_url");
+      expect(error.cause).toBeUndefined();
+
+      const decoded = yield* Schema.decodeUnknownEffect(PutioContractError)(
+        JSON.parse(JSON.stringify(yield* Schema.encodeEffect(PutioContractError)(error))),
+      );
+
+      expect(decoded).toBeInstanceOf(PutioContractError);
+      expect(decoded.missingField).toBe("stream_url");
+    }),
+  );
 
   it.effect("keeps protocol response errors schema-decodable", () =>
     Effect.gen(function* () {
@@ -355,4 +432,23 @@ describe("sdk core errors", () => {
       expect(expectFailure(exit)).toBe(transportError);
     }),
   );
+
+  it("matches cause-carrying errors that lost an undefined cause in a JSON round trip", () => {
+    const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json));
+
+    const roundTrip = (error: PutioSdkError) => decodeJson(JSON.stringify(error));
+
+    expect(isPutioTransportError(roundTrip(new PutioTransportError({ cause: undefined })))).toBe(
+      true,
+    );
+    expect(
+      isPutioConfigurationError(roundTrip(new PutioConfigurationError({ cause: undefined }))),
+    ).toBe(true);
+    expect(isPutioValidationError(roundTrip(new PutioValidationError({ cause: undefined })))).toBe(
+      true,
+    );
+    expect(isPutioValidationError(roundTrip(new PutioTransportError({ cause: undefined })))).toBe(
+      false,
+    );
+  });
 });

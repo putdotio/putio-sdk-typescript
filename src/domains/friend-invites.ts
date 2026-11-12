@@ -6,6 +6,7 @@ import {
   type PutioOperationFailure,
 } from "../core/errors.js";
 import { requestJson, selectJsonFields, type PutioSdkContext } from "../core/http.js";
+import { NonNegativeNumberSchema } from "../core/validation.js";
 
 export const FriendInviteJoinedUserStatusSchema = Schema.Literals([
   "CONVERTED",
@@ -18,7 +19,7 @@ export const FriendInviteJoinedUserStatusSchema = Schema.Literals([
 export const FriendInviteJoinedUserSchema = Schema.Struct({
   avatar_url: Schema.String,
   created_at: Schema.String,
-  earned_amount: Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
+  earned_amount: Schema.NullOr(NonNegativeNumberSchema),
   name: Schema.String,
   status: FriendInviteJoinedUserStatusSchema,
 });

@@ -66,9 +66,9 @@ export type PutioErrorWithBody =
   | PutioOperationError<string, string, PutioKnownOperationErrorContract>;
 
 export type PutioLocalizableError = {
-  readonly _tag?: string;
+  readonly _tag?: string | undefined;
   readonly body: PutioErrorEnvelope;
-  readonly status?: number;
+  readonly status?: number | undefined;
 };
 
 class LocalizablePutioErrorEnvelope extends Data.TaggedClass("PutioErrorEnvelope")<{

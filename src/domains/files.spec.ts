@@ -1,6 +1,12 @@
-import { Effect, Exit } from "effect";
-import { PutioOperationError, PutioValidationError } from "../core/errors.js";
-import { describe, expect, it } from "@effect/vitest";
+import { Effect, Exit, Redacted } from "effect";
+import {
+  PutioConfigurationError,
+  PutioContractError,
+  PutioOperationError,
+  PutioValidationError,
+} from "../core/errors.js";
+import { normalizePutioSdkOptions, PutioSdkConfig } from "../core/http.js";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 
 import * as files from "./files.js";
 import {
@@ -79,7 +85,7 @@ describe("files domain", () => {
         ),
       );
 
-      expect(expectFailure(exit)).toBeInstanceOf(PutioValidationError);
+      expect(expectFailure(exit)).toBeInstanceOf(PutioContractError);
     }),
   );
 
@@ -743,21 +749,17 @@ describe("files domain", () => {
       );
 
       const validationError = expectFailure(validationExit);
-      expect(validationError).toBeInstanceOf(PutioValidationError);
+      expect(validationError).toBeInstanceOf(PutioContractError);
       expect(validationError).toMatchObject({
-        cause: 'Expected put.io to include "stream_url" because it was requested',
+        missingField: "stream_url",
       });
 
-      for (const [query, expectedCause] of [
-        [
-          { media_metadata: 1 },
-          'Expected put.io to include "media_metadata" because it was requested',
-        ],
-        [
-          { codecs: 1 },
-          'Expected put.io to include "content_type_and_codecs" because it was requested',
-        ],
-        [{ media_info: 1 }, 'Expected put.io to include "media_info" because it was requested'],
+      for (const [query, expectedField, file] of [
+        [{ media_metadata: 1 }, "media_metadata", baseFile],
+        [{ codecs: 1 }, "content_type_and_codecs", baseFile],
+        [{ media_info: 1 }, "media_info", baseFile],
+        [{ mp4_status: 1 }, "mp4_size", baseFile],
+        [{ mp4_stream_url: 1 }, "need_convert", { ...baseFile, mp4_size: null }],
       ] as const) {
         const missingExit = yield* Effect.exit(
           provideSdk(
@@ -767,16 +769,16 @@ describe("files domain", () => {
             }),
             () =>
               jsonResponse({
-                file: baseFile,
+                file,
                 status: "OK",
               }),
             { accessToken: "token-123" },
           ),
         );
 
-        expect(expectFailure(missingExit)).toBeInstanceOf(PutioValidationError);
+        expect(expectFailure(missingExit)).toBeInstanceOf(PutioContractError);
         expect(expectFailure(missingExit)).toMatchObject({
-          cause: expectedCause,
+          missingField: expectedField,
         });
       }
 
@@ -895,6 +897,74 @@ describe("files domain", () => {
           { accessToken: "token-123" },
         ),
       ).toMatchObject({ files: [expect.objectContaining({ id: 9 })] });
+    }),
+  );
+
+  it.effect("names search continue failures after the continue operation", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        provideSdk(
+          files.continueSearch("cursor-2"),
+          () => jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 }),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      expect(expectFailure(exit)).toBeInstanceOf(PutioOperationError);
+      expect(expectFailure(exit)).toMatchObject({
+        domain: "files",
+        operation: "continueSearch",
+        status: 400,
+      });
+    }),
+  );
+
+  it.effect("requires the breadcrumbs a file list asked for", () =>
+    Effect.gen(function* () {
+      const listing = { cursor: null, files: [baseFile], parent: baseFile, status: "OK", total: 1 };
+
+      const withBreadcrumbs = yield* provideSdk(
+        files.queryFiles(5, { breadcrumbs: 1 }),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/files/list?breadcrumbs=1&parent_id=5");
+
+          return jsonResponse({ ...listing, breadcrumbs: [[0, "Your Files"]] });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expectTypeOf(withBreadcrumbs.breadcrumbs).toEqualTypeOf<
+        ReadonlyArray<files.FileBreadcrumb>
+      >();
+      expect(withBreadcrumbs.breadcrumbs).toEqual([[0, "Your Files"]]);
+
+      const withoutBreadcrumbs = yield* provideSdk(
+        files.queryFiles(5, { per_page: 2 }),
+        () => jsonResponse(listing),
+        { accessToken: "token-123" },
+      );
+
+      expectTypeOf(withoutBreadcrumbs.breadcrumbs).toEqualTypeOf<
+        ReadonlyArray<files.FileBreadcrumb> | undefined
+      >();
+      expect(withoutBreadcrumbs.breadcrumbs).toBeUndefined();
+
+      const widenedQuery: files.FilesListQuery = { breadcrumbs: 1 };
+
+      expectTypeOf(files.queryFiles(5, widenedQuery)).toEqualTypeOf(files.queryFiles(5));
+
+      for (const parent of [5, "friends"] as const) {
+        const exit = yield* Effect.exit(
+          provideSdk(files.queryFiles(parent, { breadcrumbs: 1 }), () => jsonResponse(listing), {
+            accessToken: "token-123",
+          }),
+        );
+
+        expect(expectFailure(exit)).toBeInstanceOf(PutioContractError);
+        expect(expectFailure(exit)).toMatchObject({
+          missingField: "breadcrumbs",
+        });
+      }
     }),
   );
 
@@ -1586,7 +1656,43 @@ describe("files domain", () => {
         ),
       );
 
-      expect(expectFailure(emptyUpload)).toBeInstanceOf(PutioValidationError);
+      expect(expectFailure(emptyUpload)).toBeInstanceOf(PutioContractError);
     }),
   );
+
+  it.effect("fails upload helpers with PutioConfigurationError on a wiped or empty token", () =>
+    Effect.gen(function* () {
+      const wiped = Redacted.make("wiped-secret");
+      Redacted.wipeUnsafe(wiped);
+
+      const failures = yield* Effect.forEach([wiped, Redacted.make("")], (accessToken) =>
+        Effect.exit(
+          files.createFileUploadRequest({ file: new Blob(["hello"]) }).pipe(
+            Effect.provideService(PutioSdkConfig, {
+              ...normalizePutioSdkOptions({}),
+              accessToken,
+            }),
+          ),
+        ),
+      );
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioConfigurationError)),
+      );
+    }),
+  );
+
+  it("keeps the broad file type for an optional or widened file query", () => {
+    const get = (query: files.FileQuery | undefined) => files.getFile({ id: 1, query });
+
+    const getChild = (query: files.FileQuery | undefined) =>
+      files.getFileChild({ name: "a", parentId: 0, query });
+
+    expectTypeOf<Effect.Success<ReturnType<typeof get>>>().toEqualTypeOf<files.FileBroad>();
+    expectTypeOf<Effect.Success<ReturnType<typeof getChild>>>().toEqualTypeOf<files.FileBroad>();
+    expectTypeOf<Effect.Error<ReturnType<typeof get>>>().toEqualTypeOf<files.GetFileError>();
+    expectTypeOf<
+      Effect.Error<ReturnType<typeof getChild>>
+    >().toEqualTypeOf<files.GetFileChildError>();
+  });
 });

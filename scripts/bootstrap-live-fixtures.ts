@@ -44,7 +44,7 @@ const TypedErrorSummarySchema = Schema.Struct({
       errorType: Schema.optional(Schema.String),
     }),
   ),
-  status: Schema.optional(Schema.Number),
+  status: Schema.optional(Schema.Finite),
 });
 
 const decodeTypedErrorSummary = Schema.decodeUnknownOption(TypedErrorSummarySchema);

@@ -63,8 +63,8 @@ export type PutioLiveTokens = {
 
 export type PutioCredentialFixture = {
   readonly password: string;
-  readonly totp?: string;
-  readonly totpReference?: string;
+  readonly totp?: string | undefined;
+  readonly totpReference?: string | undefined;
   readonly username: string;
 };
 
@@ -76,7 +76,7 @@ export type PutioClientCredentials = {
 export type PutioBootstrapSecrets = {
   readonly credentials: PutioCredentialFixture;
   readonly firstPartyClient: PutioClientCredentials;
-  readonly thirdPartyClientId?: string;
+  readonly thirdPartyClientId?: string | undefined;
 };
 
 export const readLiveTokens = (): PutioLiveTokens => ({

@@ -1,9 +1,9 @@
 type CsvValue = string | number;
 
 export interface CursorSelectionInput<TValue extends CsvValue = number> {
-  readonly cursor?: string;
-  readonly excludeIds?: ReadonlyArray<TValue>;
-  readonly ids?: ReadonlyArray<TValue>;
+  readonly cursor?: string | undefined;
+  readonly excludeIds?: ReadonlyArray<TValue> | undefined;
+  readonly ids?: ReadonlyArray<TValue> | undefined;
 }
 
 export const joinCsv = <TValue extends CsvValue>(
@@ -11,8 +11,8 @@ export const joinCsv = <TValue extends CsvValue>(
 ): string | undefined => (values && values.length > 0 ? values.join(",") : undefined);
 
 type CursorSelectionForm<TIdsFieldName extends string> = {
-  readonly cursor?: string;
-  readonly exclude_ids?: string;
+  readonly cursor?: string | undefined;
+  readonly exclude_ids?: string | undefined;
 } & Record<TIdsFieldName, string | undefined>;
 
 export function toCursorSelectionForm<TValue extends CsvValue>(

@@ -1,7 +1,12 @@
 import { Effect, Schema } from "effect";
 
 import { joinCsv } from "../core/forms.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
+import {
+  NonNegativeNumberSchema,
+  NonEmptyStringSchema,
+  PositiveIntegerSchema,
+  decodeAndRun,
+} from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
@@ -23,8 +28,11 @@ export const TrashFileSchema = Schema.Struct({
   id: Schema.Int,
   name: Schema.String,
   parent_id: Schema.NullOr(Schema.Int),
-  screenshot: Schema.Unknown,
-  size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  screenshot: Schema.Union([
+    Schema.NullOr(Schema.String),
+    Schema.Tuple([Schema.NullOr(Schema.String)]),
+  ]),
+  size: NonNegativeNumberSchema,
 });
 
 const TrashListEnvelopeSchema = Schema.Struct({
@@ -32,7 +40,7 @@ const TrashListEnvelopeSchema = Schema.Struct({
   files: Schema.Array(TrashFileSchema),
   status: Schema.Literal("OK"),
   total: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  trash_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  trash_size: NonNegativeNumberSchema,
 });
 
 const TrashContinueEnvelopeSchema = Schema.Struct({

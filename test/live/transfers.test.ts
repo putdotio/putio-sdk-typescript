@@ -39,9 +39,11 @@ const waitForTorrentTransfer = async (id: number) => {
 };
 
 test("transfers list decodes", async () => {
-  await client.transfers.list({
+  const page = await client.transfers.list({
     per_page: 5,
   });
+
+  assert(Number.isFinite(page.total), "expected a total for a paged transfer list");
 });
 
 test("transfers list per_page too large yields typed 400", async () => {

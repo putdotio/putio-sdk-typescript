@@ -52,8 +52,8 @@ export default defineConfig({
     rules: {
       "effecttsgo/any-unknown-in-error-context": "error",
       "effecttsgo/lazy-effect": "off",
-      "effecttsgo/schema-class-missing-brand": "off",
-      "effecttsgo/schema-number": "off",
+      "effecttsgo/schema-class-missing-brand": "error",
+      "effecttsgo/schema-number": "error",
       "effecttsgo/unsafe-effect-type-assertion": "error",
       "oxc/no-accumulating-spread": "error",
       "anti-slop/no-array-filter-map": "error",

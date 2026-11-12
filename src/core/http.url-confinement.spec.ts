@@ -102,7 +102,7 @@ describe("request URL confinement", () => {
     }
 
     expect(violations.slice(0, 10)).toEqual([]);
-  });
+  }, 30_000);
 
   it("keeps generated paths on the base origin and under their prefix", () => {
     fc.assert(

@@ -75,6 +75,8 @@ const account = await sdk.account.getInfo({});
 sdk.setAccessToken(undefined);
 ```
 
+`accessToken` and `setAccessToken(...)` take a string or an Effect `Redacted<string>`. The SDK stores the token as `Redacted`, so `PutioSdkConfig` never prints it, and unwraps it only to build the `Authorization` header.
+
 The token is snapshotted when each Promise-client operation is invoked. Token changes apply to subsequent operations; an operation already in flight keeps the snapshot it started with. Base, upload, and web app URLs remain fixed from client creation.
 
 Authorization-code clients can exchange a code without configuring a default access token:
@@ -127,13 +129,19 @@ const sdk = createPutioSdkEffectClient();
 
 const program = sdk.files
   .list(0, {
+    breadcrumbs: 1,
     per_page: 20,
-    total: 1,
   })
   .pipe(Effect.provide(putioSdkLiveLayer({ accessToken: userAccessToken })));
 
-const result = await Effect.runPromise(program);
+const { breadcrumbs, files } = await Effect.runPromise(program);
 ```
+
+A field the query asks for is required in the result type, and the call fails with
+`PutioContractError` when the response leaves it out: `breadcrumbs` on `files.list` and
+`sharing.publicAccess.listFiles`, `cursor` and `total` on `transfers.list` with `per_page`, and the
+flags of `account.getInfo`, `files.get`, and `files.getChild`. The Effect client, the `PutioSdk`
+service, and the Promise client share these checks and result types.
 
 Effect workflows can also depend on the SDK as a service:
 
@@ -145,6 +153,8 @@ const serviceProgram = Effect.gen(function* () {
 ```
 
 `makePutioSdkLiveClientLayer(...)` provides the SDK service, SDK config, and default fetch-backed transport.
+`PutioSdk` methods need no further services: `makePutioSdkEffectClientLayer()` reads `PutioSdkConfig` and `PutioHttpClient` once and provides them to every operation, so a test can replace `PutioSdk` alone.
+The free domain functions and `createPutioSdkEffectClient()` keep requiring both services.
 `putioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed transport.
 Use `putioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioHttpClient` service when you want to supply custom transport.
 
@@ -210,6 +220,20 @@ polyfills or adapters instead of patching the SDK surface.
 
 Backend error bodies parse into `PutioErrorEnvelopeSchema` in
 [src/core/errors.ts](./src/core/errors.ts); current backend errors carry metadata in `extra`.
+
+Each error tag names who has to act, and each has an `isPutio*` guard:
+
+| Tag                                                      | Meaning                                                            | Who acts               |
+| -------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------- |
+| `PutioValidationError`                                   | Your arguments are invalid, or a value fails the schema you passed | You fix the call       |
+| `PutioConfigurationError`                                | The client options are missing or invalid, such as no access token | You fix the setup      |
+| `PutioContractError`                                     | A 2xx response was not JSON or did not match the expected shape    | Report it; retry later |
+| `PutioTransportError`                                    | The request or the response body read failed                       | Retry                  |
+| `PutioApiError`, `PutioAuthError`, `PutioRateLimitError` | put.io answered with an error status                               | Read `status`, `body`  |
+| `PutioOperationError`                                    | An error status the operation documents                            | Branch on `operation`  |
+
+`PutioContractError.missingField` names a field you requested with a query flag, such as
+`stream_url`, that the response left out.
 
 Promise consumers receive tagged SDK error objects:
 
@@ -299,6 +323,17 @@ const upload = await sdk.files.upload({
   file: new File(["hello"], "hello.txt"),
   parentId: 0,
 });
+```
+
+## Bulk Selections
+
+Bulk operations take file IDs or a list cursor, and reject a selection that has neither before
+sending a request:
+
+```ts
+await sdk.downloadLinks.create({ ids: [fileId] });
+await sdk.sharing.clone({ cursor, excludeIds: [skippedFileId], parentId: 0 });
+await sdk.zips.create({ file_ids: [fileId] });
 ```
 
 ## Endpoint Coverage

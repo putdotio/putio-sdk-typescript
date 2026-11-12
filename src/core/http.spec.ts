@@ -1,4 +1,4 @@
-import { Effect, Fiber, Tracer } from "effect";
+import { Effect, Fiber, Redacted, Tracer } from "effect";
 import { describe, expect, it } from "@effect/vitest";
 
 import { expectFailure, provideSdk } from "../../test/support/sdk-test.js";
@@ -26,18 +26,81 @@ import {
   requestVoid,
   selectJsonField,
   selectJsonFields,
+  type PutioAuth,
   type PutioSdkContext,
 } from "./http.js";
 
 describe("sdk core http", () => {
   it("applies default sdk configuration values", () => {
     expect(normalizePutioSdkOptions({ accessToken: "token" })).toEqual({
-      accessToken: "token",
+      accessToken: Redacted.make("token"),
       baseUrl: "https://api.put.io",
+      headers: undefined,
       uploadBaseUrl: "https://upload.put.io",
       webAppUrl: "https://app.put.io",
     });
   });
+
+  it("stores the access token redacted, whichever form the caller passes", () => {
+    const fromString = normalizePutioSdkOptions({ accessToken: "secret-token" });
+    const fromRedacted = normalizePutioSdkOptions({ accessToken: Redacted.make("secret-token") });
+
+    expect(fromString.accessToken).toEqual(fromRedacted.accessToken);
+    expect(JSON.stringify(fromString)).not.toContain("secret-token");
+    expect(normalizePutioSdkOptions({ accessToken: "" }).accessToken).toBeUndefined();
+    expect(normalizePutioSdkOptions({}).accessToken).toBeUndefined();
+  });
+
+  it.effect("unwraps redacted credentials only into the Authorization header", () =>
+    Effect.gen(function* () {
+      const authorizations: Array<string | null> = [];
+
+      const respond = (request: { readonly headers: Headers }) => {
+        authorizations.push(request.headers.get("authorization"));
+
+        return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+      };
+
+      yield* provideSdk(
+        requestJson(OkResponseSchema, { method: "GET", path: "/v2/test" }),
+        respond,
+        {
+          accessToken: Redacted.make("config-secret"),
+        },
+      );
+      yield* provideSdk(
+        requestJson(OkResponseSchema, {
+          auth: { type: "token", token: Redacted.make("override-secret") },
+          method: "GET",
+          path: "/v2/test",
+        }),
+        respond,
+      );
+      yield* provideSdk(
+        requestJson(OkResponseSchema, {
+          auth: { type: "basic", username: "user", password: Redacted.make("basic-secret") },
+          method: "GET",
+          path: "/v2/test",
+        }),
+        respond,
+      );
+      yield* provideSdk(
+        requestJson(OkResponseSchema, {
+          auth: { type: "basic", username: "user", password: "plain-secret" },
+          method: "GET",
+          path: "/v2/test",
+        }),
+        respond,
+      );
+
+      expect(authorizations).toEqual([
+        "Token config-secret",
+        "Token override-secret",
+        `Basic ${btoa("user:basic-secret")}`,
+        `Basic ${btoa("user:plain-secret")}`,
+      ]);
+    }),
+  );
 
   it.effect("provides both config and an http client through the live layer", () =>
     Effect.gen(function* () {
@@ -47,8 +110,9 @@ describe("sdk core http", () => {
       }).pipe(Effect.provide(putioSdkLiveLayer({ accessToken: "token-123" })));
 
       expect(result.config).toEqual({
-        accessToken: "token-123",
+        accessToken: Redacted.make("token-123"),
         baseUrl: "https://api.put.io",
+        headers: undefined,
         uploadBaseUrl: "https://upload.put.io",
         webAppUrl: "https://app.put.io",
       });
@@ -711,6 +775,76 @@ describe("sdk core http", () => {
           return new Response(null, { status: 204 });
         },
       );
+    }),
+  );
+
+  it("normalises a redacted access token without unwrapping it", () => {
+    const wiped = Redacted.make("wiped-secret");
+    Redacted.wipeUnsafe(wiped);
+
+    expect(normalizePutioSdkOptions({ accessToken: wiped }).accessToken).toBe(wiped);
+  });
+
+  it.effect.each<{
+    readonly auth: (secret: Redacted.Redacted<string>) => PutioAuth;
+    readonly name: string;
+  }>([
+    { auth: () => ({ type: "config-token" }), name: "the configured access token" },
+    { auth: (token) => ({ type: "token", token }), name: "a token override" },
+    {
+      auth: (password) => ({ type: "basic", username: "user", password }),
+      name: "a basic password",
+    },
+  ])("fails with PutioConfigurationError when $name is a wiped Redacted", (scenario) =>
+    Effect.gen(function* () {
+      const wiped = Redacted.make("wiped-secret");
+      Redacted.wipeUnsafe(wiped);
+      let requestCount = 0;
+      const auth = scenario.auth(wiped);
+
+      const exit = yield* Effect.exit(
+        requestJson(OkResponseSchema, { auth, method: "GET", path: "/v2/test" }).pipe(
+          Effect.provideService(PutioHttpClient, {
+            execute: () => {
+              requestCount += 1;
+
+              return Effect.die("unexpected request");
+            },
+          }),
+          Effect.provideService(PutioSdkConfig, {
+            ...normalizePutioSdkOptions({}),
+            accessToken: wiped,
+          }),
+        ),
+      );
+
+      expect(expectFailure(exit)).toBeInstanceOf(PutioConfigurationError);
+      expect(requestCount).toBe(0);
+    }),
+  );
+
+  it.effect("treats an empty configured access token as a missing token", () =>
+    Effect.gen(function* () {
+      let requestCount = 0;
+
+      const exit = yield* Effect.exit(
+        requestJson(OkResponseSchema, { method: "GET", path: "/v2/test" }).pipe(
+          Effect.provideService(PutioHttpClient, {
+            execute: () => {
+              requestCount += 1;
+
+              return Effect.die("unexpected request");
+            },
+          }),
+          Effect.provideService(PutioSdkConfig, {
+            ...normalizePutioSdkOptions({}),
+            accessToken: Redacted.make(""),
+          }),
+        ),
+      );
+
+      expect(expectFailure(exit)).toBeInstanceOf(PutioConfigurationError);
+      expect(requestCount).toBe(0);
     }),
   );
 });

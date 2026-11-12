@@ -35,7 +35,7 @@ const runHttpCancellationCompatibility = async (url: string) => {
     const client = httpFetch(async (input, init) => {
       observedSignal = init?.signal ?? undefined;
       const response = await fetch(input, init);
-      const read = kind === "arrayBuffer" ? response.arrayBuffer.bind(response) : kind === "error" ? response.text.bind(response) : response.json.bind(response);
+      const read = kind === "arrayBuffer" ? response.arrayBuffer.bind(response) : response.text.bind(response);
       const observe = () => {
         bodyRead = read();
         // Observe rejection immediately, including during fiber interruption.
@@ -47,11 +47,10 @@ const runHttpCancellationCompatibility = async (url: string) => {
         if (!(value instanceof ArrayBuffer)) throw new Error("Expected binary body");
         return value;
       });
-      else if (kind === "error") response.text = () => observe().then((value) => {
+      else response.text = () => observe().then((value) => {
         if (typeof value !== "string") throw new Error("Expected text body");
         return value;
       });
-      else response.json = observe;
       return response;
     });
     const fiber = HttpEffect.runFork(client.execute({

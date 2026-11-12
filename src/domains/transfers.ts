@@ -1,11 +1,18 @@
 import { Effect, Schema } from "effect";
 import { joinCsv } from "../core/forms.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
+import {
+  NonNegativeNumberSchema,
+  NonEmptyStringSchema,
+  PositiveIntegerSchema,
+  decodeAndRun,
+  failMissingField,
+} from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
   type PutioSdkError,
+  type PutioContractError,
 } from "../core/errors.js";
 import {
   OkResponseSchema,
@@ -50,9 +57,7 @@ const TransferLinkSchema = Schema.Struct({
 
 const NullableInt = Schema.NullOr(Schema.Int);
 
-const NullableNonNegativeNumber = Schema.NullOr(
-  Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-);
+const NullableNonNegativeNumber = Schema.NullOr(NonNegativeNumberSchema);
 
 export const TransferBaseSchema = Schema.Struct({
   availability: NullableNonNegativeNumber,
@@ -117,7 +122,7 @@ const TransferLiveSchema = TransferBaseSchema.mapFields(
   ({ recorded_seconds: _recordedSeconds, type: _type, ...fields }) => fields,
 ).pipe(
   Schema.fieldsAssign({
-    recorded_seconds: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+    recorded_seconds: NonNegativeNumberSchema,
     type: Schema.Literal("LIVE_STREAM"),
   }),
 );
@@ -132,8 +137,8 @@ const TransferTorrentSeedingSchema = TransferBaseSchema.mapFields(
   }) => fields,
 ).pipe(
   Schema.fieldsAssign({
-    current_ratio: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-    seconds_seeding: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+    current_ratio: NonNegativeNumberSchema,
+    seconds_seeding: NonNegativeNumberSchema,
     status: Schema.Literals(["SEEDING", "COMPLETED", "PREPARING_SEED"]),
     type: Schema.Literal("TORRENT"),
   }),
@@ -199,7 +204,7 @@ export const TransferRemoveInputSchema = Schema.Union([
 const TransferInfoItemSchema = Schema.Struct({
   error: Schema.optional(Schema.String),
   error_message: Schema.optional(Schema.String),
-  file_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  file_size: NonNegativeNumberSchema,
   human_size: Schema.String,
   name: Schema.String,
   type_name: Schema.String,
@@ -230,7 +235,7 @@ const TransferCountEnvelopeSchema = Schema.Struct({
 });
 
 const TransferInfoEnvelopeSchema = Schema.Struct({
-  disk_avail: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  disk_avail: NonNegativeNumberSchema,
   ret: Schema.Array(TransferInfoItemSchema),
   status: Schema.Literal("OK"),
 });
@@ -272,6 +277,14 @@ export type TransferInfoItem = Schema.Schema.Type<typeof TransferInfoItemSchema>
 
 export type TransfersListResponse = Schema.Schema.Type<typeof TransfersListEnvelopeSchema>;
 
+export type TransfersListResponseFor<TQuery extends TransfersListQuery> = TransfersListResponse &
+  (TQuery["per_page"] extends number
+    ? {
+        readonly cursor: string | null;
+        readonly total: number;
+      }
+    : {});
+
 export type TransfersContinueResponse = Schema.Schema.Type<typeof TransfersContinueEnvelopeSchema>;
 
 export type TransfersAddMultiError = Schema.Schema.Type<typeof TransfersAddMultiErrorSchema>;
@@ -279,6 +292,15 @@ export type TransfersAddMultiError = Schema.Schema.Type<typeof TransfersAddMulti
 export const ListTransfersErrorSpec = definePutioOperationErrorSpec({
   domain: "transfers",
   operation: "list",
+  knownErrors: [
+    { errorType: "invalid_scope", statusCode: 401 as const },
+    { statusCode: 400 as const },
+  ],
+});
+
+export const ContinueTransfersErrorSpec = definePutioOperationErrorSpec({
+  domain: "transfers",
+  operation: "continue",
   knownErrors: [
     { errorType: "invalid_scope", statusCode: 401 as const },
     { statusCode: 400 as const },
@@ -391,6 +413,8 @@ export const StopRecordingTransferErrorSpec = definePutioOperationErrorSpec({
 
 export type ListTransfersError = PutioOperationFailure<typeof ListTransfersErrorSpec>;
 
+export type ContinueTransfersError = PutioOperationFailure<typeof ContinueTransfersErrorSpec>;
+
 export type GetTransferError = PutioOperationFailure<typeof GetTransferErrorSpec>;
 
 export type GetTransferTorrentError = PutioOperationFailure<typeof GetTransferTorrentErrorSpec>;
@@ -411,21 +435,44 @@ export type StopRecordingTransferError = PutioOperationFailure<
   typeof StopRecordingTransferErrorSpec
 >;
 
-export const listTransfers = (
-  query: TransfersListQuery = {},
-): Effect.Effect<TransfersListResponse, ListTransfersError, PutioSdkContext> =>
-  decodeAndRun(TransfersListQuerySchema, query, (decodedQuery) =>
-    requestJson(TransfersListEnvelopeSchema, {
+const ensurePagedTransferFields = (
+  response: TransfersListResponse,
+): Effect.Effect<TransfersListResponse, PutioContractError> => {
+  if (response.cursor === undefined) {
+    return failMissingField("cursor");
+  }
+
+  if (response.total === undefined) {
+    return failMissingField("total");
+  }
+
+  return Effect.succeed(response);
+};
+
+export function listTransfers<TQuery extends TransfersListQuery>(
+  query: TQuery,
+): Effect.Effect<TransfersListResponseFor<TQuery>, ListTransfersError, PutioSdkContext>;
+export function listTransfers(
+  query?: TransfersListQuery,
+): Effect.Effect<TransfersListResponse, ListTransfersError, PutioSdkContext>;
+export function listTransfers(query: TransfersListQuery = {}) {
+  return decodeAndRun(TransfersListQuerySchema, query, (decodedQuery) => {
+    const effect = requestJson(TransfersListEnvelopeSchema, {
       method: "GET",
       path: "/v2/transfers/list",
       query: decodedQuery,
-    }),
-  ).pipe(withOperationErrors(ListTransfersErrorSpec));
+    });
+
+    return decodedQuery.per_page === undefined
+      ? effect
+      : Effect.flatMap(effect, ensurePagedTransferFields);
+  }).pipe(withOperationErrors(ListTransfersErrorSpec));
+}
 
 export const continueTransfers = (
   cursor: string,
   query: TransfersListQuery = {},
-): Effect.Effect<TransfersContinueResponse, ListTransfersError, PutioSdkContext> =>
+): Effect.Effect<TransfersContinueResponse, ContinueTransfersError, PutioSdkContext> =>
   decodeAndRun(TransferContinueInputSchema, { cursor, query }, (decodedInput) =>
     requestJson(TransfersContinueEnvelopeSchema, {
       body: {
@@ -438,7 +485,7 @@ export const continueTransfers = (
       path: "/v2/transfers/list/continue",
       query: decodedInput.query,
     }),
-  ).pipe(withOperationErrors(ListTransfersErrorSpec));
+  ).pipe(withOperationErrors(ContinueTransfersErrorSpec));
 
 export const getTransfer = (
   id: number,

@@ -40,13 +40,13 @@ type ContractBody<TContract extends PutioKnownErrorContract> = TContract extends
 export type PutioTypedErrorEnvelope<TContract extends PutioKnownErrorContract> =
   TContract extends PutioKnownErrorContract
     ? Omit<ContractBody<TContract>, "error_message" | "error_type" | "status_code"> & {
-        readonly error_message?: string;
+        readonly error_message?: string | undefined;
         readonly error_type?: [ContractErrorType<TContract>] extends [never]
-          ? string
-          : ContractErrorType<TContract>;
+          ? string | undefined
+          : ContractErrorType<TContract> | undefined;
         readonly status_code?: [ContractStatusCode<TContract>] extends [never]
-          ? number
-          : ContractStatusCode<TContract>;
+          ? number | undefined
+          : ContractStatusCode<TContract> | undefined;
       }
     : never;
 
@@ -134,7 +134,7 @@ const PutioOperationErrorReasonSchema = Schema.Union([
   }),
   Schema.Struct({
     kind: Schema.Literal("status_code"),
-    statusCode: Schema.Number,
+    statusCode: Schema.Int,
   }),
 ]);
 
@@ -154,17 +154,32 @@ const toOperationReason = (
   };
 };
 
-export class PutioTransportError extends Data.TaggedError("PutioTransportError")<{
-  readonly cause: unknown;
-}> {}
+const CauseErrorFields = {
+  cause: Schema.Defect(),
+};
 
-export class PutioConfigurationError extends Data.TaggedError("PutioConfigurationError")<{
-  readonly cause: unknown;
-}> {}
+export class PutioTransportError extends Schema.TaggedError<
+  PutioTransportError,
+  { readonly brand: unique symbol }
+>()("PutioTransportError", { ...CauseErrorFields }) {}
 
-export class PutioValidationError extends Data.TaggedError("PutioValidationError")<{
-  readonly cause: unknown;
-}> {}
+export class PutioConfigurationError extends Schema.TaggedError<
+  PutioConfigurationError,
+  { readonly brand: unique symbol }
+>()("PutioConfigurationError", { ...CauseErrorFields }) {}
+
+export class PutioValidationError extends Schema.TaggedError<
+  PutioValidationError,
+  { readonly brand: unique symbol }
+>()("PutioValidationError", { ...CauseErrorFields }) {}
+
+export class PutioContractError extends Schema.TaggedError<
+  PutioContractError,
+  { readonly brand: unique symbol }
+>()("PutioContractError", {
+  cause: Schema.optional(Schema.Defect()),
+  missingField: Schema.optional(Schema.String),
+}) {}
 
 const RateLimitHeaderFields = {
   action: Schema.optional(Schema.String),
@@ -172,7 +187,7 @@ const RateLimitHeaderFields = {
   limit: Schema.optional(Schema.String),
   remaining: Schema.optional(Schema.String),
   retryAfter: Schema.optional(Schema.String),
-  retryAfterSeconds: Schema.optional(Schema.Number),
+  retryAfterSeconds: Schema.optional(Schema.Finite),
   reset: Schema.optional(Schema.String),
 };
 
@@ -182,18 +197,24 @@ const PutioResponseErrorFields = {
   cause: Schema.optional(Schema.Defect()),
 };
 
-export class PutioApiError extends Schema.TaggedError<PutioApiError>()("PutioApiError", {
+export class PutioApiError extends Schema.TaggedError<
+  PutioApiError,
+  { readonly brand: unique symbol }
+>()("PutioApiError", {
   ...PutioResponseErrorFields,
 }) {}
 
-export class PutioAuthError extends Schema.TaggedError<PutioAuthError>()("PutioAuthError", {
+export class PutioAuthError extends Schema.TaggedError<
+  PutioAuthError,
+  { readonly brand: unique symbol }
+>()("PutioAuthError", {
   ...PutioResponseErrorFields,
 }) {}
 
-export class PutioRateLimitError extends Schema.TaggedError<PutioRateLimitError>()(
-  "PutioRateLimitError",
-  { ...PutioResponseErrorFields, ...RateLimitHeaderFields },
-) {}
+export class PutioRateLimitError extends Schema.TaggedError<
+  PutioRateLimitError,
+  { readonly brand: unique symbol }
+>()("PutioRateLimitError", { ...PutioResponseErrorFields, ...RateLimitHeaderFields }) {}
 
 export class PutioOperationError<
   TDomain extends string,
@@ -212,6 +233,7 @@ export type PutioSdkError =
   | PutioConfigurationError
   | PutioTransportError
   | PutioValidationError
+  | PutioContractError
   | PutioApiError
   | PutioAuthError
   | PutioRateLimitError;
@@ -250,31 +272,49 @@ const isPutioErrorEnvelopeValue = Schema.is(PutioErrorEnvelopeSchema);
 export const isPutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelope =>
   isPutioErrorEnvelopeValue(value);
 
-const responseErrorFields = {
-  body: PutioErrorEnvelopeSchema,
-  status: Schema.Number,
-};
-
-const PutioApiErrorValueSchema = Schema.TaggedStruct("PutioApiError", {
-  ...responseErrorFields,
-});
-
-const PutioAuthErrorValueSchema = Schema.TaggedStruct("PutioAuthError", {
-  ...responseErrorFields,
-});
-
-const PutioRateLimitErrorValueSchema = Schema.TaggedStruct("PutioRateLimitError", {
-  ...responseErrorFields,
-  ...RateLimitHeaderFields,
-});
-
 const PutioOperationErrorValueSchema = Schema.TaggedStruct("PutioOperationError", {
-  ...responseErrorFields,
+  body: PutioResponseErrorFields.body,
+  status: PutioResponseErrorFields.status,
   contract: PutioKnownOperationErrorContractSchema,
   domain: Schema.String,
   operation: Schema.String,
   reason: PutioOperationErrorReasonSchema,
 });
+
+const CauseErrorValueFields = {
+  cause: Schema.optional(Schema.Defect()),
+};
+
+const PutioTransportErrorValueSchema = Schema.Struct({
+  ...PutioTransportError.fields,
+  ...CauseErrorValueFields,
+});
+
+const PutioConfigurationErrorValueSchema = Schema.Struct({
+  ...PutioConfigurationError.fields,
+  ...CauseErrorValueFields,
+});
+
+const PutioValidationErrorValueSchema = Schema.Struct({
+  ...PutioValidationError.fields,
+  ...CauseErrorValueFields,
+});
+
+const PutioContractErrorValueSchema = Schema.Struct(PutioContractError.fields);
+
+const PutioApiErrorValueSchema = Schema.Struct(PutioApiError.fields);
+
+const PutioAuthErrorValueSchema = Schema.Struct(PutioAuthError.fields);
+
+const PutioRateLimitErrorValueSchema = Schema.Struct(PutioRateLimitError.fields);
+
+export type PutioTransportErrorValue = typeof PutioTransportErrorValueSchema.Type;
+
+export type PutioConfigurationErrorValue = typeof PutioConfigurationErrorValueSchema.Type;
+
+export type PutioValidationErrorValue = typeof PutioValidationErrorValueSchema.Type;
+
+export type PutioContractErrorValue = typeof PutioContractErrorValueSchema.Type;
 
 export type PutioApiErrorValue = typeof PutioApiErrorValueSchema.Type;
 
@@ -283,6 +323,14 @@ export type PutioAuthErrorValue = typeof PutioAuthErrorValueSchema.Type;
 export type PutioRateLimitErrorValue = typeof PutioRateLimitErrorValueSchema.Type;
 
 export type PutioOperationErrorValue = typeof PutioOperationErrorValueSchema.Type;
+
+export const isPutioTransportError = Schema.is(PutioTransportErrorValueSchema);
+
+export const isPutioConfigurationError = Schema.is(PutioConfigurationErrorValueSchema);
+
+export const isPutioValidationError = Schema.is(PutioValidationErrorValueSchema);
+
+export const isPutioContractError = Schema.is(PutioContractErrorValueSchema);
 
 export const isPutioApiError = Schema.is(PutioApiErrorValueSchema);
 
@@ -341,8 +389,9 @@ export const responseRateLimitHeaders = (headers: Headers) => {
   };
 };
 
-export const mapDecodeErrorToValidationError = (cause: unknown) =>
-  new PutioValidationError({ cause });
+export const mapValidationError = (cause: unknown) => new PutioValidationError({ cause });
+
+export const mapContractError = (cause: unknown) => new PutioContractError({ cause });
 
 export const mapConfigurationError = (cause: unknown) => new PutioConfigurationError({ cause });
 

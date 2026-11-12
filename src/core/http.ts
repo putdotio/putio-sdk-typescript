@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Predicate, Schema, Struct } from "effect";
+import { Context, Effect, Layer, Predicate, Redacted, Schema, Struct } from "effect";
 
 import {
   DEFAULT_PUTIO_API_BASE_URL,
@@ -6,16 +6,18 @@ import {
   DEFAULT_PUTIO_WEB_APP_URL,
 } from "./defaults.js";
 import {
-  fallbackPutioErrorEnvelope,
   mapConfigurationError,
-  mapDecodeErrorToValidationError,
+  mapContractError,
   mapTransportError,
+  mapValidationError,
   parseErrorBody,
   PutioConfigurationError,
   type PutioSdkError,
   PutioValidationError,
   toPutioResponseError,
 } from "./errors.js";
+import { isSuccessStatus, unparsableJsonBodyError } from "./response-body.js";
+import { revealAccessToken, revealSecret } from "./secrets.js";
 
 export type PutioQueryValue = string | number | boolean | null | undefined;
 
@@ -23,16 +25,26 @@ export type PutioQuery = Readonly<Record<string, PutioQueryValue>>;
 
 export type PutioPathSegment = string | number | boolean;
 
+export type PutioSecret = string | Redacted.Redacted<string>;
+
 export interface PutioSdkOptions {
-  readonly accessToken?: string;
-  readonly baseUrl?: string | URL;
-  readonly headers?: HeadersInit;
-  readonly uploadBaseUrl?: string | URL;
-  readonly webAppUrl?: string | URL;
+  readonly accessToken?: PutioSecret | undefined;
+  readonly baseUrl?: string | URL | undefined;
+  readonly headers?: HeadersInit | undefined;
+  readonly uploadBaseUrl?: string | URL | undefined;
+  readonly webAppUrl?: string | URL | undefined;
 }
 
-export class PutioSdkConfig extends Context.Service<PutioSdkConfig, PutioSdkOptions>()(
-  "PutioSdkConfig",
+export interface PutioSdkResolvedConfig {
+  readonly accessToken: Redacted.Redacted<string> | undefined;
+  readonly baseUrl: string | URL;
+  readonly headers: HeadersInit | undefined;
+  readonly uploadBaseUrl: string | URL;
+  readonly webAppUrl: string | URL;
+}
+
+export class PutioSdkConfig extends Context.Service<PutioSdkConfig, PutioSdkResolvedConfig>()(
+  "@putdotio/sdk/PutioSdkConfig",
 ) {}
 
 export interface PutioHttpRequest {
@@ -54,13 +66,27 @@ export interface PutioHttpClientService {
 }
 
 export class PutioHttpClient extends Context.Service<PutioHttpClient, PutioHttpClientService>()(
-  "PutioHttpClient",
+  "@putdotio/sdk/PutioHttpClient",
 ) {}
 
 export type PutioSdkContext = PutioSdkConfig | PutioHttpClient;
 
-export const normalizePutioSdkOptions = (config: PutioSdkOptions): PutioSdkOptions => ({
-  accessToken: config.accessToken,
+const redactPutioSecret = (
+  secret: PutioSecret | undefined,
+): Redacted.Redacted<string> | undefined => {
+  if (secret === undefined) {
+    return undefined;
+  }
+
+  if (Predicate.isString(secret)) {
+    return secret === "" ? undefined : Redacted.make(secret);
+  }
+
+  return secret;
+};
+
+export const normalizePutioSdkOptions = (config: PutioSdkOptions): PutioSdkResolvedConfig => ({
+  accessToken: redactPutioSecret(config.accessToken),
   baseUrl: config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
   headers: config.headers,
   uploadBaseUrl: config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
@@ -77,6 +103,8 @@ export const makePutioFetchLayer = (
   fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
 ) => Layer.succeed(PutioHttpClient, makePutioFetchClient(fetchImplementation));
 
+const decodeJsonText = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
+
 export const makePutioFetchClient = (
   fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
 ): PutioHttpClientService => ({
@@ -91,7 +119,7 @@ export const makePutioFetchClient = (
 
       return read(async () => {
         const response = await fetchImplementation(request.url, {
-          body: request.body,
+          body: request.body ?? null,
           headers: request.headers,
           method: request.method,
           signal: controller.signal,
@@ -100,22 +128,13 @@ export const makePutioFetchClient = (
         return {
           arrayBuffer: read(() => response.arrayBuffer()),
           headers: response.headers,
-          json: isSuccessStatus(response.status)
-            ? read(() => response.json())
-            : read(() => response.text()).pipe(
-                Effect.flatMap((text) =>
-                  Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
-                    Effect.mapError(() =>
-                      toPutioResponseError(
-                        response.status,
-                        response.headers,
-                        fallbackPutioErrorEnvelope(response.status),
-                        new SyntaxError("The HTTP error response body is not valid JSON"),
-                      ),
-                    ),
-                  ),
-                ),
+          json: read(() => response.text()).pipe(
+            Effect.flatMap((text) =>
+              decodeJsonText(text).pipe(
+                Effect.mapError(() => unparsableJsonBodyError(response.status, response.headers)),
               ),
+            ),
+          ),
           status: response.status,
         };
       });
@@ -137,7 +156,7 @@ const normalizeApiPath = (path: string): string => {
   }
 
   if (parserRewrittenPattern.test(path)) {
-    throw mapDecodeErrorToValidationError(
+    throw mapValidationError(
       "SDK API request paths must not contain backslashes, control characters, or edge spaces",
     );
   }
@@ -145,7 +164,7 @@ const normalizeApiPath = (path: string): string => {
   const [pathname = ""] = path.split(/[?#]/, 1);
 
   if (pathname.split("/").some((segment) => dotSegmentPattern.test(segment))) {
-    throw mapDecodeErrorToValidationError("SDK API request paths must not contain dot segments");
+    throw mapValidationError("SDK API request paths must not contain dot segments");
   }
 
   return path.startsWith("/") ? path : `/${path}`;
@@ -176,8 +195,8 @@ export const OkResponseSchema = Schema.Struct({
 
 export type PutioAuth =
   | { readonly type: "config-token" }
-  | { readonly type: "token"; readonly token: string }
-  | { readonly type: "basic"; readonly username: string; readonly password: string }
+  | { readonly type: "token"; readonly token: PutioSecret }
+  | { readonly type: "basic"; readonly username: string; readonly password: PutioSecret }
   | { readonly type: "none" };
 
 type PutioRequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -191,21 +210,17 @@ type PutioRequestBody =
 interface PutioRequestOptions {
   readonly method: PutioRequestMethod;
   readonly path: string;
-  readonly baseUrl?: string | URL;
-  readonly query?: PutioQuery;
-  readonly headers?: HeadersInit;
-  readonly auth?: PutioAuth;
-  readonly body?: PutioRequestBody;
+  readonly baseUrl?: string | URL | undefined;
+  readonly query?: PutioQuery | undefined;
+  readonly headers?: HeadersInit | undefined;
+  readonly auth?: PutioAuth | undefined;
+  readonly body?: PutioRequestBody | undefined;
 }
-
-const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 
 const decodeSuccessJson = <S extends Schema.Top>(schema: S, response: PutioHttpResponse) =>
   response.json.pipe(
     Effect.flatMap((json) =>
-      Schema.decodeUnknownEffect(schema)(json).pipe(
-        Effect.mapError(mapDecodeErrorToValidationError),
-      ),
+      Schema.decodeUnknownEffect(schema)(json).pipe(Effect.mapError(mapContractError)),
     ),
   );
 
@@ -216,7 +231,7 @@ const decodeFailure = (response: PutioHttpResponse, headers: Headers) =>
   );
 
 const resolveAuthorization = (
-  config: PutioSdkOptions,
+  config: PutioSdkResolvedConfig,
   auth: PutioAuth | undefined,
 ): Effect.Effect<string | undefined, PutioSdkError> => {
   const resolvedAuth = auth ?? { type: "config-token" as const };
@@ -225,22 +240,28 @@ const resolveAuthorization = (
     case "none":
       return Effect.undefined;
     case "token":
-      return Effect.succeed(`Token ${resolvedAuth.token}`);
+      return revealSecret(resolvedAuth.token).pipe(Effect.map((token) => `Token ${token}`));
     case "basic":
-      return Effect.try({
-        try: () => `Basic ${btoa(`${resolvedAuth.username}:${resolvedAuth.password}`)}`,
-        catch: mapConfigurationError,
-      });
+      return revealSecret(resolvedAuth.password).pipe(
+        Effect.flatMap((password) =>
+          Effect.try({
+            try: () => `Basic ${btoa(`${resolvedAuth.username}:${password}`)}`,
+            catch: mapConfigurationError,
+          }),
+        ),
+      );
     case "config-token":
-      if (!config.accessToken) {
-        return Effect.fail(
-          mapConfigurationError(
-            "This endpoint requires an access token, but PutioSdkConfig.accessToken is missing",
-          ),
-        );
-      }
-
-      return Effect.succeed(`Token ${config.accessToken}`);
+      return revealAccessToken(config.accessToken).pipe(
+        Effect.flatMap((token) =>
+          token === undefined
+            ? Effect.fail(
+                mapConfigurationError(
+                  "This endpoint requires an access token, but PutioSdkConfig.accessToken is missing",
+                ),
+              )
+            : Effect.succeed(`Token ${token}`),
+        ),
+      );
   }
 };
 
@@ -267,7 +288,7 @@ const withBody = (body: PutioRequestBody): Effect.Effect<BodyInit | undefined, P
     case "json":
       return Effect.try({
         try: () => JSON.stringify(body.value),
-        catch: mapDecodeErrorToValidationError,
+        catch: mapValidationError,
       });
     case "form":
       return Effect.succeed(
@@ -306,12 +327,11 @@ const makeRequest = Effect.fnUntraced(function* (
     headers.set("content-type", "application/json");
   }
 
-  return {
-    body: yield* withBody(body),
-    headers,
-    method: options.method,
-    url,
-  };
+  const requestBody = yield* withBody(body);
+
+  const request: PutioHttpRequest = { headers, method: options.method, url };
+
+  return requestBody === undefined ? request : { ...request, body: requestBody };
 });
 
 const executeRequest = Effect.fn("PutioSdk.executeRequest")(function* (
@@ -324,12 +344,7 @@ const executeRequest = Effect.fn("PutioSdk.executeRequest")(function* (
   const authorization = yield* resolveAuthorization(config, options.auth);
 
   const url = yield* Effect.try({
-    try: () =>
-      buildPutioUrl(
-        options.baseUrl ?? config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
-        options.path,
-        options.query,
-      ),
+    try: () => buildPutioUrl(options.baseUrl ?? config.baseUrl, options.path, options.query),
     catch: mapUrlBuildError,
   });
 

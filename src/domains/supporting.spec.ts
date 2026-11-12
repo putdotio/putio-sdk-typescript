@@ -1,4 +1,4 @@
-import { PutioOperationError, PutioValidationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError, PutioContractError } from "../core/errors.js";
 import { Cause, Effect, Exit, Schema, SchemaIssue, SchemaParser } from "effect";
 import { runInNewContext } from "node:vm";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -62,12 +62,18 @@ const decodeJsonValue = Schema.decodeUnknownSync(configDomain.JsonValueSchema);
 const decodeJsonObject = Schema.decodeUnknownSync(configDomain.JsonObjectSchema);
 
 describe("supporting domain boundaries", () => {
-  it("types download-link selections by field", () => {
-    expectTypeOf<downloadLinks.DownloadLinksCreateInput>().toEqualTypeOf<{
-      readonly cursor?: string;
-      readonly excludeIds?: ReadonlyArray<number>;
-      readonly ids?: ReadonlyArray<number>;
-    }>();
+  it("requires a selector in download-link selections", () => {
+    type Input = downloadLinks.DownloadLinksCreateInput;
+
+    expectTypeOf<{ readonly cursor: string }>().toExtend<Input>();
+    expectTypeOf<{ readonly ids: ReadonlyArray<number> }>().toExtend<Input>();
+    expectTypeOf<{
+      readonly cursor: string;
+      readonly excludeIds: ReadonlyArray<number>;
+    }>().toExtend<Input>();
+    expectTypeOf<{}>().not.toExtend<Input>();
+    expectTypeOf<{ readonly excludeIds: ReadonlyArray<number> }>().not.toExtend<Input>();
+    expectTypeOf(downloadLinks.createDownloadLinks).parameters.toEqualTypeOf<[input: Input]>();
   });
 
   it.effect("covers config reads and writes", () =>
@@ -492,7 +498,7 @@ describe("supporting domain boundaries", () => {
       );
 
       expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
+        failures.map(() => expect.any(PutioContractError)),
       );
 
       let fullConfigRequestCount = 0;
@@ -511,7 +517,7 @@ describe("supporting domain boundaries", () => {
         ),
       );
 
-      expect(fullConfigFailure).toBeInstanceOf(PutioValidationError);
+      expect(fullConfigFailure).toBeInstanceOf(PutioContractError);
       expect(fullConfigRequestCount).toBe(1);
 
       let envelopeGetterCalls = 0;
@@ -572,10 +578,10 @@ describe("supporting domain boundaries", () => {
         ),
       );
 
-      expect(valueEnvelopeFailure).toBeInstanceOf(PutioValidationError);
-      expect(configEnvelopeFailure).toBeInstanceOf(PutioValidationError);
-      expect(typedValueFailure).toBeInstanceOf(PutioValidationError);
-      expect(typedConfigFailure).toBeInstanceOf(PutioValidationError);
+      expect(valueEnvelopeFailure).toBeInstanceOf(PutioContractError);
+      expect(configEnvelopeFailure).toBeInstanceOf(PutioContractError);
+      expect(typedValueFailure).toBeInstanceOf(PutioContractError);
+      expect(typedConfigFailure).toBeInstanceOf(PutioContractError);
       expect(envelopeGetterCalls).toBe(0);
     }),
   );
@@ -709,7 +715,12 @@ describe("supporting domain boundaries", () => {
       };
 
       const failures = yield* Effect.all([
+        // @ts-expect-error A download-link task needs a cursor or file IDs.
         Effect.exit(provideSdk(downloadLinks.createDownloadLinks(), handler)),
+        // @ts-expect-error A download-link task needs a cursor or file IDs.
+        Effect.exit(provideSdk(downloadLinks.createDownloadLinks({}), handler)),
+        // @ts-expect-error Excluded IDs alone select nothing.
+        Effect.exit(provideSdk(downloadLinks.createDownloadLinks({ excludeIds: [7] }), handler)),
         Effect.exit(provideSdk(downloadLinks.createDownloadLinks({ cursor: "" }), handler)),
         Effect.exit(provideSdk(downloadLinks.createDownloadLinks({ ids: [] }), handler)),
         Effect.exit(provideSdk(downloadLinks.createDownloadLinks({ ids: [0] }), handler)),
@@ -1194,6 +1205,58 @@ describe("supporting domain boundaries", () => {
         },
         status: 400,
       });
+    }),
+  );
+
+  it.effect("fails with PutioValidationError when a config value breaks the caller's schema", () =>
+    Effect.gen(function* () {
+      const callerSchema = Schema.Struct({ theme: Schema.Literal("dark") });
+
+      const failures = yield* Effect.all([
+        Effect.exit(
+          provideSdk(
+            configDomain.readConfigWith(callerSchema),
+            () => jsonResponse({ config: { theme: "light" }, status: "OK" }),
+            { accessToken: "token-123" },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            configDomain.getConfigKeyWith("theme", Schema.Literal("dark")),
+            () => jsonResponse({ status: "OK", value: "light" }),
+            { accessToken: "token-123" },
+          ),
+        ),
+      ]);
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioValidationError)),
+      );
+    }),
+  );
+
+  it.effect("fails with PutioContractError when a typed config read gets a broken envelope", () =>
+    Effect.gen(function* () {
+      const failures = yield* Effect.all([
+        Effect.exit(
+          provideSdk(
+            configDomain.readConfigWith(Schema.Struct({ theme: Schema.Literal("dark") })),
+            () => jsonResponse({ config: { theme: "dark" }, status: "ERROR" }),
+            { accessToken: "token-123" },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            configDomain.getConfigKeyWith("theme", Schema.Literal("dark")),
+            () => jsonResponse({ status: "OK" }),
+            { accessToken: "token-123" },
+          ),
+        ),
+      ]);
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioContractError)),
+      );
     }),
   );
 });

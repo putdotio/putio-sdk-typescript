@@ -116,11 +116,13 @@ test("files list continue", async () => {
 
 test("files shared-with-you list", async () => {
   const result = await oauthClient.files.list("friends", {
+    breadcrumbs: 1,
     per_page: 2,
     total: 1,
   });
 
   assert(result.parent?.id === -2, "expected shared-with-you synthetic parent");
+  assert(Array.isArray(result.breadcrumbs), "expected requested breadcrumbs");
 });
 
 test("files search and continue", async () => {

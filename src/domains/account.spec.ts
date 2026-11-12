@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { PutioOperationError, PutioValidationError } from "../core/errors.js";
+import { PutioOperationError, PutioValidationError, PutioContractError } from "../core/errors.js";
 import {
   clearAccount,
   destroyAccount,
@@ -8,8 +8,12 @@ import {
   listAccountSubtitleLanguages,
   listAccountConfirmations,
   saveAccountSettings,
+  type AccountInfoBroad,
+  type AccountInfoQuery,
+  type PasInfo,
 } from "./account.js";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { createPutioSdkPromiseClient } from "../core/client.js";
 
 import {
   expectFailure,
@@ -162,14 +166,14 @@ describe("account domain", () => {
       );
 
       const error = expectFailure(exit);
-      expect(error).toBeInstanceOf(PutioValidationError);
+      expect(error).toBeInstanceOf(PutioContractError);
       expect(error).toMatchObject({
-        cause: 'Expected put.io to include "push_token" because it was requested',
+        missingField: "push_token",
       });
 
-      for (const [query, expectedCause] of [
-        [{ features: 1 }, 'Expected put.io to include "features" because it was requested'],
-        [{ profitwell: 1 }, 'Expected put.io to include "paddle_user_id" because it was requested'],
+      for (const [query, expectedField] of [
+        [{ features: 1 }, "features"],
+        [{ profitwell: 1 }, "paddle_user_id"],
       ] as const) {
         const missingExit = yield* Effect.exit(
           provideSdk(
@@ -183,13 +187,44 @@ describe("account domain", () => {
           ),
         );
 
-        expect(expectFailure(missingExit)).toBeInstanceOf(PutioValidationError);
+        expect(expectFailure(missingExit)).toBeInstanceOf(PutioContractError);
         expect(expectFailure(missingExit)).toMatchObject({
-          cause: expectedCause,
+          missingField: expectedField,
         });
       }
     }),
   );
+
+  it("types account info from any combination of requested fields", () => {
+    type Result<TQuery extends AccountInfoQuery> = Effect.Success<
+      ReturnType<typeof getAccountInfo<TQuery>>
+    >;
+
+    const combined = getAccountInfo({ download_token: 1, features: 1, push_token: 1 });
+
+    expectTypeOf<Effect.Success<typeof combined>["download_token"]>().toEqualTypeOf<string>();
+    expectTypeOf<Effect.Success<typeof combined>["push_token"]>().toEqualTypeOf<string>();
+    expectTypeOf<Effect.Success<typeof combined>["features"]>().toExtend<Record<string, boolean>>();
+    expectTypeOf<Effect.Success<typeof combined>["pas"]>().toEqualTypeOf<PasInfo | undefined>();
+
+    const widenedQuery: AccountInfoQuery = { download_token: 1 };
+
+    expectTypeOf(getAccountInfo(widenedQuery)).toEqualTypeOf(getAccountInfo());
+    expectTypeOf<Result<AccountInfoQuery>>().toEqualTypeOf<AccountInfoBroad>();
+    expectTypeOf<Result<AccountInfoQuery>["download_token"]>().toEqualTypeOf<string | undefined>();
+
+    const client = createPutioSdkPromiseClient();
+
+    expectTypeOf(
+      client.account.getInfo<{ readonly features: 1; readonly pas: 1 }>,
+    ).returns.resolves.toExtend<{
+      readonly features: Record<string, boolean>;
+      readonly pas: PasInfo;
+    }>();
+    expectTypeOf(
+      client.account.getInfo<AccountInfoQuery>,
+    ).returns.resolves.toEqualTypeOf<AccountInfoBroad>();
+  });
 
   it.effect("reads and saves account settings", () =>
     Effect.gen(function* () {
@@ -446,7 +481,7 @@ describe("account domain", () => {
         ),
       );
 
-      expect(expectFailure(invalidExit)).toBeInstanceOf(PutioValidationError);
+      expect(expectFailure(invalidExit)).toBeInstanceOf(PutioContractError);
     }),
   );
 

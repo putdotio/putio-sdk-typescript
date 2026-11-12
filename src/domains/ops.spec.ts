@@ -115,18 +115,16 @@ describe("operational domain boundaries", () => {
   ];
 
   it.effect.each(okRoutes)("sends an OK-only operation to %s %s", ([method, path, effect]) =>
-    Effect.gen(function* () {
-      yield* provideSdk(
-        effect,
-        (request) => {
-          expect(request.method).toBe(method);
-          expect(new URL(request.url).pathname).toBe(path);
+    provideSdk(
+      effect,
+      (request) => {
+        expect(request.method).toBe(method);
+        expect(new URL(request.url).pathname).toBe(path);
 
-          return jsonResponse({ status: "OK" });
-        },
-        { accessToken: "token-123" },
-      );
-    }),
+        return jsonResponse({ status: "OK" });
+      },
+      { accessToken: "token-123" },
+    ),
   );
 
   it.effect("covers rss endpoints", () =>

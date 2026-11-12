@@ -33,6 +33,12 @@ export default defineConfig({
     extends: [correctness, strict],
     overrides: [
       {
+        files: ["**/*.spec.ts"],
+        rules: {
+          "effecttsgo/unstable-api-usage": "off",
+        },
+      },
+      {
         files: ["src/core/client.ts", "src/domains/ops.spec.ts"],
         rules: {
           "effecttsgo/any-unknown-in-error-context": "off",

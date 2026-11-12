@@ -57,6 +57,10 @@ const sharedFile = {
   updated_at: "2026-03-17T00:00:00Z",
 };
 
+const decodeJsonValue = Schema.decodeUnknownSync(configDomain.JsonValueSchema);
+
+const decodeJsonObject = Schema.decodeUnknownSync(configDomain.JsonObjectSchema);
+
 describe("supporting domain boundaries", () => {
   it("types download-link selections by field", () => {
     expectTypeOf<downloadLinks.DownloadLinksCreateInput>().toEqualTypeOf<{
@@ -68,9 +72,6 @@ describe("supporting domain boundaries", () => {
 
   it.effect("covers config reads and writes", () =>
     Effect.gen(function* () {
-      const decodeJsonValue = Schema.decodeUnknownSync(configDomain.JsonValueSchema);
-      const decodeJsonObject = Schema.decodeUnknownSync(configDomain.JsonObjectSchema);
-
       expect(decodeJsonValue(null)).toBeNull();
       expect(decodeJsonValue(["sdk", 1, false])).toEqual(["sdk", 1, false]);
       expect(decodeJsonObject({ nested: { enabled: true } })).toEqual({
@@ -130,7 +131,7 @@ describe("supporting domain boundaries", () => {
       });
 
       const accessorExit = yield* Effect.exit(
-        Schema.decodeUnknownEffect(configDomain.JsonObjectSchema)(accessorValue),
+        Schema.decodeEffect(configDomain.JsonObjectSchema)(accessorValue),
       );
 
       expect(accessorExit._tag).toBe("Failure");
@@ -480,14 +481,12 @@ describe("supporting domain boundaries", () => {
         new Date(),
       ];
 
-      const failures = yield* Effect.all(
-        invalidValues.map((value) =>
-          Effect.exit(
-            provideSdk(
-              configDomain.getConfigKey("invalid"),
-              () => inMemoryJsonResponse({ status: "OK", value }),
-              { accessToken: "token-123" },
-            ),
+      const failures = yield* Effect.forEach(invalidValues, (value) =>
+        Effect.exit(
+          provideSdk(
+            configDomain.getConfigKey("invalid"),
+            () => inMemoryJsonResponse({ status: "OK", value }),
+            { accessToken: "token-123" },
           ),
         ),
       );

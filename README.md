@@ -140,8 +140,9 @@ const { breadcrumbs, files } = await Effect.runPromise(program);
 A field the query asks for is required in the result type, and the call fails with
 `PutioContractError` when the response leaves it out: `breadcrumbs` on `files.list` and
 `sharing.publicAccess.listFiles`, `cursor` and `total` on `transfers.list` with `per_page`, and the
-flags of `account.getInfo`, `files.get`, and `files.getChild`. The Effect client, the `PutioSdk`
-service, and the Promise client share these checks and result types.
+flags of `account.getInfo`, `files.get`, and `files.getChild`. One flag is exempt: `intercom` leaves
+`user_hash` optional. The Effect client, the `PutioSdk` service, and the Promise client share these
+checks and result types.
 
 Effect workflows can also depend on the SDK as a service:
 
@@ -250,7 +251,7 @@ const sdk = createPutioSdkPromiseClient({
 
 try {
   await sdk.files.createFolder({
-    name: "",
+    name: "Downloads",
     parent_id: 0,
   });
 } catch (error) {
@@ -283,7 +284,7 @@ import { PutioSdk, makePutioSdkLiveClientLayer } from "@putdotio/sdk";
 const handled = Effect.gen(function* () {
   const sdk = yield* PutioSdk;
   return yield* sdk.files.createFolder({
-    name: "",
+    name: "Downloads",
     parent_id: 0,
   });
 }).pipe(

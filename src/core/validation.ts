@@ -4,6 +4,7 @@ import { mapValidationError, PutioContractError, PutioValidationError } from "./
 
 export const PositiveIntegerSchema = Schema.Int.check(Schema.isGreaterThan(0));
 export const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
+export const NonNegativeNumberSchema = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 
 export const decodeAndRun = <S extends Schema.Top, A, E, R>(
   schema: S,

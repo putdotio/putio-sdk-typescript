@@ -8,8 +8,12 @@ import {
   listAccountSubtitleLanguages,
   listAccountConfirmations,
   saveAccountSettings,
+  type AccountInfoBroad,
+  type AccountInfoQuery,
+  type PasInfo,
 } from "./account.js";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { createPutioSdkPromiseClient } from "../core/client.js";
 
 import {
   expectFailure,
@@ -190,6 +194,37 @@ describe("account domain", () => {
       }
     }),
   );
+
+  it("types account info from any combination of requested fields", () => {
+    type Result<TQuery extends AccountInfoQuery> = Effect.Success<
+      ReturnType<typeof getAccountInfo<TQuery>>
+    >;
+
+    const combined = getAccountInfo({ download_token: 1, features: 1, push_token: 1 });
+
+    expectTypeOf<Effect.Success<typeof combined>["download_token"]>().toEqualTypeOf<string>();
+    expectTypeOf<Effect.Success<typeof combined>["push_token"]>().toEqualTypeOf<string>();
+    expectTypeOf<Effect.Success<typeof combined>["features"]>().toExtend<Record<string, boolean>>();
+    expectTypeOf<Effect.Success<typeof combined>["pas"]>().toEqualTypeOf<PasInfo | undefined>();
+
+    const widenedQuery: AccountInfoQuery = { download_token: 1 };
+
+    expectTypeOf(getAccountInfo(widenedQuery)).toEqualTypeOf(getAccountInfo());
+    expectTypeOf<Result<AccountInfoQuery>>().toEqualTypeOf<AccountInfoBroad>();
+    expectTypeOf<Result<AccountInfoQuery>["download_token"]>().toEqualTypeOf<string | undefined>();
+
+    const client = createPutioSdkPromiseClient();
+
+    expectTypeOf(
+      client.account.getInfo<{ readonly features: 1; readonly pas: 1 }>,
+    ).returns.resolves.toExtend<{
+      readonly features: Record<string, boolean>;
+      readonly pas: PasInfo;
+    }>();
+    expectTypeOf(
+      client.account.getInfo<AccountInfoQuery>,
+    ).returns.resolves.toEqualTypeOf<AccountInfoBroad>();
+  });
 
   it.effect("reads and saves account settings", () =>
     Effect.gen(function* () {

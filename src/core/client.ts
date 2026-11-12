@@ -10,10 +10,9 @@ import {
   saveAccountSettings,
 } from "../domains/account.js";
 import type {
-  AccountInfoBase,
   AccountInfoBroad,
   AccountInfoQuery,
-  PasInfo,
+  AccountInfoResponseFor,
 } from "../domains/account.js";
 import {
   createAppSpecificPassword,
@@ -340,43 +339,10 @@ type ResultOf<
 >;
 
 interface AccountGetInfo<Kind extends OperationKind> {
-  (query: {
-    readonly download_token: 1;
-    readonly pas: 1;
-  }): ResultOf<
-    Kind,
-    typeof getAccountInfo,
-    AccountInfoBase & { readonly download_token: string; readonly pas: PasInfo }
-  >;
-  (query: {
-    readonly download_token: 1;
-  }): ResultOf<Kind, typeof getAccountInfo, AccountInfoBase & { readonly download_token: string }>;
-  (query: {
-    readonly features: 1;
-  }): ResultOf<
-    Kind,
-    typeof getAccountInfo,
-    AccountInfoBase & { readonly features: Record<string, boolean> }
-  >;
-  (query: {
-    readonly intercom: 1;
-    readonly platform?: "web" | "ios";
-  }): ResultOf<Kind, typeof getAccountInfo, AccountInfoBase & { readonly user_hash?: string }>;
-  (query: {
-    readonly pas: 1;
-  }): ResultOf<Kind, typeof getAccountInfo, AccountInfoBase & { readonly pas: PasInfo }>;
-  (query: {
-    readonly profitwell: 1;
-  }): ResultOf<
-    Kind,
-    typeof getAccountInfo,
-    AccountInfoBase & { readonly paddle_user_id: number | string | null }
-  >;
-  (query: {
-    readonly push_token: 1;
-  }): ResultOf<Kind, typeof getAccountInfo, AccountInfoBase & { readonly push_token: string }>;
-  (): ResultOf<Kind, typeof getAccountInfo, AccountInfoBroad>;
-  (query: AccountInfoQuery): ResultOf<Kind, typeof getAccountInfo, AccountInfoBroad>;
+  <TQuery extends AccountInfoQuery>(
+    query: TQuery,
+  ): ResultOf<Kind, typeof getAccountInfo, AccountInfoResponseFor<TQuery>>;
+  (query?: AccountInfoQuery): ResultOf<Kind, typeof getAccountInfo, AccountInfoBroad>;
 }
 
 interface ConfigGetKeyWith<Kind extends OperationKind> {

@@ -16,7 +16,7 @@ const probeValue = {
 
 const ConfigProbeSchema = Schema.Struct({
   tags: Schema.Array(Schema.String),
-  version: Schema.Number,
+  version: Schema.Finite,
 });
 
 test("config read decodes", async () => {

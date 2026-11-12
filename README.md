@@ -129,13 +129,19 @@ const sdk = createPutioSdkEffectClient();
 
 const program = sdk.files
   .list(0, {
+    breadcrumbs: 1,
     per_page: 20,
-    total: 1,
   })
   .pipe(Effect.provide(putioSdkLiveLayer({ accessToken: userAccessToken })));
 
-const result = await Effect.runPromise(program);
+const { breadcrumbs, files } = await Effect.runPromise(program);
 ```
+
+A field the query asks for is required in the result type, and the call fails with
+`PutioValidationError` when the response leaves it out: `breadcrumbs` on `files.list` and
+`sharing.publicAccess.listFiles`, `cursor` and `total` on `transfers.list` with `per_page`, and the
+flags of `account.getInfo` and `files.get`. The Promise client runs the same checks; its types
+narrow for `account.getInfo`, `files.get`, and `files.getChild`.
 
 Effect workflows can also depend on the SDK as a service:
 
@@ -317,6 +323,17 @@ const upload = await sdk.files.upload({
   file: new File(["hello"], "hello.txt"),
   parentId: 0,
 });
+```
+
+## Bulk Selections
+
+Bulk operations take file IDs or a list cursor, and reject a selection that has neither before
+sending a request:
+
+```ts
+await sdk.downloadLinks.create({ ids: [fileId] });
+await sdk.sharing.clone({ cursor, excludeIds: [skippedFileId], parentId: 0 });
+await sdk.zips.create({ file_ids: [fileId] });
 ```
 
 ## Endpoint Coverage

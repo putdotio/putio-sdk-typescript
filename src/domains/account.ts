@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 import {
+  NonNegativeNumberSchema,
   decodeAndRun,
   decodeAndRunRedacted,
   failMissingField,
@@ -21,9 +22,9 @@ import {
 const RequestedFlag = Schema.Literal(1);
 
 export const AccountDiskSchema = Schema.Struct({
-  avail: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-  size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-  used: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  avail: NonNegativeNumberSchema,
+  size: NonNegativeNumberSchema,
+  used: NonNegativeNumberSchema,
 });
 
 export const AccountWarningsSchema = Schema.Struct({
@@ -81,11 +82,11 @@ export const AccountInfoBaseSchema = Schema.Struct({
   is_eligible_for_friend_invitation: Schema.Boolean,
   is_sub_account: Schema.Boolean,
   mail: Schema.String,
-  monthly_bandwidth_usage: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  monthly_bandwidth_usage: NonNegativeNumberSchema,
   password_last_changed_at: Schema.NullOr(Schema.String),
   private_download_host_ip: Schema.NullOr(Schema.String),
   settings: AccountSettingsSchema,
-  trash_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  trash_size: NonNegativeNumberSchema,
   user_id: Schema.Int,
   username: Schema.String,
   warnings: AccountWarningsSchema,
@@ -241,7 +242,7 @@ export type AccountConfirmation = Schema.Schema.Type<typeof AccountConfirmationS
 
 export type AccountSubtitleLanguage = Schema.Schema.Type<typeof AccountSubtitleLanguageSchema>;
 
-export type AccountInfoResponseFor<TQuery extends AccountInfoQuery> = AccountInfoBase &
+export type AccountInfoResponseFor<TQuery extends AccountInfoQuery> = AccountInfoBroad &
   (TQuery["download_token"] extends 1
     ? {
         readonly download_token: string;
@@ -338,65 +339,11 @@ export type SaveAccountSettingsError = PutioOperationFailure<typeof SaveAccountS
 
 export type AccountConfirmationsError = PutioOperationFailure<typeof AccountConfirmationsErrorSpec>;
 
-export function getAccountInfo(query: {
-  readonly download_token: 1;
-  readonly pas: 1;
-}): Effect.Effect<
-  AccountInfoBase & {
-    readonly download_token: string;
-    readonly pas: PasInfo;
-  },
-  PutioSdkError,
-  PutioSdkContext
->;
-export function getAccountInfo(query: { readonly download_token: 1 }): Effect.Effect<
-  AccountInfoBase & {
-    readonly download_token: string;
-  },
-  PutioSdkError,
-  PutioSdkContext
->;
-export function getAccountInfo(query: { readonly features: 1 }): Effect.Effect<
-  AccountInfoBase & {
-    readonly features: Record<string, boolean>;
-  },
-  PutioSdkError,
-  PutioSdkContext
->;
-export function getAccountInfo(query: {
-  readonly intercom: 1;
-  readonly platform?: "web" | "ios";
-}): Effect.Effect<
-  AccountInfoBase & {
-    readonly user_hash?: string;
-  },
-  PutioSdkError,
-  PutioSdkContext
->;
-export function getAccountInfo(query: { readonly pas: 1 }): Effect.Effect<
-  AccountInfoBase & {
-    readonly pas: PasInfo;
-  },
-  PutioSdkError,
-  PutioSdkContext
->;
-export function getAccountInfo(query: { readonly profitwell: 1 }): Effect.Effect<
-  AccountInfoBase & {
-    readonly paddle_user_id: number | string | null;
-  },
-  PutioSdkError,
-  PutioSdkContext
->;
-export function getAccountInfo(query: { readonly push_token: 1 }): Effect.Effect<
-  AccountInfoBase & {
-    readonly push_token: string;
-  },
-  PutioSdkError,
-  PutioSdkContext
->;
-export function getAccountInfo(): Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext>;
+export function getAccountInfo<TQuery extends AccountInfoQuery>(
+  query: TQuery,
+): Effect.Effect<AccountInfoResponseFor<TQuery>, PutioSdkError, PutioSdkContext>;
 export function getAccountInfo(
-  query: AccountInfoQuery,
+  query?: AccountInfoQuery,
 ): Effect.Effect<AccountInfoBroad, PutioSdkError, PutioSdkContext>;
 export function getAccountInfo(query: AccountInfoQuery = {}) {
   return decodeAndRun(AccountInfoQuerySchema, query, (decodedQuery) => {

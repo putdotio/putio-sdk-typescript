@@ -12,7 +12,12 @@ import {
   selectJsonField,
   type PutioSdkContext,
 } from "../core/http.js";
-import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
+import {
+  NonNegativeNumberSchema,
+  NonEmptyStringSchema,
+  PositiveIntegerSchema,
+  decodeAndRun,
+} from "../core/validation.js";
 
 export const PaymentPlanTypeSchema = Schema.Literals(["onetime", "subscription"]);
 export const PaymentOptionPlanTypeSchema = Schema.Literals(["onetime", "subscription", "trial"]);
@@ -46,7 +51,7 @@ export const PaymentInfoPlanSchema = Schema.Struct({
   code: Schema.optional(Schema.String),
   group_code: Schema.optional(Schema.String),
   period_days: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0)))),
-  storage_space: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
+  storage_space: Schema.optional(NonNegativeNumberSchema),
   subscription: Schema.optional(PaymentSubscriptionInfoSchema),
   type: Schema.optional(Schema.NullOr(PaymentPlanTypeSchema)),
 });
@@ -69,9 +74,9 @@ export const PaymentInfoSchema = Schema.Struct({
 
 const PaymentPlanCommonPropertiesSchema = Schema.Struct({
   family_invites: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  seed_ratio: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-  seed_time: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-  storage_space: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  seed_ratio: NonNegativeNumberSchema,
+  seed_time: NonNegativeNumberSchema,
+  storage_space: NonNegativeNumberSchema,
   torrent_slot: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 });
 
@@ -98,7 +103,7 @@ const PaymentPlansEnvelopeSchema = Schema.Struct({
 });
 
 export const PaymentOptionSchema = Schema.Struct({
-  discount_percent: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  discount_percent: NonNegativeNumberSchema,
   name: PaymentTypeSchema,
   suitable_plan_types: Schema.Array(PaymentOptionPlanTypeSchema),
 });
@@ -157,7 +162,7 @@ const PaymentChangePlanCurrentPlanSchema = Schema.Struct({
 });
 
 const PaymentChangePlanTargetPlanSchema = Schema.Struct({
-  hd_avail: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  hd_avail: NonNegativeNumberSchema,
   is_trial_subscription: Schema.Boolean,
   new_code: Schema.String,
   period_days: Schema.NullOr(Schema.Int.check(Schema.isGreaterThan(0))),
@@ -187,7 +192,7 @@ const PaymentChangePlanProviderFastspringPreviewSchema = Schema.Struct({
 });
 
 const PaymentChangePlanDiscountSchema = Schema.Struct({
-  discount: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  discount: NonNegativeNumberSchema,
   type: Schema.Literals(["percentage", "amount"]),
 });
 
@@ -228,7 +233,7 @@ const FastspringPaymentProviderSchema = Schema.Struct({
 });
 
 const OpenNodePaymentProviderSchema = Schema.Struct({
-  discount_percent: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  discount_percent: NonNegativeNumberSchema,
   provider: Schema.Literal("OpenNode"),
   type: Schema.Literal("cryptocurrency"),
 });
@@ -295,7 +300,7 @@ const PaymentVoucherPlanSchema = Schema.Struct({
 const PaymentVoucherTargetPlanSchema = Schema.Struct({
   code: Schema.String,
   group_code: Schema.String,
-  hd_avail: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  hd_avail: NonNegativeNumberSchema,
   name: Schema.String,
   simulated_expiration: Schema.optional(Schema.NullOr(Schema.String)),
   type: PaymentPlanTypeSchema,

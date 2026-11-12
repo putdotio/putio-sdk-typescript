@@ -119,7 +119,7 @@ export const makePutioFetchClient = (
 
       return read(async () => {
         const response = await fetchImplementation(request.url, {
-          body: request.body,
+          body: request.body ?? null,
           headers: request.headers,
           method: request.method,
           signal: controller.signal,
@@ -210,11 +210,11 @@ type PutioRequestBody =
 interface PutioRequestOptions {
   readonly method: PutioRequestMethod;
   readonly path: string;
-  readonly baseUrl?: string | URL;
-  readonly query?: PutioQuery;
-  readonly headers?: HeadersInit;
-  readonly auth?: PutioAuth;
-  readonly body?: PutioRequestBody;
+  readonly baseUrl?: string | URL | undefined;
+  readonly query?: PutioQuery | undefined;
+  readonly headers?: HeadersInit | undefined;
+  readonly auth?: PutioAuth | undefined;
+  readonly body?: PutioRequestBody | undefined;
 }
 
 const decodeSuccessJson = <S extends Schema.Top>(schema: S, response: PutioHttpResponse) =>
@@ -327,12 +327,11 @@ const makeRequest = Effect.fnUntraced(function* (
     headers.set("content-type", "application/json");
   }
 
-  return {
-    body: yield* withBody(body),
-    headers,
-    method: options.method,
-    url,
-  };
+  const requestBody = yield* withBody(body);
+
+  const request: PutioHttpRequest = { headers, method: options.method, url };
+
+  return requestBody === undefined ? request : { ...request, body: requestBody };
 });
 
 const executeRequest = Effect.fn("PutioSdk.executeRequest")(function* (

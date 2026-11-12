@@ -378,7 +378,7 @@ interface FileGet<Kind extends OperationKind> {
   }): ResultOf<Kind, typeof getFile, FileResponseFor<TQuery>>;
   (input: {
     readonly id: number;
-    readonly query?: FileQuery;
+    readonly query?: FileQuery | undefined;
   }): ResultOf<Kind, typeof getFile, FileBroad>;
 }
 
@@ -395,7 +395,7 @@ interface FileGetChild<Kind extends OperationKind> {
   (input: {
     readonly name: string;
     readonly parentId: number;
-    readonly query?: FileQuery;
+    readonly query?: FileQuery | undefined;
   }): ResultOf<Kind, typeof getFileChild, FileBroad>;
 }
 

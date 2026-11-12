@@ -40,13 +40,13 @@ type ContractBody<TContract extends PutioKnownErrorContract> = TContract extends
 export type PutioTypedErrorEnvelope<TContract extends PutioKnownErrorContract> =
   TContract extends PutioKnownErrorContract
     ? Omit<ContractBody<TContract>, "error_message" | "error_type" | "status_code"> & {
-        readonly error_message?: string;
+        readonly error_message?: string | undefined;
         readonly error_type?: [ContractErrorType<TContract>] extends [never]
-          ? string
-          : ContractErrorType<TContract>;
+          ? string | undefined
+          : ContractErrorType<TContract> | undefined;
         readonly status_code?: [ContractStatusCode<TContract>] extends [never]
-          ? number
-          : ContractStatusCode<TContract>;
+          ? number | undefined
+          : ContractStatusCode<TContract> | undefined;
       }
     : never;
 

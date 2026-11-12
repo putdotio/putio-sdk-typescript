@@ -564,12 +564,13 @@ export type FileListContinuationResponse = Schema.Schema.Type<
   typeof FilesListContinueEnvelopeSchema
 >;
 
-export type FileListResponseFor<TQuery extends { readonly breadcrumbs?: 1 }> = FileListResponse &
-  (TQuery["breadcrumbs"] extends 1
-    ? {
-        readonly breadcrumbs: ReadonlyArray<FileBreadcrumb>;
-      }
-    : {});
+export type FileListResponseFor<TQuery extends { readonly breadcrumbs?: 1 | undefined }> =
+  FileListResponse &
+    (TQuery["breadcrumbs"] extends 1
+      ? {
+          readonly breadcrumbs: ReadonlyArray<FileBreadcrumb>;
+        }
+      : {});
 
 export type FileSearchResponse = Schema.Schema.Type<typeof FilesSearchEnvelopeSchema>;
 
@@ -612,16 +613,16 @@ export type FileUploadResult =
 export type FileDirectAccessOptions = {
   /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
   readonly downloadToken: string;
-  readonly useTunnel?: boolean;
+  readonly useTunnel?: boolean | undefined;
 };
 
 export type FileApiDownloadUrlOptions = FileDirectAccessOptions & {
-  readonly name?: string;
+  readonly name?: string | undefined;
 };
 
 export type FileApiMp4DownloadUrlOptions = FileDirectAccessOptions & {
-  readonly convert?: boolean;
-  readonly name?: string;
+  readonly convert?: boolean | undefined;
+  readonly name?: string | undefined;
 };
 
 export type FileHlsMasterPlaylistOptions = Schema.Schema.Type<
@@ -629,11 +630,11 @@ export type FileHlsMasterPlaylistOptions = Schema.Schema.Type<
 >;
 
 export type FileHlsStreamUrlOptions = {
-  readonly maxSubtitleCount?: number;
+  readonly maxSubtitleCount?: number | undefined;
   /** The account download token from `getAccountInfo({ download_token: 1 })`, not the OAuth token. */
   readonly downloadToken: string;
-  readonly playOriginal?: boolean;
-  readonly subtitleLanguages?: ReadonlyArray<string>;
+  readonly playOriginal?: boolean | undefined;
+  readonly subtitleLanguages?: ReadonlyArray<string> | undefined;
 };
 
 export type FileXspfPlaylistUrlOptions = {
@@ -643,8 +644,8 @@ export type FileXspfPlaylistUrlOptions = {
 
 export type FileUploadInput = {
   readonly file: Blob;
-  readonly fileName?: string;
-  readonly parentId?: number;
+  readonly fileName?: string | undefined;
+  readonly parentId?: number | undefined;
 };
 
 export type FileUploadRequestDescriptor = {
@@ -1265,9 +1266,9 @@ export function getFile<TQuery extends FileQuery>(input: {
 }): Effect.Effect<FileResponseFor<TQuery>, GetFileError, PutioSdkContext>;
 export function getFile(input: {
   readonly id: number;
-  readonly query?: FileQuery;
+  readonly query?: FileQuery | undefined;
 }): Effect.Effect<FileBroad, GetFileError, PutioSdkContext>;
-export function getFile(input: { readonly id: number; readonly query?: FileQuery }) {
+export function getFile(input: { readonly id: number; readonly query?: FileQuery | undefined }) {
   return decodeAndRun(FileGetInputSchema, input, (decodedInput) => {
     const effect = requestJson(FileEnvelopeSchema, {
       method: "GET",

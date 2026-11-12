@@ -49,8 +49,8 @@ export const requireRequestedBreadcrumbs =
     );
 
 type CursorOrIdsSelection = {
-  readonly cursor?: string;
-  readonly ids?: ReadonlyArray<number>;
+  readonly cursor?: string | undefined;
+  readonly ids?: ReadonlyArray<number> | undefined;
 };
 
 export type CursorSelection<TFields extends CursorOrIdsSelection> =

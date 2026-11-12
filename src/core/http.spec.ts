@@ -824,6 +824,35 @@ describe("sdk core http", () => {
     }),
   );
 
+  it.effect.each([
+    ["access token", { accessToken: "bad\ntoken-123" }],
+    ["configured header", { accessToken: "token-456", headers: { "x-trace": "bad\ntoken-123" } }],
+  ] as const)("fails without the value when the %s is not a valid header value", ([, options]) =>
+    Effect.gen(function* () {
+      let requestCount = 0;
+
+      const exit = yield* Effect.exit(
+        provideSdk(
+          requestJson(OkResponseSchema, { method: "GET", path: "/v2/test" }),
+          () => {
+            requestCount += 1;
+
+            return new Response("{}");
+          },
+          options,
+        ),
+      );
+
+      const error = expectFailure(exit);
+
+      expect(error).toBeInstanceOf(PutioConfigurationError);
+      expect([String(error), JSON.stringify(error), String(error.cause)].join(" ")).not.toContain(
+        "token-123",
+      );
+      expect(requestCount).toBe(0);
+    }),
+  );
+
   it.effect("treats an empty configured access token as a missing token", () =>
     Effect.gen(function* () {
       let requestCount = 0;

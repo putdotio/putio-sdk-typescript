@@ -303,17 +303,15 @@ const withBody = (body: PutioRequestBody): Effect.Effect<BodyInit | undefined, P
   }
 };
 
-const makeRequest = Effect.fnUntraced(function* (
-  url: string,
-  options: PutioRequestOptions,
+const buildRequestHeaders = (
+  requestHeaders: HeadersInit | undefined,
   configHeaders: HeadersInit | undefined,
-  authorization?: string,
-) {
+  authorization: string | undefined,
+  bodyType: PutioRequestBody["type"] | "none",
+): Headers => {
   const headers = new Headers(configHeaders);
   headers.delete("authorization");
-  new Headers(options.headers).forEach((value, name) => headers.set(name, value));
-
-  const body = options.body ?? { type: "none" as const };
+  new Headers(requestHeaders).forEach((value, name) => headers.set(name, value));
 
   if (!headers.has("accept")) {
     headers.set("accept", "application/json");
@@ -323,9 +321,25 @@ const makeRequest = Effect.fnUntraced(function* (
     headers.set("authorization", authorization);
   }
 
-  if (body.type === "json" && !headers.has("content-type")) {
+  if (bodyType === "json" && !headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }
+
+  return headers;
+};
+
+const makeRequest = Effect.fnUntraced(function* (
+  url: string,
+  options: PutioRequestOptions,
+  configHeaders: HeadersInit | undefined,
+  authorization?: string,
+) {
+  const body = options.body ?? { type: "none" as const };
+
+  const headers = yield* Effect.try({
+    try: () => buildRequestHeaders(options.headers, configHeaders, authorization, body.type),
+    catch: () => mapConfigurationError("SDK request headers must be valid HTTP header values"),
+  });
 
   const requestBody = yield* withBody(body);
 

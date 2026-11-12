@@ -23,9 +23,11 @@ import {
 } from "../core/http.js";
 import {
   NonEmptyStringSchema,
+  NonNegativeNumberSchema,
   PositiveIntegerSchema,
   decodeAndRun,
   cursorSelectionSchema,
+  failMissingField,
 } from "../core/validation.js";
 
 const RequestedFlag = Schema.Literal(1);
@@ -87,18 +89,16 @@ export const FileTouchInputSchema = Schema.Struct({
 });
 
 export const FileMediaMetadataSchema = Schema.Struct({
-  aspect_ratio: Schema.optional(
-    Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
-  ),
+  aspect_ratio: Schema.optional(Schema.NullOr(NonNegativeNumberSchema)),
   codec: Schema.optional(Schema.NullOr(Schema.String)),
-  duration: Schema.optional(Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)))),
+  duration: Schema.optional(Schema.NullOr(NonNegativeNumberSchema)),
   height: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   width: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
 });
 
 export const FileMediaInfoFormatSchema = Schema.Struct({
-  bit_rate: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
-  duration: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
+  bit_rate: Schema.optional(NonNegativeNumberSchema),
+  duration: Schema.optional(NonNegativeNumberSchema),
   name: Schema.optional(Schema.String),
 });
 
@@ -140,8 +140,8 @@ export const FileBaseSchema = Schema.Struct({
   parent_id: Schema.NullOr(Schema.Int),
   screenshot: Schema.NullOr(Schema.String),
   sha1: Schema.optional(Schema.NullOr(Schema.String)),
-  size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-  start_from: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
+  size: NonNegativeNumberSchema,
+  start_from: Schema.optional(NonNegativeNumberSchema),
   updated_at: Schema.String,
 });
 
@@ -150,7 +150,7 @@ export const FileBroadSchema = FileBaseSchema.pipe(
     content_type_and_codecs: Schema.optional(Schema.NullOr(Schema.String)),
     media_info: Schema.optional(Schema.NullOr(FileMediaInfoSchema)),
     media_metadata: Schema.optional(Schema.NullOr(FileMediaMetadataSchema)),
-    mp4_size: Schema.optional(Schema.NullOr(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)))),
+    mp4_size: Schema.optional(Schema.NullOr(NonNegativeNumberSchema)),
     mp4_stream_url: Schema.optional(Schema.NullOr(Schema.String)),
     need_convert: Schema.optional(Schema.Boolean),
     sender_name: Schema.optional(Schema.String),
@@ -277,11 +277,11 @@ const FileRenameInputSchema = Schema.Struct({
 
 const FileStartFromSetInputSchema = Schema.Struct({
   file_id: PositiveFileIdSchema,
-  time: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  time: NonNegativeNumberSchema,
 });
 
 const FileStartFromEnvelopeSchema = Schema.Struct({
-  start_from: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  start_from: NonNegativeNumberSchema,
   status: Schema.Literal("OK"),
 });
 
@@ -313,20 +313,20 @@ const FileConversionNotAvailableSchema = Schema.Struct({
 
 const FileConversionInQueueSchema = Schema.Struct({
   id: Schema.Int,
-  percent_done: Schema.optional(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0))),
+  percent_done: Schema.optional(NonNegativeNumberSchema),
   status: Schema.Literal("IN_QUEUE"),
 });
 
 const FileConversionConvertingSchema = Schema.Struct({
   id: Schema.Int,
-  percent_done: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  percent_done: NonNegativeNumberSchema,
   status: Schema.Literal("CONVERTING"),
 });
 
 const FileConversionCompletedSchema = Schema.Struct({
   id: Schema.Int,
-  percent_done: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
-  size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+  percent_done: NonNegativeNumberSchema,
+  size: NonNegativeNumberSchema,
   status: Schema.Literal("COMPLETED"),
 });
 
@@ -426,15 +426,7 @@ const FileExtractionsEnvelopeSchema = Schema.Struct({
   status: Schema.optional(Schema.Literal("OK")),
 });
 
-const FilesBulkSelectionSchema = Schema.Struct({
-  cursor: Schema.optional(NonEmptyStringSchema),
-  excludeIds: Schema.optional(Schema.Array(PositiveIntegerSchema)),
-  ids: Schema.optional(Schema.Array(PositiveIntegerSchema).check(Schema.isMinLength(1))),
-}).check(
-  Schema.makeFilter((input) => input.cursor !== undefined || input.ids !== undefined, {
-    expected: "a non-empty cursor or file ID selection",
-  }),
-);
+const FilesBulkSelectionSchema = cursorSelectionSchema({});
 
 const FilesDeleteOptionsSchema = Schema.Struct({
   ignoreFileOwner: Schema.optional(Schema.Boolean),
@@ -569,6 +561,13 @@ export type FileListResponse = Schema.Schema.Type<typeof FilesListEnvelopeSchema
 export type FileListContinuationResponse = Schema.Schema.Type<
   typeof FilesListContinueEnvelopeSchema
 >;
+
+export type FileListResponseFor<TQuery extends { readonly breadcrumbs?: 1 }> = FileListResponse &
+  (TQuery["breadcrumbs"] extends 1
+    ? {
+        readonly breadcrumbs: ReadonlyArray<FileBreadcrumb>;
+      }
+    : {});
 
 export type FileSearchResponse = Schema.Schema.Type<typeof FilesSearchEnvelopeSchema>;
 
@@ -798,6 +797,15 @@ export const SearchFilesErrorSpec = definePutioOperationErrorSpec({
   ],
 });
 
+export const ContinueSearchErrorSpec = definePutioOperationErrorSpec({
+  domain: "files",
+  operation: "continueSearch",
+  knownErrors: [
+    { errorType: "invalid_scope", statusCode: 401 as const },
+    { statusCode: 400 as const },
+  ],
+});
+
 export const CreateFolderErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "createFolder",
@@ -939,6 +947,8 @@ export type CanWriteFileError = PutioOperationFailure<typeof CanWriteFileErrorSp
 
 export type SearchFilesError = PutioOperationFailure<typeof SearchFilesErrorSpec>;
 
+export type ContinueSearchError = PutioOperationFailure<typeof ContinueSearchErrorSpec>;
+
 export type CreateFolderError = PutioOperationFailure<typeof CreateFolderErrorSpec>;
 
 export type RenameFileError = PutioOperationFailure<typeof RenameFileErrorSpec>;
@@ -962,13 +972,6 @@ export type FileExtractionsError = PutioOperationFailure<typeof FileExtractionsE
 export type FileWatchStatusError = PutioOperationFailure<typeof FileWatchStatusErrorSpec>;
 
 export type FileUploadError = PutioOperationFailure<typeof FileUploadErrorSpec>;
-
-const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
-  Effect.fail(
-    new PutioValidationError({
-      cause: `Expected put.io to include "${field}" because it was requested`,
-    }),
-  );
 
 const hasStreamUrl = (
   value: FileBroad,
@@ -1207,11 +1210,16 @@ const ensureFileQueryFields = <E>(
     return file;
   });
 
-export const queryFiles = (
+export function queryFiles<TQuery extends FilesListQuery>(
   parent: number | "friends",
-  query: FilesListQuery = {},
-): Effect.Effect<FileListResponse, QueryFilesError, PutioSdkContext> =>
-  decodeAndRun(FilesListInputSchema, { parent, query }, (decodedInput) =>
+  query: TQuery,
+): Effect.Effect<FileListResponseFor<TQuery>, QueryFilesError, PutioSdkContext>;
+export function queryFiles(
+  parent: number | "friends",
+  query?: FilesListQuery,
+): Effect.Effect<FileListResponse, QueryFilesError, PutioSdkContext>;
+export function queryFiles(parent: number | "friends", query: FilesListQuery = {}) {
+  return decodeAndRun(FilesListInputSchema, { parent, query }, (decodedInput) =>
     requestJson(FilesListEnvelopeSchema, {
       method: "GET",
       path:
@@ -1225,8 +1233,14 @@ export const queryFiles = (
               ...decodedInput.query,
               parent_id: decodedInput.parent,
             },
-    }),
+    }).pipe(
+      Effect.filterOrElse(
+        (response) => decodedInput.query.breadcrumbs !== 1 || response.breadcrumbs !== undefined,
+        () => failMissingField("breadcrumbs"),
+      ),
+    ),
   ).pipe(withOperationErrors(QueryFilesErrorSpec));
+}
 
 export const continueFiles = (
   cursor: string,
@@ -1360,7 +1374,7 @@ export const continueSearch = (
   query: {
     readonly per_page?: number;
   } = {},
-): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
+): Effect.Effect<FileSearchResponse, ContinueSearchError, PutioSdkContext> =>
   decodeAndRun(FilesContinueInputSchema, { cursor, query }, (decodedInput) =>
     requestJson(FilesSearchEnvelopeSchema, {
       body: {
@@ -1373,7 +1387,7 @@ export const continueSearch = (
       path: "/v2/files/search/continue",
       query: decodedInput.query,
     }),
-  ).pipe(withOperationErrors(SearchFilesErrorSpec));
+  ).pipe(withOperationErrors(ContinueSearchErrorSpec));
 
 export const setFileSort = (
   input: FileSetSortInput,

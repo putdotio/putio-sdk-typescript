@@ -22,14 +22,14 @@ const OperationErrorSchema = Schema.TaggedStruct("PutioOperationError", {
       kind: Schema.String,
     }),
   ),
-  status: Schema.Number,
+  status: Schema.Finite,
 });
 
 type OperationError = typeof OperationErrorSchema.Type;
 
 const TaggedErrorSchema = Schema.Struct({
   _tag: Schema.String,
-  status: Schema.optional(Schema.Number),
+  status: Schema.optional(Schema.Finite),
 });
 
 type TaggedError = typeof TaggedErrorSchema.Type;

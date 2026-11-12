@@ -12,6 +12,7 @@ import {
   selectJsonFields,
   type PutioSdkContext,
 } from "../core/http.js";
+import type { FilesBulkSelection } from "./files.js";
 
 export const DownloadLinksStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
 export const DownloadLinksCreateInputSchema = cursorSelectionSchema({});
@@ -56,7 +57,7 @@ export const DownloadLinksInfoSchema = Schema.Union([
 
 export type DownloadLinksStatus = Schema.Schema.Type<typeof DownloadLinksStatusSchema>;
 
-export type DownloadLinksCreateInput = Schema.Schema.Type<typeof DownloadLinksCreateInputSchema>;
+export type DownloadLinksCreateInput = FilesBulkSelection;
 
 export type DownloadLinksPayload = Schema.Schema.Type<typeof DownloadLinksPayloadSchema>;
 
@@ -90,7 +91,7 @@ export type CreateDownloadLinksError = PutioOperationFailure<typeof CreateDownlo
 export type GetDownloadLinksError = PutioOperationFailure<typeof GetDownloadLinksErrorSpec>;
 
 export const createDownloadLinks = (
-  input: DownloadLinksCreateInput = {},
+  input: DownloadLinksCreateInput,
 ): Effect.Effect<
   {
     readonly id: number;

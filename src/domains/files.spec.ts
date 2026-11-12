@@ -1,6 +1,6 @@
 import { Effect, Exit } from "effect";
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 
 import * as files from "./files.js";
 import {
@@ -895,6 +895,74 @@ describe("files domain", () => {
           { accessToken: "token-123" },
         ),
       ).toMatchObject({ files: [expect.objectContaining({ id: 9 })] });
+    }),
+  );
+
+  it.effect("names search continue failures after the continue operation", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(
+        provideSdk(
+          files.continueSearch("cursor-2"),
+          () => jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 }),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      expect(expectFailure(exit)).toBeInstanceOf(PutioOperationError);
+      expect(expectFailure(exit)).toMatchObject({
+        domain: "files",
+        operation: "continueSearch",
+        status: 400,
+      });
+    }),
+  );
+
+  it.effect("requires the breadcrumbs a file list asked for", () =>
+    Effect.gen(function* () {
+      const listing = { cursor: null, files: [baseFile], parent: baseFile, status: "OK", total: 1 };
+
+      const withBreadcrumbs = yield* provideSdk(
+        files.queryFiles(5, { breadcrumbs: 1 }),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/files/list?breadcrumbs=1&parent_id=5");
+
+          return jsonResponse({ ...listing, breadcrumbs: [[0, "Your Files"]] });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expectTypeOf(withBreadcrumbs.breadcrumbs).toEqualTypeOf<
+        ReadonlyArray<files.FileBreadcrumb>
+      >();
+      expect(withBreadcrumbs.breadcrumbs).toEqual([[0, "Your Files"]]);
+
+      const withoutBreadcrumbs = yield* provideSdk(
+        files.queryFiles(5, { per_page: 2 }),
+        () => jsonResponse(listing),
+        { accessToken: "token-123" },
+      );
+
+      expectTypeOf(withoutBreadcrumbs.breadcrumbs).toEqualTypeOf<
+        ReadonlyArray<files.FileBreadcrumb> | undefined
+      >();
+      expect(withoutBreadcrumbs.breadcrumbs).toBeUndefined();
+
+      const widenedQuery: files.FilesListQuery = { breadcrumbs: 1 };
+
+      expectTypeOf(files.queryFiles(5, widenedQuery)).toEqualTypeOf(files.queryFiles(5));
+
+      for (const parent of [5, "friends"] as const) {
+        const exit = yield* Effect.exit(
+          provideSdk(files.queryFiles(parent, { breadcrumbs: 1 }), () => jsonResponse(listing), {
+            accessToken: "token-123",
+          }),
+        );
+
+        expect(expectFailure(exit)).toBeInstanceOf(PutioValidationError);
+        expect(expectFailure(exit)).toMatchObject({
+          cause: 'Expected put.io to include "breadcrumbs" because it was requested',
+        });
+      }
     }),
   );
 

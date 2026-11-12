@@ -1,6 +1,6 @@
-import { Effect } from "effect";
+import { Effect, type Schema } from "effect";
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 
 import type { PutioSdkContext } from "../core/http.js";
 
@@ -546,8 +546,9 @@ describe("operational domain boundaries", () => {
     Effect.gen(function* () {
       expect(
         yield* provideSdk(
-          sharing.cloneSharedFiles(),
+          sharing.cloneSharedFiles({ ids: [7] }),
           (request) => {
+            expect(getFormBody(request).get("file_ids")).toBe("7");
             expect(getFormBody(request).get("parent_id")).toBe("0");
 
             return jsonResponse({ id: 9, status: "OK" });
@@ -836,7 +837,21 @@ describe("operational domain boundaries", () => {
         Effect.exit(provideSdk(sharing.cloneSharedFiles(null), handler)),
         Effect.exit(provideSdk(sharing.cloneSharedFiles({ cursor: "" }), handler)),
         Effect.exit(provideSdk(sharing.cloneSharedFiles({ ids: [0] }), handler)),
-        Effect.exit(provideSdk(sharing.cloneSharedFiles({ parentId: -1 }), handler)),
+        Effect.exit(provideSdk(sharing.cloneSharedFiles({ ids: [7], parentId: -1 }), handler)),
+        // @ts-expect-error A clone needs a cursor or file IDs.
+        Effect.exit(provideSdk(sharing.cloneSharedFiles({}), handler)),
+        // @ts-expect-error Excluded IDs alone select nothing.
+        Effect.exit(provideSdk(sharing.cloneSharedFiles({ excludeIds: [7] }), handler)),
+        Effect.exit(provideSdk(sharing.cloneSharedFiles({ ids: [] }), handler)),
+        // @ts-expect-error A share needs a cursor or file IDs.
+        Effect.exit(provideSdk(sharing.shareFiles({ target: { type: "everyone" } }), handler)),
+        Effect.exit(
+          provideSdk(sharing.shareFiles({ ids: [], target: { type: "everyone" } }), handler),
+        ),
+        // @ts-expect-error Public share lists sort by the file sort values.
+        Effect.exit(provideSdk(sharing.listPublicShareFiles({ sort_by: "NEWEST" }), handler)),
+        // @ts-expect-error Public share lists sort by the file sort values.
+        Effect.exit(provideSdk(sharing.listPublicShareFiles({ sort: "NEWEST" }), handler)),
         Effect.exit(provideSdk(sharing.getSharingCloneInfo(0), handler)),
         // @ts-expect-error JavaScript callers can provide null instead of a request object.
         Effect.exit(provideSdk(sharing.shareFiles(null), handler)),
@@ -1479,7 +1494,10 @@ describe("operational domain boundaries", () => {
         Effect.exit(provideSdk(trash.deleteTrash({ cursor: "cursor" }), handler)),
         // @ts-expect-error JavaScript callers can provide null instead of a request object.
         Effect.exit(provideSdk(zips.createZip(null), handler)),
+        // @ts-expect-error A zip needs a cursor or file IDs.
         Effect.exit(provideSdk(zips.createZip({}), handler)),
+        // @ts-expect-error Excluded IDs alone select nothing.
+        Effect.exit(provideSdk(zips.createZip({ exclude_ids: [7] }), handler)),
         Effect.exit(provideSdk(zips.createZip({ cursor: "" }), handler)),
         Effect.exit(provideSdk(zips.createZip({ file_ids: [] }), handler)),
         Effect.exit(provideSdk(zips.createZip({ file_ids: [0] }), handler)),
@@ -1494,6 +1512,189 @@ describe("operational domain boundaries", () => {
         failures.map(() => expect.any(PutioValidationError)),
       );
       expect(requestCount).toBe(0);
+    }),
+  );
+
+  it.effect("names continue failures after the continue operation", () =>
+    Effect.gen(function* () {
+      const badCursor = () =>
+        jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 });
+
+      const transfersFailure = yield* Effect.exit(
+        provideSdk(transfers.continueTransfers("cursor-1"), badCursor, {
+          accessToken: "token-123",
+        }),
+      );
+
+      expect(expectFailure(transfersFailure)).toBeInstanceOf(PutioOperationError);
+      expect(expectFailure(transfersFailure)).toMatchObject({
+        domain: "transfers",
+        operation: "continue",
+        status: 400,
+      });
+    }),
+  );
+
+  it.effect("requires the cursor and total a paged transfer list returns", () =>
+    Effect.gen(function* () {
+      const paged = yield* provideSdk(
+        transfers.listTransfers({ per_page: 2 }),
+        () => jsonResponse({ cursor: null, status: "OK", total: 1, transfers: [transfer] }),
+        { accessToken: "token-123" },
+      );
+
+      expectTypeOf(paged.total).toEqualTypeOf<number>();
+      expectTypeOf(paged.cursor).toEqualTypeOf<string | null>();
+      expect(paged.total).toBe(1);
+
+      const unpaged = yield* provideSdk(
+        transfers.listTransfers(),
+        () => jsonResponse({ status: "OK", transfers: [transfer] }),
+        { accessToken: "token-123" },
+      );
+
+      expectTypeOf(unpaged.total).toEqualTypeOf<number | undefined>();
+      expect(unpaged.transfers).toHaveLength(1);
+
+      const widenedQuery: transfers.TransfersListQuery = {};
+
+      expectTypeOf(transfers.listTransfers(widenedQuery)).toEqualTypeOf(transfers.listTransfers());
+
+      for (const [body, field] of [
+        [{ status: "OK", total: 1, transfers: [transfer] }, "cursor"],
+        [{ cursor: null, status: "OK", transfers: [transfer] }, "total"],
+      ] as const) {
+        const exit = yield* Effect.exit(
+          provideSdk(transfers.listTransfers({ per_page: 2 }), () => jsonResponse(body), {
+            accessToken: "token-123",
+          }),
+        );
+
+        expect(expectFailure(exit)).toBeInstanceOf(PutioValidationError);
+        expect(expectFailure(exit)).toMatchObject({
+          cause: `Expected put.io to include "${field}" because it was requested`,
+        });
+      }
+    }),
+  );
+
+  it.effect("requires the breadcrumbs a public share list asked for", () =>
+    Effect.gen(function* () {
+      const listing = yield* provideSdk(
+        sharing.listPublicShareFiles({ breadcrumbs: 1 }),
+        () =>
+          jsonResponse({
+            breadcrumbs: [[7, "Shared"]],
+            cursor: null,
+            files: [],
+            parent: sharedFile,
+            status: "OK",
+          }),
+        { accessToken: "token-123" },
+      );
+
+      expectTypeOf(listing.breadcrumbs).toEqualTypeOf<ReadonlyArray<readonly [number, string]>>();
+      expect(listing.breadcrumbs).toEqual([[7, "Shared"]]);
+
+      const exit = yield* Effect.exit(
+        provideSdk(
+          sharing.listPublicShareFiles({ breadcrumbs: 1 }),
+          () => jsonResponse({ cursor: null, files: [], parent: sharedFile, status: "OK" }),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      expect(expectFailure(exit)).toBeInstanceOf(PutioValidationError);
+      expect(expectFailure(exit)).toMatchObject({
+        cause: 'Expected put.io to include "breadcrumbs" because it was requested',
+      });
+    }),
+  );
+
+  it.effect("decodes the trash screenshot shapes and rejects anything else", () =>
+    Effect.gen(function* () {
+      const trashFile = {
+        content_type: "video/mp4",
+        created_at: "2026-03-17T00:00:00Z",
+        deleted_at: "2026-03-18T00:00:00Z",
+        expiration_date: "2026-04-18T00:00:00Z",
+        extension: "mp4",
+        file_type: "VIDEO",
+        first_accessed_at: null,
+        folder_type: "REGULAR",
+        icon: null,
+        id: 11,
+        name: "trash.mp4",
+        parent_id: 0,
+        size: 1,
+      };
+
+      const listWith = (screenshot: Schema.Json) =>
+        provideSdk(
+          trash.continueTrash("cursor-1"),
+          () => jsonResponse({ cursor: null, files: [{ ...trashFile, screenshot }], status: "OK" }),
+          { accessToken: "token-123" },
+        );
+
+      const url = "https://api.put.io/screenshots/abc.jpg";
+
+      for (const screenshot of [[url], [null], url, null]) {
+        expect((yield* listWith(screenshot)).files[0]?.screenshot).toEqual(screenshot);
+      }
+
+      for (const screenshot of [[], [url, url], [7], { url }, 7]) {
+        expect(expectFailure(yield* Effect.exit(listWith(screenshot)))).toBeInstanceOf(
+          PutioValidationError,
+        );
+      }
+    }),
+  );
+
+  it.effect("rejects a public share whose file type is outside the file types", () =>
+    Effect.gen(function* () {
+      const publicShare = (fileType: string) =>
+        provideSdk(
+          sharing.getPublicShare(),
+          () =>
+            jsonResponse({
+              public_share: {
+                created_at: "2026-03-17T00:00:00Z",
+                expiration_date: "2026-03-18T00:00:00Z",
+                id: 3,
+                owner: { name: "sdk" },
+                push_token: "push-token",
+                token: "public-token",
+                user_file: { file_type: fileType, id: 7, name: "Shared" },
+              },
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        );
+
+      expect((yield* publicShare("FOLDER")).user_file.file_type).toBe("FOLDER");
+      expect(expectFailure(yield* Effect.exit(publicShare("folder")))).toBeInstanceOf(
+        PutioValidationError,
+      );
+    }),
+  );
+
+  it.effect("rejects sizes that are not finite", () =>
+    Effect.gen(function* () {
+      const listTrashWithSize = (trashSize: string) =>
+        provideSdk(
+          trash.listTrash(),
+          () =>
+            new Response(
+              `{"cursor":null,"files":[],"status":"OK","total":0,"trash_size":${trashSize}}`,
+              { headers: { "content-type": "application/json" } },
+            ),
+          { accessToken: "token-123" },
+        );
+
+      expect((yield* listTrashWithSize("1e15")).trash_size).toBe(1e15);
+      expect(expectFailure(yield* Effect.exit(listTrashWithSize("1e999")))).toBeInstanceOf(
+        PutioValidationError,
+      );
     }),
   );
 

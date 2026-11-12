@@ -62,12 +62,18 @@ const decodeJsonValue = Schema.decodeUnknownSync(configDomain.JsonValueSchema);
 const decodeJsonObject = Schema.decodeUnknownSync(configDomain.JsonObjectSchema);
 
 describe("supporting domain boundaries", () => {
-  it("types download-link selections by field", () => {
-    expectTypeOf<downloadLinks.DownloadLinksCreateInput>().toEqualTypeOf<{
-      readonly cursor?: string;
-      readonly excludeIds?: ReadonlyArray<number>;
-      readonly ids?: ReadonlyArray<number>;
-    }>();
+  it("requires a selector in download-link selections", () => {
+    type Input = downloadLinks.DownloadLinksCreateInput;
+
+    expectTypeOf<{ readonly cursor: string }>().toExtend<Input>();
+    expectTypeOf<{ readonly ids: ReadonlyArray<number> }>().toExtend<Input>();
+    expectTypeOf<{
+      readonly cursor: string;
+      readonly excludeIds: ReadonlyArray<number>;
+    }>().toExtend<Input>();
+    expectTypeOf<{}>().not.toExtend<Input>();
+    expectTypeOf<{ readonly excludeIds: ReadonlyArray<number> }>().not.toExtend<Input>();
+    expectTypeOf(downloadLinks.createDownloadLinks).parameters.toEqualTypeOf<[input: Input]>();
   });
 
   it.effect("covers config reads and writes", () =>
@@ -709,7 +715,12 @@ describe("supporting domain boundaries", () => {
       };
 
       const failures = yield* Effect.all([
+        // @ts-expect-error A download-link task needs a cursor or file IDs.
         Effect.exit(provideSdk(downloadLinks.createDownloadLinks(), handler)),
+        // @ts-expect-error A download-link task needs a cursor or file IDs.
+        Effect.exit(provideSdk(downloadLinks.createDownloadLinks({}), handler)),
+        // @ts-expect-error Excluded IDs alone select nothing.
+        Effect.exit(provideSdk(downloadLinks.createDownloadLinks({ excludeIds: [7] }), handler)),
         Effect.exit(provideSdk(downloadLinks.createDownloadLinks({ cursor: "" }), handler)),
         Effect.exit(provideSdk(downloadLinks.createDownloadLinks({ ids: [] }), handler)),
         Effect.exit(provideSdk(downloadLinks.createDownloadLinks({ ids: [0] }), handler)),

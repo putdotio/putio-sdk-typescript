@@ -4,6 +4,14 @@ import { mapDecodeErrorToValidationError, PutioValidationError } from "./errors.
 
 export const PositiveIntegerSchema = Schema.Int.check(Schema.isGreaterThan(0));
 export const NonEmptyStringSchema = Schema.String.check(Schema.isMinLength(1));
+export const NonNegativeNumberSchema = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
+
+export const failMissingField = (field: string): Effect.Effect<never, PutioValidationError> =>
+  Effect.fail(
+    new PutioValidationError({
+      cause: `Expected put.io to include "${field}" because it was requested`,
+    }),
+  );
 
 export const decodeAndRun = <S extends Schema.Top, A, E, R>(
   schema: S,

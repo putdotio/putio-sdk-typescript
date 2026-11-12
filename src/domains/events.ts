@@ -1,5 +1,9 @@
 import { Effect, Schema } from "effect";
-import { PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
+import {
+  NonNegativeNumberSchema,
+  PositiveIntegerSchema,
+  decodeAndRun,
+} from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
   withOperationErrors,
@@ -24,7 +28,7 @@ const HistoryFileEventSchema = HistoryEventBaseSchema.pipe(
   Schema.fieldsAssign({
     file_id: Schema.Int,
     file_name: Schema.String,
-    file_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+    file_size: NonNegativeNumberSchema,
   }),
 );
 
@@ -66,7 +70,7 @@ export const HistoryTransferCompletedEventSchema = HistoryTransferEventSchema.ma
 ).pipe(
   Schema.fieldsAssign({
     file_id: Schema.Int,
-    transfer_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+    transfer_size: NonNegativeNumberSchema,
     type: Schema.Literal("transfer_completed"),
   }),
 );
@@ -138,7 +142,7 @@ export const HistoryZipCreatedEventSchema = HistoryEventBaseSchema.mapFields(
   Schema.fieldsAssign({
     type: Schema.Literal("zip_created"),
     zip_id: Schema.Int,
-    zip_size: Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)),
+    zip_size: NonNegativeNumberSchema,
   }),
 );
 

@@ -134,7 +134,7 @@ const PutioOperationErrorReasonSchema = Schema.Union([
   }),
   Schema.Struct({
     kind: Schema.Literal("status_code"),
-    statusCode: Schema.Number,
+    statusCode: Schema.Finite,
   }),
 ]);
 
@@ -172,7 +172,7 @@ const RateLimitHeaderFields = {
   limit: Schema.optional(Schema.String),
   remaining: Schema.optional(Schema.String),
   retryAfter: Schema.optional(Schema.String),
-  retryAfterSeconds: Schema.optional(Schema.Number),
+  retryAfterSeconds: Schema.optional(Schema.Finite),
   reset: Schema.optional(Schema.String),
 };
 
@@ -252,7 +252,7 @@ export const isPutioErrorEnvelope = (value: unknown): value is PutioErrorEnvelop
 
 const responseErrorFields = {
   body: PutioErrorEnvelopeSchema,
-  status: Schema.Number,
+  status: Schema.Finite,
 };
 
 const PutioApiErrorValueSchema = Schema.TaggedStruct("PutioApiError", {

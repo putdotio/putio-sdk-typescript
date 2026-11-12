@@ -19,12 +19,7 @@ import {
   listAccountConfirmations,
   saveAccountSettings,
 } from "../domains/account.js";
-import type {
-  AccountInfoBase,
-  AccountInfoBroad,
-  AccountInfoQuery,
-  PasInfo,
-} from "../domains/account.js";
+import type { AccountInfoQuery, AccountInfoResponseFor } from "../domains/account.js";
 import {
   createAppSpecificPassword,
   deleteAllAppSpecificPasswords,
@@ -635,31 +630,9 @@ export const makePutioSdkLiveClientLayer = (config: PutioSdkOptions) =>
 const createPromiseOperations = (state: PutioSdkPromiseState, signal: AbortSignal | undefined) => {
   const config: PutioSdkPromiseRunner = { signal, state };
 
-  function getInfo(query: {
-    readonly download_token: 1;
-    readonly pas: 1;
-  }): Promise<AccountInfoBase & { readonly download_token: string; readonly pas: PasInfo }>;
-  function getInfo(query: {
-    readonly download_token: 1;
-  }): Promise<AccountInfoBase & { readonly download_token: string }>;
-  function getInfo(query: {
-    readonly features: 1;
-  }): Promise<AccountInfoBase & { readonly features: Record<string, boolean> }>;
-  function getInfo(query: {
-    readonly intercom: 1;
-    readonly platform?: "web" | "ios";
-  }): Promise<AccountInfoBase & { readonly user_hash?: string }>;
-  function getInfo(query: {
-    readonly pas: 1;
-  }): Promise<AccountInfoBase & { readonly pas: PasInfo }>;
-  function getInfo(query: {
-    readonly profitwell: 1;
-  }): Promise<AccountInfoBase & { readonly paddle_user_id: number | string | null }>;
-  function getInfo(query: {
-    readonly push_token: 1;
-  }): Promise<AccountInfoBase & { readonly push_token: string }>;
-  function getInfo(): Promise<AccountInfoBroad>;
-  function getInfo(query: AccountInfoQuery): Promise<AccountInfoBroad>;
+  function getInfo<TQuery extends AccountInfoQuery = AccountInfoQuery>(
+    query?: TQuery,
+  ): Promise<AccountInfoResponseFor<TQuery>>;
   function getInfo(query: AccountInfoQuery = {}) {
     return provideSdk(config, getAccountInfo(query));
   }

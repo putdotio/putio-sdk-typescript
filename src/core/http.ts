@@ -6,7 +6,6 @@ import {
   DEFAULT_PUTIO_WEB_APP_URL,
 } from "./defaults.js";
 import {
-  fallbackPutioErrorEnvelope,
   mapConfigurationError,
   mapContractError,
   mapTransportError,
@@ -17,6 +16,8 @@ import {
   PutioValidationError,
   toPutioResponseError,
 } from "./errors.js";
+import { isSuccessStatus, unparsableJsonBodyError } from "./response-body.js";
+import { revealAccessToken, revealSecret } from "./secrets.js";
 
 export type PutioQueryValue = string | number | boolean | null | undefined;
 
@@ -77,9 +78,11 @@ const redactPutioSecret = (
     return undefined;
   }
 
-  const redacted = Predicate.isString(secret) ? Redacted.make(secret) : secret;
+  if (Predicate.isString(secret)) {
+    return secret === "" ? undefined : Redacted.make(secret);
+  }
 
-  return Redacted.value(redacted) === "" ? undefined : redacted;
+  return secret;
 };
 
 export const normalizePutioSdkOptions = (config: PutioSdkOptions): PutioSdkResolvedConfig => ({
@@ -128,16 +131,7 @@ export const makePutioFetchClient = (
           json: read(() => response.text()).pipe(
             Effect.flatMap((text) =>
               decodeJsonText(text).pipe(
-                Effect.mapError(() =>
-                  isSuccessStatus(response.status)
-                    ? mapContractError(new SyntaxError("The HTTP response body is not valid JSON"))
-                    : toPutioResponseError(
-                        response.status,
-                        response.headers,
-                        fallbackPutioErrorEnvelope(response.status),
-                        new SyntaxError("The HTTP error response body is not valid JSON"),
-                      ),
-                ),
+                Effect.mapError(() => unparsableJsonBodyError(response.status, response.headers)),
               ),
             ),
           ),
@@ -223,8 +217,6 @@ interface PutioRequestOptions {
   readonly body?: PutioRequestBody;
 }
 
-const isSuccessStatus = (status: number) => status >= 200 && status < 300;
-
 const decodeSuccessJson = <S extends Schema.Top>(schema: S, response: PutioHttpResponse) =>
   response.json.pipe(
     Effect.flatMap((json) =>
@@ -238,9 +230,6 @@ const decodeFailure = (response: PutioHttpResponse, headers: Headers) =>
     Effect.map((body) => toPutioResponseError(response.status, headers, body)),
   );
 
-const revealPutioSecret = (secret: PutioSecret): string =>
-  Predicate.isString(secret) ? secret : Redacted.value(secret);
-
 const resolveAuthorization = (
   config: PutioSdkResolvedConfig,
   auth: PutioAuth | undefined,
@@ -251,23 +240,28 @@ const resolveAuthorization = (
     case "none":
       return Effect.undefined;
     case "token":
-      return Effect.succeed(`Token ${revealPutioSecret(resolvedAuth.token)}`);
+      return revealSecret(resolvedAuth.token).pipe(Effect.map((token) => `Token ${token}`));
     case "basic":
-      return Effect.try({
-        try: () =>
-          `Basic ${btoa(`${resolvedAuth.username}:${revealPutioSecret(resolvedAuth.password)}`)}`,
-        catch: mapConfigurationError,
-      });
+      return revealSecret(resolvedAuth.password).pipe(
+        Effect.flatMap((password) =>
+          Effect.try({
+            try: () => `Basic ${btoa(`${resolvedAuth.username}:${password}`)}`,
+            catch: mapConfigurationError,
+          }),
+        ),
+      );
     case "config-token":
-      if (config.accessToken === undefined) {
-        return Effect.fail(
-          mapConfigurationError(
-            "This endpoint requires an access token, but PutioSdkConfig.accessToken is missing",
-          ),
-        );
-      }
-
-      return Effect.succeed(`Token ${Redacted.value(config.accessToken)}`);
+      return revealAccessToken(config.accessToken).pipe(
+        Effect.flatMap((token) =>
+          token === undefined
+            ? Effect.fail(
+                mapConfigurationError(
+                  "This endpoint requires an access token, but PutioSdkConfig.accessToken is missing",
+                ),
+              )
+            : Effect.succeed(`Token ${token}`),
+        ),
+      );
   }
 };
 

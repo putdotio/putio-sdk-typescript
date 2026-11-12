@@ -26,6 +26,7 @@ import {
   requestVoid,
   selectJsonField,
   selectJsonFields,
+  type PutioAuth,
   type PutioSdkContext,
 } from "./http.js";
 
@@ -774,6 +775,76 @@ describe("sdk core http", () => {
           return new Response(null, { status: 204 });
         },
       );
+    }),
+  );
+
+  it("normalises a redacted access token without unwrapping it", () => {
+    const wiped = Redacted.make("wiped-secret");
+    Redacted.wipeUnsafe(wiped);
+
+    expect(normalizePutioSdkOptions({ accessToken: wiped }).accessToken).toBe(wiped);
+  });
+
+  it.effect.each<{
+    readonly auth: (secret: Redacted.Redacted<string>) => PutioAuth;
+    readonly name: string;
+  }>([
+    { auth: () => ({ type: "config-token" }), name: "the configured access token" },
+    { auth: (token) => ({ type: "token", token }), name: "a token override" },
+    {
+      auth: (password) => ({ type: "basic", username: "user", password }),
+      name: "a basic password",
+    },
+  ])("fails with PutioConfigurationError when $name is a wiped Redacted", (scenario) =>
+    Effect.gen(function* () {
+      const wiped = Redacted.make("wiped-secret");
+      Redacted.wipeUnsafe(wiped);
+      let requestCount = 0;
+      const auth = scenario.auth(wiped);
+
+      const exit = yield* Effect.exit(
+        requestJson(OkResponseSchema, { auth, method: "GET", path: "/v2/test" }).pipe(
+          Effect.provideService(PutioHttpClient, {
+            execute: () => {
+              requestCount += 1;
+
+              return Effect.die("unexpected request");
+            },
+          }),
+          Effect.provideService(PutioSdkConfig, {
+            ...normalizePutioSdkOptions({}),
+            accessToken: wiped,
+          }),
+        ),
+      );
+
+      expect(expectFailure(exit)).toBeInstanceOf(PutioConfigurationError);
+      expect(requestCount).toBe(0);
+    }),
+  );
+
+  it.effect("treats an empty configured access token as a missing token", () =>
+    Effect.gen(function* () {
+      let requestCount = 0;
+
+      const exit = yield* Effect.exit(
+        requestJson(OkResponseSchema, { method: "GET", path: "/v2/test" }).pipe(
+          Effect.provideService(PutioHttpClient, {
+            execute: () => {
+              requestCount += 1;
+
+              return Effect.die("unexpected request");
+            },
+          }),
+          Effect.provideService(PutioSdkConfig, {
+            ...normalizePutioSdkOptions({}),
+            accessToken: Redacted.make(""),
+          }),
+        ),
+      );
+
+      expect(expectFailure(exit)).toBeInstanceOf(PutioConfigurationError);
+      expect(requestCount).toBe(0);
     }),
   );
 });

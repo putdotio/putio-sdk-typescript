@@ -36,10 +36,26 @@ export const decodeAndRunRedacted =
 export const failMissingField = (field: string): Effect.Effect<never, PutioContractError> =>
   Effect.fail(new PutioContractError({ missingField: field }));
 
+export const requireRequestedBreadcrumbs =
+  (query: { readonly breadcrumbs?: 1 | undefined }) =>
+  <A extends { readonly breadcrumbs?: unknown }, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | PutioContractError, R> =>
+    effect.pipe(
+      Effect.filterOrElse(
+        (response) => query.breadcrumbs !== 1 || response.breadcrumbs !== undefined,
+        () => failMissingField("breadcrumbs"),
+      ),
+    );
+
 type CursorOrIdsSelection = {
   readonly cursor?: string;
   readonly ids?: ReadonlyArray<number>;
 };
+
+export type CursorSelection<TFields extends CursorOrIdsSelection> =
+  | (TFields & { readonly cursor: string })
+  | (TFields & { readonly ids: ReadonlyArray<number> });
 
 export const cursorSelectionSchema = <const TFields extends Schema.Struct.Fields>(
   fields: TFields,

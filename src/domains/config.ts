@@ -1,6 +1,10 @@
 import { Effect, Predicate, Schema, SchemaIssue, SchemaParser } from "effect";
 import { decodeAndRun } from "../core/validation.js";
-import { type PutioSdkError } from "../core/errors.js";
+import {
+  mapValidationError,
+  type PutioSdkError,
+  type PutioValidationError,
+} from "../core/errors.js";
 import {
   OkResponseSchema,
   encodePathSegment,
@@ -317,6 +321,11 @@ const makeConfigValueEnvelopeSchema = <A>(schema: Schema.ConstraintDecoder<A, ne
 const ConfigEnvelopeSchema = makeConfigEnvelopeSchema(JsonObjectResponseSchema);
 const ConfigValueEnvelopeSchema = makeConfigValueEnvelopeSchema(JsonValueResponseSchema);
 
+const decodeWithCallerSchema =
+  <A>(schema: Schema.ConstraintDecoder<A, never>) =>
+  (value: PutioJsonValue): Effect.Effect<A, PutioValidationError> =>
+    Schema.decodeEffect(schema)(value).pipe(Effect.mapError(mapValidationError));
+
 export const readConfig = (): Effect.Effect<PutioJsonObject, PutioSdkError, PutioSdkContext> =>
   requestJson(ConfigEnvelopeSchema, {
     method: "GET",
@@ -326,10 +335,7 @@ export const readConfig = (): Effect.Effect<PutioJsonObject, PutioSdkError, Puti
 export const readConfigWith = <A>(
   schema: Schema.ConstraintDecoder<A, never>,
 ): Effect.Effect<A, PutioSdkError, PutioSdkContext> =>
-  requestJson(makeConfigEnvelopeSchema(JsonObjectResponseSchema.pipe(Schema.decodeTo(schema))), {
-    method: "GET",
-    path: "/v2/config",
-  }).pipe(Effect.map((envelope) => envelope["config"]));
+  readConfig().pipe(Effect.flatMap(decodeWithCallerSchema(schema)));
 
 export const writeConfig = (
   config: PutioJsonObject,
@@ -361,15 +367,7 @@ export const getConfigKeyWith = <A>(
   key: string,
   schema: Schema.ConstraintDecoder<A, never>,
 ): Effect.Effect<A, PutioSdkError, PutioSdkContext> =>
-  decodeAndRun(ConfigKeySchema, key, (decodedKey) =>
-    requestJson(
-      makeConfigValueEnvelopeSchema(JsonValueResponseSchema.pipe(Schema.decodeTo(schema))),
-      {
-        method: "GET",
-        path: `/v2/config/${encodePathSegment(decodedKey)}`,
-      },
-    ),
-  ).pipe(Effect.map((envelope) => envelope["value"]));
+  getConfigKey(key).pipe(Effect.flatMap(decodeWithCallerSchema(schema)));
 
 export const setConfigKey = (
   key: string,

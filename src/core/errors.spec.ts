@@ -13,6 +13,7 @@ import {
   PutioTransportError,
   PutioOperationError,
   PutioValidationError,
+  type PutioSdkError,
   definePutioOperationErrorSpec,
   fallbackPutioErrorEnvelope,
   isPutioApiError,
@@ -431,4 +432,23 @@ describe("sdk core errors", () => {
       expect(expectFailure(exit)).toBe(transportError);
     }),
   );
+
+  it("matches cause-carrying errors that lost an undefined cause in a JSON round trip", () => {
+    const decodeJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json));
+
+    const roundTrip = (error: PutioSdkError) => decodeJson(JSON.stringify(error));
+
+    expect(isPutioTransportError(roundTrip(new PutioTransportError({ cause: undefined })))).toBe(
+      true,
+    );
+    expect(
+      isPutioConfigurationError(roundTrip(new PutioConfigurationError({ cause: undefined }))),
+    ).toBe(true);
+    expect(isPutioValidationError(roundTrip(new PutioValidationError({ cause: undefined })))).toBe(
+      true,
+    );
+    expect(isPutioValidationError(roundTrip(new PutioTransportError({ cause: undefined })))).toBe(
+      false,
+    );
+  });
 });

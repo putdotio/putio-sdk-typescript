@@ -10,6 +10,7 @@ import {
   type PutioSdkOptions,
   type PutioSdkContext,
 } from "../../src/core/http.js";
+import { unparsableJsonBodyError } from "../../src/core/response-body.js";
 
 export type MockRequestHandler = (request: PutioHttpRequest) => Response;
 
@@ -58,7 +59,10 @@ const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientService
       headers: response.headers,
       json: Effect.tryPromise({
         try: () => response.json(),
-        catch: (cause) => new PutioTransportError({ cause }),
+        catch: (cause) =>
+          cause instanceof SyntaxError
+            ? unparsableJsonBodyError(response.status, response.headers)
+            : new PutioTransportError({ cause }),
       }),
       status: response.status,
     });

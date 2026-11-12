@@ -281,11 +281,24 @@ const PutioOperationErrorValueSchema = Schema.TaggedStruct("PutioOperationError"
   reason: PutioOperationErrorReasonSchema,
 });
 
-const PutioTransportErrorValueSchema = Schema.Struct(PutioTransportError.fields);
+const CauseErrorValueFields = {
+  cause: Schema.optional(Schema.Defect()),
+};
 
-const PutioConfigurationErrorValueSchema = Schema.Struct(PutioConfigurationError.fields);
+const PutioTransportErrorValueSchema = Schema.Struct({
+  ...PutioTransportError.fields,
+  ...CauseErrorValueFields,
+});
 
-const PutioValidationErrorValueSchema = Schema.Struct(PutioValidationError.fields);
+const PutioConfigurationErrorValueSchema = Schema.Struct({
+  ...PutioConfigurationError.fields,
+  ...CauseErrorValueFields,
+});
+
+const PutioValidationErrorValueSchema = Schema.Struct({
+  ...PutioValidationError.fields,
+  ...CauseErrorValueFields,
+});
 
 const PutioContractErrorValueSchema = Schema.Struct(PutioContractError.fields);
 

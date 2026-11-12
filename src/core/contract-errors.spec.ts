@@ -1,10 +1,11 @@
 import { Effect, Layer, Schema } from "effect";
 import { afterEach, assert, describe, expect, it, vi } from "@effect/vitest";
 
-import { expectFailure } from "../../test/support/sdk-test.js";
+import { expectFailure, provideSdk } from "../../test/support/sdk-test.js";
 import { login } from "../domains/auth.js";
 import { createPutioSdkPromiseClient } from "./client.js";
 import {
+  PutioApiError,
   PutioContractError,
   PutioTransportError,
   isPutioContractError,
@@ -114,4 +115,29 @@ describe("response contract errors", () => {
     assert.instanceOf(error, PutioContractError);
     expect(serialized(error)).not.toContain("private-token");
   });
+
+  it.effect("maps unparsable bodies in the mock transport as the fetch client does", () =>
+    Effect.gen(function* () {
+      const request = requestJson(OkResponseSchema, {
+        method: "GET",
+        path: "/test",
+        auth: { type: "none" },
+      });
+
+      const success = expectFailure(
+        yield* Effect.exit(provideSdk(request, () => new Response("<html></html>"))),
+      );
+
+      const failure = expectFailure(
+        yield* Effect.exit(
+          provideSdk(request, () => new Response("<html></html>", { status: 502 })),
+        ),
+      );
+
+      expect(success).toBeInstanceOf(PutioContractError);
+      expect(success).toMatchObject({ cause: expect.any(SyntaxError) });
+      expect(failure).toBeInstanceOf(PutioApiError);
+      expect(failure).toMatchObject({ status: 502, cause: expect.any(SyntaxError) });
+    }),
+  );
 });

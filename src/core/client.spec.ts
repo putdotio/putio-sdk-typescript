@@ -1,5 +1,5 @@
 import { Effect, Layer, Predicate, Redacted, Schema } from "effect";
-import { afterEach, describe, expect, it, vi } from "@effect/vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "@effect/vitest";
 
 import { publicContractFixtures } from "../../test/fixtures/public-contracts.js";
 import { jsonResponse, provideMockTransport } from "../../test/support/sdk-test.js";
@@ -9,7 +9,17 @@ import {
   createPutioSdkPromiseClient,
   makePutioSdkEffectClientLayer,
   makePutioSdkLiveClientLayer,
+  type PutioSdkService,
 } from "./client.js";
+import type {
+  FileBreadcrumb,
+  FileBroad,
+  FileListResponse,
+  FileListResponseFor,
+  FileQuery,
+  FilesListQuery,
+} from "../domains/files.js";
+import type { TransfersListResponse, TransfersListResponseFor } from "../domains/transfers.js";
 import { PutioAuthError, PutioConfigurationError, PutioOperationError } from "./errors.js";
 import { PutioHttpClient, PutioSdkConfig, putioSdkLayer } from "./http.js";
 
@@ -742,5 +752,72 @@ describe("sdk client factories", () => {
     await client.dispose();
 
     await expect(client.account.getSettings()).rejects.toBeInstanceOf(PutioConfigurationError);
+  });
+
+  it("types conditioned list results the same in the Promise client and the service", () => {
+    const client = createPutioSdkPromiseClient();
+
+    const service = (sdk: PutioSdkService) => ({
+      files: sdk.files.list(0, { breadcrumbs: 1 }),
+      filesBroad: sdk.files.list(0),
+      shared: sdk.sharing.publicAccess.listFiles({ breadcrumbs: 1 }),
+      transfers: sdk.transfers.list({ per_page: 20 }),
+      transfersBroad: sdk.transfers.list(),
+    });
+
+    type Service = ReturnType<typeof service>;
+
+    expectTypeOf(client.files.list<{ readonly breadcrumbs: 1 }>).returns.resolves.toEqualTypeOf<
+      FileListResponseFor<{ readonly breadcrumbs: 1 }>
+    >();
+    expectTypeOf(
+      client.sharing.publicAccess.listFiles<{ readonly breadcrumbs: 1 }>,
+    ).returns.resolves.toEqualTypeOf<FileListResponseFor<{ readonly breadcrumbs: 1 }>>();
+    expectTypeOf(
+      client.transfers.list<{ readonly per_page: number }>,
+    ).returns.resolves.toEqualTypeOf<TransfersListResponseFor<{ readonly per_page: number }>>();
+    expectTypeOf(client.transfers.list<{ readonly per_page: number }>)
+      .returns.resolves.toHaveProperty("total")
+      .toEqualTypeOf<number>();
+    expectTypeOf(client.files.list<FilesListQuery>).returns.resolves.toEqualTypeOf<
+      FileListResponseFor<FilesListQuery>
+    >();
+
+    expectTypeOf<Effect.Success<Service["files"]>["breadcrumbs"]>().toEqualTypeOf<
+      ReadonlyArray<FileBreadcrumb>
+    >();
+    expectTypeOf<Effect.Success<Service["filesBroad"]>>().toEqualTypeOf<FileListResponse>();
+    expectTypeOf<Effect.Success<Service["shared"]>["breadcrumbs"]>().toEqualTypeOf<
+      ReadonlyArray<FileBreadcrumb>
+    >();
+    expectTypeOf<Effect.Success<Service["transfers"]>["cursor"]>().toEqualTypeOf<string | null>();
+    expectTypeOf<Effect.Success<Service["transfers"]>["total"]>().toEqualTypeOf<number>();
+    expectTypeOf<
+      Effect.Success<Service["transfersBroad"]>
+    >().toEqualTypeOf<TransfersListResponse>();
+    expectTypeOf<Effect.Services<Service["files"]>>().toEqualTypeOf<never>();
+  });
+
+  it("accepts an optional file query in the Promise client and the service", () => {
+    const client = createPutioSdkPromiseClient();
+
+    const promised = (query: FileQuery | undefined) => ({
+      get: client.files.get({ id: 1, query }),
+      getChild: client.files.getChild({ name: "a", parentId: 0, query }),
+    });
+
+    const service = (sdk: PutioSdkService, query: FileQuery | undefined) => ({
+      get: sdk.files.get({ id: 1, query }),
+      getChild: sdk.files.getChild({ name: "a", parentId: 0, query }),
+    });
+
+    type Promised = ReturnType<typeof promised>;
+
+    type Service = ReturnType<typeof service>;
+
+    expectTypeOf<Awaited<Promised["get"]>>().toEqualTypeOf<FileBroad>();
+    expectTypeOf<Awaited<Promised["getChild"]>>().toEqualTypeOf<FileBroad>();
+    expectTypeOf<Effect.Success<Service["get"]>>().toEqualTypeOf<FileBroad>();
+    expectTypeOf<Effect.Success<Service["getChild"]>>().toEqualTypeOf<FileBroad>();
   });
 });

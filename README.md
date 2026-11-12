@@ -138,10 +138,10 @@ const { breadcrumbs, files } = await Effect.runPromise(program);
 ```
 
 A field the query asks for is required in the result type, and the call fails with
-`PutioValidationError` when the response leaves it out: `breadcrumbs` on `files.list` and
+`PutioContractError` when the response leaves it out: `breadcrumbs` on `files.list` and
 `sharing.publicAccess.listFiles`, `cursor` and `total` on `transfers.list` with `per_page`, and the
-flags of `account.getInfo` and `files.get`. The Promise client runs the same checks; its types
-narrow for `account.getInfo`, `files.get`, and `files.getChild`.
+flags of `account.getInfo`, `files.get`, and `files.getChild`. The Effect client, the `PutioSdk`
+service, and the Promise client share these checks and result types.
 
 Effect workflows can also depend on the SDK as a service:
 
@@ -225,7 +225,7 @@ Each error tag names who has to act, and each has an `isPutio*` guard:
 
 | Tag                                                      | Meaning                                                            | Who acts               |
 | -------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------- |
-| `PutioValidationError`                                   | The arguments you passed are invalid; no request was sent          | You fix the call       |
+| `PutioValidationError`                                   | Your arguments are invalid, or a value fails the schema you passed | You fix the call       |
 | `PutioConfigurationError`                                | The client options are missing or invalid, such as no access token | You fix the setup      |
 | `PutioContractError`                                     | A 2xx response was not JSON or did not match the expected shape    | Report it; retry later |
 | `PutioTransportError`                                    | The request or the response body read failed                       | Retry                  |

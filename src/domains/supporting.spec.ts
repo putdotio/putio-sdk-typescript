@@ -1207,4 +1207,56 @@ describe("supporting domain boundaries", () => {
       });
     }),
   );
+
+  it.effect("fails with PutioValidationError when a config value breaks the caller's schema", () =>
+    Effect.gen(function* () {
+      const callerSchema = Schema.Struct({ theme: Schema.Literal("dark") });
+
+      const failures = yield* Effect.all([
+        Effect.exit(
+          provideSdk(
+            configDomain.readConfigWith(callerSchema),
+            () => jsonResponse({ config: { theme: "light" }, status: "OK" }),
+            { accessToken: "token-123" },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            configDomain.getConfigKeyWith("theme", Schema.Literal("dark")),
+            () => jsonResponse({ status: "OK", value: "light" }),
+            { accessToken: "token-123" },
+          ),
+        ),
+      ]);
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioValidationError)),
+      );
+    }),
+  );
+
+  it.effect("fails with PutioContractError when a typed config read gets a broken envelope", () =>
+    Effect.gen(function* () {
+      const failures = yield* Effect.all([
+        Effect.exit(
+          provideSdk(
+            configDomain.readConfigWith(Schema.Struct({ theme: Schema.Literal("dark") })),
+            () => jsonResponse({ config: { theme: "dark" }, status: "ERROR" }),
+            { accessToken: "token-123" },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            configDomain.getConfigKeyWith("theme", Schema.Literal("dark")),
+            () => jsonResponse({ status: "OK" }),
+            { accessToken: "token-123" },
+          ),
+        ),
+      ]);
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioContractError)),
+      );
+    }),
+  );
 });

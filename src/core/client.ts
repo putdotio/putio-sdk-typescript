@@ -112,7 +112,15 @@ import {
   touchFiles,
   uploadFile,
 } from "../domains/files.js";
-import type { FileCore, FileQuery, FileResponseFor } from "../domains/files.js";
+import type {
+  FileBroad,
+  FileCore,
+  FileListResponse,
+  FileListResponseFor,
+  FileQuery,
+  FileResponseFor,
+  FilesListQuery,
+} from "../domains/files.js";
 import { createFriendInvite, listFriendInvites } from "../domains/friend-invites.js";
 import {
   approveFriendRequest,
@@ -199,6 +207,7 @@ import {
   shareFiles,
   unshareFile,
 } from "../domains/sharing.js";
+import type { PublicShareListQuery } from "../domains/sharing.js";
 import {
   continueTrash,
   deleteTrash,
@@ -222,6 +231,11 @@ import {
   removeTransfers,
   retryTransfer,
   stopTransferRecording,
+} from "../domains/transfers.js";
+import type {
+  TransfersListQuery,
+  TransfersListResponse,
+  TransfersListResponseFor,
 } from "../domains/transfers.js";
 import { removeRateLimitBan } from "../domains/rate-limits.js";
 import { listTunnelRoutes } from "../domains/tunnel.js";
@@ -362,6 +376,10 @@ interface FileGet<Kind extends OperationKind> {
     readonly id: number;
     readonly query: TQuery;
   }): ResultOf<Kind, typeof getFile, FileResponseFor<TQuery>>;
+  (input: {
+    readonly id: number;
+    readonly query?: FileQuery;
+  }): ResultOf<Kind, typeof getFile, FileBroad>;
 }
 
 interface FileGetChild<Kind extends OperationKind> {
@@ -374,6 +392,36 @@ interface FileGetChild<Kind extends OperationKind> {
     readonly parentId: number;
     readonly query: TQuery;
   }): ResultOf<Kind, typeof getFileChild, FileResponseFor<TQuery>>;
+  (input: {
+    readonly name: string;
+    readonly parentId: number;
+    readonly query?: FileQuery;
+  }): ResultOf<Kind, typeof getFileChild, FileBroad>;
+}
+
+interface FileList<Kind extends OperationKind> {
+  <TQuery extends FilesListQuery>(
+    parent: number | "friends",
+    query: TQuery,
+  ): ResultOf<Kind, typeof queryFiles, FileListResponseFor<TQuery>>;
+  (
+    parent: number | "friends",
+    query?: FilesListQuery,
+  ): ResultOf<Kind, typeof queryFiles, FileListResponse>;
+}
+
+interface PublicShareListFiles<Kind extends OperationKind> {
+  <TQuery extends PublicShareListQuery>(
+    query: TQuery,
+  ): ResultOf<Kind, typeof listPublicShareFiles, FileListResponseFor<TQuery>>;
+  (query?: PublicShareListQuery): ResultOf<Kind, typeof listPublicShareFiles, FileListResponse>;
+}
+
+interface TransferList<Kind extends OperationKind> {
+  <TQuery extends TransfersListQuery>(
+    query: TQuery,
+  ): ResultOf<Kind, typeof listTransfers, TransfersListResponseFor<TQuery>>;
+  (query?: TransfersListQuery): ResultOf<Kind, typeof listTransfers, TransfersListResponse>;
 }
 
 interface SignedOperations<Kind extends OperationKind> {
@@ -387,6 +435,15 @@ interface SignedOperations<Kind extends OperationKind> {
   files: {
     get: FileGet<Kind>;
     getChild: FileGetChild<Kind>;
+    list: FileList<Kind>;
+  };
+  sharing: {
+    publicAccess: {
+      listFiles: PublicShareListFiles<Kind>;
+    };
+  };
+  transfers: {
+    list: TransferList<Kind>;
   };
 }
 
@@ -568,7 +625,7 @@ const sharedOperationTree = {
     getXspfPlaylistUrl: effect(getXspfPlaylistUrl),
     getMp4Status: effect(getMp4Status),
     getStartFrom: effect(getStartFrom),
-    list: effect(queryFiles),
+    list: effect(queryFiles satisfies FileList<ContextualEffectKind>),
     listActiveConversions: effect(listActiveMp4Conversions),
     listExtractions: effect(listFileExtractions),
     listSubtitles: effect(listFileSubtitles),
@@ -665,7 +722,7 @@ const sharedOperationTree = {
       continueFiles: effect(continuePublicShareFiles),
       get: effect(getPublicShare),
       getFileUrl: effect(getPublicShareFileUrl),
-      listFiles: effect(listPublicShareFiles),
+      listFiles: effect(listPublicShareFiles satisfies PublicShareListFiles<ContextualEffectKind>),
     },
     publicShares: {
       create: effect(createPublicShare),
@@ -696,7 +753,7 @@ const sharedOperationTree = {
     get: effect(getTransfer),
     getTorrent: effect(getTransferTorrent),
     info: effect(getTransferInfo),
-    list: effect(listTransfers),
+    list: effect(listTransfers satisfies TransferList<ContextualEffectKind>),
     reannounce: effect(reannounceTransfer),
     remove: effect(removeTransfers),
     retry: effect(retryTransfer),

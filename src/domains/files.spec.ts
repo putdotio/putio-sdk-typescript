@@ -1,5 +1,11 @@
-import { Effect, Exit } from "effect";
-import { PutioContractError, PutioOperationError, PutioValidationError } from "../core/errors.js";
+import { Effect, Exit, Redacted } from "effect";
+import {
+  PutioConfigurationError,
+  PutioContractError,
+  PutioOperationError,
+  PutioValidationError,
+} from "../core/errors.js";
+import { normalizePutioSdkOptions, PutioSdkConfig } from "../core/http.js";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 
 import * as files from "./files.js";
@@ -1653,4 +1659,40 @@ describe("files domain", () => {
       expect(expectFailure(emptyUpload)).toBeInstanceOf(PutioContractError);
     }),
   );
+
+  it.effect("fails upload helpers with PutioConfigurationError on a wiped or empty token", () =>
+    Effect.gen(function* () {
+      const wiped = Redacted.make("wiped-secret");
+      Redacted.wipeUnsafe(wiped);
+
+      const failures = yield* Effect.forEach([wiped, Redacted.make("")], (accessToken) =>
+        Effect.exit(
+          files.createFileUploadRequest({ file: new Blob(["hello"]) }).pipe(
+            Effect.provideService(PutioSdkConfig, {
+              ...normalizePutioSdkOptions({}),
+              accessToken,
+            }),
+          ),
+        ),
+      );
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioConfigurationError)),
+      );
+    }),
+  );
+
+  it("keeps the broad file type for an optional or widened file query", () => {
+    const get = (query: files.FileQuery | undefined) => files.getFile({ id: 1, query });
+
+    const getChild = (query: files.FileQuery | undefined) =>
+      files.getFileChild({ name: "a", parentId: 0, query });
+
+    expectTypeOf<Effect.Success<ReturnType<typeof get>>>().toEqualTypeOf<files.FileBroad>();
+    expectTypeOf<Effect.Success<ReturnType<typeof getChild>>>().toEqualTypeOf<files.FileBroad>();
+    expectTypeOf<Effect.Error<ReturnType<typeof get>>>().toEqualTypeOf<files.GetFileError>();
+    expectTypeOf<
+      Effect.Error<ReturnType<typeof getChild>>
+    >().toEqualTypeOf<files.GetFileChildError>();
+  });
 });

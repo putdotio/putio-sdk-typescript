@@ -5,7 +5,7 @@ import {
   PositiveIntegerSchema,
   cursorSelectionSchema,
   decodeAndRun,
-  failMissingField,
+  requireRequestedBreadcrumbs,
 } from "../core/validation.js";
 import {
   definePutioOperationErrorSpec,
@@ -488,12 +488,7 @@ export function listPublicShareFiles(query: PublicShareListQuery = {}) {
       method: "GET",
       path: "/v2/public_share/files/list",
       query: decodedQuery,
-    }).pipe(
-      Effect.filterOrElse(
-        (response) => decodedQuery.breadcrumbs !== 1 || response.breadcrumbs !== undefined,
-        () => failMissingField("breadcrumbs"),
-      ),
-    ),
+    }).pipe(requireRequestedBreadcrumbs(decodedQuery)),
   ).pipe(withOperationErrors(ListPublicShareFilesErrorSpec));
 }
 

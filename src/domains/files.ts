@@ -1,10 +1,8 @@
-import { Effect, Redacted, Schema } from "effect";
-import { DEFAULT_PUTIO_API_BASE_URL, DEFAULT_PUTIO_UPLOAD_BASE_URL } from "../core/defaults.js";
+import { Effect, Schema } from "effect";
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
 import {
   mapConfigurationError,
   PutioContractError,
-  type PutioValidationError,
   definePutioOperationErrorSpec,
   withOperationErrors,
   type PutioOperationFailure,
@@ -19,16 +17,19 @@ import {
   requestText,
   requestVoid,
   selectJsonField,
-  type PutioSdkOptions,
+  type PutioSdkResolvedConfig,
   type PutioSdkContext,
 } from "../core/http.js";
+import { revealAccessToken } from "../core/secrets.js";
 import {
   NonEmptyStringSchema,
   NonNegativeNumberSchema,
   PositiveIntegerSchema,
   decodeAndRun,
   cursorSelectionSchema,
+  type CursorSelection,
   failMissingField,
+  requireRequestedBreadcrumbs,
 } from "../core/validation.js";
 
 const RequestedFlag = Schema.Literal(1);
@@ -590,11 +591,9 @@ export type FileSubtitle = Schema.Schema.Type<typeof FileSubtitleSchema>;
 
 export type FilesMoveError = Schema.Schema.Type<typeof FilesMoveErrorSchema>;
 
-type FilesBulkSelectionFields = Schema.Schema.Type<typeof FilesBulkSelectionSchema>;
-
-export type FilesBulkSelection =
-  | (FilesBulkSelectionFields & { readonly cursor: string })
-  | (FilesBulkSelectionFields & { readonly ids: ReadonlyArray<number> });
+export type FilesBulkSelection = CursorSelection<
+  Schema.Schema.Type<typeof FilesBulkSelectionSchema>
+>;
 
 export type FileUploadTransfer = Schema.Schema.Type<typeof FileUploadTransferSchema>;
 
@@ -1041,7 +1040,7 @@ const resolveRouteContext = (
   token?: string,
 ): Effect.Effect<
   {
-    readonly config: PutioSdkOptions;
+    readonly config: PutioSdkResolvedConfig;
     readonly token: string;
   },
   PutioSdkError,
@@ -1050,26 +1049,25 @@ const resolveRouteContext = (
   Effect.gen(function* () {
     const config = yield* PutioSdkConfig;
 
-    const resolvedToken =
-      token ?? (config.accessToken === undefined ? undefined : Redacted.value(config.accessToken));
+    const resolvedToken = token ?? (yield* revealAccessToken(config.accessToken));
 
-    if (resolvedToken) {
-      return {
-        config,
-        token: resolvedToken,
-      };
+    if (resolvedToken === undefined) {
+      return yield* mapConfigurationError(
+        "This helper requires a token, but neither an override nor PutioSdkConfig.accessToken was provided",
+      );
     }
 
-    return yield* mapConfigurationError(
-      "This helper requires a token, but neither an override nor PutioSdkConfig.accessToken was provided",
-    );
+    return {
+      config,
+      token: resolvedToken,
+    };
   });
 
 const resolveApiBaseUrl: Effect.Effect<string | URL, never, PutioSdkConfig> = Effect.gen(
   function* () {
     const config = yield* PutioSdkConfig;
 
-    return config.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL;
+    return config.baseUrl;
   },
 );
 
@@ -1234,12 +1232,7 @@ export function queryFiles(parent: number | "friends", query: FilesListQuery = {
               ...decodedInput.query,
               parent_id: decodedInput.parent,
             },
-    }).pipe(
-      Effect.filterOrElse(
-        (response) => decodedInput.query.breadcrumbs !== 1 || response.breadcrumbs !== undefined,
-        () => failMissingField("breadcrumbs"),
-      ),
-    ),
+    }).pipe(requireRequestedBreadcrumbs(decodedInput.query)),
   ).pipe(withOperationErrors(QueryFilesErrorSpec));
 }
 
@@ -1265,11 +1258,15 @@ export const continueFiles = (
 
 export function getFile(input: {
   readonly id: number;
-}): Effect.Effect<FileCore, GetFileError | PutioValidationError, PutioSdkContext>;
+}): Effect.Effect<FileCore, GetFileError, PutioSdkContext>;
 export function getFile<TQuery extends FileQuery>(input: {
   readonly id: number;
   readonly query: TQuery;
-}): Effect.Effect<FileResponseFor<TQuery>, GetFileError | PutioValidationError, PutioSdkContext>;
+}): Effect.Effect<FileResponseFor<TQuery>, GetFileError, PutioSdkContext>;
+export function getFile(input: {
+  readonly id: number;
+  readonly query?: FileQuery;
+}): Effect.Effect<FileBroad, GetFileError, PutioSdkContext>;
 export function getFile(input: { readonly id: number; readonly query?: FileQuery }) {
   return decodeAndRun(FileGetInputSchema, input, (decodedInput) => {
     const effect = requestJson(FileEnvelopeSchema, {
@@ -1287,16 +1284,15 @@ export function getFile(input: { readonly id: number; readonly query?: FileQuery
 export function getFileChild(input: {
   readonly name: string;
   readonly parentId: number;
-}): Effect.Effect<FileCore, GetFileChildError | PutioValidationError, PutioSdkContext>;
+}): Effect.Effect<FileCore, GetFileChildError, PutioSdkContext>;
 export function getFileChild<TQuery extends FileQuery>(input: {
   readonly name: string;
   readonly parentId: number;
   readonly query: TQuery;
-}): Effect.Effect<
-  FileResponseFor<TQuery>,
-  GetFileChildError | PutioValidationError,
-  PutioSdkContext
->;
+}): Effect.Effect<FileResponseFor<TQuery>, GetFileChildError, PutioSdkContext>;
+export function getFileChild(
+  input: FileGetChildInput,
+): Effect.Effect<FileBroad, GetFileChildError, PutioSdkContext>;
 export function getFileChild(input: FileGetChildInput) {
   return decodeAndRun(FileGetChildInputSchema, input, (decodedInput) => {
     const effect = requestJson(FileEnvelopeSchema, {
@@ -1316,7 +1312,7 @@ export function getFileChild(input: FileGetChildInput) {
 
 export const copyFile = (
   input: FileCopyInput,
-): Effect.Effect<FileBroad, CopyFileError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<FileBroad, CopyFileError, PutioSdkContext> =>
   decodeAndRun(FileCopyInputSchema, input, (decodedInput) =>
     requestJson(FileEnvelopeSchema, {
       body: {
@@ -1334,7 +1330,7 @@ export const copyFile = (
 
 export const touchFiles = (
   input: FileTouchInput,
-): Effect.Effect<void, TouchFilesError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<void, TouchFilesError, PutioSdkContext> =>
   decodeAndRun(FileTouchInputSchema, input, (decodedInput) =>
     requestJson(OkResponseSchema, {
       body: {
@@ -1351,7 +1347,7 @@ export const touchFiles = (
 
 export const canWriteFile = (
   fileId: number,
-): Effect.Effect<number, CanWriteFileError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<number, CanWriteFileError, PutioSdkContext> =>
   decodeAndRun(PositiveFileIdSchema, fileId, (decodedFileId) =>
     requestJson(FileCanWriteEnvelopeSchema, {
       method: "GET",
@@ -1639,7 +1635,7 @@ const FileHlsMasterPlaylistInputSchema = Schema.Struct({
 export const getHlsMasterPlaylist = (
   fileId: number,
   options: FileHlsMasterPlaylistOptions = {},
-): Effect.Effect<string, GetHlsMasterPlaylistError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<string, GetHlsMasterPlaylistError, PutioSdkContext> =>
   decodeAndRun(FileHlsMasterPlaylistInputSchema, { fileId, options }, (decoded) =>
     requestText({
       headers: { accept: "application/vnd.apple.mpegurl, application/x-mpegURL, */*" },
@@ -1897,13 +1893,9 @@ export const createFileUploadRequest = (
       Effect.map(({ config, token }) => ({
         body: createFileUploadFormData(decoded.input),
         method: "POST" as const,
-        url: buildPutioUrl(
-          config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
-          "/v2/files/upload",
-          {
-            oauth_token: token,
-          },
-        ),
+        url: buildPutioUrl(config.uploadBaseUrl, "/v2/files/upload", {
+          oauth_token: token,
+        }),
       })),
     ),
   );
@@ -1913,7 +1905,7 @@ export const uploadFile = (
   options: {
     readonly oauthToken?: string;
   } = {},
-): Effect.Effect<FileUploadResult, FileUploadError | PutioValidationError, PutioSdkContext> =>
+): Effect.Effect<FileUploadResult, FileUploadError, PutioSdkContext> =>
   decodeAndRun(FileUploadCallInputSchema, { input, options }, (decoded) =>
     resolveRouteContext(decoded.options.oauthToken).pipe(
       Effect.flatMap(({ config, token }) =>
@@ -1921,7 +1913,7 @@ export const uploadFile = (
           auth: {
             type: "none",
           },
-          baseUrl: config.uploadBaseUrl ?? DEFAULT_PUTIO_UPLOAD_BASE_URL,
+          baseUrl: config.uploadBaseUrl,
           body: {
             type: "form-data",
             value: createFileUploadFormData(decoded.input),

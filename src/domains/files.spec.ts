@@ -1595,7 +1595,8 @@ describe("files domain", () => {
           }),
           (request) => {
             const body = getFormDataBody(request);
-            expect(request.url).toBe("https://upload.put.io/v2/files/upload?oauth_token=token-123");
+            expect(request.url).toBe("https://upload.put.io/v2/files/upload");
+            expect(request.headers.get("authorization")).toBe("Token token-123");
             expect(body.get("filename")).toBe("hello.txt");
             expect(body.get("parent_id")).toBe("7");
 
@@ -1625,9 +1626,8 @@ describe("files domain", () => {
             },
           ),
           (request) => {
-            expect(request.url).toBe(
-              "https://upload.put.io/v2/files/upload?oauth_token=override-token",
-            );
+            expect(request.url).toBe("https://upload.put.io/v2/files/upload");
+            expect(request.headers.get("authorization")).toBe("Token override-token");
 
             return jsonResponse({
               status: "OK",

@@ -1912,7 +1912,8 @@ export const uploadFile = (
       Effect.flatMap(({ config, token }) =>
         requestJson(FileUploadEnvelopeSchema, {
           auth: {
-            type: "none",
+            token,
+            type: "token",
           },
           baseUrl: config.uploadBaseUrl,
           body: {
@@ -1921,9 +1922,6 @@ export const uploadFile = (
           },
           method: "POST",
           path: "/v2/files/upload",
-          query: {
-            oauth_token: token,
-          },
         }),
       ),
     ),

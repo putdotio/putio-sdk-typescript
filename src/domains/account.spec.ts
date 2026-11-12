@@ -172,7 +172,9 @@ describe("account domain", () => {
       });
 
       for (const [query, expectedField] of [
+        [{ download_token: 1 }, "download_token"],
         [{ features: 1 }, "features"],
+        [{ pas: 1 }, "pas"],
         [{ profitwell: 1 }, "paddle_user_id"],
       ] as const) {
         const missingExit = yield* Effect.exit(

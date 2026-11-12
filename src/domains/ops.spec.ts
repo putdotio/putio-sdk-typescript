@@ -1520,18 +1520,20 @@ describe("operational domain boundaries", () => {
       const badCursor = () =>
         jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 });
 
-      const transfersFailure = yield* Effect.exit(
-        provideSdk(transfers.continueTransfers("cursor-1"), badCursor, {
-          accessToken: "token-123",
-        }),
-      );
+      const badCursorFailure = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
+        Effect.exit(provideSdk(effect, badCursor, { accessToken: "token-123" })).pipe(
+          Effect.map((exit) => expectFailure<unknown>(exit)),
+        );
 
-      expect(expectFailure(transfersFailure)).toBeInstanceOf(PutioOperationError);
-      expect(expectFailure(transfersFailure)).toMatchObject({
-        domain: "transfers",
-        operation: "continue",
-        status: 400,
-      });
+      const failures = {
+        transfers: yield* badCursorFailure(transfers.continueTransfers("cursor-1")),
+        trash: yield* badCursorFailure(trash.continueTrash("cursor-1")),
+      };
+
+      for (const [domain, failure] of Object.entries(failures)) {
+        expect(failure).toBeInstanceOf(PutioOperationError);
+        expect(failure).toMatchObject({ domain, operation: "continue", status: 400 });
+      }
     }),
   );
 

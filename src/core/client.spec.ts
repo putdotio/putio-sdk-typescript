@@ -21,7 +21,12 @@ import type {
 } from "../domains/files.js";
 import type { TransfersListResponse, TransfersListResponseFor } from "../domains/transfers.js";
 import { PutioAuthError, PutioConfigurationError, PutioOperationError } from "./errors.js";
-import { PutioHttpClient, PutioSdkConfig, putioSdkLayer } from "./http.js";
+import {
+  PutioHttpClient,
+  PutioSdkConfig,
+  normalizePutioSdkOptions,
+  putioSdkLayer,
+} from "./http.js";
 
 interface ClientSurface {
   readonly [key: string]: ClientSurface | ((...args: never[]) => void);
@@ -113,6 +118,39 @@ describe("sdk client factories", () => {
 
       expect(yield* program).toBe("dark");
       expect(authorizations).toEqual(["Token token-123", "Token token-123"]);
+    }),
+  );
+
+  it.effect("keeps the config its layer was built with over one provided around a call", () =>
+    Effect.gen(function* () {
+      const urls: Array<string> = [];
+
+      const layer = makePutioSdkEffectClientLayer().pipe(
+        Layer.provide(
+          putioSdkLayer({ accessToken: "token-123", baseUrl: "https://captured.invalid" }),
+        ),
+        provideMockTransport((request) => {
+          urls.push(request.url);
+
+          return jsonResponse({ status: "OK" });
+        }),
+      );
+
+      yield* Effect.gen(function* () {
+        const sdk = yield* PutioSdk;
+
+        yield* sdk.events.clear().pipe(
+          Effect.provideService(
+            PutioSdkConfig,
+            normalizePutioSdkOptions({
+              accessToken: "token-456",
+              baseUrl: "https://ambient.invalid",
+            }),
+          ),
+        );
+      }).pipe(Effect.provide(layer));
+
+      expect(urls.map((url) => new URL(url).host)).toEqual(["captured.invalid"]);
     }),
   );
 

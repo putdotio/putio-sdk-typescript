@@ -39,7 +39,7 @@
     "bootstrap:live-fixtures": "node ./scripts/bootstrap-live-fixtures.ts",
     "bootstrap:tokens": "node ./scripts/bootstrap-tokens.ts",
     "build": "vp pack",
-    "check": "vp check .",
+    "check": "effect-tsgo vp check .",
     "clean": "rm -rf .live-build .turbo coverage dist",
     "coverage": "vp test run --coverage --passWithNoTests",
     "dev": "vp pack --watch",
@@ -59,13 +59,14 @@
     "test:live:targets": "vp pack && node ./scripts/test-live-targets.ts",
     "validate:routes": "vp pack && vp run validate:routes:packed",
     "validate:routes:packed": "node ./scripts/validate-route-matrix.ts",
-    "verify": "vp pack && vp check . && vp run lint:package && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests"
+    "verify": "vp pack && effect-tsgo vp check . && vp run lint:package && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests"
   },
   "dependencies": {
     "effect": "4.1.4"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
+    "@effect/tsgo": "0.68.1",
     "@effect/vitest": "4.1.4",
     "@oxlint/plugins": "1.91.0",
     "@types/node": "^26.1.0",

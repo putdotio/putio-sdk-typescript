@@ -16,3 +16,6 @@ peerDependencyRules:
   allowedVersions:
     vite: "*"
     vitest: "*"
+minimumReleaseAgeExclude:
+  - "@effect/tsgo"
+  - "@effect/tsgo-*"

@@ -181,7 +181,7 @@ describe("sdk core errors", () => {
 
   it.effect("keeps protocol response errors schema-decodable", () =>
     Effect.gen(function* () {
-      const encoded = Schema.encodeSync(PutioRateLimitError)(
+      const encoded = yield* Schema.encodeEffect(PutioRateLimitError)(
         new PutioRateLimitError({
           action: "captcha-needed",
           body: {

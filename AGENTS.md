@@ -35,7 +35,8 @@ removes the env files and `vp run clean` removes generated artifacts.
 
 ## Proof
 
-- Docs only: `vp check .`.
+- Docs only: `vp run check`. Bare `vp check` cannot load the Effect diagnostics
+  and stops at `Unknown plugin: effecttsgo`.
 - Source, schema, or error-mapping change: `vp run verify`. It enforces the
   coverage floor in [vite.config.ts](./vite.config.ts); cover new code instead
   of lowering the floor.

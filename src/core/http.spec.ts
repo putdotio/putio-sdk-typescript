@@ -267,45 +267,41 @@ describe("sdk core http", () => {
   );
 
   it.effect("sends configured headers under request headers and the sdk authorization", () =>
-    Effect.gen(function* () {
-      yield* provideSdk(
-        requestVoid({
-          method: "POST",
-          path: "/v2/test",
-          headers: { "x-request-id": "request" },
-        }),
-        (request) => {
-          expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
-          expect(request.headers.get("x-request-id")).toBe("request");
-          expect(request.headers.get("authorization")).toBe("Token token-123");
+    provideSdk(
+      requestVoid({
+        method: "POST",
+        path: "/v2/test",
+        headers: { "x-request-id": "request" },
+      }),
+      (request) => {
+        expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
+        expect(request.headers.get("x-request-id")).toBe("request");
+        expect(request.headers.get("authorization")).toBe("Token token-123");
 
-          return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+        return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+      },
+      {
+        accessToken: "token-123",
+        headers: {
+          authorization: "Token spoofed",
+          "x-forwarded-for": "203.0.113.7",
+          "x-request-id": "config",
         },
-        {
-          accessToken: "token-123",
-          headers: {
-            authorization: "Token spoofed",
-            "x-forwarded-for": "203.0.113.7",
-            "x-request-id": "config",
-          },
-        },
-      );
-    }),
+      },
+    ),
   );
 
   it.effect("never sends a configured authorization header on unauthenticated requests", () =>
-    Effect.gen(function* () {
-      yield* provideSdk(
-        requestVoid({ method: "POST", path: "/v2/test", auth: { type: "none" } }),
-        (request) => {
-          expect(request.headers.has("authorization")).toBe(false);
-          expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
+    provideSdk(
+      requestVoid({ method: "POST", path: "/v2/test", auth: { type: "none" } }),
+      (request) => {
+        expect(request.headers.has("authorization")).toBe(false);
+        expect(request.headers.get("x-forwarded-for")).toBe("203.0.113.7");
 
-          return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
-        },
-        { headers: { authorization: "Token leaked", "x-forwarded-for": "203.0.113.7" } },
-      );
-    }),
+        return new Response(JSON.stringify({ status: "OK" }), { status: 200 });
+      },
+      { headers: { authorization: "Token leaked", "x-forwarded-for": "203.0.113.7" } },
+    ),
   );
 
   it.effect("fails fast when a config-token request has no configured access token", () =>

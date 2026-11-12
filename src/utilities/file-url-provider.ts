@@ -25,7 +25,7 @@ export type FileUrlProviderOptions = {
 };
 
 const decodeOptions = (options: FileUrlProviderOptions): FileUrlProviderOptions => {
-  const decoded = Schema.decodeUnknownResult(FileUrlProviderOptionsSchema, {
+  const decoded = Schema.decodeResult(FileUrlProviderOptionsSchema, {
     onExcessProperty: "error",
   })(options);
 

@@ -68,9 +68,9 @@ describe("sdk client factories", () => {
 
   it.effect("provides the Effect client as an Effect service", () =>
     Effect.gen(function* () {
-      const program = Effect.gen(function* () {
-        return yield* PutioSdk;
-      }).pipe(Effect.provide(makePutioSdkEffectClientLayer()));
+      const program = Effect.service(PutioSdk).pipe(
+        Effect.provide(makePutioSdkEffectClientLayer()),
+      );
 
       expect(yield* program).toMatchObject({
         files: {

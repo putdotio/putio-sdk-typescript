@@ -1,3 +1,4 @@
+import { correctness, strict } from "@effect/tsgo/oxlint-presets";
 import { defineConfig } from "vite-plus";
 
 const agentIgnorePatterns = [
@@ -29,11 +30,31 @@ export default defineConfig({
       },
       { name: "uinaf", specifier: "@uinaf/oxlint-plugin-no-comments" },
     ],
+    extends: [correctness, strict],
+    overrides: [
+      {
+        files: ["**/*.spec.ts"],
+        rules: {
+          "effecttsgo/unstable-api-usage": "off",
+        },
+      },
+      {
+        files: ["src/core/client.ts", "src/domains/ops.spec.ts"],
+        rules: {
+          "effecttsgo/any-unknown-in-error-context": "off",
+        },
+      },
+    ],
     options: {
       typeAware: true,
       typeCheck: true,
     },
     rules: {
+      "effecttsgo/any-unknown-in-error-context": "error",
+      "effecttsgo/lazy-effect": "off",
+      "effecttsgo/schema-class-missing-brand": "off",
+      "effecttsgo/schema-number": "off",
+      "effecttsgo/unsafe-effect-type-assertion": "error",
       "oxc/no-accumulating-spread": "error",
       "anti-slop/no-array-filter-map": "error",
       "anti-slop/no-reduce-accumulator-copy": "error",
@@ -71,7 +92,7 @@ export default defineConfig({
     sourcemap: true,
   },
   staged: {
-    "*.{js,ts,tsx,mjs,cjs,cts}": "vp check --fix",
+    "*.{js,ts,tsx,mjs,cjs,cts}": "effect-tsgo vp check --fix",
   },
   test: {
     coverage: {

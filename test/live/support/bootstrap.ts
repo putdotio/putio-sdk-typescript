@@ -20,8 +20,7 @@ type BootstrappedToken = {
   readonly userId: number | null;
 };
 
-const CodeNotFoundErrorSchema = Schema.Struct({
-  _tag: Schema.Literal("PutioOperationError"),
+const CodeNotFoundErrorSchema = Schema.TaggedStruct("PutioOperationError", {
   body: Schema.Struct({
     error_type: Schema.Literal("code_not_found"),
   }),

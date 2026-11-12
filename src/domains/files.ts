@@ -1054,10 +1054,8 @@ const resolveRouteContext = (
       };
     }
 
-    return yield* Effect.fail(
-      mapConfigurationError(
-        "This helper requires a token, but neither an override nor PutioSdkConfig.accessToken was provided",
-      ),
+    return yield* mapConfigurationError(
+      "This helper requires a token, but neither an override nor PutioSdkConfig.accessToken was provided",
     );
   });
 

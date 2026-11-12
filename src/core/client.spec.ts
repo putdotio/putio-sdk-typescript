@@ -214,6 +214,52 @@ describe("sdk client factories", () => {
     await client.dispose();
   });
 
+  it("keeps the SDK error of a request that failed before the signal aborted", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>(
+        async () =>
+          new Response(JSON.stringify({ status: "OK" }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      ),
+    );
+    const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
+    const controller = new AbortController();
+    const bound = client.withSignal(controller.signal);
+
+    await bound.config.deleteKey("warm-up");
+    client.setAccessToken(undefined);
+
+    const failed = bound.config.deleteKey("missing-token");
+    controller.abort(new Error("caller gave up"));
+
+    await expect(failed).rejects.toBeInstanceOf(PutioConfigurationError);
+
+    await client.dispose();
+  });
+
+  it("does not report the signal's reason when the client is disposed mid-request", async () => {
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise<Response>(() => {}));
+
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createPutioSdkPromiseClient({ accessToken: "token-123" });
+    const pending = client.withSignal(new AbortController().signal).transfers.list();
+
+    const settled = pending.then(
+      () => "resolved",
+      (error: Error) => error,
+    );
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    await client.dispose();
+
+    expect(await settled).toBeInstanceOf(Error);
+  });
+
   it("keeps results, SDK errors, and client state when the signal never aborts", async () => {
     const authorizations: Array<string | null> = [];
 

@@ -75,6 +75,8 @@ const account = await sdk.account.getInfo({});
 sdk.setAccessToken(undefined);
 ```
 
+`accessToken` and `setAccessToken(...)` take a string or an Effect `Redacted<string>`. The SDK stores the token as `Redacted`, so `PutioSdkConfig` never prints it, and unwraps it only to build the `Authorization` header.
+
 The token is snapshotted when each Promise-client operation is invoked. Token changes apply to subsequent operations; an operation already in flight keeps the snapshot it started with. Base, upload, and web app URLs remain fixed from client creation.
 
 Authorization-code clients can exchange a code without configuring a default access token:
@@ -145,6 +147,8 @@ const serviceProgram = Effect.gen(function* () {
 ```
 
 `makePutioSdkLiveClientLayer(...)` provides the SDK service, SDK config, and default fetch-backed transport.
+`PutioSdk` methods need no further services: `makePutioSdkEffectClientLayer()` reads `PutioSdkConfig` and `PutioHttpClient` once and provides them to every operation, so a test can replace `PutioSdk` alone.
+The free domain functions and `createPutioSdkEffectClient()` keep requiring both services.
 `putioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed transport.
 Use `putioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioHttpClient` service when you want to supply custom transport.
 

@@ -1,4 +1,4 @@
-import { Effect, Schema } from "effect";
+import { Effect, Redacted, Schema } from "effect";
 import { DEFAULT_PUTIO_API_BASE_URL, DEFAULT_PUTIO_UPLOAD_BASE_URL } from "../core/defaults.js";
 import { joinCsv, toCursorSelectionForm } from "../core/forms.js";
 import {
@@ -1040,7 +1040,9 @@ const resolveRouteContext = (
 > =>
   Effect.gen(function* () {
     const config = yield* PutioSdkConfig;
-    const resolvedToken = token ?? config.accessToken;
+
+    const resolvedToken =
+      token ?? (config.accessToken === undefined ? undefined : Redacted.value(config.accessToken));
 
     if (resolvedToken) {
       return {

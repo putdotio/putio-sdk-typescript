@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit, Predicate, Schema } from "effect";
+import { Cause, Effect, Exit, Layer, Predicate, Schema } from "effect";
 
 import { PutioTransportError } from "../../src/core/errors.js";
 import {
@@ -64,6 +64,11 @@ const makeMockHttpClient = (handler: MockRequestHandler): PutioHttpClientService
     });
   },
 });
+
+export const provideMockTransport =
+  (handler: MockRequestHandler) =>
+  <A, E, R>(layer: Layer.Layer<A, E, R>) =>
+    Layer.provide(layer, Layer.succeed(PutioHttpClient, makeMockHttpClient(handler)));
 
 export const provideSdk = <A, E>(
   effect: Effect.Effect<A, E, PutioSdkContext>,

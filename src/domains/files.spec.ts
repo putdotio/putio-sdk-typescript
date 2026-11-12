@@ -5,7 +5,7 @@ import {
   PutioOperationError,
   PutioValidationError,
 } from "../core/errors.js";
-import { normalizePutioSdkOptions, PutioSdkConfig } from "../core/http.js";
+import { normalizePutioSdkOptions, PutioSdkConfig, type PutioSdkContext } from "../core/http.js";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 
 import * as files from "./files.js";
@@ -760,6 +760,12 @@ describe("files domain", () => {
         [{ media_info: 1 }, "media_info", baseFile],
         [{ mp4_status: 1 }, "mp4_size", baseFile],
         [{ mp4_stream_url: 1 }, "need_convert", { ...baseFile, mp4_size: null }],
+        [
+          { mp4_stream_url: 1 },
+          "mp4_stream_url",
+          { ...baseFile, is_mp4_available: true, mp4_size: 1, need_convert: false },
+        ],
+        [{ video_metadata: 1 }, "video_metadata", baseFile],
       ] as const) {
         const missingExit = yield* Effect.exit(
           provideSdk(
@@ -900,22 +906,26 @@ describe("files domain", () => {
     }),
   );
 
-  it.effect("names search continue failures after the continue operation", () =>
+  it.effect("names continue failures after the continue operation", () =>
     Effect.gen(function* () {
-      const exit = yield* Effect.exit(
-        provideSdk(
-          files.continueSearch("cursor-2"),
-          () => jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 }),
-          { accessToken: "token-123" },
-        ),
-      );
+      const badCursorFailure = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
+        Effect.exit(
+          provideSdk(
+            effect,
+            () => jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 }),
+            { accessToken: "token-123" },
+          ),
+        ).pipe(Effect.map((exit) => expectFailure<unknown>(exit)));
 
-      expect(expectFailure(exit)).toBeInstanceOf(PutioOperationError);
-      expect(expectFailure(exit)).toMatchObject({
-        domain: "files",
-        operation: "continueSearch",
-        status: 400,
-      });
+      const failures = {
+        continue: yield* badCursorFailure(files.continueFiles("cursor-2")),
+        continueSearch: yield* badCursorFailure(files.continueSearch("cursor-2")),
+      };
+
+      for (const [operation, failure] of Object.entries(failures)) {
+        expect(failure).toBeInstanceOf(PutioOperationError);
+        expect(failure).toMatchObject({ domain: "files", operation, status: 400 });
+      }
     }),
   );
 

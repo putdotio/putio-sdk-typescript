@@ -313,6 +313,7 @@ describe("sdk core http", () => {
           query: { page: 2 },
         }),
         (request) => {
+          expect(Object.hasOwn(request, "body")).toBe(false);
           expect(request.url).toBe("https://api.put.io/v2/test?page=2");
           expect(request.headers.get("authorization")).toBe("Token token-123");
 

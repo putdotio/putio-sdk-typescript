@@ -242,9 +242,12 @@ test("sharing public share lifecycle", async () => {
       assert(details.id === publicShare.id, "expected public share details id");
 
       const files = await publicClient.sharing.publicAccess.listFiles({
+        breadcrumbs: 1,
         parent_id: publicShare.user_file.id,
         total: 1,
       });
+
+      assert(Array.isArray(files.breadcrumbs), "expected requested breadcrumbs");
 
       assert(files.parent?.id === publicShare.user_file.id, "expected public share parent id");
 

@@ -8,6 +8,12 @@
       "matchDepTypes": ["dependencies"],
       "semanticCommitType": "fix",
       "semanticCommitScope": "deps"
+    },
+    {
+      "description": "@effect/tsgo supports a fixed set of Oxlint and TypeScript versions, so it moves on its own instead of with the effect group",
+      "matchPackageNames": ["@effect/tsgo"],
+      "groupName": "effect-tsgo",
+      "groupSlug": "effect-tsgo"
     }
   ]
 }

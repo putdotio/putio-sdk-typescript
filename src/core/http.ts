@@ -104,7 +104,7 @@ export const makePutioFetchClient = (
             ? read(() => response.json())
             : read(() => response.text()).pipe(
                 Effect.flatMap((text) =>
-                  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
+                  Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
                     Effect.mapError(() =>
                       toPutioResponseError(
                         response.status,
@@ -223,7 +223,7 @@ const resolveAuthorization = (
 
   switch (resolvedAuth.type) {
     case "none":
-      return Effect.succeed(undefined);
+      return Effect.undefined;
     case "token":
       return Effect.succeed(`Token ${resolvedAuth.token}`);
     case "basic":
@@ -263,7 +263,7 @@ const normalizeFormValue = (value: Schema.Json): string => {
 const withBody = (body: PutioRequestBody): Effect.Effect<BodyInit | undefined, PutioSdkError> => {
   switch (body.type) {
     case "none":
-      return Effect.succeed(undefined);
+      return Effect.undefined;
     case "json":
       return Effect.try({
         try: () => JSON.stringify(body.value),

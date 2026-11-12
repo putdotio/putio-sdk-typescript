@@ -7,8 +7,7 @@ import {
 } from "../../../dist/index.js";
 import { readLiveTokens, type PutioLiveTokens } from "./secrets.ts";
 
-const OperationErrorSchema = Schema.Struct({
-  _tag: Schema.Literal("PutioOperationError"),
+const OperationErrorSchema = Schema.TaggedStruct("PutioOperationError", {
   body: Schema.optional(
     Schema.Struct({
       error_message: Schema.optional(Schema.String),

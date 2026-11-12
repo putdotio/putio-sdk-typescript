@@ -50,8 +50,7 @@ const TypedErrorSummarySchema = Schema.Struct({
 const decodeTypedErrorSummary = Schema.decodeUnknownOption(TypedErrorSummarySchema);
 
 const isSubAccountPaymentRejection = Schema.is(
-  Schema.Struct({
-    _tag: Schema.Literal("PutioOperationError"),
+  Schema.TaggedStruct("PutioOperationError", {
     domain: Schema.Literal("payment"),
     operation: Schema.Literal("previewChangePlan"),
     reason: Schema.Struct({ errorType: Schema.Literal("PAYMENT_SUB_ACCOUNT_NOT_ALLOWED") }),

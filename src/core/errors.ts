@@ -255,24 +255,20 @@ const responseErrorFields = {
   status: Schema.Number,
 };
 
-const PutioApiErrorValueSchema = Schema.Struct({
-  _tag: Schema.Literal("PutioApiError"),
+const PutioApiErrorValueSchema = Schema.TaggedStruct("PutioApiError", {
   ...responseErrorFields,
 });
 
-const PutioAuthErrorValueSchema = Schema.Struct({
-  _tag: Schema.Literal("PutioAuthError"),
+const PutioAuthErrorValueSchema = Schema.TaggedStruct("PutioAuthError", {
   ...responseErrorFields,
 });
 
-const PutioRateLimitErrorValueSchema = Schema.Struct({
-  _tag: Schema.Literal("PutioRateLimitError"),
+const PutioRateLimitErrorValueSchema = Schema.TaggedStruct("PutioRateLimitError", {
   ...responseErrorFields,
   ...RateLimitHeaderFields,
 });
 
-const PutioOperationErrorValueSchema = Schema.Struct({
-  _tag: Schema.Literal("PutioOperationError"),
+const PutioOperationErrorValueSchema = Schema.TaggedStruct("PutioOperationError", {
   ...responseErrorFields,
   contract: PutioKnownOperationErrorContractSchema,
   domain: Schema.String,

@@ -66,6 +66,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
+    "@effect/vitest": "4.1.4",
     "@oxlint/plugins": "1.91.0",
     "@types/node": "^26.1.0",
     "@uinaf/oxlint-plugin-no-comments": "1.1.0",

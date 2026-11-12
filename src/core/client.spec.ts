@@ -1,5 +1,5 @@
 import { Effect, Predicate, Schema } from "effect";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 
 import { publicContractFixtures } from "../../test/fixtures/public-contracts.js";
 import {
@@ -66,39 +66,43 @@ describe("sdk client factories", () => {
     expect(second.auth.twoFactor.generateTOTP).toBe(generateTOTP);
   });
 
-  it("provides the Effect client as an Effect service", async () => {
-    const program = Effect.gen(function* () {
-      return yield* PutioSdk;
-    }).pipe(Effect.provide(makePutioSdkEffectClientLayer()));
+  it.effect("provides the Effect client as an Effect service", () =>
+    Effect.gen(function* () {
+      const program = Effect.gen(function* () {
+        return yield* PutioSdk;
+      }).pipe(Effect.provide(makePutioSdkEffectClientLayer()));
 
-    await expect(Effect.runPromise(program)).resolves.toMatchObject({
-      files: {
-        list: expect.any(Function),
-      },
-    });
-  });
+      expect(yield* program).toMatchObject({
+        files: {
+          list: expect.any(Function),
+        },
+      });
+    }),
+  );
 
-  it("provides the Effect client, SDK config, and live transport as one layer", async () => {
-    const program = Effect.gen(function* () {
-      const client = yield* PutioSdk;
-      const config = yield* PutioSdkConfig;
+  it.effect("provides the Effect client, SDK config, and live transport as one layer", () =>
+    Effect.gen(function* () {
+      const program = Effect.gen(function* () {
+        const client = yield* PutioSdk;
+        const config = yield* PutioSdkConfig;
 
-      expect(client.files.list).toBeTypeOf("function");
+        expect(client.files.list).toBeTypeOf("function");
 
-      return config;
-    }).pipe(
-      Effect.provide(
-        makePutioSdkLiveClientLayer({
-          accessToken: "token-123",
-        }),
-      ),
-    );
+        return config;
+      }).pipe(
+        Effect.provide(
+          makePutioSdkLiveClientLayer({
+            accessToken: "token-123",
+          }),
+        ),
+      );
 
-    await expect(Effect.runPromise(program)).resolves.toMatchObject({
-      accessToken: "token-123",
-      baseUrl: "https://api.put.io",
-    });
-  });
+      expect(yield* program).toMatchObject({
+        accessToken: "token-123",
+        baseUrl: "https://api.put.io",
+      });
+    }),
+  );
 
   it("sends a snapshot of the configured headers from the Promise client", async () => {
     const fetchMock = vi.fn<typeof fetch>(

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
 import {
   clearAccount,
@@ -8,15 +9,14 @@ import {
   listAccountConfirmations,
   saveAccountSettings,
 } from "./account.js";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "@effect/vitest";
 
 import {
   expectFailure,
   getFormBody,
   getJsonBody,
   jsonResponse,
-  runSdkEffect,
-  runSdkExit,
+  provideSdk,
 } from "../../test/support/sdk-test.js";
 
 const accountSettings = {
@@ -75,411 +75,447 @@ const baseAccountInfo = {
 };
 
 describe("account domain", () => {
-  it("decodes account info and enforces requested-field contracts", async () => {
-    const info = await runSdkEffect(
-      getAccountInfo({
-        download_token: 1,
-        pas: 1,
-      }),
-      (request) => {
-        expect(request.url).toBe("https://api.put.io/v2/account/info?download_token=1&pas=1");
-
-        return jsonResponse({
-          info: {
-            ...baseAccountInfo,
-            download_token: "token-123",
-            pas: {
-              user_hash: "user-hash",
-            },
-          },
-          status: "OK",
-        });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(info.download_token).toBe("token-123");
-    expect(info.pas.user_hash).toBe("user-hash");
-
-    const fullInfo = await runSdkEffect(
-      getAccountInfo({
-        features: 1,
-        intercom: 1,
-        profitwell: 1,
-      }),
-      (request) => {
-        expect(request.url).toBe(
-          "https://api.put.io/v2/account/info?features=1&intercom=1&profitwell=1",
-        );
-
-        return jsonResponse({
-          info: {
-            ...baseAccountInfo,
-            features: {
-              beta: true,
-            },
-            paddle_user_id: "ctm_99",
-            user_hash: "intercom-user",
-          },
-          status: "OK",
-        });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(fullInfo.features?.beta).toBe(true);
-    expect(fullInfo.user_hash).toBe("intercom-user");
-    expect(fullInfo.paddle_user_id).toBe("ctm_99");
-
-    const intercomInfo = await runSdkEffect(
-      getAccountInfo({
-        intercom: 1,
-        platform: "ios",
-      }),
-      (request) => {
-        expect(request.url).toBe("https://api.put.io/v2/account/info?intercom=1&platform=ios");
-
-        return jsonResponse({ info: baseAccountInfo, status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(intercomInfo.user_hash).toBeUndefined();
-
-    const exit = await runSdkExit(
-      getAccountInfo({
-        push_token: 1,
-      }),
-      () =>
-        jsonResponse({
-          info: baseAccountInfo,
-          status: "OK",
+  it.effect("decodes account info and enforces requested-field contracts", () =>
+    Effect.gen(function* () {
+      const info = yield* provideSdk(
+        getAccountInfo({
+          download_token: 1,
+          pas: 1,
         }),
-      { accessToken: "token-123" },
-    );
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/account/info?download_token=1&pas=1");
 
-    const error = expectFailure(exit);
-    expect(error).toBeInstanceOf(PutioValidationError);
-    expect(error).toMatchObject({
-      cause: 'Expected put.io to include "push_token" because it was requested',
-    });
-
-    for (const [query, expectedCause] of [
-      [{ features: 1 }, 'Expected put.io to include "features" because it was requested'],
-      [{ profitwell: 1 }, 'Expected put.io to include "paddle_user_id" because it was requested'],
-    ] as const) {
-      const missingExit = await runSdkExit(
-        getAccountInfo(query),
-        () =>
-          jsonResponse({
-            info: baseAccountInfo,
+          return jsonResponse({
+            info: {
+              ...baseAccountInfo,
+              download_token: "token-123",
+              pas: {
+                user_hash: "user-hash",
+              },
+            },
             status: "OK",
-          }),
+          });
+        },
         { accessToken: "token-123" },
       );
 
-      expect(expectFailure(missingExit)).toBeInstanceOf(PutioValidationError);
-      expect(expectFailure(missingExit)).toMatchObject({
-        cause: expectedCause,
+      expect(info.download_token).toBe("token-123");
+      expect(info.pas.user_hash).toBe("user-hash");
+
+      const fullInfo = yield* provideSdk(
+        getAccountInfo({
+          features: 1,
+          intercom: 1,
+          profitwell: 1,
+        }),
+        (request) => {
+          expect(request.url).toBe(
+            "https://api.put.io/v2/account/info?features=1&intercom=1&profitwell=1",
+          );
+
+          return jsonResponse({
+            info: {
+              ...baseAccountInfo,
+              features: {
+                beta: true,
+              },
+              paddle_user_id: "ctm_99",
+              user_hash: "intercom-user",
+            },
+            status: "OK",
+          });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expect(fullInfo.features?.beta).toBe(true);
+      expect(fullInfo.user_hash).toBe("intercom-user");
+      expect(fullInfo.paddle_user_id).toBe("ctm_99");
+
+      const intercomInfo = yield* provideSdk(
+        getAccountInfo({
+          intercom: 1,
+          platform: "ios",
+        }),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/account/info?intercom=1&platform=ios");
+
+          return jsonResponse({ info: baseAccountInfo, status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expect(intercomInfo.user_hash).toBeUndefined();
+
+      const exit = yield* Effect.exit(
+        provideSdk(
+          getAccountInfo({
+            push_token: 1,
+          }),
+          () =>
+            jsonResponse({
+              info: baseAccountInfo,
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      const error = expectFailure(exit);
+      expect(error).toBeInstanceOf(PutioValidationError);
+      expect(error).toMatchObject({
+        cause: 'Expected put.io to include "push_token" because it was requested',
       });
-    }
-  });
 
-  it("reads and saves account settings", async () => {
-    const settings = await runSdkEffect(
-      getAccountSettings(),
-      (request) => {
-        expect(request.url).toBe("https://api.put.io/v2/account/settings");
+      for (const [query, expectedCause] of [
+        [{ features: 1 }, 'Expected put.io to include "features" because it was requested'],
+        [{ profitwell: 1 }, 'Expected put.io to include "paddle_user_id" because it was requested'],
+      ] as const) {
+        const missingExit = yield* Effect.exit(
+          provideSdk(
+            getAccountInfo(query),
+            () =>
+              jsonResponse({
+                info: baseAccountInfo,
+                status: "OK",
+              }),
+            { accessToken: "token-123" },
+          ),
+        );
 
-        return jsonResponse({
-          settings: accountSettings,
-          status: "OK",
+        expect(expectFailure(missingExit)).toBeInstanceOf(PutioValidationError);
+        expect(expectFailure(missingExit)).toMatchObject({
+          cause: expectedCause,
         });
-      },
-      { accessToken: "token-123" },
-    );
+      }
+    }),
+  );
 
-    expect(settings.locale).toBe("en");
-    expect(settings.diagnostics_enabled).toBe(false);
-    expect(settings.product_analytics_enabled).toBe(true);
-    expect(settings).not.toHaveProperty("support_widget_enabled");
+  it.effect("reads and saves account settings", () =>
+    Effect.gen(function* () {
+      const settings = yield* provideSdk(
+        getAccountSettings(),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/account/settings");
 
-    const result = await runSdkEffect(
-      saveAccountSettings({
-        diagnostics_enabled: false,
-        username: "sdk-user",
-      }),
-      (request) => {
-        expect(request.url).toBe("https://api.put.io/v2/account/settings");
-        expect(getJsonBody(request)).toEqual({
+          return jsonResponse({
+            settings: accountSettings,
+            status: "OK",
+          });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expect(settings.locale).toBe("en");
+      expect(settings.diagnostics_enabled).toBe(false);
+      expect(settings.product_analytics_enabled).toBe(true);
+      expect(settings).not.toHaveProperty("support_widget_enabled");
+
+      const result = yield* provideSdk(
+        saveAccountSettings({
           diagnostics_enabled: false,
           username: "sdk-user",
-        });
+        }),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/account/settings");
+          expect(getJsonBody(request)).toEqual({
+            diagnostics_enabled: false,
+            username: "sdk-user",
+          });
 
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
 
-    expect(result).toEqual({ status: "OK" });
+      expect(result).toEqual({ status: "OK" });
 
-    const combinedResult = await runSdkEffect(
-      saveAccountSettings({
-        current_password: "current-secret",
-        locale: "tr",
-        mail: "sdk-next@put.io",
-        theme: "auto",
-        username: "sdk-next",
-      }),
-      (request) => {
-        expect(getJsonBody(request)).toEqual({
+      const combinedResult = yield* provideSdk(
+        saveAccountSettings({
           current_password: "current-secret",
           locale: "tr",
           mail: "sdk-next@put.io",
           theme: "auto",
           username: "sdk-next",
-        });
+        }),
+        (request) => {
+          expect(getJsonBody(request)).toEqual({
+            current_password: "current-secret",
+            locale: "tr",
+            mail: "sdk-next@put.io",
+            theme: "auto",
+            username: "sdk-next",
+          });
 
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(combinedResult).toEqual({ status: "OK" });
-
-    const twoFactorResult = await runSdkEffect(
-      saveAccountSettings({
-        two_factor_enabled: {
-          code: "123456",
-          enable: true,
+          return jsonResponse({ status: "OK" });
         },
-      }),
-      (request) => {
-        expect(getJsonBody(request)).toEqual({
+        { accessToken: "token-123" },
+      );
+
+      expect(combinedResult).toEqual({ status: "OK" });
+
+      const twoFactorResult = yield* provideSdk(
+        saveAccountSettings({
           two_factor_enabled: {
             code: "123456",
             enable: true,
           },
-        });
+        }),
+        (request) => {
+          expect(getJsonBody(request)).toEqual({
+            two_factor_enabled: {
+              code: "123456",
+              enable: true,
+            },
+          });
+
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expect(twoFactorResult).toEqual({ status: "OK" });
+    }),
+  );
+
+  it.effect("rejects invalid account request inputs before transport", () =>
+    Effect.gen(function* () {
+      let requestCount = 0;
+
+      const handler = () => {
+        requestCount += 1;
 
         return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
+      };
 
-    expect(twoFactorResult).toEqual({ status: "OK" });
-  });
+      const invalidQuery = expectFailure(
+        yield* Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can still supply invalid query flags.
+            getAccountInfo({ download_token: 2 }),
+            handler,
+          ),
+        ),
+      );
 
-  it("rejects invalid account request inputs before transport", async () => {
-    let requestCount = 0;
+      const invalidNestedSettings = expectFailure(
+        yield* Effect.exit(
+          provideSdk(
+            saveAccountSettings({
+              two_factor_enabled: {
+                code: "123456",
+                // @ts-expect-error JavaScript callers can still supply invalid nested values.
+                enable: "yes",
+              },
+            }),
+            handler,
+          ),
+        ),
+      );
 
-    const handler = () => {
-      requestCount += 1;
+      const sensitiveSettings = "settings-secret-value";
 
-      return jsonResponse({ status: "OK" });
-    };
+      const invalidSensitiveSettings = expectFailure(
+        yield* Effect.exit(
+          provideSdk(
+            saveAccountSettings({
+              current_password: sensitiveSettings,
+              // @ts-expect-error JavaScript callers can supply non-string mail values.
+              mail: { value: sensitiveSettings },
+            }),
+            handler,
+          ),
+        ),
+      );
 
-    const invalidQuery = expectFailure(
-      await runSdkExit(
-        // @ts-expect-error JavaScript callers can still supply invalid query flags.
-        getAccountInfo({ download_token: 2 }),
-        handler,
-      ),
-    );
+      const invalidSubtitleCount = expectFailure(
+        yield* Effect.exit(
+          provideSdk(
+            saveAccountSettings({
+              subtitle_languages: ["en", "tr", "de"],
+            }),
+            handler,
+          ),
+        ),
+      );
 
-    const invalidNestedSettings = expectFailure(
-      await runSdkExit(
-        saveAccountSettings({
-          two_factor_enabled: {
-            code: "123456",
-            // @ts-expect-error JavaScript callers can still supply invalid nested values.
-            enable: "yes",
+      const unknownSetting = expectFailure(
+        yield* Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can supply unknown settings.
+            saveAccountSettings({ unknown_setting: true }),
+            handler,
+          ),
+        ),
+      );
+
+      const incompleteClearOptions = expectFailure(
+        yield* Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can omit required clear flags.
+            clearAccount({ files: true }),
+            handler,
+          ),
+        ),
+      );
+
+      const invalidPassword = expectFailure(
+        yield* Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can supply non-string passwords.
+            destroyAccount({ value: "destroy-secret-value" }),
+            handler,
+          ),
+        ),
+      );
+
+      const emptyPassword = expectFailure(
+        yield* Effect.exit(provideSdk(destroyAccount(""), handler)),
+      );
+
+      const invalidConfirmationSubject = expectFailure(
+        yield* Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can supply unknown confirmation subjects.
+            listAccountConfirmations("username_change"),
+            handler,
+          ),
+        ),
+      );
+
+      expect(invalidQuery).toBeInstanceOf(PutioValidationError);
+      expect(invalidNestedSettings).toBeInstanceOf(PutioValidationError);
+      expect(invalidSensitiveSettings).toMatchObject({
+        cause: {
+          domain: "account",
+          operation: "saveSettings",
+          reason: "Invalid request input",
+        },
+      });
+      expect(JSON.stringify(invalidSensitiveSettings)).not.toContain(sensitiveSettings);
+      expect(invalidSubtitleCount).toBeInstanceOf(PutioValidationError);
+      expect(unknownSetting).toBeInstanceOf(PutioValidationError);
+      expect(incompleteClearOptions).toBeInstanceOf(PutioValidationError);
+      expect(invalidPassword).toBeInstanceOf(PutioValidationError);
+      expect(invalidPassword).toMatchObject({
+        cause: {
+          domain: "account",
+          operation: "destroy",
+          reason: "Invalid request input",
+        },
+      });
+      expect(JSON.stringify(invalidPassword)).not.toContain("destroy-secret-value");
+      expect(emptyPassword).toBeInstanceOf(PutioValidationError);
+      expect(invalidConfirmationSubject).toBeInstanceOf(PutioValidationError);
+      expect(requestCount).toBe(0);
+    }),
+  );
+
+  it.effect("lists supported subtitle languages", () =>
+    Effect.gen(function* () {
+      const languages = yield* provideSdk(
+        listAccountSubtitleLanguages(),
+        (request) => {
+          expect(request.url).toBe("https://api.put.io/v2/account/subtitle_languages");
+
+          return jsonResponse({
+            languages: [
+              { code: "eng", name: "English" },
+              { code: "tur", name: "Turkish" },
+            ],
+            status: "OK",
+          });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expect(languages).toEqual([
+        { code: "eng", name: "English" },
+        { code: "tur", name: "Turkish" },
+      ]);
+
+      const invalidExit = yield* Effect.exit(
+        provideSdk(
+          listAccountSubtitleLanguages(),
+          () =>
+            jsonResponse({
+              languages: [{ code: "eng" }],
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      expect(expectFailure(invalidExit)).toBeInstanceOf(PutioValidationError);
+    }),
+  );
+
+  it.effect("maps account operation failures and form mutations", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.exit(
+        provideSdk(
+          listAccountConfirmations("mail_change"),
+          (request) => {
+            expect(request.url).toBe(
+              "https://api.put.io/v2/account/confirmation/list?type=mail_change",
+            );
+
+            return jsonResponse(
+              {
+                error_message: "Unauthorized",
+                error_type: "invalid_scope",
+                status_code: 401,
+              },
+              { status: 401 },
+            );
           },
-        }),
-        handler,
-      ),
-    );
+          { accessToken: "token-123" },
+        ),
+      );
 
-    const sensitiveSettings = "settings-secret-value";
-
-    const invalidSensitiveSettings = expectFailure(
-      await runSdkExit(
-        saveAccountSettings({
-          current_password: sensitiveSettings,
-          // @ts-expect-error JavaScript callers can supply non-string mail values.
-          mail: { value: sensitiveSettings },
-        }),
-        handler,
-      ),
-    );
-
-    const invalidSubtitleCount = expectFailure(
-      await runSdkExit(
-        saveAccountSettings({
-          subtitle_languages: ["en", "tr", "de"],
-        }),
-        handler,
-      ),
-    );
-
-    const unknownSetting = expectFailure(
-      await runSdkExit(
-        // @ts-expect-error JavaScript callers can supply unknown settings.
-        saveAccountSettings({ unknown_setting: true }),
-        handler,
-      ),
-    );
-
-    const incompleteClearOptions = expectFailure(
-      await runSdkExit(
-        // @ts-expect-error JavaScript callers can omit required clear flags.
-        clearAccount({ files: true }),
-        handler,
-      ),
-    );
-
-    const invalidPassword = expectFailure(
-      await runSdkExit(
-        // @ts-expect-error JavaScript callers can supply non-string passwords.
-        destroyAccount({ value: "destroy-secret-value" }),
-        handler,
-      ),
-    );
-
-    const emptyPassword = expectFailure(await runSdkExit(destroyAccount(""), handler));
-
-    const invalidConfirmationSubject = expectFailure(
-      await runSdkExit(
-        // @ts-expect-error JavaScript callers can supply unknown confirmation subjects.
-        listAccountConfirmations("username_change"),
-        handler,
-      ),
-    );
-
-    expect(invalidQuery).toBeInstanceOf(PutioValidationError);
-    expect(invalidNestedSettings).toBeInstanceOf(PutioValidationError);
-    expect(invalidSensitiveSettings).toMatchObject({
-      cause: {
+      const error = expectFailure(failure);
+      expect(error).toBeInstanceOf(PutioOperationError);
+      expect(error).toMatchObject({
         domain: "account",
-        operation: "saveSettings",
-        reason: "Invalid request input",
-      },
-    });
-    expect(JSON.stringify(invalidSensitiveSettings)).not.toContain(sensitiveSettings);
-    expect(invalidSubtitleCount).toBeInstanceOf(PutioValidationError);
-    expect(unknownSetting).toBeInstanceOf(PutioValidationError);
-    expect(incompleteClearOptions).toBeInstanceOf(PutioValidationError);
-    expect(invalidPassword).toBeInstanceOf(PutioValidationError);
-    expect(invalidPassword).toMatchObject({
-      cause: {
-        domain: "account",
-        operation: "destroy",
-        reason: "Invalid request input",
-      },
-    });
-    expect(JSON.stringify(invalidPassword)).not.toContain("destroy-secret-value");
-    expect(emptyPassword).toBeInstanceOf(PutioValidationError);
-    expect(invalidConfirmationSubject).toBeInstanceOf(PutioValidationError);
-    expect(requestCount).toBe(0);
-  });
+        operation: "listConfirmations",
+      });
 
-  it("lists supported subtitle languages", async () => {
-    const languages = await runSdkEffect(
-      listAccountSubtitleLanguages(),
-      (request) => {
-        expect(request.url).toBe("https://api.put.io/v2/account/subtitle_languages");
-
-        return jsonResponse({
-          languages: [
-            { code: "eng", name: "English" },
-            { code: "tur", name: "Turkish" },
-          ],
-          status: "OK",
-        });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(languages).toEqual([
-      { code: "eng", name: "English" },
-      { code: "tur", name: "Turkish" },
-    ]);
-
-    const invalidExit = await runSdkExit(
-      listAccountSubtitleLanguages(),
-      () =>
-        jsonResponse({
-          languages: [{ code: "eng" }],
-          status: "OK",
+      const clearResult = yield* provideSdk(
+        clearAccount({
+          active_transfers: true,
+          files: true,
+          finished_transfers: false,
+          friends: false,
+          history: true,
+          rss_feeds: false,
+          rss_logs: false,
+          trash: true,
         }),
-      { accessToken: "token-123" },
-    );
+        (request) => {
+          const body = getFormBody(request);
+          expect(request.url).toBe("https://api.put.io/v2/account/clear");
+          expect(body.get("active_transfers")).toBe("true");
+          expect(body.get("files")).toBe("true");
+          expect(body.get("trash")).toBe("true");
 
-    expect(expectFailure(invalidExit)).toBeInstanceOf(PutioValidationError);
-  });
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
 
-  it("maps account operation failures and form mutations", async () => {
-    const failure = await runSdkExit(
-      listAccountConfirmations("mail_change"),
-      (request) => {
-        expect(request.url).toBe(
-          "https://api.put.io/v2/account/confirmation/list?type=mail_change",
-        );
+      expect(clearResult).toEqual({ status: "OK" });
 
-        return jsonResponse(
-          {
-            error_message: "Unauthorized",
-            error_type: "invalid_scope",
-            status_code: 401,
-          },
-          { status: 401 },
-        );
-      },
-      { accessToken: "token-123" },
-    );
+      const destroyResult = yield* provideSdk(
+        destroyAccount("secret"),
+        (request) => {
+          expect(getFormBody(request).get("current_password")).toBe("secret");
 
-    const error = expectFailure(failure);
-    expect(error).toBeInstanceOf(PutioOperationError);
-    expect(error).toMatchObject({
-      domain: "account",
-      operation: "listConfirmations",
-    });
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
 
-    const clearResult = await runSdkEffect(
-      clearAccount({
-        active_transfers: true,
-        files: true,
-        finished_transfers: false,
-        friends: false,
-        history: true,
-        rss_feeds: false,
-        rss_logs: false,
-        trash: true,
-      }),
-      (request) => {
-        const body = getFormBody(request);
-        expect(request.url).toBe("https://api.put.io/v2/account/clear");
-        expect(body.get("active_transfers")).toBe("true");
-        expect(body.get("files")).toBe("true");
-        expect(body.get("trash")).toBe("true");
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(clearResult).toEqual({ status: "OK" });
-
-    const destroyResult = await runSdkEffect(
-      destroyAccount("secret"),
-      (request) => {
-        expect(getFormBody(request).get("current_password")).toBe("secret");
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(destroyResult).toEqual({ status: "OK" });
-  });
+      expect(destroyResult).toEqual({ status: "OK" });
+    }),
+  );
 });

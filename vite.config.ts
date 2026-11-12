@@ -95,5 +95,10 @@ export default defineConfig({
     },
     exclude: ["test/live/**"],
     include: ["scripts/**/*.spec.ts", "src/**/*.spec.ts", "src/**/*.test.ts"],
+    server: {
+      deps: {
+        inline: ["@effect/vitest"],
+      },
+    },
   },
 });

@@ -1,6 +1,6 @@
+import { Effect } from "effect";
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
-import type { Effect } from "effect";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "@effect/vitest";
 
 import type { PutioSdkContext } from "../core/http.js";
 
@@ -16,8 +16,7 @@ import {
   getFormBody,
   getFormDataBody,
   jsonResponse,
-  runSdkEffect,
-  runSdkExit,
+  provideSdk,
 } from "../../test/support/sdk-test.js";
 
 const sharedFile = {
@@ -115,170 +114,204 @@ describe("operational domain boundaries", () => {
     ["GET", "/v2/zips/9/cancel", zips.cancelZip(9)],
   ];
 
-  it.each(okRoutes)("sends an OK-only operation to %s %s", async (method, path, effect) => {
-    await runSdkEffect(
-      effect,
-      (request) => {
-        expect(request.method).toBe(method);
-        expect(new URL(request.url).pathname).toBe(path);
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-  });
-
-  it("covers rss endpoints", async () => {
-    expect(
-      await runSdkEffect(
-        rss.listRssFeeds(),
-        () => jsonResponse({ feeds: [rssFeed], status: "OK" }),
-        { accessToken: "token-123" },
-      ),
-    ).toHaveLength(1);
-
-    expect(
-      await runSdkEffect(rss.getRssFeed(1), () => jsonResponse({ feed: rssFeed, status: "OK" }), {
-        accessToken: "token-123",
-      }),
-    ).toMatchObject({ id: 1 });
-
-    expect(
-      await runSdkEffect(
-        rss.createRssFeed({
-          delete_old_files: true,
-          keyword: null,
-          parent_dir_id: "newf",
-          rss_source_url: "https://example.com/feed.xml",
-          title: "SDK Feed",
-        }),
+  it.effect.each(okRoutes)("sends an OK-only operation to %s %s", ([method, path, effect]) =>
+    Effect.gen(function* () {
+      yield* provideSdk(
+        effect,
         (request) => {
-          const body = getFormBody(request);
-          expect(body.get("delete_old_files")).toBe("on");
-          expect(body.get("parent_dir_id")).toBe("newf");
-          expect(body.get("unwanted_keywords")).toBe("");
-
-          return jsonResponse({ feed: rssFeed, status: "OK" });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ title: "SDK Feed" });
-
-    expect(
-      await runSdkEffect(
-        rss.updateRssFeed(1, {
-          dont_process_whole_feed: true,
-          rss_source_url: "https://example.com/feed.xml",
-          title: "SDK Feed",
-          unwanted_keywords: "spam",
-        }),
-        (request) => {
-          const body = getFormBody(request);
-          expect(body.get("dont_process_whole_feed")).toBe("true");
-          expect(body.get("unwanted_keywords")).toBe("spam");
+          expect(request.method).toBe(method);
+          expect(new URL(request.url).pathname).toBe(path);
 
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
-      ),
-    ).toEqual({ status: "OK" });
+      );
+    }),
+  );
 
-    expect(
-      await runSdkEffect(
-        rss.listRssFeedItems(1),
-        () =>
-          jsonResponse({
-            feed: rssFeed,
-            items: [
-              {
-                detected_date: "2026-03-17",
-                id: 1,
-                is_failed: true,
-                failure_reason: "bad feed",
-                processed_at: "2026-03-17",
-                publish_date: null,
-                title: "Episode 1",
-              },
-            ],
-            status: "OK",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ items: [expect.objectContaining({ id: 1 })] });
-  });
+  it.effect("covers rss endpoints", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* provideSdk(
+          rss.listRssFeeds(),
+          () => jsonResponse({ feeds: [rssFeed], status: "OK" }),
+          { accessToken: "token-123" },
+        ),
+      ).toHaveLength(1);
 
-  it("rejects invalid rss inputs before transport", async () => {
-    let requestCount = 0;
-
-    const handler = () => {
-      requestCount += 1;
-
-      return jsonResponse({ status: "OK" });
-    };
-
-    const validParams = {
-      rss_source_url: "https://example.com/feed.xml",
-      title: "SDK Feed",
-    };
-
-    const failures = await Promise.all([
-      runSdkExit(rss.getRssFeed(0), handler),
-      // @ts-expect-error JavaScript callers can provide null instead of feed parameters.
-      runSdkExit(rss.createRssFeed(null), handler),
-      runSdkExit(rss.createRssFeed({ ...validParams, rss_source_url: "" }), handler),
-      runSdkExit(rss.createRssFeed({ ...validParams, title: "" }), handler),
-      runSdkExit(rss.createRssFeed({ ...validParams, parent_dir_id: -1 }), handler),
-      runSdkExit(
-        rss.createRssFeed({
-          ...validParams,
-          // @ts-expect-error JavaScript callers can provide non-boolean flags.
-          delete_old_files: "yes",
+      expect(
+        yield* provideSdk(rss.getRssFeed(1), () => jsonResponse({ feed: rssFeed, status: "OK" }), {
+          accessToken: "token-123",
         }),
-        handler,
-      ),
-      runSdkExit(rss.updateRssFeed(0, validParams), handler),
-      // @ts-expect-error JavaScript callers can provide null instead of feed parameters.
-      runSdkExit(rss.updateRssFeed(1, null), handler),
-      runSdkExit(rss.pauseRssFeed(0), handler),
-      runSdkExit(rss.resumeRssFeed(0), handler),
-      runSdkExit(rss.deleteRssFeed(0), handler),
-      runSdkExit(rss.listRssFeedItems(0), handler),
-      runSdkExit(rss.clearRssFeedLogs(0), handler),
-      runSdkExit(rss.retryRssFeedItem(0, 1), handler),
-      runSdkExit(rss.retryRssFeedItem(1, 0), handler),
-      runSdkExit(rss.retryAllRssFeedItems(0), handler),
-    ]);
+      ).toMatchObject({ id: 1 });
 
-    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-      failures.map(() => expect.any(PutioValidationError)),
-    );
-    expect(requestCount).toBe(0);
-  });
+      expect(
+        yield* provideSdk(
+          rss.createRssFeed({
+            delete_old_files: true,
+            keyword: null,
+            parent_dir_id: "newf",
+            rss_source_url: "https://example.com/feed.xml",
+            title: "SDK Feed",
+          }),
+          (request) => {
+            const body = getFormBody(request);
+            expect(body.get("delete_old_files")).toBe("on");
+            expect(body.get("parent_dir_id")).toBe("newf");
+            expect(body.get("unwanted_keywords")).toBe("");
 
-  it("covers oauth endpoints and URL helpers", async () => {
-    expect(
-      oauth.buildOAuthAuthorizeUrl({
-        oauthToken: "token-123",
-        query: { redirect_uri: "https://example.com/callback" },
-      }),
-    ).toBe(
-      "https://api.put.io/v2/oauth2/authorize?redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&oauth_token=token-123",
-    );
+            return jsonResponse({ feed: rssFeed, status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ title: "SDK Feed" });
 
-    expect(
-      oauth.buildOAuthAppIconUrl({
-        id: 9,
-        oauthToken: "token-123",
-      }),
-    ).toBe("https://api.put.io/v2/oauth/apps/9/icon?oauth_token=token-123");
+      expect(
+        yield* provideSdk(
+          rss.updateRssFeed(1, {
+            dont_process_whole_feed: true,
+            rss_source_url: "https://example.com/feed.xml",
+            title: "SDK Feed",
+            unwanted_keywords: "spam",
+          }),
+          (request) => {
+            const body = getFormBody(request);
+            expect(body.get("dont_process_whole_feed")).toBe("true");
+            expect(body.get("unwanted_keywords")).toBe("spam");
 
-    expect(
-      await runSdkEffect(
-        oauth.queryOAuthApps(),
-        () =>
-          jsonResponse({
-            apps: [
-              {
+            return jsonResponse({ status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toEqual({ status: "OK" });
+
+      expect(
+        yield* provideSdk(
+          rss.listRssFeedItems(1),
+          () =>
+            jsonResponse({
+              feed: rssFeed,
+              items: [
+                {
+                  detected_date: "2026-03-17",
+                  id: 1,
+                  is_failed: true,
+                  failure_reason: "bad feed",
+                  processed_at: "2026-03-17",
+                  publish_date: null,
+                  title: "Episode 1",
+                },
+              ],
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ items: [expect.objectContaining({ id: 1 })] });
+    }),
+  );
+
+  it.effect("rejects invalid rss inputs before transport", () =>
+    Effect.gen(function* () {
+      let requestCount = 0;
+
+      const handler = () => {
+        requestCount += 1;
+
+        return jsonResponse({ status: "OK" });
+      };
+
+      const validParams = {
+        rss_source_url: "https://example.com/feed.xml",
+        title: "SDK Feed",
+      };
+
+      const failures = yield* Effect.all([
+        Effect.exit(provideSdk(rss.getRssFeed(0), handler)),
+        // @ts-expect-error JavaScript callers can provide null instead of feed parameters.
+        Effect.exit(provideSdk(rss.createRssFeed(null), handler)),
+        Effect.exit(provideSdk(rss.createRssFeed({ ...validParams, rss_source_url: "" }), handler)),
+        Effect.exit(provideSdk(rss.createRssFeed({ ...validParams, title: "" }), handler)),
+        Effect.exit(provideSdk(rss.createRssFeed({ ...validParams, parent_dir_id: -1 }), handler)),
+        Effect.exit(
+          provideSdk(
+            rss.createRssFeed({
+              ...validParams,
+              // @ts-expect-error JavaScript callers can provide non-boolean flags.
+              delete_old_files: "yes",
+            }),
+            handler,
+          ),
+        ),
+        Effect.exit(provideSdk(rss.updateRssFeed(0, validParams), handler)),
+        // @ts-expect-error JavaScript callers can provide null instead of feed parameters.
+        Effect.exit(provideSdk(rss.updateRssFeed(1, null), handler)),
+        Effect.exit(provideSdk(rss.pauseRssFeed(0), handler)),
+        Effect.exit(provideSdk(rss.resumeRssFeed(0), handler)),
+        Effect.exit(provideSdk(rss.deleteRssFeed(0), handler)),
+        Effect.exit(provideSdk(rss.listRssFeedItems(0), handler)),
+        Effect.exit(provideSdk(rss.clearRssFeedLogs(0), handler)),
+        Effect.exit(provideSdk(rss.retryRssFeedItem(0, 1), handler)),
+        Effect.exit(provideSdk(rss.retryRssFeedItem(1, 0), handler)),
+        Effect.exit(provideSdk(rss.retryAllRssFeedItems(0), handler)),
+      ]);
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioValidationError)),
+      );
+      expect(requestCount).toBe(0);
+    }),
+  );
+
+  it.effect("covers oauth endpoints and URL helpers", () =>
+    Effect.gen(function* () {
+      expect(
+        oauth.buildOAuthAuthorizeUrl({
+          oauthToken: "token-123",
+          query: { redirect_uri: "https://example.com/callback" },
+        }),
+      ).toBe(
+        "https://api.put.io/v2/oauth2/authorize?redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&oauth_token=token-123",
+      );
+
+      expect(
+        oauth.buildOAuthAppIconUrl({
+          id: 9,
+          oauthToken: "token-123",
+        }),
+      ).toBe("https://api.put.io/v2/oauth/apps/9/icon?oauth_token=token-123");
+
+      expect(
+        yield* provideSdk(
+          oauth.queryOAuthApps(),
+          () =>
+            jsonResponse({
+              apps: [
+                {
+                  callback: "https://example.com/callback",
+                  description: "SDK app",
+                  has_icon: false,
+                  hidden: false,
+                  id: 9,
+                  name: "SDK app",
+                  secret: "secret",
+                  users: 10,
+                  website: "https://example.com",
+                },
+              ],
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toHaveLength(1);
+
+      expect(
+        yield* provideSdk(
+          oauth.getOAuthApp(9, { edit: true }),
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/oauth/apps/9/edit");
+
+            return jsonResponse({
+              app: {
                 callback: "https://example.com/callback",
                 description: "SDK app",
                 has_icon: false,
@@ -286,406 +319,387 @@ describe("operational domain boundaries", () => {
                 id: 9,
                 name: "SDK app",
                 secret: "secret",
-                users: 10,
                 website: "https://example.com",
               },
-            ],
-            status: "OK",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toHaveLength(1);
+              status: "OK",
+              token: "token-123",
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ token: "token-123" });
 
-    expect(
-      await runSdkEffect(
-        oauth.getOAuthApp(9, { edit: true }),
-        (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/oauth/apps/9/edit");
+      expect(
+        yield* provideSdk(
+          oauth.getOAuthApp(9),
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/oauth/apps/9");
 
-          return jsonResponse({
-            app: {
-              callback: "https://example.com/callback",
-              description: "SDK app",
-              has_icon: false,
-              hidden: false,
-              id: 9,
-              name: "SDK app",
-              secret: "secret",
-              website: "https://example.com",
-            },
-            status: "OK",
-            token: "token-123",
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ token: "token-123" });
-
-    expect(
-      await runSdkEffect(
-        oauth.getOAuthApp(9),
-        (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/oauth/apps/9");
-
-          return jsonResponse({
-            app: {
-              callback: "https://example.com/callback",
-              description: "SDK app",
-              has_icon: false,
-              hidden: false,
-              id: 9,
-              name: "SDK app",
-              secret: "secret",
-              website: "https://example.com",
-            },
-            status: "OK",
-            token: "token-123",
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ token: "token-123" });
-
-    await runSdkEffect(
-      oauth.setOAuthAppIcon(9, {
-        icon: new Blob(["icon"], { type: "image/png" }),
-      }),
-      (request) => {
-        expect(getFormDataBody(request).get("icon")).toBeInstanceOf(Blob);
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(
-      await runSdkEffect(
-        oauth.createOAuthApp({
-          callback: "https://example.com/callback",
-          description: "SDK app test",
-          hidden: true,
-          icon: new Blob(["icon"], { type: "image/png" }),
-          name: "SDK app",
-          website: "https://example.com",
-        }),
-        (request) => {
-          const body = getFormDataBody(request);
-          expect(body.get("icon")).toBeInstanceOf(Blob);
-          expect(body.get("name")).toBe("SDK app");
-          expect(body.get("hidden")).toBe("true");
-
-          return jsonResponse({
-            app: {
-              callback: "https://example.com/callback",
-              description: "SDK app",
-              has_icon: false,
-              hidden: true,
-              id: 9,
-              name: "SDK app",
-              secret: "secret",
-              website: "https://example.com",
-            },
-            status: "OK",
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ app: expect.objectContaining({ id: 9 }) });
-
-    expect(
-      await runSdkEffect(
-        oauth.updateOAuthApp({
-          callback: "https://example.com/callback",
-          description: "Updated SDK app",
-          id: 9,
-          website: "https://example.com",
-        }),
-        (request) => {
-          const body = getFormDataBody(request);
-          expect(body.get("description")).toBe("Updated SDK app");
-
-          return jsonResponse({
-            app: {
-              callback: "https://example.com/callback",
-              description: "Updated SDK app",
-              has_icon: false,
-              id: 9,
-              name: "SDK app",
-              website: "https://example.com",
-            },
-            status: "OK",
-            token: null,
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ token: null });
-
-    expect(
-      await runSdkEffect(
-        oauth.regenerateOAuthAppToken(9),
-        () => jsonResponse({ access_token: "new-token", status: "OK" }),
-        { accessToken: "token-123" },
-      ),
-    ).toBe("new-token");
-
-    expect(
-      await runSdkEffect(
-        oauth.getPopularOAuthApps(),
-        () =>
-          jsonResponse({
-            apps: [
-              {
-                description: "Popular SDK app",
+            return jsonResponse({
+              app: {
+                callback: "https://example.com/callback",
+                description: "SDK app",
                 has_icon: false,
                 hidden: false,
-                id: 10,
-                maker: "put.io",
-                name: "Popular SDK app",
-                users: 99,
+                id: 9,
+                name: "SDK app",
+                secret: "secret",
                 website: "https://example.com",
               },
-            ],
-            status: "OK",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toHaveLength(1);
-  });
-
-  it("rejects invalid oauth app inputs before transport", async () => {
-    let requestCount = 0;
-
-    const handler = () => {
-      requestCount += 1;
-
-      return jsonResponse({ status: "OK" });
-    };
-
-    const validCreateInput = {
-      callback: "https://example.com/callback",
-      description: "A valid SDK application",
-      name: "SDK app",
-      website: "https://example.com",
-    };
-
-    const failures = await Promise.all([
-      runSdkExit(oauth.getOAuthApp(0), handler),
-      runSdkExit(
-        // @ts-expect-error JavaScript callers can provide invalid option values.
-        oauth.getOAuthApp(1, { edit: "yes" }),
-        handler,
-      ),
-      runSdkExit(
-        oauth.setOAuthAppIcon(0, { icon: new Blob(["icon"], { type: "image/png" }) }),
-        handler,
-      ),
-      runSdkExit(
-        // @ts-expect-error JavaScript callers can provide non-Blob icon values.
-        oauth.setOAuthAppIcon(1, { icon: "icon" }),
-        handler,
-      ),
-      runSdkExit(oauth.createOAuthApp({ ...validCreateInput, name: "app" }), handler),
-      runSdkExit(oauth.createOAuthApp({ ...validCreateInput, description: "too short" }), handler),
-      runSdkExit(oauth.createOAuthApp({ ...validCreateInput, website: "x".repeat(256) }), handler),
-      runSdkExit(oauth.createOAuthApp({ ...validCreateInput, callback: "x".repeat(256) }), handler),
-      runSdkExit(
-        oauth.updateOAuthApp({
-          callback: validCreateInput.callback,
-          description: "too short",
-          id: 1,
-          website: validCreateInput.website,
-        }),
-        handler,
-      ),
-      runSdkExit(oauth.deleteOAuthApp(0), handler),
-      runSdkExit(oauth.regenerateOAuthAppToken(0), handler),
-    ]);
-
-    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-      failures.map(() => expect.any(PutioValidationError)),
-    );
-    expect(requestCount).toBe(0);
-  });
-
-  it("covers sharing endpoints", async () => {
-    expect(
-      await runSdkEffect(
-        sharing.cloneSharedFiles(),
-        (request) => {
-          expect(getFormBody(request).get("parent_id")).toBe("0");
-
-          return jsonResponse({ id: 9, status: "OK" });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toEqual({ id: 9 });
-
-    expect(
-      await runSdkEffect(
-        sharing.cloneSharedFiles({
-          cursor: "cursor-1",
-          ids: [7],
-          parentId: 5,
-        }),
-        (request) => {
-          const body = getFormBody(request);
-          expect(body.get("cursor")).toBe("cursor-1");
-          expect(body.get("file_ids")).toBe("7");
-          expect(body.get("parent_id")).toBe("5");
-
-          return jsonResponse({ id: 10, status: "OK" });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toEqual({ id: 10 });
-
-    expect(
-      await runSdkEffect(
-        sharing.getSharingCloneInfo(10),
-        () => jsonResponse({ shared_file_clone_status: "DONE", status: "OK" }),
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ shared_file_clone_status: "DONE" });
-
-    expect(
-      await runSdkEffect(
-        sharing.shareFiles({
-          ids: [7],
-          target: {
-            type: "everyone",
+              status: "OK",
+              token: "token-123",
+            });
           },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ token: "token-123" });
+
+      yield* provideSdk(
+        oauth.setOAuthAppIcon(9, {
+          icon: new Blob(["icon"], { type: "image/png" }),
         }),
         (request) => {
-          expect(getFormBody(request).get("friends")).toBe("everyone");
+          expect(getFormDataBody(request).get("icon")).toBeInstanceOf(Blob);
 
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
-      ),
-    ).toEqual({ status: "OK" });
+      );
 
-    expect(
-      await runSdkEffect(
-        sharing.shareFiles({
-          cursor: "cursor-1",
-          ids: [7],
-          target: {
-            friendNames: ["sdk-user", "sdk"],
-            type: "friends",
-          },
-        }),
-        (request) => {
-          const body = getFormBody(request);
-          expect(body.get("cursor")).toBe("cursor-1");
-          expect(body.get("file_ids")).toBe("7");
-          expect(body.get("friends")).toBe("sdk-user,sdk");
-
-          return jsonResponse({ status: "OK" });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toEqual({ status: "OK" });
-
-    const emptyFriendsExit = await runSdkExit(
-      sharing.shareFiles({
-        ids: [7],
-        target: {
-          friendNames: [],
-          type: "friends",
-        },
-      }),
-      () => {
-        throw new Error("request should not execute");
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(expectFailure(emptyFriendsExit)).toBeInstanceOf(PutioValidationError);
-
-    expect(
-      await runSdkEffect(
-        sharing.listSharedFiles(),
-        () =>
-          jsonResponse({
-            shared: [{ ...sharedFile, shared_with: "everyone" }],
-            status: "OK",
+      expect(
+        yield* provideSdk(
+          oauth.createOAuthApp({
+            callback: "https://example.com/callback",
+            description: "SDK app test",
+            hidden: true,
+            icon: new Blob(["icon"], { type: "image/png" }),
+            name: "SDK app",
+            website: "https://example.com",
           }),
-        { accessToken: "token-123" },
-      ),
-    ).toHaveLength(1);
+          (request) => {
+            const body = getFormDataBody(request);
+            expect(body.get("icon")).toBeInstanceOf(Blob);
+            expect(body.get("name")).toBe("SDK app");
+            expect(body.get("hidden")).toBe("true");
 
-    expect(
-      await runSdkEffect(
-        sharing.getSharedWith(7),
-        () =>
-          jsonResponse({
-            share_type: "friends",
-            shares: [
-              { share_id: 1, user_avatar_url: "https://put.io/avatar.png", user_name: "Altay" },
-            ],
-            status: "OK",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ share_type: "friends" });
-
-    await runSdkEffect(
-      sharing.unshareFile({
-        fileId: 7,
-      }),
-      (request) => {
-        expect(getFormBody(request).get("shares")).toBe("everyone");
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    await runSdkEffect(
-      sharing.unshareFile({
-        fileId: 7,
-        shares: [1, "everyone"],
-      }),
-      (request) => {
-        expect(getFormBody(request).get("shares")).toBe("1,everyone");
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(
-      await runSdkEffect(
-        sharing.createPublicShare(7),
-        () =>
-          jsonResponse({
-            public_share: {
-              created_at: "2026-03-17",
-              expiration_date: "2026-04-17",
-              id: 1,
-              owner: { name: "put.io" },
-              push_token: "push",
-              token: "public-token",
-              user_file: {
-                file_type: "FOLDER",
-                id: 7,
-                name: "Shared",
+            return jsonResponse({
+              app: {
+                callback: "https://example.com/callback",
+                description: "SDK app",
+                has_icon: false,
+                hidden: true,
+                id: 9,
+                name: "SDK app",
+                secret: "secret",
+                website: "https://example.com",
               },
-            },
-            status: "OK",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ id: 1 });
+              status: "OK",
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ app: expect.objectContaining({ id: 9 }) });
 
-    expect(
-      await runSdkEffect(
-        sharing.listPublicShares(),
-        () =>
-          jsonResponse({
-            public_shares: [
-              {
+      expect(
+        yield* provideSdk(
+          oauth.updateOAuthApp({
+            callback: "https://example.com/callback",
+            description: "Updated SDK app",
+            id: 9,
+            website: "https://example.com",
+          }),
+          (request) => {
+            const body = getFormDataBody(request);
+            expect(body.get("description")).toBe("Updated SDK app");
+
+            return jsonResponse({
+              app: {
+                callback: "https://example.com/callback",
+                description: "Updated SDK app",
+                has_icon: false,
+                id: 9,
+                name: "SDK app",
+                website: "https://example.com",
+              },
+              status: "OK",
+              token: null,
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ token: null });
+
+      expect(
+        yield* provideSdk(
+          oauth.regenerateOAuthAppToken(9),
+          () => jsonResponse({ access_token: "new-token", status: "OK" }),
+          { accessToken: "token-123" },
+        ),
+      ).toBe("new-token");
+
+      expect(
+        yield* provideSdk(
+          oauth.getPopularOAuthApps(),
+          () =>
+            jsonResponse({
+              apps: [
+                {
+                  description: "Popular SDK app",
+                  has_icon: false,
+                  hidden: false,
+                  id: 10,
+                  maker: "put.io",
+                  name: "Popular SDK app",
+                  users: 99,
+                  website: "https://example.com",
+                },
+              ],
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toHaveLength(1);
+    }),
+  );
+
+  it.effect("rejects invalid oauth app inputs before transport", () =>
+    Effect.gen(function* () {
+      let requestCount = 0;
+
+      const handler = () => {
+        requestCount += 1;
+
+        return jsonResponse({ status: "OK" });
+      };
+
+      const validCreateInput = {
+        callback: "https://example.com/callback",
+        description: "A valid SDK application",
+        name: "SDK app",
+        website: "https://example.com",
+      };
+
+      const failures = yield* Effect.all([
+        Effect.exit(provideSdk(oauth.getOAuthApp(0), handler)),
+        Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can provide invalid option values.
+            oauth.getOAuthApp(1, { edit: "yes" }),
+            handler,
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            oauth.setOAuthAppIcon(0, { icon: new Blob(["icon"], { type: "image/png" }) }),
+            handler,
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can provide non-Blob icon values.
+            oauth.setOAuthAppIcon(1, { icon: "icon" }),
+            handler,
+          ),
+        ),
+        Effect.exit(
+          provideSdk(oauth.createOAuthApp({ ...validCreateInput, name: "app" }), handler),
+        ),
+        Effect.exit(
+          provideSdk(
+            oauth.createOAuthApp({ ...validCreateInput, description: "too short" }),
+            handler,
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            oauth.createOAuthApp({ ...validCreateInput, website: "x".repeat(256) }),
+            handler,
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            oauth.createOAuthApp({ ...validCreateInput, callback: "x".repeat(256) }),
+            handler,
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            oauth.updateOAuthApp({
+              callback: validCreateInput.callback,
+              description: "too short",
+              id: 1,
+              website: validCreateInput.website,
+            }),
+            handler,
+          ),
+        ),
+        Effect.exit(provideSdk(oauth.deleteOAuthApp(0), handler)),
+        Effect.exit(provideSdk(oauth.regenerateOAuthAppToken(0), handler)),
+      ]);
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioValidationError)),
+      );
+      expect(requestCount).toBe(0);
+    }),
+  );
+
+  it.effect("covers sharing endpoints", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* provideSdk(
+          sharing.cloneSharedFiles(),
+          (request) => {
+            expect(getFormBody(request).get("parent_id")).toBe("0");
+
+            return jsonResponse({ id: 9, status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toEqual({ id: 9 });
+
+      expect(
+        yield* provideSdk(
+          sharing.cloneSharedFiles({
+            cursor: "cursor-1",
+            ids: [7],
+            parentId: 5,
+          }),
+          (request) => {
+            const body = getFormBody(request);
+            expect(body.get("cursor")).toBe("cursor-1");
+            expect(body.get("file_ids")).toBe("7");
+            expect(body.get("parent_id")).toBe("5");
+
+            return jsonResponse({ id: 10, status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toEqual({ id: 10 });
+
+      expect(
+        yield* provideSdk(
+          sharing.getSharingCloneInfo(10),
+          () => jsonResponse({ shared_file_clone_status: "DONE", status: "OK" }),
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ shared_file_clone_status: "DONE" });
+
+      expect(
+        yield* provideSdk(
+          sharing.shareFiles({
+            ids: [7],
+            target: {
+              type: "everyone",
+            },
+          }),
+          (request) => {
+            expect(getFormBody(request).get("friends")).toBe("everyone");
+
+            return jsonResponse({ status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toEqual({ status: "OK" });
+
+      expect(
+        yield* provideSdk(
+          sharing.shareFiles({
+            cursor: "cursor-1",
+            ids: [7],
+            target: {
+              friendNames: ["sdk-user", "sdk"],
+              type: "friends",
+            },
+          }),
+          (request) => {
+            const body = getFormBody(request);
+            expect(body.get("cursor")).toBe("cursor-1");
+            expect(body.get("file_ids")).toBe("7");
+            expect(body.get("friends")).toBe("sdk-user,sdk");
+
+            return jsonResponse({ status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toEqual({ status: "OK" });
+
+      const emptyFriendsExit = yield* Effect.exit(
+        provideSdk(
+          sharing.shareFiles({
+            ids: [7],
+            target: {
+              friendNames: [],
+              type: "friends",
+            },
+          }),
+          () => {
+            throw new Error("request should not execute");
+          },
+          { accessToken: "token-123" },
+        ),
+      );
+
+      expect(expectFailure(emptyFriendsExit)).toBeInstanceOf(PutioValidationError);
+
+      expect(
+        yield* provideSdk(
+          sharing.listSharedFiles(),
+          () =>
+            jsonResponse({
+              shared: [{ ...sharedFile, shared_with: "everyone" }],
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toHaveLength(1);
+
+      expect(
+        yield* provideSdk(
+          sharing.getSharedWith(7),
+          () =>
+            jsonResponse({
+              share_type: "friends",
+              shares: [
+                { share_id: 1, user_avatar_url: "https://put.io/avatar.png", user_name: "Altay" },
+              ],
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ share_type: "friends" });
+
+      yield* provideSdk(
+        sharing.unshareFile({
+          fileId: 7,
+        }),
+        (request) => {
+          expect(getFormBody(request).get("shares")).toBe("everyone");
+
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
+
+      yield* provideSdk(
+        sharing.unshareFile({
+          fileId: 7,
+          shares: [1, "everyone"],
+        }),
+        (request) => {
+          expect(getFormBody(request).get("shares")).toBe("1,everyone");
+
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expect(
+        yield* provideSdk(
+          sharing.createPublicShare(7),
+          () =>
+            jsonResponse({
+              public_share: {
                 created_at: "2026-03-17",
                 expiration_date: "2026-04-17",
                 id: 1,
@@ -698,808 +712,922 @@ describe("operational domain boundaries", () => {
                   name: "Shared",
                 },
               },
-            ],
-            status: "OK",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toHaveLength(1);
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ id: 1 });
 
-    expect(
-      await runSdkEffect(
-        sharing.getPublicShare(),
-        () =>
-          jsonResponse({
-            public_share: {
-              created_at: "2026-03-17",
-              expiration_date: "2026-04-17",
-              id: 1,
-              owner: { name: "put.io" },
-              push_token: "push",
-              token: "public-token",
-              user_file: {
-                file_type: "FOLDER",
-                id: 7,
-                name: "Shared",
+      expect(
+        yield* provideSdk(
+          sharing.listPublicShares(),
+          () =>
+            jsonResponse({
+              public_shares: [
+                {
+                  created_at: "2026-03-17",
+                  expiration_date: "2026-04-17",
+                  id: 1,
+                  owner: { name: "put.io" },
+                  push_token: "push",
+                  token: "public-token",
+                  user_file: {
+                    file_type: "FOLDER",
+                    id: 7,
+                    name: "Shared",
+                  },
+                },
+              ],
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toHaveLength(1);
+
+      expect(
+        yield* provideSdk(
+          sharing.getPublicShare(),
+          () =>
+            jsonResponse({
+              public_share: {
+                created_at: "2026-03-17",
+                expiration_date: "2026-04-17",
+                id: 1,
+                owner: { name: "put.io" },
+                push_token: "push",
+                token: "public-token",
+                user_file: {
+                  file_type: "FOLDER",
+                  id: 7,
+                  name: "Shared",
+                },
               },
-            },
-            status: "OK",
+              status: "OK",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ token: "public-token" });
+
+      expect(
+        yield* provideSdk(
+          sharing.listPublicShareFiles({
+            parent_id: 7,
+            total: 1,
           }),
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ token: "public-token" });
-
-    expect(
-      await runSdkEffect(
-        sharing.listPublicShareFiles({
-          parent_id: 7,
-          total: 1,
-        }),
-        (request) => {
-          expect(request.url).toBe(
-            "https://api.put.io/v2/public_share/files/list?parent_id=7&total=1",
-          );
-
-          return jsonResponse({
-            breadcrumbs: [[0, "Root"]],
-            cursor: null,
-            files: [sharedFile],
-            parent: sharedFile,
-            status: "OK",
-            total: 1,
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ total: 1 });
-
-    expect(
-      await runSdkEffect(
-        sharing.continuePublicShareFiles("cursor-1", { per_page: 2 }),
-        (request) => {
-          expect(request.url).toBe(
-            "https://api.put.io/v2/public_share/files/list/continue?per_page=2",
-          );
-          expect(getFormBody(request).get("cursor")).toBe("cursor-1");
-
-          return jsonResponse({
-            cursor: null,
-            files: [sharedFile],
-            parent: sharedFile,
-            status: "OK",
-            total: 1,
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ files: [expect.objectContaining({ id: 7 })] });
-
-    expect(
-      await runSdkEffect(
-        sharing.getPublicShareFileUrl(7),
-        () => jsonResponse({ status: "OK", url: "https://download.put.io/public-share" }),
-        { accessToken: "token-123" },
-      ),
-    ).toBe("https://download.put.io/public-share");
-  });
-
-  it("rejects invalid sharing inputs before transport", async () => {
-    let requestCount = 0;
-
-    const handler = () => {
-      requestCount += 1;
-
-      return jsonResponse({ status: "OK" });
-    };
-
-    const failures = await Promise.all([
-      // @ts-expect-error JavaScript callers can provide null instead of a request object.
-      runSdkExit(sharing.cloneSharedFiles(null), handler),
-      runSdkExit(sharing.cloneSharedFiles({ cursor: "" }), handler),
-      runSdkExit(sharing.cloneSharedFiles({ ids: [0] }), handler),
-      runSdkExit(sharing.cloneSharedFiles({ parentId: -1 }), handler),
-      runSdkExit(sharing.getSharingCloneInfo(0), handler),
-      // @ts-expect-error JavaScript callers can provide null instead of a request object.
-      runSdkExit(sharing.shareFiles(null), handler),
-      runSdkExit(sharing.shareFiles({ ids: [0], target: { type: "everyone" } }), handler),
-      runSdkExit(
-        sharing.shareFiles({
-          ids: [7],
-          target: { friendNames: [""], type: "friends" },
-        }),
-        handler,
-      ),
-      runSdkExit(sharing.getSharedWith(0), handler),
-      runSdkExit(sharing.unshareFile({ fileId: 0 }), handler),
-      runSdkExit(sharing.unshareFile({ fileId: 7, shares: [0] }), handler),
-      runSdkExit(sharing.createPublicShare(0), handler),
-      runSdkExit(sharing.deletePublicShare(0), handler),
-      // @ts-expect-error JavaScript callers can provide null instead of a query object.
-      runSdkExit(sharing.listPublicShareFiles(null), handler),
-      runSdkExit(sharing.listPublicShareFiles({ parent_id: -1 }), handler),
-      runSdkExit(sharing.listPublicShareFiles({ per_page: 0 }), handler),
-      runSdkExit(sharing.continuePublicShareFiles(""), handler),
-      // @ts-expect-error JavaScript callers can provide null instead of a query object.
-      runSdkExit(sharing.continuePublicShareFiles("cursor", null), handler),
-      runSdkExit(sharing.continuePublicShareFiles("cursor", { per_page: 0 }), handler),
-      runSdkExit(sharing.getPublicShareFileUrl(0), handler),
-    ]);
-
-    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-      failures.map(() => expect.any(PutioValidationError)),
-    );
-    expect(requestCount).toBe(0);
-  });
-
-  it("covers transfers, trash, and zips", async () => {
-    expect(
-      await runSdkEffect(
-        transfers.listTransfers({
-          per_page: 2,
-        }),
-        (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/transfers/list?per_page=2");
-
-          return jsonResponse({
-            cursor: "cursor-1",
-            status: "OK",
-            total: 1,
-            transfers: [transfer],
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ total: 1 });
-
-    expect(
-      await runSdkEffect(
-        transfers.continueTransfers("cursor-1", { per_page: 3 }),
-        (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/transfers/list/continue?per_page=3");
-          expect(getFormBody(request).get("cursor")).toBe("cursor-1");
-
-          return jsonResponse({
-            cursor: null,
-            status: "OK",
-            transfers: [transfer],
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ transfers: [expect.objectContaining({ id: 11 })] });
-
-    expect(
-      await runSdkEffect(
-        transfers.getTransfer(11),
-        () => jsonResponse({ status: "OK", transfer }),
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ id: 11 });
-
-    expect(
-      Array.from(
-        await runSdkEffect(
-          transfers.getTransferTorrent(11),
           (request) => {
-            expect(request.method).toBe("GET");
-            expect(request.url).toBe("https://api.put.io/v2/transfers/11/torrent");
+            expect(request.url).toBe(
+              "https://api.put.io/v2/public_share/files/list?parent_id=7&total=1",
+            );
 
-            return arrayBufferResponse([0x64, 0x38, 0x3a]);
+            return jsonResponse({
+              breadcrumbs: [[0, "Root"]],
+              cursor: null,
+              files: [sharedFile],
+              parent: sharedFile,
+              status: "OK",
+              total: 1,
+            });
           },
           { accessToken: "token-123" },
         ),
-      ),
-    ).toEqual([0x64, 0x38, 0x3a]);
+      ).toMatchObject({ total: 1 });
 
-    expect(
-      await runSdkEffect(
-        transfers.countTransfers(),
-        () => jsonResponse({ count: 3, status: "OK" }),
-        { accessToken: "token-123" },
-      ),
-    ).toBe(3);
+      expect(
+        yield* provideSdk(
+          sharing.continuePublicShareFiles("cursor-1", { per_page: 2 }),
+          (request) => {
+            expect(request.url).toBe(
+              "https://api.put.io/v2/public_share/files/list/continue?per_page=2",
+            );
+            expect(getFormBody(request).get("cursor")).toBe("cursor-1");
 
-    expect(
-      await runSdkEffect(
-        transfers.getTransferInfo(["https://example.com/a", "https://example.com/b"]),
-        (request) => {
-          expect(getFormBody(request).get("urls")).toBe(
-            "https://example.com/a\nhttps://example.com/b",
-          );
+            return jsonResponse({
+              cursor: null,
+              files: [sharedFile],
+              parent: sharedFile,
+              status: "OK",
+              total: 1,
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ files: [expect.objectContaining({ id: 7 })] });
 
-          return jsonResponse({
-            disk_avail: 100,
-            ret: [
-              {
-                file_size: 100,
-                human_size: "100 B",
-                name: "A",
-                type_name: "file",
-                url: "https://example.com/a",
-              },
-            ],
-            status: "OK",
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ disk_avail: 100 });
+      expect(
+        yield* provideSdk(
+          sharing.getPublicShareFileUrl(7),
+          () => jsonResponse({ status: "OK", url: "https://download.put.io/public-share" }),
+          { accessToken: "token-123" },
+        ),
+      ).toBe("https://download.put.io/public-share");
+    }),
+  );
 
-    expect(
-      await runSdkEffect(
-        transfers.addTransfer({
-          callback_url: "https://example.com/callback",
-          save_parent_id: 5,
-          url: "https://example.com/file",
-        }),
+  it.effect("rejects invalid sharing inputs before transport", () =>
+    Effect.gen(function* () {
+      let requestCount = 0;
+
+      const handler = () => {
+        requestCount += 1;
+
+        return jsonResponse({ status: "OK" });
+      };
+
+      const failures = yield* Effect.all([
+        // @ts-expect-error JavaScript callers can provide null instead of a request object.
+        Effect.exit(provideSdk(sharing.cloneSharedFiles(null), handler)),
+        Effect.exit(provideSdk(sharing.cloneSharedFiles({ cursor: "" }), handler)),
+        Effect.exit(provideSdk(sharing.cloneSharedFiles({ ids: [0] }), handler)),
+        Effect.exit(provideSdk(sharing.cloneSharedFiles({ parentId: -1 }), handler)),
+        Effect.exit(provideSdk(sharing.getSharingCloneInfo(0), handler)),
+        // @ts-expect-error JavaScript callers can provide null instead of a request object.
+        Effect.exit(provideSdk(sharing.shareFiles(null), handler)),
+        Effect.exit(
+          provideSdk(sharing.shareFiles({ ids: [0], target: { type: "everyone" } }), handler),
+        ),
+        Effect.exit(
+          provideSdk(
+            sharing.shareFiles({
+              ids: [7],
+              target: { friendNames: [""], type: "friends" },
+            }),
+            handler,
+          ),
+        ),
+        Effect.exit(provideSdk(sharing.getSharedWith(0), handler)),
+        Effect.exit(provideSdk(sharing.unshareFile({ fileId: 0 }), handler)),
+        Effect.exit(provideSdk(sharing.unshareFile({ fileId: 7, shares: [0] }), handler)),
+        Effect.exit(provideSdk(sharing.createPublicShare(0), handler)),
+        Effect.exit(provideSdk(sharing.deletePublicShare(0), handler)),
+        // @ts-expect-error JavaScript callers can provide null instead of a query object.
+        Effect.exit(provideSdk(sharing.listPublicShareFiles(null), handler)),
+        Effect.exit(provideSdk(sharing.listPublicShareFiles({ parent_id: -1 }), handler)),
+        Effect.exit(provideSdk(sharing.listPublicShareFiles({ per_page: 0 }), handler)),
+        Effect.exit(provideSdk(sharing.continuePublicShareFiles(""), handler)),
+        // @ts-expect-error JavaScript callers can provide null instead of a query object.
+        Effect.exit(provideSdk(sharing.continuePublicShareFiles("cursor", null), handler)),
+        Effect.exit(
+          provideSdk(sharing.continuePublicShareFiles("cursor", { per_page: 0 }), handler),
+        ),
+        Effect.exit(provideSdk(sharing.getPublicShareFileUrl(0), handler)),
+      ]);
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioValidationError)),
+      );
+      expect(requestCount).toBe(0);
+    }),
+  );
+
+  it.effect("covers transfers, trash, and zips", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* provideSdk(
+          transfers.listTransfers({
+            per_page: 2,
+          }),
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/transfers/list?per_page=2");
+
+            return jsonResponse({
+              cursor: "cursor-1",
+              status: "OK",
+              total: 1,
+              transfers: [transfer],
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ total: 1 });
+
+      expect(
+        yield* provideSdk(
+          transfers.continueTransfers("cursor-1", { per_page: 3 }),
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/transfers/list/continue?per_page=3");
+            expect(getFormBody(request).get("cursor")).toBe("cursor-1");
+
+            return jsonResponse({
+              cursor: null,
+              status: "OK",
+              transfers: [transfer],
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ transfers: [expect.objectContaining({ id: 11 })] });
+
+      expect(
+        yield* provideSdk(
+          transfers.getTransfer(11),
+          () => jsonResponse({ status: "OK", transfer }),
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ id: 11 });
+
+      expect(
+        Array.from(
+          yield* provideSdk(
+            transfers.getTransferTorrent(11),
+            (request) => {
+              expect(request.method).toBe("GET");
+              expect(request.url).toBe("https://api.put.io/v2/transfers/11/torrent");
+
+              return arrayBufferResponse([0x64, 0x38, 0x3a]);
+            },
+            { accessToken: "token-123" },
+          ),
+        ),
+      ).toEqual([0x64, 0x38, 0x3a]);
+
+      expect(
+        yield* provideSdk(
+          transfers.countTransfers(),
+          () => jsonResponse({ count: 3, status: "OK" }),
+          { accessToken: "token-123" },
+        ),
+      ).toBe(3);
+
+      expect(
+        yield* provideSdk(
+          transfers.getTransferInfo(["https://example.com/a", "https://example.com/b"]),
+          (request) => {
+            expect(getFormBody(request).get("urls")).toBe(
+              "https://example.com/a\nhttps://example.com/b",
+            );
+
+            return jsonResponse({
+              disk_avail: 100,
+              ret: [
+                {
+                  file_size: 100,
+                  human_size: "100 B",
+                  name: "A",
+                  type_name: "file",
+                  url: "https://example.com/a",
+                },
+              ],
+              status: "OK",
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ disk_avail: 100 });
+
+      expect(
+        yield* provideSdk(
+          transfers.addTransfer({
+            callback_url: "https://example.com/callback",
+            save_parent_id: 5,
+            url: "https://example.com/file",
+          }),
+          (request) => {
+            const body = getFormBody(request);
+            expect(body.get("callback_url")).toBe("https://example.com/callback");
+            expect(body.get("save_parent_id")).toBe("5");
+            expect(body.get("url")).toBe("https://example.com/file");
+
+            return jsonResponse({ status: "OK", transfer });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ id: 11 });
+
+      expect(
+        yield* provideSdk(
+          transfers.addManyTransfers([
+            {
+              url: "https://example.com/a",
+            },
+            {
+              save_parent_id: 5,
+              url: "https://example.com/b",
+            },
+          ]),
+          (request) => {
+            expect(getFormBody(request).get("urls")).toBe(
+              JSON.stringify([
+                { url: "https://example.com/a" },
+                { save_parent_id: 5, url: "https://example.com/b" },
+              ]),
+            );
+
+            return jsonResponse({
+              errors: [],
+              status: "OK",
+              transfers: [transfer],
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ transfers: [expect.objectContaining({ id: 11 })] });
+
+      expect(
+        yield* provideSdk(
+          transfers.addTransferTrackers({
+            trackers: ["udp://tracker.example:80", "https://tracker.example/announce"],
+            transferId: 11,
+          }),
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/transfers/add-trackers/11");
+            expect(getFormBody(request).get("trackers")).toBe(
+              "udp://tracker.example:80,https://tracker.example/announce",
+            );
+
+            return jsonResponse({ status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toBeUndefined();
+
+      yield* provideSdk(
+        transfers.removeTransfers({ ids: [11, 12] }),
         (request) => {
           const body = getFormBody(request);
-          expect(body.get("callback_url")).toBe("https://example.com/callback");
-          expect(body.get("save_parent_id")).toBe("5");
-          expect(body.get("url")).toBe("https://example.com/file");
-
-          return jsonResponse({ status: "OK", transfer });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ id: 11 });
-
-    expect(
-      await runSdkEffect(
-        transfers.addManyTransfers([
-          {
-            url: "https://example.com/a",
-          },
-          {
-            save_parent_id: 5,
-            url: "https://example.com/b",
-          },
-        ]),
-        (request) => {
-          expect(getFormBody(request).get("urls")).toBe(
-            JSON.stringify([
-              { url: "https://example.com/a" },
-              { save_parent_id: 5, url: "https://example.com/b" },
-            ]),
-          );
-
-          return jsonResponse({
-            errors: [],
-            status: "OK",
-            transfers: [transfer],
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ transfers: [expect.objectContaining({ id: 11 })] });
-
-    await expect(
-      runSdkEffect(
-        transfers.addTransferTrackers({
-          trackers: ["udp://tracker.example:80", "https://tracker.example/announce"],
-          transferId: 11,
-        }),
-        (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/transfers/add-trackers/11");
-          expect(getFormBody(request).get("trackers")).toBe(
-            "udp://tracker.example:80,https://tracker.example/announce",
-          );
+          expect(request.url).toBe("https://api.put.io/v2/transfers/remove");
+          expect(body.get("transfer_ids")).toBe("11,12");
+          expect(body.has("remove_filter")).toBe(false);
 
           return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
-      ),
-    ).resolves.toBeUndefined();
+      );
 
-    await runSdkEffect(
-      transfers.removeTransfers({ ids: [11, 12] }),
-      (request) => {
-        const body = getFormBody(request);
-        expect(request.url).toBe("https://api.put.io/v2/transfers/remove");
-        expect(body.get("transfer_ids")).toBe("11,12");
-        expect(body.has("remove_filter")).toBe(false);
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    await runSdkEffect(
-      transfers.removeTransfers({ filter: "completed" }),
-      (request) => {
-        const body = getFormBody(request);
-        expect(body.get("remove_filter")).toBe("completed");
-        expect(body.has("transfer_ids")).toBe(false);
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    await runSdkEffect(
-      transfers.removeTransfers({ filter: "all", ids: undefined }),
-      (request) => {
-        const body = getFormBody(request);
-        expect(body.get("remove_filter")).toBe("all");
-        expect(body.has("transfer_ids")).toBe(false);
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    await runSdkEffect(
-      transfers.cancelTransfers([11, 12]),
-      (request) => {
-        expect(getFormBody(request).get("transfer_ids")).toBe("11,12");
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(
-      await runSdkEffect(
-        transfers.cleanTransfers([11]),
+      yield* provideSdk(
+        transfers.removeTransfers({ filter: "completed" }),
         (request) => {
-          expect(getFormBody(request).get("transfer_ids")).toBe("11");
+          const body = getFormBody(request);
+          expect(body.get("remove_filter")).toBe("completed");
+          expect(body.has("transfer_ids")).toBe(false);
 
-          return jsonResponse({ deleted_ids: [11], status: "OK" });
+          return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
-      ),
-    ).toEqual({ deleted_ids: [11] });
+      );
 
-    expect(
-      await runSdkEffect(
-        transfers.retryTransfer(11),
+      yield* provideSdk(
+        transfers.removeTransfers({ filter: "all", ids: undefined }),
+        (request) => {
+          const body = getFormBody(request);
+          expect(body.get("remove_filter")).toBe("all");
+          expect(body.has("transfer_ids")).toBe(false);
+
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
+
+      yield* provideSdk(
+        transfers.cancelTransfers([11, 12]),
+        (request) => {
+          expect(getFormBody(request).get("transfer_ids")).toBe("11,12");
+
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expect(
+        yield* provideSdk(
+          transfers.cleanTransfers([11]),
+          (request) => {
+            expect(getFormBody(request).get("transfer_ids")).toBe("11");
+
+            return jsonResponse({ deleted_ids: [11], status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toEqual({ deleted_ids: [11] });
+
+      expect(
+        yield* provideSdk(
+          transfers.retryTransfer(11),
+          (request) => {
+            expect(getFormBody(request).get("id")).toBe("11");
+
+            return jsonResponse({ status: "OK", transfer });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ id: 11 });
+
+      yield* provideSdk(
+        transfers.reannounceTransfer(11),
         (request) => {
           expect(getFormBody(request).get("id")).toBe("11");
 
-          return jsonResponse({ status: "OK", transfer });
+          return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ id: 11 });
+      );
 
-    await runSdkEffect(
-      transfers.reannounceTransfer(11),
-      (request) => {
-        expect(getFormBody(request).get("id")).toBe("11");
+      yield* provideSdk(
+        transfers.stopTransferRecording(11),
+        (request) => {
+          expect(getFormBody(request).get("transfer_id")).toBe("11");
 
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
 
-    await runSdkEffect(
-      transfers.stopTransferRecording(11),
-      (request) => {
-        expect(getFormBody(request).get("transfer_id")).toBe("11");
+      expect(
+        yield* provideSdk(
+          trash.listTrash({
+            per_page: 2,
+          }),
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/trash/list?per_page=2");
 
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
+            return jsonResponse({
+              cursor: "cursor-1",
+              files: [
+                {
+                  content_type: null,
+                  created_at: "2026-03-17",
+                  deleted_at: "2026-03-17",
+                  expiration_date: "2026-04-17",
+                  extension: null,
+                  file_type: "FILE",
+                  first_accessed_at: null,
+                  folder_type: "REGULAR",
+                  icon: null,
+                  id: 1,
+                  name: "trash.txt",
+                  parent_id: null,
+                  screenshot: null,
+                  size: 1,
+                },
+              ],
+              status: "OK",
+              total: 1,
+              trash_size: 1,
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ total: 1 });
 
-    expect(
-      await runSdkEffect(
-        trash.listTrash({
-          per_page: 2,
+      expect(
+        yield* provideSdk(
+          trash.continueTrash("cursor-1", { per_page: 2 }),
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/trash/list/continue?per_page=2");
+            expect(getFormBody(request).get("cursor")).toBe("cursor-1");
+
+            return jsonResponse({
+              cursor: null,
+              files: [],
+              status: "OK",
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ files: [] });
+
+      yield* provideSdk(
+        trash.restoreTrash({
+          file_ids: [1, 2],
         }),
         (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/trash/list?per_page=2");
+          expect(getFormBody(request).get("file_ids")).toBe("1,2");
 
-          return jsonResponse({
-            cursor: "cursor-1",
-            files: [
-              {
-                content_type: null,
-                created_at: "2026-03-17",
-                deleted_at: "2026-03-17",
-                expiration_date: "2026-04-17",
-                extension: null,
-                file_type: "FILE",
-                first_accessed_at: null,
-                folder_type: "REGULAR",
-                icon: null,
-                id: 1,
-                name: "trash.txt",
-                parent_id: null,
-                screenshot: null,
-                size: 1,
-              },
-            ],
-            status: "OK",
-            total: 1,
-            trash_size: 1,
-          });
+          return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ total: 1 });
+      );
 
-    expect(
-      await runSdkEffect(
-        trash.continueTrash("cursor-1", { per_page: 2 }),
+      yield* provideSdk(
+        trash.deleteTrash({
+          cursor: "cursor-1",
+          useCursor: true,
+        }),
         (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/trash/list/continue?per_page=2");
           expect(getFormBody(request).get("cursor")).toBe("cursor-1");
 
-          return jsonResponse({
-            cursor: null,
-            files: [],
-            status: "OK",
-          });
+          return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ files: [] });
+      );
 
-    await runSdkEffect(
-      trash.restoreTrash({
-        file_ids: [1, 2],
-      }),
-      (request) => {
-        expect(getFormBody(request).get("file_ids")).toBe("1,2");
+      expect(
+        yield* provideSdk(
+          zips.listZips(),
+          () =>
+            jsonResponse({
+              status: "OK",
+              zips: [{ created_at: "2026-03-17", id: 1 }],
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toHaveLength(1);
+
+      expect(
+        yield* provideSdk(
+          zips.createZip({
+            cursor: "cursor-1",
+            exclude_ids: [2],
+            file_ids: [1],
+          }),
+          (request) => {
+            const body = getFormBody(request);
+            expect(body.get("cursor")).toBe("cursor-1");
+            expect(body.get("exclude_ids")).toBe("2");
+            expect(body.get("file_ids")).toBe("1");
+
+            return jsonResponse({ status: "OK", zip_id: 9 });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toBe(9);
+
+      expect(
+        yield* provideSdk(
+          zips.getZip(9),
+          () =>
+            jsonResponse({
+              id: 9,
+              missing_files: [],
+              size: 100,
+              status: "OK",
+              url: "https://download.put.io/zip",
+              zip_status: "DONE",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ zip_status: "DONE" });
+
+      expect(
+        yield* provideSdk(
+          zips.getZip(9),
+          () =>
+            jsonResponse({
+              id: 9,
+              missing_files: [{ id: 10, missing: true, name: "missing.zip" }],
+              size: 100,
+              status: "OK",
+              url: "https://download.put.io/zip",
+              zip_status: "DONE",
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ missing_files: [{ missing: true }] });
+    }),
+  );
+
+  it.effect("rejects invalid transfer utility inputs before transport", () =>
+    Effect.gen(function* () {
+      let requestCount = 0;
+
+      const handler = () => {
+        requestCount += 1;
 
         return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
+      };
 
-    await runSdkEffect(
-      trash.deleteTrash({
-        cursor: "cursor-1",
-        useCursor: true,
-      }),
-      (request) => {
-        expect(getFormBody(request).get("cursor")).toBe("cursor-1");
+      const failures = yield* Effect.all([
+        Effect.exit(
+          // @ts-expect-error JavaScript callers can provide null instead of a query object.
+          provideSdk(transfers.listTransfers(null), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.listTransfers({ per_page: 0 }), handler, {
+            accessToken: "token-123",
+          }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.listTransfers({ per_page: 1.5 }), handler, {
+            accessToken: "token-123",
+          }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.continueTransfers(""), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          // @ts-expect-error JavaScript callers can provide null instead of a query object.
+          provideSdk(transfers.continueTransfers("cursor", null), handler, {
+            accessToken: "token-123",
+          }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.continueTransfers("cursor", { per_page: 0 }), handler, {
+            accessToken: "token-123",
+          }),
+        ),
+        Effect.exit(provideSdk(transfers.getTransfer(0), handler, { accessToken: "token-123" })),
+        Effect.exit(
+          provideSdk(transfers.getTransferTorrent(0), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.getTransferInfo([]), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          provideSdk(
+            transfers.getTransferInfo(["https://example.com/a\nhttps://example.com/b"]),
+            handler,
+            {
+              accessToken: "token-123",
+            },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(transfers.addTransfer({ url: "" }), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          provideSdk(
+            transfers.addTransfer({ save_parent_id: -1, url: "https://example.com" }),
+            handler,
+            {
+              accessToken: "token-123",
+            },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can provide unknown request properties.
+            transfers.addTransfer({ unexpected: true, url: "https://example.com" }),
+            handler,
+            { accessToken: "token-123" },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(transfers.addManyTransfers([]), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.addManyTransfers([{ url: "" }]), handler, {
+            accessToken: "token-123",
+          }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.addTransferTrackers({ trackers: [], transferId: 1 }), handler, {
+            accessToken: "token-123",
+          }),
+        ),
+        Effect.exit(
+          provideSdk(
+            transfers.addTransferTrackers({ trackers: ["one,two"], transferId: 1 }),
+            handler,
+            {
+              accessToken: "token-123",
+            },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            transfers.addTransferTrackers({ trackers: ["udp://tracker example"], transferId: 1 }),
+            handler,
+            { accessToken: "token-123" },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(transfers.cancelTransfers([]), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.cancelTransfers([0]), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.cleanTransfers([-1]), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.removeTransfers({ ids: [] }), handler, {
+            accessToken: "token-123",
+          }),
+        ),
+        Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can omit both required selectors.
+            transfers.removeTransfers({}),
+            handler,
+            { accessToken: "token-123" },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(transfers.removeTransfers({ ids: [-1] }), handler, {
+            accessToken: "token-123",
+          }),
+        ),
+        Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can provide both mutually exclusive selectors.
+            transfers.removeTransfers({ filter: "all", ids: [1] }),
+            handler,
+            { accessToken: "token-123" },
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            // @ts-expect-error JavaScript callers can provide unsupported filter literals.
+            transfers.removeTransfers({ filter: "pending" }),
+            handler,
+            { accessToken: "token-123" },
+          ),
+        ),
+        Effect.exit(provideSdk(transfers.retryTransfer(0), handler, { accessToken: "token-123" })),
+        Effect.exit(
+          provideSdk(transfers.reannounceTransfer(0), handler, { accessToken: "token-123" }),
+        ),
+        Effect.exit(
+          provideSdk(transfers.stopTransferRecording(0), handler, { accessToken: "token-123" }),
+        ),
+      ]);
+
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioValidationError)),
+      );
+      expect(requestCount).toBe(0);
+    }),
+  );
+
+  it.effect("rejects invalid trash and zip inputs before transport", () =>
+    Effect.gen(function* () {
+      let requestCount = 0;
+
+      const handler = () => {
+        requestCount += 1;
 
         return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
+      };
 
-    expect(
-      await runSdkEffect(
-        zips.listZips(),
-        () =>
-          jsonResponse({
-            status: "OK",
-            zips: [{ created_at: "2026-03-17", id: 1 }],
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toHaveLength(1);
-
-    expect(
-      await runSdkEffect(
-        zips.createZip({
-          cursor: "cursor-1",
-          exclude_ids: [2],
-          file_ids: [1],
-        }),
-        (request) => {
-          const body = getFormBody(request);
-          expect(body.get("cursor")).toBe("cursor-1");
-          expect(body.get("exclude_ids")).toBe("2");
-          expect(body.get("file_ids")).toBe("1");
-
-          return jsonResponse({ status: "OK", zip_id: 9 });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toBe(9);
-
-    expect(
-      await runSdkEffect(
-        zips.getZip(9),
-        () =>
-          jsonResponse({
-            id: 9,
-            missing_files: [],
-            size: 100,
-            status: "OK",
-            url: "https://download.put.io/zip",
-            zip_status: "DONE",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ zip_status: "DONE" });
-
-    expect(
-      await runSdkEffect(
-        zips.getZip(9),
-        () =>
-          jsonResponse({
-            id: 9,
-            missing_files: [{ id: 10, missing: true, name: "missing.zip" }],
-            size: 100,
-            status: "OK",
-            url: "https://download.put.io/zip",
-            zip_status: "DONE",
-          }),
-        { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ missing_files: [{ missing: true }] });
-  });
-
-  it("rejects invalid transfer utility inputs before transport", async () => {
-    let requestCount = 0;
-
-    const handler = () => {
-      requestCount += 1;
-
-      return jsonResponse({ status: "OK" });
-    };
-
-    const failures = await Promise.all([
-      // @ts-expect-error JavaScript callers can provide null instead of a query object.
-      runSdkExit(transfers.listTransfers(null), handler, { accessToken: "token-123" }),
-      runSdkExit(transfers.listTransfers({ per_page: 0 }), handler, {
-        accessToken: "token-123",
-      }),
-      runSdkExit(transfers.listTransfers({ per_page: 1.5 }), handler, {
-        accessToken: "token-123",
-      }),
-      runSdkExit(transfers.continueTransfers(""), handler, { accessToken: "token-123" }),
-      // @ts-expect-error JavaScript callers can provide null instead of a query object.
-      runSdkExit(transfers.continueTransfers("cursor", null), handler, {
-        accessToken: "token-123",
-      }),
-      runSdkExit(transfers.continueTransfers("cursor", { per_page: 0 }), handler, {
-        accessToken: "token-123",
-      }),
-      runSdkExit(transfers.getTransfer(0), handler, { accessToken: "token-123" }),
-      runSdkExit(transfers.getTransferTorrent(0), handler, { accessToken: "token-123" }),
-      runSdkExit(transfers.getTransferInfo([]), handler, { accessToken: "token-123" }),
-      runSdkExit(
-        transfers.getTransferInfo(["https://example.com/a\nhttps://example.com/b"]),
-        handler,
-        {
-          accessToken: "token-123",
-        },
-      ),
-      runSdkExit(transfers.addTransfer({ url: "" }), handler, { accessToken: "token-123" }),
-      runSdkExit(
-        transfers.addTransfer({ save_parent_id: -1, url: "https://example.com" }),
-        handler,
-        {
-          accessToken: "token-123",
-        },
-      ),
-      runSdkExit(
+      const failures = yield* Effect.all([
+        // @ts-expect-error JavaScript callers can provide null instead of a query object.
+        Effect.exit(provideSdk(trash.listTrash(null), handler)),
+        Effect.exit(provideSdk(trash.listTrash({ per_page: 0 }), handler)),
+        // @ts-expect-error JavaScript callers can provide unknown query properties.
+        Effect.exit(provideSdk(trash.listTrash({ unexpected: true }), handler)),
+        Effect.exit(provideSdk(trash.continueTrash(""), handler)),
+        Effect.exit(provideSdk(trash.continueTrash("cursor", { per_page: 0 }), handler)),
+        // @ts-expect-error JavaScript callers can provide null instead of a query object.
+        Effect.exit(provideSdk(trash.continueTrash("cursor", null), handler)),
+        // @ts-expect-error JavaScript callers can omit both bulk selectors.
+        Effect.exit(provideSdk(trash.restoreTrash({}), handler)),
+        Effect.exit(provideSdk(trash.restoreTrash({ cursor: "", useCursor: true }), handler)),
+        Effect.exit(provideSdk(trash.restoreTrash({ file_ids: [] }), handler)),
+        Effect.exit(
+          provideSdk(
+            // @ts-expect-error Cursor mode cannot also carry explicit file IDs.
+            trash.restoreTrash({ cursor: "cursor", file_ids: [1], useCursor: true }),
+            handler,
+          ),
+        ),
+        Effect.exit(provideSdk(trash.deleteTrash({ file_ids: [0] }), handler)),
+        Effect.exit(
+          provideSdk(
+            // @ts-expect-error File-ID mode cannot also carry a cursor.
+            trash.deleteTrash({ cursor: "cursor", file_ids: [1], useCursor: false }),
+            handler,
+          ),
+        ),
+        // @ts-expect-error Cursor selection must opt into cursor serialization.
+        Effect.exit(provideSdk(trash.deleteTrash({ cursor: "cursor" }), handler)),
+        // @ts-expect-error JavaScript callers can provide null instead of a request object.
+        Effect.exit(provideSdk(zips.createZip(null), handler)),
+        Effect.exit(provideSdk(zips.createZip({}), handler)),
+        Effect.exit(provideSdk(zips.createZip({ cursor: "" }), handler)),
+        Effect.exit(provideSdk(zips.createZip({ file_ids: [] }), handler)),
+        Effect.exit(provideSdk(zips.createZip({ file_ids: [0] }), handler)),
+        Effect.exit(provideSdk(zips.createZip({ cursor: "cursor", exclude_ids: [0] }), handler)),
         // @ts-expect-error JavaScript callers can provide unknown request properties.
-        transfers.addTransfer({ unexpected: true, url: "https://example.com" }),
-        handler,
-        { accessToken: "token-123" },
-      ),
-      runSdkExit(transfers.addManyTransfers([]), handler, { accessToken: "token-123" }),
-      runSdkExit(transfers.addManyTransfers([{ url: "" }]), handler, {
-        accessToken: "token-123",
-      }),
-      runSdkExit(transfers.addTransferTrackers({ trackers: [], transferId: 1 }), handler, {
-        accessToken: "token-123",
-      }),
-      runSdkExit(transfers.addTransferTrackers({ trackers: ["one,two"], transferId: 1 }), handler, {
-        accessToken: "token-123",
-      }),
-      runSdkExit(
-        transfers.addTransferTrackers({ trackers: ["udp://tracker example"], transferId: 1 }),
-        handler,
-        { accessToken: "token-123" },
-      ),
-      runSdkExit(transfers.cancelTransfers([]), handler, { accessToken: "token-123" }),
-      runSdkExit(transfers.cancelTransfers([0]), handler, { accessToken: "token-123" }),
-      runSdkExit(transfers.cleanTransfers([-1]), handler, { accessToken: "token-123" }),
-      runSdkExit(transfers.removeTransfers({ ids: [] }), handler, {
-        accessToken: "token-123",
-      }),
-      runSdkExit(
-        // @ts-expect-error JavaScript callers can omit both required selectors.
-        transfers.removeTransfers({}),
-        handler,
-        { accessToken: "token-123" },
-      ),
-      runSdkExit(transfers.removeTransfers({ ids: [-1] }), handler, {
-        accessToken: "token-123",
-      }),
-      runSdkExit(
-        // @ts-expect-error JavaScript callers can provide both mutually exclusive selectors.
-        transfers.removeTransfers({ filter: "all", ids: [1] }),
-        handler,
-        { accessToken: "token-123" },
-      ),
-      runSdkExit(
-        // @ts-expect-error JavaScript callers can provide unsupported filter literals.
-        transfers.removeTransfers({ filter: "pending" }),
-        handler,
-        { accessToken: "token-123" },
-      ),
-      runSdkExit(transfers.retryTransfer(0), handler, { accessToken: "token-123" }),
-      runSdkExit(transfers.reannounceTransfer(0), handler, { accessToken: "token-123" }),
-      runSdkExit(transfers.stopTransferRecording(0), handler, { accessToken: "token-123" }),
-    ]);
+        Effect.exit(provideSdk(zips.createZip({ file_ids: [1], unexpected: true }), handler)),
+        Effect.exit(provideSdk(zips.getZip(0), handler)),
+        Effect.exit(provideSdk(zips.cancelZip(0), handler)),
+      ]);
 
-    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-      failures.map(() => expect.any(PutioValidationError)),
-    );
-    expect(requestCount).toBe(0);
-  });
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioValidationError)),
+      );
+      expect(requestCount).toBe(0);
+    }),
+  );
 
-  it("rejects invalid trash and zip inputs before transport", async () => {
-    let requestCount = 0;
-
-    const handler = () => {
-      requestCount += 1;
-
-      return jsonResponse({ status: "OK" });
-    };
-
-    const failures = await Promise.all([
-      // @ts-expect-error JavaScript callers can provide null instead of a query object.
-      runSdkExit(trash.listTrash(null), handler),
-      runSdkExit(trash.listTrash({ per_page: 0 }), handler),
-      // @ts-expect-error JavaScript callers can provide unknown query properties.
-      runSdkExit(trash.listTrash({ unexpected: true }), handler),
-      runSdkExit(trash.continueTrash(""), handler),
-      runSdkExit(trash.continueTrash("cursor", { per_page: 0 }), handler),
-      // @ts-expect-error JavaScript callers can provide null instead of a query object.
-      runSdkExit(trash.continueTrash("cursor", null), handler),
-      // @ts-expect-error JavaScript callers can omit both bulk selectors.
-      runSdkExit(trash.restoreTrash({}), handler),
-      runSdkExit(trash.restoreTrash({ cursor: "", useCursor: true }), handler),
-      runSdkExit(trash.restoreTrash({ file_ids: [] }), handler),
-      runSdkExit(
-        // @ts-expect-error Cursor mode cannot also carry explicit file IDs.
-        trash.restoreTrash({ cursor: "cursor", file_ids: [1], useCursor: true }),
-        handler,
-      ),
-      runSdkExit(trash.deleteTrash({ file_ids: [0] }), handler),
-      runSdkExit(
-        // @ts-expect-error File-ID mode cannot also carry a cursor.
-        trash.deleteTrash({ cursor: "cursor", file_ids: [1], useCursor: false }),
-        handler,
-      ),
-      // @ts-expect-error Cursor selection must opt into cursor serialization.
-      runSdkExit(trash.deleteTrash({ cursor: "cursor" }), handler),
-      // @ts-expect-error JavaScript callers can provide null instead of a request object.
-      runSdkExit(zips.createZip(null), handler),
-      runSdkExit(zips.createZip({}), handler),
-      runSdkExit(zips.createZip({ cursor: "" }), handler),
-      runSdkExit(zips.createZip({ file_ids: [] }), handler),
-      runSdkExit(zips.createZip({ file_ids: [0] }), handler),
-      runSdkExit(zips.createZip({ cursor: "cursor", exclude_ids: [0] }), handler),
-      // @ts-expect-error JavaScript callers can provide unknown request properties.
-      runSdkExit(zips.createZip({ file_ids: [1], unexpected: true }), handler),
-      runSdkExit(zips.getZip(0), handler),
-      runSdkExit(zips.cancelZip(0), handler),
-    ]);
-
-    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-      failures.map(() => expect.any(PutioValidationError)),
-    );
-    expect(requestCount).toBe(0);
-  });
-
-  it("maps representative operation failures in operational domains", async () => {
-    const failure = await runSdkExit(
-      sharing.getPublicShareFileUrl(7),
-      () =>
-        jsonResponse(
-          {
-            error_message: "Missing",
-            status_code: 404,
-          },
-          { status: 404 },
+  it.effect("maps representative operation failures in operational domains", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.exit(
+        provideSdk(
+          sharing.getPublicShareFileUrl(7),
+          () =>
+            jsonResponse(
+              {
+                error_message: "Missing",
+                status_code: 404,
+              },
+              { status: 404 },
+            ),
+          { accessToken: "token-123" },
         ),
-      { accessToken: "token-123" },
-    );
+      );
 
-    const error = expectFailure(failure);
-    expect(error).toBeInstanceOf(PutioOperationError);
-    expect(error).toMatchObject({
-      domain: "sharing",
-      operation: "getPublicShareFileUrl",
-      status: 404,
-    });
+      const error = expectFailure(failure);
+      expect(error).toBeInstanceOf(PutioOperationError);
+      expect(error).toMatchObject({
+        domain: "sharing",
+        operation: "getPublicShareFileUrl",
+        status: 404,
+      });
 
-    const torrentFailure = await runSdkExit(
-      transfers.getTransferTorrent(11),
-      () =>
-        jsonResponse(
-          {
-            error_message: "Transfer is from a magnet link",
-            error_type: "IS_MAGNET",
-            status_code: 400,
-          },
-          { status: 400 },
+      const torrentFailure = yield* Effect.exit(
+        provideSdk(
+          transfers.getTransferTorrent(11),
+          () =>
+            jsonResponse(
+              {
+                error_message: "Transfer is from a magnet link",
+                error_type: "IS_MAGNET",
+                status_code: 400,
+              },
+              { status: 400 },
+            ),
+          { accessToken: "token-123" },
         ),
-      { accessToken: "token-123" },
-    );
+      );
 
-    expect(expectFailure(torrentFailure)).toBeInstanceOf(PutioOperationError);
-    expect(expectFailure(torrentFailure)).toMatchObject({
-      domain: "transfers",
-      operation: "getTorrent",
-      reason: {
-        errorType: "IS_MAGNET",
-        kind: "error_type",
-      },
-      status: 400,
-    });
+      expect(expectFailure(torrentFailure)).toBeInstanceOf(PutioOperationError);
+      expect(expectFailure(torrentFailure)).toMatchObject({
+        domain: "transfers",
+        operation: "getTorrent",
+        reason: {
+          errorType: "IS_MAGNET",
+          kind: "error_type",
+        },
+        status: 400,
+      });
 
-    const addTrackersFailure = await runSdkExit(
-      transfers.addTransferTrackers({
-        trackers: ["udp://tracker.example:80"],
-        transferId: 11,
-      }),
-      () =>
-        jsonResponse(
-          {
-            error_message: "No trackers were accepted",
-            error_type: "NO_TRACKERS",
-            status_code: 400,
-          },
-          { status: 400 },
+      const addTrackersFailure = yield* Effect.exit(
+        provideSdk(
+          transfers.addTransferTrackers({
+            trackers: ["udp://tracker.example:80"],
+            transferId: 11,
+          }),
+          () =>
+            jsonResponse(
+              {
+                error_message: "No trackers were accepted",
+                error_type: "NO_TRACKERS",
+                status_code: 400,
+              },
+              { status: 400 },
+            ),
+          { accessToken: "token-123" },
         ),
-      { accessToken: "token-123" },
-    );
+      );
 
-    expect(expectFailure(addTrackersFailure)).toBeInstanceOf(PutioOperationError);
-    expect(expectFailure(addTrackersFailure)).toMatchObject({
-      domain: "transfers",
-      operation: "addTrackers",
-      reason: {
-        errorType: "NO_TRACKERS",
-        kind: "error_type",
-      },
-      status: 400,
-    });
+      expect(expectFailure(addTrackersFailure)).toBeInstanceOf(PutioOperationError);
+      expect(expectFailure(addTrackersFailure)).toMatchObject({
+        domain: "transfers",
+        operation: "addTrackers",
+        reason: {
+          errorType: "NO_TRACKERS",
+          kind: "error_type",
+        },
+        status: 400,
+      });
 
-    const reannounceFailure = await runSdkExit(
-      transfers.reannounceTransfer(11),
-      () =>
-        jsonResponse(
-          {
-            error_message: "No such user download",
-            error_type: "TRANSFER_NOT_FOUND",
-            status_code: 404,
-          },
-          { status: 404 },
+      const reannounceFailure = yield* Effect.exit(
+        provideSdk(
+          transfers.reannounceTransfer(11),
+          () =>
+            jsonResponse(
+              {
+                error_message: "No such user download",
+                error_type: "TRANSFER_NOT_FOUND",
+                status_code: 404,
+              },
+              { status: 404 },
+            ),
+          { accessToken: "token-123" },
         ),
-      { accessToken: "token-123" },
-    );
+      );
 
-    expect(expectFailure(reannounceFailure)).toMatchObject({
-      domain: "transfers",
-      operation: "reannounce",
-      reason: {
-        errorType: "TRANSFER_NOT_FOUND",
-        kind: "error_type",
-      },
-      status: 404,
-    });
+      expect(expectFailure(reannounceFailure)).toMatchObject({
+        domain: "transfers",
+        operation: "reannounce",
+        reason: {
+          errorType: "TRANSFER_NOT_FOUND",
+          kind: "error_type",
+        },
+        status: 404,
+      });
 
-    const removeFailure = await runSdkExit(
-      transfers.removeTransfers({ ids: [11] }),
-      () =>
-        jsonResponse(
-          {
-            error_message: "Transfer cannot be removed",
-            status_code: 400,
-          },
-          { status: 400 },
+      const removeFailure = yield* Effect.exit(
+        provideSdk(
+          transfers.removeTransfers({ ids: [11] }),
+          () =>
+            jsonResponse(
+              {
+                error_message: "Transfer cannot be removed",
+                status_code: 400,
+              },
+              { status: 400 },
+            ),
+          { accessToken: "token-123" },
         ),
-      { accessToken: "token-123" },
-    );
+      );
 
-    expect(expectFailure(removeFailure)).toBeInstanceOf(PutioOperationError);
-    expect(expectFailure(removeFailure)).toMatchObject({
-      domain: "transfers",
-      operation: "remove",
-      status: 400,
-    });
-  });
+      expect(expectFailure(removeFailure)).toBeInstanceOf(PutioOperationError);
+      expect(expectFailure(removeFailure)).toMatchObject({
+        domain: "transfers",
+        operation: "remove",
+        status: 400,
+      });
+    }),
+  );
 });

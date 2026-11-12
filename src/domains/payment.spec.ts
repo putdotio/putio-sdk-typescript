@@ -1,5 +1,6 @@
+import { Effect } from "effect";
 import { PutioOperationError, PutioValidationError } from "../core/errors.js";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it } from "@effect/vitest";
 
 import * as payment from "./payment.js";
 import {
@@ -7,8 +8,7 @@ import {
   getAuthorizationHeader,
   getFormBody,
   jsonResponse,
-  runSdkEffect,
-  runSdkExit,
+  provideSdk,
 } from "../../test/support/sdk-test.js";
 
 const paymentInfo = {
@@ -84,477 +84,506 @@ describe("payment domain", () => {
     ).toMatchObject({ type: "success" });
   });
 
-  it("covers payment info, lists, and preview flows", async () => {
-    expect(
-      await runSdkEffect(payment.getPaymentInfo(), () => jsonResponse(paymentInfo), {
-        accessToken: "token-123",
-      }),
-    ).toEqual(paymentInfo);
-
-    expect(
-      await runSdkEffect(
-        payment.getPaymentInfo(),
-        () =>
-          jsonResponse({
-            ...paymentInfo,
-            last_payment: {},
-          }),
-        {
+  it.effect("covers payment info, lists, and preview flows", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* provideSdk(payment.getPaymentInfo(), () => jsonResponse(paymentInfo), {
           accessToken: "token-123",
-        },
-      ),
-    ).toEqual({
-      ...paymentInfo,
-      last_payment: {},
-    });
-
-    expect(
-      await runSdkEffect(
-        payment.listPaymentPlans(),
-        () => jsonResponse({ plans: [paymentPlan], status: "OK" }),
-        { accessToken: "token-123" },
-      ),
-    ).toHaveLength(1);
-
-    expect(
-      await runSdkEffect(payment.listPaymentOptions(), (request) => {
-        expect(getAuthorizationHeader(request)).toBeUndefined();
-
-        return jsonResponse({
-          options: [
-            {
-              discount_percent: 0,
-              name: "credit-card",
-              suitable_plan_types: ["subscription"],
-            },
-          ],
-          status: "OK",
-        });
-      }),
-    ).toEqual([
-      {
-        discount_percent: 0,
-        name: "credit-card",
-        suitable_plan_types: ["subscription"],
-      },
-    ]);
-
-    expect(
-      await runSdkEffect(
-        payment.listPaymentHistory({
-          unreported_only: true,
         }),
-        (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/payment/history?unreported_only=true");
+      ).toEqual(paymentInfo);
+
+      expect(
+        yield* provideSdk(
+          payment.getPaymentInfo(),
+          () =>
+            jsonResponse({
+              ...paymentInfo,
+              last_payment: {},
+            }),
+          {
+            accessToken: "token-123",
+          },
+        ),
+      ).toEqual({
+        ...paymentInfo,
+        last_payment: {},
+      });
+
+      expect(
+        yield* provideSdk(
+          payment.listPaymentPlans(),
+          () => jsonResponse({ plans: [paymentPlan], status: "OK" }),
+          { accessToken: "token-123" },
+        ),
+      ).toHaveLength(1);
+
+      expect(
+        yield* provideSdk(payment.listPaymentOptions(), (request) => {
+          expect(getAuthorizationHeader(request)).toBeUndefined();
 
           return jsonResponse({
-            payments: [
+            options: [
               {
-                amount: "9.99",
-                amount_currency: "USD",
-                coupon_code: null,
-                date: "2026-03-17",
-                id: 1,
-                invoice: null,
-                plan: {
-                  name: "Pro",
-                  period_days: 30,
-                  price: "9.99",
-                  type: "subscription",
-                },
-                refunded: false,
-                refunds: [],
-                return_status: "accepted",
-                type: "subscription",
+                discount_percent: 0,
+                name: "credit-card",
+                suitable_plan_types: ["subscription"],
               },
             ],
             status: "OK",
           });
+        }),
+      ).toEqual([
+        {
+          discount_percent: 0,
+          name: "credit-card",
+          suitable_plan_types: ["subscription"],
         },
-        { accessToken: "token-123" },
-      ),
-    ).toHaveLength(1);
+      ]);
 
-    expect(
-      await runSdkEffect(
-        payment.listPaymentInvites(),
-        () =>
-          jsonResponse({
-            status: "OK",
-            vouchers: [{ is_converted: false, url: "https://put.io/voucher", used_by: null }],
+      expect(
+        yield* provideSdk(
+          payment.listPaymentHistory({
+            unreported_only: true,
           }),
-        { accessToken: "token-123" },
-      ),
-    ).toHaveLength(1);
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/payment/history?unreported_only=true");
 
-    expect(
-      await runSdkEffect(
-        payment.previewPaymentChangePlan({
+            return jsonResponse({
+              payments: [
+                {
+                  amount: "9.99",
+                  amount_currency: "USD",
+                  coupon_code: null,
+                  date: "2026-03-17",
+                  id: 1,
+                  invoice: null,
+                  plan: {
+                    name: "Pro",
+                    period_days: 30,
+                    price: "9.99",
+                    type: "subscription",
+                  },
+                  refunded: false,
+                  refunds: [],
+                  return_status: "accepted",
+                  type: "subscription",
+                },
+              ],
+              status: "OK",
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toHaveLength(1);
+
+      expect(
+        yield* provideSdk(
+          payment.listPaymentInvites(),
+          () =>
+            jsonResponse({
+              status: "OK",
+              vouchers: [{ is_converted: false, url: "https://put.io/voucher", used_by: null }],
+            }),
+          { accessToken: "token-123" },
+        ),
+      ).toHaveLength(1);
+
+      expect(
+        yield* provideSdk(
+          payment.previewPaymentChangePlan({
+            coupon_code: "SAVE20",
+            payment_type: "credit-card",
+            plan_path: "pro/monthly",
+          }),
+          (request) => {
+            expect(request.url).toBe(
+              "https://api.put.io/v2/payment/change_plan/pro%2Fmonthly?coupon_code=SAVE20&payment_type=credit-card",
+            );
+
+            return jsonResponse({
+              Fastspring: {
+                charge_amount: "7.99",
+                currency: "USD",
+                prorated_amount: null,
+                refund_amount: null,
+              },
+              Paddle: {
+                charge_amount: "7.99",
+                currency: "USD",
+                next_billing_date: "2026-04-17",
+              },
+              PaddleBilling: {
+                next_billing_date: "2026-04-17",
+              },
+              amount: "7.99",
+              charge_amount: true,
+              credit: null,
+              currency: "USD",
+              current_plan: {
+                plan_type: "subscription",
+                subscription_payment_provider: "Paddle",
+              },
+              is_product_change: true,
+              new_remaining_days: 28,
+              prorated: null,
+              status: "OK",
+              target_plan: {
+                hd_avail: 200,
+                is_trial_subscription: false,
+                new_code: "pro-yearly",
+                period_days: 365,
+                plan_code: "pro-yearly",
+                plan_name: "Pro Yearly",
+                plan_type: "subscription",
+                price: "99.99",
+                simulated_expiration: null,
+                subscription_trial_period: null,
+              },
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ currency: "USD", charge_amount: true });
+    }),
+  );
+
+  it.effect("covers payment change submission and follow-up mutation endpoints", () =>
+    Effect.gen(function* () {
+      const checkout = yield* provideSdk(
+        payment.submitPaymentChangePlan({
+          confirmation_code: "confirm",
           coupon_code: "SAVE20",
           payment_type: "credit-card",
           plan_path: "pro/monthly",
         }),
         (request) => {
           expect(request.url).toBe(
-            "https://api.put.io/v2/payment/change_plan/pro%2Fmonthly?coupon_code=SAVE20&payment_type=credit-card",
+            "https://api.put.io/v2/payment/change_plan/pro%2Fmonthly?coupon_code=SAVE20",
           );
+          const body = getFormBody(request);
+          expect(body.get("confirmation_code")).toBe("confirm");
+          expect(body.get("payment_type")).toBe("credit-card");
 
           return jsonResponse({
-            Fastspring: {
-              charge_amount: "7.99",
-              currency: "USD",
-              prorated_amount: null,
-              refund_amount: null,
-            },
-            Paddle: {
-              charge_amount: "7.99",
-              currency: "USD",
-              next_billing_date: "2026-04-17",
-            },
-            PaddleBilling: {
-              next_billing_date: "2026-04-17",
-            },
-            amount: "7.99",
-            charge_amount: true,
-            credit: null,
-            currency: "USD",
-            current_plan: {
-              plan_type: "subscription",
-              subscription_payment_provider: "Paddle",
-            },
-            is_product_change: true,
-            new_remaining_days: 28,
-            prorated: null,
             status: "OK",
-            target_plan: {
-              hd_avail: 200,
-              is_trial_subscription: false,
-              new_code: "pro-yearly",
-              period_days: 365,
-              plan_code: "pro-yearly",
-              plan_name: "Pro Yearly",
-              plan_type: "subscription",
-              price: "99.99",
-              simulated_expiration: null,
-              subscription_trial_period: null,
-            },
+            urls: [
+              {
+                provider: "Fastspring",
+                type: "credit-card",
+                url: "https://checkout.put.io",
+              },
+              {
+                price_id: "pri_123",
+                provider: "PaddleBilling",
+                type: "credit-card",
+              },
+            ],
           });
         },
         { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ currency: "USD", charge_amount: true });
-  });
+      );
 
-  it("covers payment change submission and follow-up mutation endpoints", async () => {
-    const checkout = await runSdkEffect(
-      payment.submitPaymentChangePlan({
-        confirmation_code: "confirm",
-        coupon_code: "SAVE20",
-        payment_type: "credit-card",
-        plan_path: "pro/monthly",
-      }),
-      (request) => {
-        expect(request.url).toBe(
-          "https://api.put.io/v2/payment/change_plan/pro%2Fmonthly?coupon_code=SAVE20",
-        );
-        const body = getFormBody(request);
-        expect(body.get("confirmation_code")).toBe("confirm");
-        expect(body.get("payment_type")).toBe("credit-card");
+      expect(payment.classifyPaymentChangePlanResponse(checkout)).toMatchObject({
+        type: "checkout",
+      });
 
-        return jsonResponse({
-          status: "OK",
-          urls: [
-            {
-              provider: "Fastspring",
-              type: "credit-card",
-              url: "https://checkout.put.io",
-            },
-            {
-              price_id: "pri_123",
-              provider: "PaddleBilling",
-              type: "credit-card",
-            },
-          ],
-        });
-      },
-      { accessToken: "token-123" },
-    );
+      expect(
+        yield* provideSdk(
+          payment.confirmFastspringOrder("ref-1"),
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/payment/fs-confirm/ref-1");
 
-    expect(payment.classifyPaymentChangePlanResponse(checkout)).toMatchObject({
-      type: "checkout",
-    });
+            return jsonResponse({ confirmed: true, status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toBe(true);
 
-    expect(
-      await runSdkEffect(
-        payment.confirmFastspringOrder("ref-1"),
+      yield* provideSdk(
+        payment.stopPaymentSubscription(),
         (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/payment/fs-confirm/ref-1");
+          expect(request.method).toBe("POST");
+          expect(new URL(request.url).pathname).toBe("/v2/payment/stop_subscription");
 
-          return jsonResponse({ confirmed: true, status: "OK" });
+          return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
-      ),
-    ).toBe(true);
+      );
 
-    await runSdkEffect(
-      payment.stopPaymentSubscription(),
-      (request) => {
-        expect(request.method).toBe("POST");
-        expect(new URL(request.url).pathname).toBe("/v2/payment/stop_subscription");
+      expect(
+        yield* provideSdk(
+          payment.getPaymentVoucherInfo("voucher-1"),
+          (request) => {
+            expect(request.url).toBe("https://api.put.io/v2/payment/redeem_voucher/voucher-1");
 
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
+            return jsonResponse({
+              current_plan: {
+                expiration_date: null,
+                type: "subscription",
+              },
+              new_remaining_days: 10,
+              status: "OK",
+              target_plan: {
+                code: "pro",
+                group_code: "pro",
+                hd_avail: 100,
+                name: "Pro",
+                simulated_expiration: null,
+                type: "subscription",
+              },
+            });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ new_remaining_days: 10 });
 
-    expect(
-      await runSdkEffect(
-        payment.getPaymentVoucherInfo("voucher-1"),
+      yield* provideSdk(
+        payment.redeemPaymentVoucher("voucher-1"),
+        () => jsonResponse({ status: "OK" }),
+        { accessToken: "token-123" },
+      );
+
+      yield* provideSdk(
+        payment.reportPayments([1, 2]),
         (request) => {
-          expect(request.url).toBe("https://api.put.io/v2/payment/redeem_voucher/voucher-1");
+          expect(getFormBody(request).get("payment_ids")).toBe("1,2");
 
-          return jsonResponse({
-            current_plan: {
-              expiration_date: null,
-              type: "subscription",
-            },
-            new_remaining_days: 10,
-            status: "OK",
-            target_plan: {
-              code: "pro",
-              group_code: "pro",
-              hd_avail: 100,
-              name: "Pro",
-              simulated_expiration: null,
-              type: "subscription",
-            },
-          });
+          return jsonResponse({ status: "OK" });
         },
         { accessToken: "token-123" },
-      ),
-    ).toMatchObject({ new_remaining_days: 10 });
+      );
 
-    await runSdkEffect(
-      payment.redeemPaymentVoucher("voucher-1"),
-      () => jsonResponse({ status: "OK" }),
-      { accessToken: "token-123" },
-    );
-
-    await runSdkEffect(
-      payment.reportPayments([1, 2]),
-      (request) => {
-        expect(getFormBody(request).get("payment_ids")).toBe("1,2");
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    await runSdkEffect(
-      payment.createPaddleWaitingPayment({
-        checkout_id: "checkout-1",
-        product_id: 5,
-      }),
-      (request) => {
-        const body = getFormBody(request);
-        expect(body.get("checkout_id")).toBe("checkout-1");
-        expect(body.get("product_id")).toBe("5");
-
-        return jsonResponse({ status: "OK" });
-      },
-      { accessToken: "token-123" },
-    );
-
-    expect(
-      await runSdkEffect(
-        payment.getPaddleBillingInvoiceUrl(123),
-        (request) => {
-          expect(request.url).toBe(
-            "https://api.put.io/v2/payment/methods/paddle_billing/invoice/123",
-          );
-
-          return jsonResponse({ url: "https://paddle.test/invoice.pdf" });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toBe("https://paddle.test/invoice.pdf");
-
-    expect(
-      await runSdkEffect(
-        payment.createPaddleBillingUpdatePaymentMethodTransaction(456),
-        (request) => {
-          expect(request.url).toBe(
-            "https://api.put.io/v2/payment/methods/paddle_billing/update_payment_method/456",
-          );
-
-          return jsonResponse({ transaction_id: "txn_123" });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toBe("txn_123");
-
-    expect(
-      await runSdkEffect(
-        payment.createOpenNodeCharge("plan/path"),
-        (request) => {
-          expect(getFormBody(request).get("plan_fs_path")).toBe("plan/path");
-
-          return jsonResponse({
-            opennode: { checkout_url: "https://checkout.opennode.com" },
-            status: "OK",
-          });
-        },
-        { accessToken: "token-123" },
-      ),
-    ).toBe("https://checkout.opennode.com");
-  });
-
-  it("rejects invalid payment inputs before transport", async () => {
-    let requestCount = 0;
-
-    const handler = () => {
-      requestCount += 1;
-
-      return jsonResponse({ status: "OK" });
-    };
-
-    const failures = await Promise.all([
-      // @ts-expect-error JavaScript callers can provide null instead of a query object.
-      runSdkExit(payment.listPaymentHistory(null), handler),
-      runSdkExit(payment.previewPaymentChangePlan({ plan_path: "" }), handler),
-      runSdkExit(
-        payment.previewPaymentChangePlan({
-          // @ts-expect-error JavaScript callers can provide unsupported payment types.
-          payment_type: "cash",
-          plan_path: "pro/monthly",
+      yield* provideSdk(
+        payment.createPaddleWaitingPayment({
+          checkout_id: "checkout-1",
+          product_id: 5,
         }),
-        handler,
-      ),
-      runSdkExit(
-        payment.submitPaymentChangePlan({
-          plan_path: "pro/monthly",
-          // @ts-expect-error JavaScript callers can provide unknown request properties.
-          unexpected: true,
-        }),
-        handler,
-      ),
-      runSdkExit(payment.confirmFastspringOrder(""), handler),
-      runSdkExit(payment.getPaymentVoucherInfo(""), handler),
-      runSdkExit(payment.redeemPaymentVoucher(""), handler),
-      runSdkExit(payment.reportPayments([]), handler),
-      runSdkExit(payment.reportPayments([0]), handler),
-      runSdkExit(payment.createPaddleWaitingPayment({ checkout_id: "", product_id: 1 }), handler),
-      runSdkExit(
-        payment.createPaddleWaitingPayment({ checkout_id: "checkout", product_id: 0 }),
-        handler,
-      ),
-      runSdkExit(payment.getPaddleBillingInvoiceUrl(0), handler),
-      runSdkExit(payment.createPaddleBillingUpdatePaymentMethodTransaction(1.5), handler),
-      runSdkExit(payment.createOpenNodeCharge(""), handler),
-    ]);
+        (request) => {
+          const body = getFormBody(request);
+          expect(body.get("checkout_id")).toBe("checkout-1");
+          expect(body.get("product_id")).toBe("5");
 
-    expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-      failures.map(() => expect.any(PutioValidationError)),
-    );
-    expect(requestCount).toBe(0);
-  });
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
 
-  it("maps payment operation failures", async () => {
-    const failure = await runSdkExit(
-      payment.submitPaymentChangePlan({
-        plan_path: "pro/monthly",
-      }),
-      () =>
-        jsonResponse(
-          {
-            error_message: "Coupon already used",
-            error_type: "PAYMENT_COUPON_CODE_NO_LONGER_AVAILABLE",
-            status_code: 410,
+      expect(
+        yield* provideSdk(
+          payment.getPaddleBillingInvoiceUrl(123),
+          (request) => {
+            expect(request.url).toBe(
+              "https://api.put.io/v2/payment/methods/paddle_billing/invoice/123",
+            );
+
+            return jsonResponse({ url: "https://paddle.test/invoice.pdf" });
           },
-          { status: 410 },
+          { accessToken: "token-123" },
         ),
-      { accessToken: "token-123" },
-    );
+      ).toBe("https://paddle.test/invoice.pdf");
 
-    const error = expectFailure(failure);
-    expect(error).toBeInstanceOf(PutioOperationError);
-    expect(error).toMatchObject({
-      domain: "payment",
-      operation: "submitChangePlan",
-      status: 410,
-    });
+      expect(
+        yield* provideSdk(
+          payment.createPaddleBillingUpdatePaymentMethodTransaction(456),
+          (request) => {
+            expect(request.url).toBe(
+              "https://api.put.io/v2/payment/methods/paddle_billing/update_payment_method/456",
+            );
 
-    const paddleBillingSubmitFailure = await runSdkExit(
-      payment.submitPaymentChangePlan({
-        coupon_code: "BAD",
-        plan_path: "pro/monthly",
-      }),
-      () =>
-        jsonResponse(
-          {
-            error_message: "Coupon is invalid.",
-            error_type: "PADDLE_BILLING_INVALID_COUPON",
-            status_code: 400,
+            return jsonResponse({ transaction_id: "txn_123" });
           },
-          { status: 400 },
+          { accessToken: "token-123" },
         ),
-      { accessToken: "token-123" },
-    );
+      ).toBe("txn_123");
 
-    const paddleBillingSubmitError = expectFailure(paddleBillingSubmitFailure);
-    expect(paddleBillingSubmitError).toBeInstanceOf(PutioOperationError);
-    expect(paddleBillingSubmitError).toMatchObject({
-      domain: "payment",
-      operation: "submitChangePlan",
-      reason: {
-        errorType: "PADDLE_BILLING_INVALID_COUPON",
-        kind: "error_type",
-      },
-      status: 400,
-    });
+      expect(
+        yield* provideSdk(
+          payment.createOpenNodeCharge("plan/path"),
+          (request) => {
+            expect(getFormBody(request).get("plan_fs_path")).toBe("plan/path");
 
-    const invoiceFailure = await runSdkExit(
-      payment.getPaddleBillingInvoiceUrl(123),
-      () =>
-        jsonResponse(
-          {
-            error_message: "Cannot find Paddle Billing payment.",
-            error_type: "PADDLE_BILLING_PAYMENT_NOT_FOUND",
-            status_code: 404,
+            return jsonResponse({
+              opennode: { checkout_url: "https://checkout.opennode.com" },
+              status: "OK",
+            });
           },
-          { status: 404 },
+          { accessToken: "token-123" },
         ),
-      { accessToken: "token-123" },
-    );
+      ).toBe("https://checkout.opennode.com");
+    }),
+  );
 
-    const invoiceError = expectFailure(invoiceFailure);
-    expect(invoiceError).toBeInstanceOf(PutioOperationError);
-    expect(invoiceError).toMatchObject({
-      domain: "payment",
-      operation: "getPaddleBillingInvoiceUrl",
-      status: 404,
-    });
+  it.effect("rejects invalid payment inputs before transport", () =>
+    Effect.gen(function* () {
+      let requestCount = 0;
 
-    const updateFailure = await runSdkExit(
-      payment.createPaddleBillingUpdatePaymentMethodTransaction(456),
-      () =>
-        jsonResponse(
-          {
-            error_message: "Paddle Billing subscription is canceled.",
-            error_type: "PADDLE_BILLING_SUBSCRIPTION_CANCELED",
-            status_code: 404,
-          },
-          { status: 404 },
+      const handler = () => {
+        requestCount += 1;
+
+        return jsonResponse({ status: "OK" });
+      };
+
+      const failures = yield* Effect.all([
+        // @ts-expect-error JavaScript callers can provide null instead of a query object.
+        Effect.exit(provideSdk(payment.listPaymentHistory(null), handler)),
+        Effect.exit(provideSdk(payment.previewPaymentChangePlan({ plan_path: "" }), handler)),
+        Effect.exit(
+          provideSdk(
+            payment.previewPaymentChangePlan({
+              // @ts-expect-error JavaScript callers can provide unsupported payment types.
+              payment_type: "cash",
+              plan_path: "pro/monthly",
+            }),
+            handler,
+          ),
         ),
-      { accessToken: "token-123" },
-    );
+        Effect.exit(
+          provideSdk(
+            payment.submitPaymentChangePlan({
+              plan_path: "pro/monthly",
+              // @ts-expect-error JavaScript callers can provide unknown request properties.
+              unexpected: true,
+            }),
+            handler,
+          ),
+        ),
+        Effect.exit(provideSdk(payment.confirmFastspringOrder(""), handler)),
+        Effect.exit(provideSdk(payment.getPaymentVoucherInfo(""), handler)),
+        Effect.exit(provideSdk(payment.redeemPaymentVoucher(""), handler)),
+        Effect.exit(provideSdk(payment.reportPayments([]), handler)),
+        Effect.exit(provideSdk(payment.reportPayments([0]), handler)),
+        Effect.exit(
+          provideSdk(
+            payment.createPaddleWaitingPayment({ checkout_id: "", product_id: 1 }),
+            handler,
+          ),
+        ),
+        Effect.exit(
+          provideSdk(
+            payment.createPaddleWaitingPayment({ checkout_id: "checkout", product_id: 0 }),
+            handler,
+          ),
+        ),
+        Effect.exit(provideSdk(payment.getPaddleBillingInvoiceUrl(0), handler)),
+        Effect.exit(
+          provideSdk(payment.createPaddleBillingUpdatePaymentMethodTransaction(1.5), handler),
+        ),
+        Effect.exit(provideSdk(payment.createOpenNodeCharge(""), handler)),
+      ]);
 
-    const updateError = expectFailure(updateFailure);
-    expect(updateError).toBeInstanceOf(PutioOperationError);
-    expect(updateError).toMatchObject({
-      domain: "payment",
-      operation: "createPaddleBillingUpdatePaymentMethodTransaction",
-      status: 404,
-    });
-  });
+      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
+        failures.map(() => expect.any(PutioValidationError)),
+      );
+      expect(requestCount).toBe(0);
+    }),
+  );
+
+  it.effect("maps payment operation failures", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.exit(
+        provideSdk(
+          payment.submitPaymentChangePlan({
+            plan_path: "pro/monthly",
+          }),
+          () =>
+            jsonResponse(
+              {
+                error_message: "Coupon already used",
+                error_type: "PAYMENT_COUPON_CODE_NO_LONGER_AVAILABLE",
+                status_code: 410,
+              },
+              { status: 410 },
+            ),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      const error = expectFailure(failure);
+      expect(error).toBeInstanceOf(PutioOperationError);
+      expect(error).toMatchObject({
+        domain: "payment",
+        operation: "submitChangePlan",
+        status: 410,
+      });
+
+      const paddleBillingSubmitFailure = yield* Effect.exit(
+        provideSdk(
+          payment.submitPaymentChangePlan({
+            coupon_code: "BAD",
+            plan_path: "pro/monthly",
+          }),
+          () =>
+            jsonResponse(
+              {
+                error_message: "Coupon is invalid.",
+                error_type: "PADDLE_BILLING_INVALID_COUPON",
+                status_code: 400,
+              },
+              { status: 400 },
+            ),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      const paddleBillingSubmitError = expectFailure(paddleBillingSubmitFailure);
+      expect(paddleBillingSubmitError).toBeInstanceOf(PutioOperationError);
+      expect(paddleBillingSubmitError).toMatchObject({
+        domain: "payment",
+        operation: "submitChangePlan",
+        reason: {
+          errorType: "PADDLE_BILLING_INVALID_COUPON",
+          kind: "error_type",
+        },
+        status: 400,
+      });
+
+      const invoiceFailure = yield* Effect.exit(
+        provideSdk(
+          payment.getPaddleBillingInvoiceUrl(123),
+          () =>
+            jsonResponse(
+              {
+                error_message: "Cannot find Paddle Billing payment.",
+                error_type: "PADDLE_BILLING_PAYMENT_NOT_FOUND",
+                status_code: 404,
+              },
+              { status: 404 },
+            ),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      const invoiceError = expectFailure(invoiceFailure);
+      expect(invoiceError).toBeInstanceOf(PutioOperationError);
+      expect(invoiceError).toMatchObject({
+        domain: "payment",
+        operation: "getPaddleBillingInvoiceUrl",
+        status: 404,
+      });
+
+      const updateFailure = yield* Effect.exit(
+        provideSdk(
+          payment.createPaddleBillingUpdatePaymentMethodTransaction(456),
+          () =>
+            jsonResponse(
+              {
+                error_message: "Paddle Billing subscription is canceled.",
+                error_type: "PADDLE_BILLING_SUBSCRIPTION_CANCELED",
+                status_code: 404,
+              },
+              { status: 404 },
+            ),
+          { accessToken: "token-123" },
+        ),
+      );
+
+      const updateError = expectFailure(updateFailure);
+      expect(updateError).toBeInstanceOf(PutioOperationError);
+      expect(updateError).toMatchObject({
+        domain: "payment",
+        operation: "createPaddleBillingUpdatePaymentMethodTransaction",
+        status: 404,
+      });
+    }),
+  );
 });

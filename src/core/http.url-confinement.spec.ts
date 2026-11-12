@@ -1,7 +1,8 @@
+import { Effect } from "effect";
 import fc from "fast-check";
 import { describe, expect, it } from "vite-plus/test";
 
-import { jsonResponse, runSdkExit } from "../../test/support/sdk-test.js";
+import { jsonResponse, provideSdk } from "../../test/support/sdk-test.js";
 
 import { PutioConfigurationError, PutioValidationError } from "./errors.js";
 import { OkResponseSchema, buildPutioUrl, requestJson } from "./http.js";
@@ -122,14 +123,16 @@ describe("request URL confinement", () => {
       fc.asyncProperty(fc.constantFrom(...bases), tokenTail, async (base, tail) => {
         const sent: Array<string> = [];
 
-        await runSdkExit(
-          requestJson(OkResponseSchema, { method: "GET", path: `/${tail}` }),
-          (request) => {
-            if (request.headers.has("authorization")) sent.push(request.url);
+        await Effect.runPromiseExit(
+          provideSdk(
+            requestJson(OkResponseSchema, { method: "GET", path: `/${tail}` }),
+            (request) => {
+              if (request.headers.has("authorization")) sent.push(request.url);
 
-            return jsonResponse({ status: "OK" });
-          },
-          { accessToken: "token-123", baseUrl: base },
+              return jsonResponse({ status: "OK" });
+            },
+            { accessToken: "token-123", baseUrl: base },
+          ),
         );
 
         for (const url of sent) expect(new URL(url).origin).toBe(new URL(base).origin);

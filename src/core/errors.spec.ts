@@ -78,7 +78,15 @@ describe("sdk core errors", () => {
       retryAfterSeconds: 0,
     });
 
-    for (const unparseable of ["-5", "1.5", "soon", "99999999999999999999"]) {
+    for (const unparseable of [
+      "-5",
+      "1.5",
+      "soon",
+      "retry in 5",
+      "5 GMT",
+      "Tue, 17 Mar 2026 00:01:30",
+      "99999999999999999999",
+    ]) {
       expect(parse(unparseable)).toEqual({
         retryAfter: unparseable,
         retryAfterSeconds: undefined,

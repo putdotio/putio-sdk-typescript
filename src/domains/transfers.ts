@@ -285,12 +285,6 @@ export const ListTransfersErrorSpec = definePutioOperationErrorSpec({
   ],
 });
 
-export const ContinueTransfersErrorSpec = definePutioOperationErrorSpec({
-  domain: "transfers",
-  operation: "continue",
-  knownErrors: ListTransfersErrorSpec.knownErrors,
-});
-
 export const GetTransferErrorSpec = definePutioOperationErrorSpec({
   domain: "transfers",
   operation: "get",
@@ -397,8 +391,6 @@ export const StopRecordingTransferErrorSpec = definePutioOperationErrorSpec({
 
 export type ListTransfersError = PutioOperationFailure<typeof ListTransfersErrorSpec>;
 
-export type ContinueTransfersError = PutioOperationFailure<typeof ContinueTransfersErrorSpec>;
-
 export type GetTransferError = PutioOperationFailure<typeof GetTransferErrorSpec>;
 
 export type GetTransferTorrentError = PutioOperationFailure<typeof GetTransferTorrentErrorSpec>;
@@ -433,7 +425,7 @@ export const listTransfers = (
 export const continueTransfers = (
   cursor: string,
   query: TransfersListQuery = {},
-): Effect.Effect<TransfersContinueResponse, ContinueTransfersError, PutioSdkContext> =>
+): Effect.Effect<TransfersContinueResponse, ListTransfersError, PutioSdkContext> =>
   decodeAndRun(TransferContinueInputSchema, { cursor, query }, (decodedInput) =>
     requestJson(TransfersContinueEnvelopeSchema, {
       body: {
@@ -446,7 +438,7 @@ export const continueTransfers = (
       path: "/v2/transfers/list/continue",
       query: decodedInput.query,
     }),
-  ).pipe(withOperationErrors(ContinueTransfersErrorSpec));
+  ).pipe(withOperationErrors(ListTransfersErrorSpec));
 
 export const getTransfer = (
   id: number,

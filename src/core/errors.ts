@@ -306,7 +306,8 @@ const getHeader = (headers: Headers, name: string): string | undefined =>
 
 const deltaSecondsPattern = /^\d+$/;
 
-const httpDatePattern = /[a-z]/i;
+const httpDatePattern =
+  /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/;
 
 const parseRetryAfterSeconds = (value: string | undefined): number | undefined => {
   const trimmed = value?.trim();

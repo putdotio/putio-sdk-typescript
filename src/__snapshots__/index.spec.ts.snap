@@ -27,8 +27,6 @@ exports[`sdk root entry > exports the expected top-level public surface 1`] = `
   "ConfirmFastspringOrderErrorSpec",
   "ContinueFilesErrorSpec",
   "ContinuePublicShareFilesErrorSpec",
-  "ContinueSearchErrorSpec",
-  "ContinueTransfersErrorSpec",
   "ContinueTrashErrorSpec",
   "CopyFileErrorSpec",
   "CountWaitingRequestsErrorSpec",

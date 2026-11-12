@@ -798,12 +798,6 @@ export const SearchFilesErrorSpec = definePutioOperationErrorSpec({
   ],
 });
 
-export const ContinueSearchErrorSpec = definePutioOperationErrorSpec({
-  domain: "files",
-  operation: "continueSearch",
-  knownErrors: SearchFilesErrorSpec.knownErrors,
-});
-
 export const CreateFolderErrorSpec = definePutioOperationErrorSpec({
   domain: "files",
   operation: "createFolder",
@@ -944,8 +938,6 @@ export type TouchFilesError = PutioOperationFailure<typeof TouchFilesErrorSpec>;
 export type CanWriteFileError = PutioOperationFailure<typeof CanWriteFileErrorSpec>;
 
 export type SearchFilesError = PutioOperationFailure<typeof SearchFilesErrorSpec>;
-
-export type ContinueSearchError = PutioOperationFailure<typeof ContinueSearchErrorSpec>;
 
 export type CreateFolderError = PutioOperationFailure<typeof CreateFolderErrorSpec>;
 
@@ -1370,7 +1362,7 @@ export const continueSearch = (
   query: {
     readonly per_page?: number;
   } = {},
-): Effect.Effect<FileSearchResponse, ContinueSearchError, PutioSdkContext> =>
+): Effect.Effect<FileSearchResponse, SearchFilesError, PutioSdkContext> =>
   decodeAndRun(FilesContinueInputSchema, { cursor, query }, (decodedInput) =>
     requestJson(FilesSearchEnvelopeSchema, {
       body: {
@@ -1383,7 +1375,7 @@ export const continueSearch = (
       path: "/v2/files/search/continue",
       query: decodedInput.query,
     }),
-  ).pipe(withOperationErrors(ContinueSearchErrorSpec));
+  ).pipe(withOperationErrors(SearchFilesErrorSpec));
 
 export const setFileSort = (
   input: FileSetSortInput,

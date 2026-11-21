@@ -497,6 +497,7 @@ const FileHlsStreamUrlOptionsSchema = Schema.Struct({
 });
 
 const FileHlsMasterPlaylistOptionsSchema = Schema.Struct({
+  downloadToken: NonEmptyStringSchema,
   maxSubtitleCount: Schema.optional(PositiveIntegerSchema),
   playOriginal: Schema.optional(Schema.Boolean),
   subtitleLanguages: Schema.optional(
@@ -1635,10 +1636,11 @@ const FileHlsMasterPlaylistInputSchema = Schema.Struct({
  */
 export const getHlsMasterPlaylist = (
   fileId: number,
-  options: FileHlsMasterPlaylistOptions = {},
+  options: FileHlsMasterPlaylistOptions,
 ): Effect.Effect<string, GetHlsMasterPlaylistError, PutioSdkContext> =>
   decodeAndRun(FileHlsMasterPlaylistInputSchema, { fileId, options }, (decoded) =>
     requestText({
+      auth: { token: decoded.options.downloadToken, type: "token" },
       headers: { accept: "application/vnd.apple.mpegurl, application/x-mpegURL, */*" },
       method: "GET",
       path: `/v2/files/${encodePathSegment(decoded.fileId)}/hls/media.m3u8`,

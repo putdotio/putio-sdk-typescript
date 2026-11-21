@@ -254,11 +254,12 @@ describe("files domain", () => {
       const master = [
         "#EXTM3U",
         '#EXT-X-STREAM-INF:BANDWIDTH=2376462,CODECS="avc1.42c01e,mp4a.40.2",VIDEO-RANGE=PQ',
-        "https://api.put.io/hls/playlist/abc/index-v1-a1.m3u8?oauth_token=token-123",
+        "https://api.put.io/hls/playlist/abc/index-v1-a1.m3u8?oauth_token=download-token-456",
       ].join("\n");
 
       const playlist = yield* provideSdk(
         files.getHlsMasterPlaylist(42, {
+          downloadToken: "download-token-456",
           maxSubtitleCount: 2,
           playOriginal: false,
           subtitleLanguages: ["en", "tr"],
@@ -269,7 +270,7 @@ describe("files domain", () => {
             "https://api.put.io/v2/files/42/hls/media.m3u8?max_subtitle_count=2&original=0&subtitle_languages=en%2Ctr",
           );
           expect(request.headers.get("accept")).toContain("mpegurl");
-          expect(request.headers.get("authorization")).toBe("Token token-123");
+          expect(request.headers.get("authorization")).toBe("Token download-token-456");
 
           return new Response(master, {
             headers: { "content-type": "application/vnd.apple.mpegurl" },
@@ -283,7 +284,10 @@ describe("files domain", () => {
 
       expect(
         yield* provideSdk(
-          files.getHlsMasterPlaylist(42, { playOriginal: true }),
+          files.getHlsMasterPlaylist(42, {
+            downloadToken: "download-token-456",
+            playOriginal: true,
+          }),
           (request) => {
             expect(request.url).toBe("https://api.put.io/v2/files/42/hls/media.m3u8?original=1");
 
@@ -296,7 +300,10 @@ describe("files domain", () => {
       const invalidMedia = expectFailure(
         yield* Effect.exit(
           provideSdk(
-            files.getHlsMasterPlaylist(42, { playOriginal: true }),
+            files.getHlsMasterPlaylist(42, {
+              downloadToken: "download-token-456",
+              playOriginal: true,
+            }),
             () =>
               jsonResponse(
                 {
@@ -326,9 +333,27 @@ describe("files domain", () => {
       expect(
         expectFailure(
           yield* Effect.exit(
-            provideSdk(files.getHlsMasterPlaylist(0), () => emptyResponse(), {
-              accessToken: "token-123",
-            }),
+            provideSdk(
+              files.getHlsMasterPlaylist(0, { downloadToken: "download-token-456" }),
+              () => emptyResponse(),
+              {
+                accessToken: "token-123",
+              },
+            ),
+          ),
+        ),
+      ).toBeInstanceOf(PutioValidationError);
+
+      expect(
+        expectFailure(
+          yield* Effect.exit(
+            provideSdk(
+              files.getHlsMasterPlaylist(42, { downloadToken: "" }),
+              () => emptyResponse(),
+              {
+                accessToken: "token-123",
+              },
+            ),
           ),
         ),
       ).toBeInstanceOf(PutioValidationError);

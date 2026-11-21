@@ -317,6 +317,7 @@ const playlistUrl = await sdk.files.getHlsStreamUrl(fileId, {
 const vlcPlaylistUrl = await sdk.files.getXspfPlaylistUrl(fileId, { downloadToken });
 
 const masterPlaylist = await sdk.files.getHlsMasterPlaylist(fileId, {
+  downloadToken,
   playOriginal: false,
 });
 

@@ -44,6 +44,12 @@ const uploadRequest = await promiseClient.files.createUploadRequest({
   file: new Blob(["hello from bun"]),
   fileName: "bun.txt",
 });
+if (new URL(uploadRequest.url).searchParams.has("oauth_token")) {
+  throw new Error("Upload request URL must not carry oauth_token");
+}
+if (uploadRequest.headers.Authorization !== "Token test-token") {
+  throw new Error("Bun upload request did not send Authorization header");
+}
 await promiseClient.dispose();
 
 const effectClient = createPutioSdkEffectClient();

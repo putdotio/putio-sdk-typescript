@@ -519,8 +519,11 @@ describe("sdk client factories", () => {
         fileName: "hello.txt",
       }),
     ).toMatchObject({
+      headers: {
+        Authorization: "Token token-123",
+      },
       method: "POST",
-      url: "https://upload.put.io/v2/files/upload?oauth_token=token-123",
+      url: "https://upload.put.io/v2/files/upload",
     });
     expect(
       client.oauth.buildAuthorizeUrl({
@@ -528,11 +531,17 @@ describe("sdk client factories", () => {
       }),
     ).toBe("https://api.put.io/v2/oauth2/authorize?oauth_token=token-123");
     expect(
-      client.oauth.buildIconUrl({
+      client.oauth.buildIconRequest({
         id: 5,
         oauthToken: "token-123",
       }),
-    ).toBe("https://api.put.io/v2/oauth/apps/5/icon?oauth_token=token-123");
+    ).toEqual({
+      headers: {
+        Authorization: "Token token-123",
+      },
+      method: "GET",
+      url: "https://api.put.io/v2/oauth/apps/5/icon",
+    });
     const grants = client.auth.grants();
 
     await expect(grants).rejects.toBeInstanceOf(PutioOperationError);
@@ -721,9 +730,8 @@ describe("sdk client factories", () => {
     });
 
     expect(requestedUrls).toEqual(["https://api.snapshot.test/v2/config/snapshot"]);
-    expect(uploadRequest.url).toBe(
-      "https://upload.snapshot.test/v2/files/upload?oauth_token=token-123",
-    );
+    expect(uploadRequest.url).toBe("https://upload.snapshot.test/v2/files/upload");
+    expect(uploadRequest.headers).toEqual({ Authorization: "Token token-123" });
     expect(new URL(loginUrl).origin).toBe("https://app.snapshot.test");
 
     await client.dispose();

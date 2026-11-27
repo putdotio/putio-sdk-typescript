@@ -223,18 +223,28 @@ export const buildOAuthAuthorizeUrl = (options: {
     oauth_token: options.oauthToken,
   });
 
-export const buildOAuthAppIconUrl = (options: {
+export type OAuthAppIconRequestDescriptor = {
+  readonly headers: {
+    readonly Authorization: string;
+  };
+  readonly method: "GET";
+  readonly url: string;
+};
+
+export const buildOAuthAppIconRequest = (options: {
   readonly baseUrl?: string | URL;
   readonly id: number;
   readonly oauthToken: string;
-}) =>
-  buildPutioUrl(
+}): OAuthAppIconRequestDescriptor => ({
+  headers: {
+    Authorization: `Token ${options.oauthToken}`,
+  },
+  method: "GET",
+  url: buildPutioUrl(
     options.baseUrl ?? DEFAULT_PUTIO_API_BASE_URL,
     `/v2/oauth/apps/${encodePathSegment(options.id)}/icon`,
-    {
-      oauth_token: options.oauthToken,
-    },
-  );
+  ),
+});
 
 export const queryOAuthApps = (): Effect.Effect<
   ReadonlyArray<MyOAuthApp>,

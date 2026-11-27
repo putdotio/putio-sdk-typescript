@@ -14,7 +14,7 @@ const DISPOSABLE_ICON_BYTES = Uint8Array.from(
 );
 
 describe("oauth live", () => {
-  const { authClient } = createLiveTokenClients();
+  const { authClient, tokens } = createLiveTokenClients();
 
   test("popular apps report icon presence", async () => {
     const apps = await authClient.oauth.getPopularApps();
@@ -80,6 +80,20 @@ describe("oauth live", () => {
           type: "image/png",
         }),
       });
+
+      const iconRequest = authClient.oauth.buildIconRequest({
+        id: created.app.id,
+        oauthToken: tokens.firstPartyToken,
+      });
+
+      expect(new URL(iconRequest.url).searchParams.has("oauth_token")).toBe(false);
+
+      const iconResponse = await fetch(iconRequest.url, {
+        headers: iconRequest.headers,
+        method: iconRequest.method,
+      });
+
+      expect(iconResponse.status).toBe(200);
 
       const regeneratedToken = await authClient.oauth.regenerateToken(created.app.id);
       expect(regeneratedToken.length).toBeGreaterThan(0);

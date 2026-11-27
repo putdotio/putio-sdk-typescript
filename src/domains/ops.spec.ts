@@ -272,11 +272,17 @@ describe("operational domain boundaries", () => {
       );
 
       expect(
-        oauth.buildOAuthAppIconUrl({
+        oauth.buildOAuthAppIconRequest({
           id: 9,
           oauthToken: "token-123",
         }),
-      ).toBe("https://api.put.io/v2/oauth/apps/9/icon?oauth_token=token-123");
+      ).toEqual({
+        headers: {
+          Authorization: "Token token-123",
+        },
+        method: "GET",
+        url: "https://api.put.io/v2/oauth/apps/9/icon",
+      });
 
       expect(
         yield* provideSdk(

@@ -254,8 +254,10 @@ const uploadRequest = await promiseClient.files.createUploadRequest({
   file: new Blob(["hello from node"]),
   fileName: "node.txt",
 });
-const uploadToken = new URL(uploadRequest.url).searchParams.get("oauth_token");
-if (uploadToken !== "test-auth-token") {
+if (new URL(uploadRequest.url).searchParams.has("oauth_token")) {
+  throw new Error("Upload request URL must not carry oauth_token");
+}
+if (uploadRequest.headers.Authorization !== "Token test-auth-token") {
   throw new Error("Promise access-token replacement did not reach the upload request");
 }
 promiseClient.setAccessToken(undefined);

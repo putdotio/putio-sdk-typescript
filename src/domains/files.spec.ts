@@ -531,7 +531,10 @@ describe("files domain", () => {
       );
 
       expect(uploadRequest.method).toBe("POST");
-      expect(uploadRequest.url).toBe("https://upload.put.io/v2/files/upload?oauth_token=token-123");
+      expect(uploadRequest.url).toBe("https://upload.put.io/v2/files/upload");
+      expect(uploadRequest.headers).toEqual({
+        Authorization: "Token token-123",
+      });
       expect(uploadRequest.body.get("filename")).toBe("hello.txt");
       expect(uploadRequest.body.get("parent_id")).toBe("7");
 

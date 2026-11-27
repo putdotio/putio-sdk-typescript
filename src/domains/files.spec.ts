@@ -1510,6 +1510,21 @@ describe("files domain", () => {
         { accessToken: "token-123" },
       );
 
+      yield* provideSdk(
+        files.setFilesWatchStatus({
+          ids: [9],
+          watched: false,
+        }),
+        (request) => {
+          const body = getFormBody(request);
+          expect(body.get("file_ids")).toBe("9");
+          expect(body.get("watched")).toBe("");
+
+          return emptyResponse({ status: 200 });
+        },
+        { accessToken: "token-123" },
+      );
+
       expect(
         yield* provideSdk(
           files.extractFiles({

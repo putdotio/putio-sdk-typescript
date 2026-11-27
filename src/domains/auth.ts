@@ -831,7 +831,8 @@ export const verifyTOTP = (
     (decodedInput) =>
       requestJson(VerifyTOTPEnvelopeSchema, {
         auth: {
-          type: "none",
+          token: decodedInput.twoFactorScopedToken,
+          type: "token",
         },
         body: {
           type: "form",
@@ -841,9 +842,6 @@ export const verifyTOTP = (
         },
         method: "POST",
         path: "/v2/two_factor/verify/totp",
-        query: {
-          oauth_token: decodedInput.twoFactorScopedToken,
-        },
       }).pipe(selectJsonFields("token", "user_id")),
   ).pipe(withOperationErrors(VerifyTOTPErrorSpec));
 

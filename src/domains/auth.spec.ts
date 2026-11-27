@@ -380,9 +380,8 @@ describe("auth domain", () => {
 
       expect(
         yield* provideSdk(verifyTOTP("temp-token", "123456"), (request) => {
-          expect(request.url).toBe(
-            "https://api.put.io/v2/two_factor/verify/totp?oauth_token=temp-token",
-          );
+          expect(request.url).toBe("https://api.put.io/v2/two_factor/verify/totp");
+          expect(request.headers.get("authorization")).toBe("Token temp-token");
           expect(getFormBody(request).get("code")).toBe("123456");
 
           return jsonResponse({

@@ -278,6 +278,45 @@ test("files start_from roundtrip", async () => {
   }
 });
 
+test("files watch-status marks watched and unwatched", async () => {
+  const video = await requireOwnedVideoFixture(authClient);
+  const original = await authClient.files.getStartFrom(video.id);
+
+  try {
+    if (original !== 0) {
+      await authClient.files.setStartFrom({
+        file_id: video.id,
+        time: 0,
+      });
+    }
+
+    await authClient.files.setWatchStatus({
+      ids: [video.id],
+      watched: true,
+    });
+
+    assert(
+      (await authClient.files.getStartFrom(video.id)) === 1,
+      "expected watched: true to set start_from to 1",
+    );
+
+    await authClient.files.setWatchStatus({
+      ids: [video.id],
+      watched: false,
+    });
+
+    assert(
+      (await authClient.files.getStartFrom(video.id)) === 0,
+      "expected watched: false to clear start_from to 0",
+    );
+  } finally {
+    await authClient.files.setStartFrom({
+      file_id: video.id,
+      time: original,
+    });
+  }
+});
+
 test("files next-file and next-video decode", async () => {
   const video = await requireOwnedVideoFixture(authClient);
 

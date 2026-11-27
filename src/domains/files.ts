@@ -1809,7 +1809,7 @@ export const setFilesWatchStatus = (
         type: "form",
         value: {
           ...toCursorSelectionForm(decodedSelection),
-          watched: decodedSelection.watched,
+          watched: decodedSelection.watched ? "true" : "",
         },
       },
       method: "POST",

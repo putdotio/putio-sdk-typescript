@@ -148,7 +148,7 @@ import type {
   PutioSecret,
 } from "./http.js";
 import {
-  buildOAuthAppIconUrl,
+  buildOAuthAppIconRequest,
   buildOAuthAuthorizeUrl,
   createOAuthApp,
   deleteOAuthApp,
@@ -660,7 +660,7 @@ const sharedOperationTree = {
   },
   oauth: {
     buildAuthorizeUrl: pure(buildOAuthAuthorizeUrl),
-    buildIconUrl: pure(buildOAuthAppIconUrl),
+    buildIconRequest: pure(buildOAuthAppIconRequest),
     create: effect(createOAuthApp),
     delete: effect(deleteOAuthApp),
     get: effect(getOAuthApp),

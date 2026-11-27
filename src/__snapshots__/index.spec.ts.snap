@@ -297,7 +297,7 @@ exports[`sdk root entry > exports the expected top-level public surface 1`] = `
   "buildFileApiMp4DownloadUrl",
   "buildFileHlsStreamUrl",
   "buildFileXspfPlaylistUrl",
-  "buildOAuthAppIconUrl",
+  "buildOAuthAppIconRequest",
   "buildOAuthAuthorizeUrl",
   "buildPutioUrl",
   "canWriteFile",

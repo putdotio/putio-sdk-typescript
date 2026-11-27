@@ -651,6 +651,9 @@ export type FileUploadInput = {
 
 export type FileUploadRequestDescriptor = {
   readonly body: FormData;
+  readonly headers: {
+    readonly Authorization: string;
+  };
   readonly method: "POST";
   readonly url: string;
 };
@@ -1895,10 +1898,11 @@ export const createFileUploadRequest = (
     resolveRouteContext(decoded.options.oauthToken).pipe(
       Effect.map(({ config, token }) => ({
         body: createFileUploadFormData(decoded.input),
+        headers: {
+          Authorization: `Token ${token}`,
+        },
         method: "POST" as const,
-        url: buildPutioUrl(config.uploadBaseUrl, "/v2/files/upload", {
-          oauth_token: token,
-        }),
+        url: buildPutioUrl(config.uploadBaseUrl, "/v2/files/upload"),
       })),
     ),
   );

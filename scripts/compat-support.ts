@@ -123,9 +123,9 @@ export const createCompatWorkspace = async (name: string): Promise<CompatWorkspa
     packageTarballPath: join(packDirectory, tarballs[0]),
     cleanup: async () => {
       server.closeAllConnections();
-      await new Promise<void>((resolveClose, reject) =>
-        server.close((error) => (error ? reject(error) : resolveClose())),
-      );
+      await new Promise<void>((resolveClose, reject) => {
+        server.close((error) => (error ? reject(error) : resolveClose()));
+      });
       await rm(root, { recursive: true, force: true });
     },
   };

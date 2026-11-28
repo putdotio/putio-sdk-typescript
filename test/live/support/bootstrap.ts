@@ -33,7 +33,10 @@ const THIRD_PARTY_BOOTSTRAP_CALLBACK = "https://example.com/putio-typescript-sdk
 const THIRD_PARTY_BOOTSTRAP_WEBSITE = "https://example.com/putio-typescript-sdk-live";
 const TOTP_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 const decodeBase32 = (value: string): Buffer => {
   const normalized = value.replaceAll(/[\s-]/g, "").replaceAll(/=+$/g, "").toUpperCase();

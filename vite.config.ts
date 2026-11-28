@@ -43,7 +43,6 @@ export default defineConfig({
       "effecttsgo/unsafe-effect-type-assertion": "error",
       "import/no-namespace": "off",
       "no-console": "off",
-      "no-promise-executor-return": "off",
       "react-hooks/rules-of-hooks": "off",
       "typescript/no-empty-object-type": "off",
       "typescript/no-misused-promises": "off",

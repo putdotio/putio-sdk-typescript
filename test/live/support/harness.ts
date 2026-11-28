@@ -75,7 +75,9 @@ export function assertPresent<T>(value: T, message: string): NonNullable<T> {
 }
 
 export const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 export const expectOperationError = (cause: unknown): OperationError =>
   Option.getOrThrowWith(

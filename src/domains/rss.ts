@@ -249,9 +249,12 @@ export type RetryRssFeedItemError = PutioOperationFailure<typeof RetryRssFeedIte
 
 export type RetryAllRssFeedItemsError = PutioOperationFailure<typeof RetryAllRssFeedItemsErrorSpec>;
 
+const toOptionalBooleanFormValue = (value: boolean | undefined): "true" | "false" | undefined =>
+  value === undefined ? undefined : value ? "true" : "false";
+
 const toCreateBody = (params: RssFeedParams) => ({
   delete_old_files: params.delete_old_files ? "on" : undefined,
-  dont_process_whole_feed: params.dont_process_whole_feed,
+  dont_process_whole_feed: toOptionalBooleanFormValue(params.dont_process_whole_feed),
   keyword: params.keyword ?? undefined,
   parent_dir_id: params.parent_dir_id,
   rss_source_url: params.rss_source_url,
@@ -261,7 +264,7 @@ const toCreateBody = (params: RssFeedParams) => ({
 
 const toUpdateBody = (params: RssFeedParams) => ({
   ...toCreateBody(params),
-  delete_old_files: params.delete_old_files,
+  delete_old_files: toOptionalBooleanFormValue(params.delete_old_files),
 });
 
 export const listRssFeeds = (): Effect.Effect<

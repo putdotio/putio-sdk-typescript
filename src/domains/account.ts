@@ -398,6 +398,8 @@ export const saveAccountSettings = (
       }),
   ).pipe(withOperationErrors(SaveAccountSettingsErrorSpec));
 
+const toBooleanFormValue = (value: boolean): "true" | "false" => (value ? "true" : "false");
+
 export const clearAccount = (
   options: AccountClearOptions,
 ): Effect.Effect<Schema.Schema.Type<typeof OkResponseSchema>, PutioSdkError, PutioSdkContext> =>
@@ -405,7 +407,16 @@ export const clearAccount = (
     requestJson(OkResponseSchema, {
       body: {
         type: "form",
-        value: decodedOptions,
+        value: {
+          active_transfers: toBooleanFormValue(decodedOptions.active_transfers),
+          files: toBooleanFormValue(decodedOptions.files),
+          finished_transfers: toBooleanFormValue(decodedOptions.finished_transfers),
+          friends: toBooleanFormValue(decodedOptions.friends),
+          history: toBooleanFormValue(decodedOptions.history),
+          rss_feeds: toBooleanFormValue(decodedOptions.rss_feeds),
+          rss_logs: toBooleanFormValue(decodedOptions.rss_logs),
+          trash: toBooleanFormValue(decodedOptions.trash),
+        },
       },
       method: "POST",
       path: "/v2/account/clear",

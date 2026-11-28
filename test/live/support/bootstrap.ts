@@ -36,7 +36,7 @@ const TOTP_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 const decodeBase32 = (value: string): Buffer => {
-  const normalized = value.replace(/[\s-]/g, "").replace(/=+$/g, "").toUpperCase();
+  const normalized = value.replaceAll(/[\s-]/g, "").replaceAll(/=+$/g, "").toUpperCase();
   const bytes: Array<number> = [];
   let accumulator = 0;
   let bits = 0;

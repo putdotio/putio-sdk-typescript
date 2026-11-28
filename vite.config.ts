@@ -52,7 +52,6 @@ export default defineConfig({
       "unicorn/prefer-at": "off",
       "unicorn/prefer-import-meta-properties": "off",
       "unicorn/prefer-set-has": "off",
-      "unicorn/prefer-string-replace-all": "off",
       "unicorn/prefer-structured-clone": "off",
     },
   },

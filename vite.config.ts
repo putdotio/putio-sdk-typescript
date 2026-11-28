@@ -23,16 +23,6 @@ export default defineConfig({
         },
       },
       {
-        files: [
-          "scripts/bootstrap-live-fixtures.ts",
-          "src/core/client.spec.ts",
-          "src/core/contract-errors.spec.ts",
-        ],
-        rules: {
-          "unicorn/catch-error-name": "off",
-        },
-      },
-      {
         files: ["scripts/**"],
         rules: {
           "no-console": "off",

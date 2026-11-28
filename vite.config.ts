@@ -45,6 +45,12 @@ export default defineConfig({
         },
       },
       {
+        files: ["src/utilities/localized-error.ts"],
+        rules: {
+          "typescript/no-unsafe-call": "off",
+        },
+      },
+      {
         files: [
           "src/core/client.spec.ts",
           "src/core/client.ts",
@@ -69,7 +75,6 @@ export default defineConfig({
       "effecttsgo/schema-number": "error",
       "effecttsgo/unsafe-effect-type-assertion": "error",
       "typescript/no-empty-object-type": "off",
-      "typescript/no-unsafe-call": "off",
       "typescript/no-unsafe-type-assertion": "off",
     },
   },

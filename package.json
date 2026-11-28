@@ -60,12 +60,12 @@
     "verify": "vp pack && effect-tsgo vp check . && vp run lint:package && knip && knip --production --no-gitignore && vp run validate:routes:packed && vp test run --coverage --passWithNoTests"
   },
   "dependencies": {
-    "effect": "4.1.5"
+    "effect": "4.1.7"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
     "@effect/tsgo": "0.74.1",
-    "@effect/vitest": "4.1.5",
+    "@effect/vitest": "4.1.7",
     "@oxlint/plugins": "1.94.0",
     "@types/node": "^26.1.0",
     "@uinaf/oxlint-plugin-no-comments": "1.1.0",

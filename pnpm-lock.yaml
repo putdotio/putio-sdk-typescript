@@ -199,8 +199,8 @@ importers:
   .:
     dependencies:
       effect:
-        specifier: 4.1.5
-        version: 4.1.5
+        specifier: 4.1.7
+        version: 4.1.7
     devDependencies:
       '@arethetypeswrong/cli':
         specifier: ^0.18.2
@@ -209,8 +209,8 @@ importers:
         specifier: 0.74.1
         version: 0.74.1
       '@effect/vitest':
-        specifier: 4.1.5
-        version: 4.1.5(effect@4.1.5)(vitest@5.1.1)
+        specifier: 4.1.7
+        version: 4.1.7(effect@4.1.7)(vitest@5.1.1)
       '@oxlint/plugins':
         specifier: 1.94.0
         version: 1.94.0
@@ -340,10 +340,10 @@ packages:
     resolution: {integrity: sha512-SGfx5zK3mMRDxe5Meli8saW07eQPJTwPhUgFsZ+8uNqWLuHoCHK7Xc2Mv0VWc2X0Z/0YDgwdvwx6bgAsxqxPtw==}
     hasBin: true
 
-  '@effect/vitest@4.1.5':
-    resolution: {integrity: sha512-18u1013wkJtSelk1ZYLc/5aUnluTQyDfi2hAemkJW1GQ9qXw4mtPSiSf0AXZPhesmGCvG1Dk2C4JYD2sz+R72w==}
+  '@effect/vitest@4.1.7':
+    resolution: {integrity: sha512-4Rj7db3Zol7HtCkuQ2KZ26KrbIWIKAS2rpvH5s3drB1sMZh93nSaK6zXZ6EOtMtWl2CM/flz7tJ8ADaMCRHUWw==}
     peerDependencies:
-      effect: ^4.1.5
+      effect: ^4.1.7
       vitest: 5.1.1
 
   '@emnapi/core@1.11.2':
@@ -1407,8 +1407,8 @@ packages:
   dom-accessibility-api@0.5.16:
     resolution: {integrity: sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg==}
 
-  effect@4.1.5:
-    resolution: {integrity: sha512-xyR20KhQI0vg2gD8ILUSQRTTESEYJ0JKdP+QD8J37xbwPTqXRxFM/l0+vUVD9fuSvoYruoTqyt33C4FZv1s4TQ==}
+  effect@4.1.7:
+    resolution: {integrity: sha512-8QUe2XO3auHF5r7+bfIDWxyXlLA0sso4Sia1QYP+vrYA7qb3sq1u2eJmhyXGmKc8yZ+TY2SNxPozeMdyKmWing==}
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
@@ -2031,9 +2031,9 @@ snapshots:
       '@effect/tsgo-win32-arm64': 0.74.1
       '@effect/tsgo-win32-x64': 0.74.1
 
-  '@effect/vitest@4.1.5(effect@4.1.5)(vitest@5.1.1)':
+  '@effect/vitest@4.1.7(effect@4.1.7)(vitest@5.1.1)':
     dependencies:
-      effect: 4.1.5
+      effect: 4.1.7
       vitest: 5.1.1(@types/node@26.6.11)(@vitest/browser-preview@5.1.1)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(@voidzero-dev/vite-plus-core@8.3.8001(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(jiti@2.7.0)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1))
 
   '@emnapi/core@1.11.2':
@@ -2693,7 +2693,7 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  effect@4.1.5: {}
+  effect@4.1.7: {}
 
   emoji-regex@8.0.0: {}
 

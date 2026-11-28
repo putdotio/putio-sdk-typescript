@@ -1,4 +1,5 @@
-import { Effect, Schema } from "effect";
+import type { Effect } from "effect";
+import { Schema } from "effect";
 import { toCursorSelectionForm } from "../core/forms.js";
 import { PositiveIntegerSchema, cursorSelectionSchema, decodeAndRun } from "../core/validation.js";
 import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";

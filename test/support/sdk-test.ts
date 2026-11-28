@@ -1,12 +1,13 @@
 import { Cause, Effect, Exit, Layer, Predicate, Schema } from "effect";
 
 import { PutioTransportError } from "../../src/core/errors.js";
-import { PutioHttpClient, PutioSdkConfig, putioSdkLayer } from "../../src/core/http.js";
+import { PutioHttpClient, putioSdkLayer } from "../../src/core/http.js";
 import type {
   PutioHttpClientService,
   PutioHttpRequest,
   PutioSdkOptions,
   PutioSdkContext,
+  PutioSdkConfig,
 } from "../../src/core/http.js";
 import { unparsableJsonBodyError } from "../../src/core/response-body.js";
 

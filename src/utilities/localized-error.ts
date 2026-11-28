@@ -1,13 +1,14 @@
 import { Data, Predicate, Schema } from "effect";
 
-import {
+import { PutioErrorEnvelopeSchema } from "../core/errors.js";
+import type {
+  PutioErrorEnvelope,
+  PutioKnownOperationErrorContract,
   PutioApiError,
   PutioAuthError,
-  PutioErrorEnvelopeSchema,
   PutioOperationError,
   PutioRateLimitError,
 } from "../core/errors.js";
-import type { PutioErrorEnvelope, PutioKnownOperationErrorContract } from "../core/errors.js";
 
 export type LocalizedErrorRecoverySuggestionTypeInstruction = {
   readonly type: "instruction";

@@ -1,4 +1,5 @@
-import { Effect, Schema } from "effect";
+import type { Effect } from "effect";
+import { Schema } from "effect";
 import { DEFAULT_PUTIO_API_BASE_URL } from "../core/defaults.js";
 import { decodeAndRun } from "../core/validation.js";
 import {

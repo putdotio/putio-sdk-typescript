@@ -42,7 +42,6 @@ export default defineConfig({
       "preserve-caught-error": "off",
       "react-hooks/rules-of-hooks": "off",
       "typescript/array-type": "off",
-      "typescript/consistent-type-imports": "off",
       "typescript/no-empty-object-type": "off",
       "typescript/no-import-type-side-effects": "off",
       "typescript/no-misused-promises": "off",

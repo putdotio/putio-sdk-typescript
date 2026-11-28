@@ -1,4 +1,5 @@
-import { Effect, Schema } from "effect";
+import type { Effect } from "effect";
+import { Schema } from "effect";
 import { decodeAndRun } from "../core/validation.js";
 
 import { joinCsv } from "../core/forms.js";

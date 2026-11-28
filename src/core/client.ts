@@ -1,4 +1,5 @@
-import { Cause, Context, Effect, Exit, Layer, ManagedRuntime, Predicate, Schema } from "effect";
+import type { Schema } from "effect";
+import { Cause, Context, Effect, Exit, Layer, ManagedRuntime, Predicate } from "effect";
 
 import {
   clearAccount,

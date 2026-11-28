@@ -1,6 +1,11 @@
 import { test } from "vite-plus/test";
 
-import { assert, createLiveTokenClients, rejectsWithOperationError } from "./support/harness.js";
+import {
+  assert,
+  assertPresent,
+  createLiveTokenClients,
+  rejectsWithOperationError,
+} from "./support/harness.js";
 
 const { authClient, oauthClient } = createLiveTokenClients();
 
@@ -15,9 +20,7 @@ test("events list before pagination", async () => {
     per_page: 3,
   });
 
-  assert(firstPage.events.length > 0, "expected at least one event");
-
-  const before = firstPage.events[firstPage.events.length - 1].id;
+  const before = assertPresent(firstPage.events.at(-1), "expected at least one event").id;
 
   const nextPage = await oauthClient.events.list({
     before,

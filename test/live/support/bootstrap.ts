@@ -67,7 +67,7 @@ const generateTotpCode = (secret: string, now = Date.now()): string => {
   counterBuffer.writeUInt32BE(counter >>> 0, 4);
 
   const digest = createHmac("sha1", decodeBase32(secret)).update(counterBuffer).digest();
-  const offset = digest[digest.length - 1] & 0x0f;
+  const offset = (digest.at(-1) ?? 0) & 0x0f;
 
   const code =
     (((digest[offset] & 0x7f) << 24) |

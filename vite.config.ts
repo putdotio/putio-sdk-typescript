@@ -19,6 +19,7 @@ export default defineConfig({
         files: ["**/*.spec.ts"],
         rules: {
           "effecttsgo/unstable-api-usage": "off",
+          "import/no-namespace": "off",
         },
       },
       {
@@ -67,7 +68,6 @@ export default defineConfig({
       "effecttsgo/schema-class-missing-brand": "error",
       "effecttsgo/schema-number": "error",
       "effecttsgo/unsafe-effect-type-assertion": "error",
-      "import/no-namespace": "off",
       "typescript/no-empty-object-type": "off",
       "typescript/no-unsafe-assignment": "off",
       "typescript/no-unsafe-call": "off",

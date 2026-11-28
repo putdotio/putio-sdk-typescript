@@ -37,7 +37,6 @@ const validMatrix = {
       operation: "account.getInfo",
       path: "/v2/account/info",
       rationale: "The SDK exposes the backend account-info contract directly.",
-      source: "putio/api2/account.py:137",
     },
     {
       classification: "equivalent",
@@ -45,14 +44,12 @@ const validMatrix = {
       operation: "files.get",
       path: "/v2/files/:fileId",
       rationale: "The client method uses an input object while preserving the route contract.",
-      source: "putio/api2/files.py:832",
     },
     {
       classification: "excluded",
       method: "GET",
       path: "/v2/docs",
       rationale: "Interactive backend documentation is not an SDK operation.",
-      source: "putio/api2/documentation.py:6",
     },
     {
       classification: "sdk",
@@ -60,7 +57,6 @@ const validMatrix = {
       operation: "auth.grants",
       path: "/v2/oauth/grants/",
       rationale: "The trailing slash is part of the registered blueprint-root route.",
-      source: "putio/api2/oauth_grants.py:28",
     },
     {
       classification: "investigate",
@@ -68,7 +64,6 @@ const validMatrix = {
       method: "POST",
       path: "/v2/files/copy",
       rationale: "The public contract still needs an explicit SDK disposition.",
-      source: "putio/api2/files.py:1381",
     },
   ],
   version: 1,
@@ -79,7 +74,7 @@ describe("route matrix validation", () => {
     expect(validateRouteMatrix(JSON.stringify(validMatrix), clients)).toEqual(validMatrix);
   });
 
-  it("rejects malformed, duplicate, internal, and absolute route evidence", () => {
+  it("rejects malformed, duplicate, and internal route evidence", () => {
     const invalid = {
       routes: [
         validMatrix.routes[0],
@@ -89,21 +84,18 @@ describe("route matrix validation", () => {
           method: "GET",
           path: "/v2/admin/users/<id>",
           rationale: " ",
-          source: "/Users/maintainer/putio/api2/admin.py:1",
         },
         {
           classification: "excluded",
           method: "GET",
           path: "/v2/",
           rationale: "A bare API prefix is not a public operation.",
-          source: "putio/app.py:1",
         },
         {
           classification: "excluded",
           method: "GET",
           path: "/v2/files/../admin/users",
           rationale: "Dot navigation cannot turn a public-looking path into an internal route.",
-          source: "putio/api2/files.py:1",
         },
       ],
       version: 1,
@@ -120,7 +112,6 @@ describe("route matrix validation", () => {
     expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(
       /rationale must not be empty/,
     );
-    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(/backend-relative/);
   });
 
   it("rejects invalid classification fields and missing client methods", () => {
@@ -183,8 +174,8 @@ describe("route matrix validation", () => {
     }
   });
 
-  it("rejects unknown fields instead of silently dropping typos", () => {
-    const invalid = {
+  it("rejects unknown fields including private source pointers", () => {
+    const withTypo = {
       ...validMatrix,
       routes: [
         {
@@ -194,6 +185,17 @@ describe("route matrix validation", () => {
       ],
     };
 
-    expect(() => validateRouteMatrix(JSON.stringify(invalid), clients)).toThrow(/operations/);
+    const withSource = {
+      ...validMatrix,
+      routes: [
+        {
+          ...validMatrix.routes[0],
+          source: "backend/example.py:1",
+        },
+      ],
+    };
+
+    expect(() => validateRouteMatrix(JSON.stringify(withTypo), clients)).toThrow(/operations/);
+    expect(() => validateRouteMatrix(JSON.stringify(withSource), clients)).toThrow(/source/);
   });
 });

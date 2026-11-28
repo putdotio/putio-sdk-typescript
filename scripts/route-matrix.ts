@@ -10,7 +10,6 @@ const RouteDecisionSchema = Schema.Struct({
   operation: Schema.optional(Schema.String),
   path: Schema.String,
   rationale: Schema.String,
-  source: Schema.String,
 });
 
 export const RouteMatrixSchema = Schema.Struct({
@@ -39,7 +38,6 @@ const canonicalPathPattern =
   /^\/v2(?:\/(?!\.{1,2}(?:\/|$))(?:[a-z0-9._~-]+|:[A-Za-z][A-Za-z0-9]*))+(?:\/)?$/;
 
 const operationPattern = /^[a-z][A-Za-z0-9]*(?:\.[a-z][A-Za-z0-9]*)+$/;
-const sourcePattern = /^[A-Za-z0-9._/-]+\.py:[1-9][0-9]*$/;
 
 const followUpPattern =
   /^https:\/\/github\.com\/putdotio\/putio-sdk-typescript\/issues\/[1-9][0-9]*$/;
@@ -134,15 +132,6 @@ export const validateRouteMatrix = (
 
     if (route.rationale.trim().length === 0) {
       issues.push(`${location}: rationale must not be empty`);
-    }
-
-    if (
-      !sourcePattern.test(route.source) ||
-      route.source.startsWith("/") ||
-      route.source.includes("..") ||
-      route.source.includes("\\")
-    ) {
-      issues.push(`${location}: source must be a backend-relative Python file and line`);
     }
 
     issues.push(...validateClassification(route, index));

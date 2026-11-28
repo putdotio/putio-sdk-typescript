@@ -5,224 +5,196 @@
       "method": "POST",
       "operation": "account.clear",
       "path": "/v2/account/clear",
-      "rationale": "The account client exposes the backend clear operation directly.",
-      "source": "putio/api2/account.py:350"
+      "rationale": "The account client exposes the backend clear operation directly."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "account.listConfirmations",
       "path": "/v2/account/confirmation/list",
-      "rationale": "The account client exposes confirmation listing directly.",
-      "source": "putio/api2/account.py:409"
+      "rationale": "The account client exposes confirmation listing directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "account.destroy",
       "path": "/v2/account/destroy",
-      "rationale": "The account client exposes the destructive account operation directly.",
-      "source": "putio/api2/account.py:300"
+      "rationale": "The account client exposes the destructive account operation directly."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "account.getInfo",
       "path": "/v2/account/info",
-      "rationale": "The account client exposes the conditional account-info contract directly.",
-      "source": "putio/api2/account.py:137"
+      "rationale": "The account client exposes the conditional account-info contract directly."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "account.getSettings",
       "path": "/v2/account/settings",
-      "rationale": "The account client exposes account settings retrieval directly.",
-      "source": "putio/api2/account.py:179"
+      "rationale": "The account client exposes account settings retrieval directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "account.saveSettings",
       "path": "/v2/account/settings",
-      "rationale": "The account client exposes JSON settings updates directly.",
-      "source": "putio/api2/account.py:188"
+      "rationale": "The account client exposes JSON settings updates directly."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "account.listSubtitleLanguages",
       "path": "/v2/account/subtitle_languages",
-      "rationale": "The account client exposes the backend subtitle-language list directly.",
-      "source": "putio/api2/account.py:425"
+      "rationale": "The account client exposes the backend subtitle-language list directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "account.appSpecificPasswords.delete",
       "path": "/v2/app_specific_password/:passwordId/delete",
-      "rationale": "The account client exposes app-specific password deletion directly.",
-      "source": "putio/login/app_specific_password/api.py:92"
+      "rationale": "The account client exposes app-specific password deletion directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "account.appSpecificPasswords.create",
       "path": "/v2/app_specific_password/create",
-      "rationale": "The account client exposes app-specific password creation directly.",
-      "source": "putio/login/app_specific_password/api.py:34"
+      "rationale": "The account client exposes app-specific password creation directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "account.appSpecificPasswords.deleteAll",
       "path": "/v2/app_specific_password/delete_all",
-      "rationale": "The account client exposes bulk app-specific password deletion directly.",
-      "source": "putio/login/app_specific_password/api.py:112"
+      "rationale": "The account client exposes bulk app-specific password deletion directly."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "account.appSpecificPasswords.list",
       "path": "/v2/app_specific_password/list",
-      "rationale": "The account client exposes app-specific password listing directly.",
-      "source": "putio/login/app_specific_password/api.py:78"
+      "rationale": "The account client exposes app-specific password listing directly."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "files.canWrite",
       "path": "/v2/files/:fileId/can-write",
-      "rationale": "The files client exposes the backend write-permission check directly.",
-      "source": "putio/api2/files.py:2175"
+      "rationale": "The files client exposes the backend write-permission check directly."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "files.getChild",
       "path": "/v2/files/:parentId/child",
-      "rationale": "The files client exposes named child lookup directly.",
-      "source": "putio/api2/files.py:786"
+      "rationale": "The files client exposes named child lookup directly."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "files.getHlsMasterPlaylist",
       "path": "/v2/files/:fileId/hls/media.m3u8",
-      "rationale": "The files client fetches the served HLS master playlist so consumers can inspect the variant the player would load.",
-      "source": "putio/hls/api.py:45"
+      "rationale": "The files client fetches the served HLS master playlist so consumers can inspect the variant the player would load."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "files.getXspfPlaylistUrl",
       "path": "/v2/files/:fileId/xspf",
-      "rationale": "The files client exposes a tokenized URL for the backend XSPF playlist used by first-party VLC handoff.",
-      "source": "putio/api2/download.py:84"
+      "rationale": "The files client exposes a tokenized URL for the backend XSPF playlist used by first-party VLC handoff."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "files.setStartFrom",
       "path": "/v2/files/:fileId/start-from",
-      "rationale": "The files client uses the canonical playback-progress update route.",
-      "source": "putio/api2/files.py:2090"
+      "rationale": "The files client uses the canonical playback-progress update route."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "files.resetStartFrom",
       "path": "/v2/files/:fileId/start-from/delete",
-      "rationale": "The files client uses the canonical playback-progress reset route.",
-      "source": "putio/api2/files.py:2132"
+      "rationale": "The files client uses the canonical playback-progress reset route."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "files.copy",
       "path": "/v2/files/copy",
-      "rationale": "The files client exposes file copy directly.",
-      "source": "putio/api2/files.py:1381"
+      "rationale": "The files client exposes file copy directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "files.resetSortSettings",
       "path": "/v2/files/remove-sort-by-settings",
-      "rationale": "The files client exposes removal of saved folder sort settings directly.",
-      "source": "putio/api2/files.py:707"
+      "rationale": "The files client exposes removal of saved folder sort settings directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "files.setSort",
       "path": "/v2/files/set-sort-by",
-      "rationale": "The files client exposes saved folder sort updates directly.",
-      "source": "putio/api2/files.py:678"
+      "rationale": "The files client exposes saved folder sort updates directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "files.touch",
       "path": "/v2/files/touch",
-      "rationale": "The files client exposes timestamp updates directly.",
-      "source": "putio/api2/files.py:1222"
+      "rationale": "The files client exposes timestamp updates directly."
     },
     {
       "classification": "equivalent",
       "method": "GET",
       "operation": "auth.exchangeAuthorizationCode",
       "path": "/v2/oauth2/access_token",
-      "rationale": "The backend accepts GET and POST for one exchange handler; the SDK deliberately uses POST so credentials and authorization codes are not placed in the query string.",
-      "source": "putio/oauth/blueprints/api.py:190"
+      "rationale": "The backend accepts GET and POST for one exchange handler; the SDK deliberately uses POST so credentials and authorization codes are not placed in the query string."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "auth.exchangeAuthorizationCode",
       "path": "/v2/oauth2/access_token",
-      "rationale": "The auth client exposes authorization-code exchange with unauthenticated form-encoded POST transport.",
-      "source": "putio/oauth/blueprints/api.py:190"
+      "rationale": "The auth client exposes authorization-code exchange with unauthenticated form-encoded POST transport."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "podcast.getLinks",
       "path": "/v2/podcast/links",
-      "rationale": "The podcast client exposes feed-link retrieval directly.",
-      "source": "putio/podcast/api.py:19"
+      "rationale": "The podcast client exposes feed-link retrieval directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "transfers.addTrackers",
       "path": "/v2/transfers/add-trackers/:transferId",
-      "rationale": "The transfers client exposes tracker addition directly.",
-      "source": "putio/api2/transfers.py:813"
+      "rationale": "The transfers client exposes tracker addition directly."
     },
     {
       "classification": "sdk",
       "method": "GET",
       "operation": "transfers.getTorrent",
       "path": "/v2/transfers/:transferId/torrent",
-      "rationale": "The transfers client exposes torrent metainfo download directly.",
-      "source": "putio/api2/transfers.py:344"
+      "rationale": "The transfers client exposes torrent metainfo download directly."
     },
     {
       "classification": "sdk",
       "method": "POST",
       "operation": "transfers.remove",
       "path": "/v2/transfers/remove",
-      "rationale": "The transfers client exposes filtered or selected transfer removal directly.",
-      "source": "putio/api2/transfers.py:669"
+      "rationale": "The transfers client exposes filtered or selected transfer removal directly."
     },
     {
       "classification": "sdk",
       "method": "DELETE",
       "operation": "rateLimits.removeBan",
       "path": "/v2/ban/:exceedingId",
-      "rationale": "Browsers lift a captcha-needed IP rate limit with the 429's X-RateLimit-ID and a reCAPTCHA token.",
-      "source": "putio/ratelimit/api.py:23"
+      "rationale": "Browsers lift a captcha-needed IP rate limit with the 429's X-RateLimit-ID and a reCAPTCHA token."
     }
   ],
   "version": 1

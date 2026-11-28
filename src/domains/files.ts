@@ -671,18 +671,17 @@ export type FileResponseFor<TQuery extends FileQuery> = FileBase &
       }
     : {}) &
   (TQuery["mp4_stream_url"] extends 1
-    ?
-        | {
-            readonly is_mp4_available: true;
-            readonly mp4_stream_url: string | null;
-            readonly mp4_size: number | null;
-            readonly need_convert: boolean;
-          }
-        | {
-            readonly is_mp4_available: false;
-            readonly mp4_size: number | null;
-            readonly need_convert: boolean;
-          }
+    ? | {
+          readonly is_mp4_available: true;
+          readonly mp4_stream_url: string | null;
+          readonly mp4_size: number | null;
+          readonly need_convert: boolean;
+        }
+      | {
+          readonly is_mp4_available: false;
+          readonly mp4_size: number | null;
+          readonly need_convert: boolean;
+        }
     : {}) &
   (TQuery["video_metadata"] extends 1
     ? TQuery["media_metadata"] extends 1

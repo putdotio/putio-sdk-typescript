@@ -23,7 +23,7 @@ Live tests are opt-in and call the real put.io API. Use them for behavior the
 fixtures cannot prove.
 
 ```bash
-cp .env.example .env   # or render maintainer secrets with `pnpm secrets:setup`
+cp .env.example .env
 vp run test:live
 ```
 

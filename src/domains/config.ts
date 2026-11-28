@@ -22,7 +22,7 @@ const nativeObjectConstructorSource = Function.prototype.toString.call(Object);
 const nativeArrayConstructorSource = Function.prototype.toString.call(Array);
 
 const isNativePrototype = (prototype: unknown, constructorSource: string): prototype is object => {
-  const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor")?.value;
+  const constructor: unknown = Object.getOwnPropertyDescriptor(prototype, "constructor")?.value;
 
   return (
     Predicate.isFunction(constructor) &&
@@ -37,7 +37,7 @@ const isPlainRecord = (value: unknown): value is object => {
       return false;
     }
 
-    const prototype = Object.getPrototypeOf(value);
+    const prototype: unknown = Object.getPrototypeOf(value);
 
     if (prototype === null) {
       return true;
@@ -59,7 +59,7 @@ const isPlainArray = (value: unknown): value is ReadonlyArray<unknown> => {
       return false;
     }
 
-    const prototype = Object.getPrototypeOf(value);
+    const prototype: unknown = Object.getPrototypeOf(value);
 
     return (
       prototype !== null &&
@@ -102,9 +102,9 @@ const isJsonValueWithin = (
       }
 
       const descriptors = Object.getOwnPropertyDescriptors<object>(value);
-      const length = descriptors["length"]?.value;
+      const length: unknown = descriptors["length"]?.value;
 
-      if (!Number.isSafeInteger(length) || length < 0) {
+      if (!Predicate.isNumber(length) || !Number.isSafeInteger(length) || length < 0) {
         return false;
       }
 

@@ -69,7 +69,6 @@ export default defineConfig({
       "effecttsgo/schema-number": "error",
       "effecttsgo/unsafe-effect-type-assertion": "error",
       "typescript/no-empty-object-type": "off",
-      "typescript/no-unsafe-assignment": "off",
       "typescript/no-unsafe-call": "off",
       "typescript/no-unsafe-type-assertion": "off",
     },

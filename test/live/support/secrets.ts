@@ -1,5 +1,4 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 type RequiredSecretKey =
   | "PUTIO_CLIENT_ID_FIRST_PARTY"
@@ -35,7 +34,7 @@ export const loadEnvFiles = (envFilePaths: ReadonlyArray<string>): void => {
   }
 };
 
-const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const packageRoot = join(import.meta.dirname, "../../..");
 
 loadEnvFiles([
   join(packageRoot, ".env.live-tokens"),

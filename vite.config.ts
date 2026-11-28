@@ -54,7 +54,6 @@ export default defineConfig({
       "typescript/no-unsafe-type-assertion": "off",
       "typescript/use-unknown-in-catch-callback-variable": "off",
       "unicorn/consistent-function-scoping": "off",
-      "unicorn/prefer-import-meta-properties": "off",
       "unicorn/prefer-set-has": "off",
       "unicorn/prefer-structured-clone": "off",
     },

@@ -71,7 +71,7 @@ describe("supporting domain boundaries", () => {
       readonly cursor: string;
       readonly excludeIds: ReadonlyArray<number>;
     }>().toExtend<Input>();
-    expectTypeOf<{}>().not.toExtend<Input>();
+    expectTypeOf<Record<never, never>>().not.toExtend<Input>();
     expectTypeOf<{ readonly excludeIds: ReadonlyArray<number> }>().not.toExtend<Input>();
     expectTypeOf(downloadLinks.createDownloadLinks).parameters.toEqualTypeOf<[input: Input]>();
   });

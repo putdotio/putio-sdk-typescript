@@ -46,6 +46,12 @@ export default defineConfig({
         },
       },
       {
+        files: ["src/domains/account.ts", "src/domains/files.ts", "src/domains/transfers.ts"],
+        rules: {
+          "typescript/no-empty-object-type": "off",
+        },
+      },
+      {
         files: ["src/utilities/localized-error.ts"],
         rules: {
           "typescript/no-unsafe-call": "off",
@@ -75,7 +81,6 @@ export default defineConfig({
       "effecttsgo/schema-class-missing-brand": "error",
       "effecttsgo/schema-number": "error",
       "effecttsgo/unsafe-effect-type-assertion": "error",
-      "typescript/no-empty-object-type": "off",
     },
   },
   pack: {

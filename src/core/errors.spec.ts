@@ -247,9 +247,8 @@ describe("sdk core errors", () => {
       expect(error.missingField).toBe("stream_url");
       expect(error.cause).toBeUndefined();
 
-      const decoded = yield* Schema.decodeUnknownEffect(PutioContractError)(
-        JSON.parse(JSON.stringify(yield* Schema.encodeEffect(PutioContractError)(error))),
-      );
+      const wire = JSON.stringify(yield* Schema.encodeEffect(PutioContractError)(error));
+      const decoded = yield* Schema.decodeUnknownEffect(PutioContractError)(JSON.parse(wire));
 
       expect(decoded).toBeInstanceOf(PutioContractError);
       expect(decoded.missingField).toBe("stream_url");
@@ -272,9 +271,8 @@ describe("sdk core errors", () => {
         }),
       );
 
-      const decoded = yield* Schema.decodeUnknownEffect(PutioRateLimitError)(
-        JSON.parse(JSON.stringify(encoded)),
-      );
+      const wire = JSON.stringify(encoded);
+      const decoded = yield* Schema.decodeUnknownEffect(PutioRateLimitError)(JSON.parse(wire));
 
       expect(decoded).toBeInstanceOf(PutioRateLimitError);
       expect(decoded).toMatchObject({

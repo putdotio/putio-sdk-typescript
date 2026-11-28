@@ -71,7 +71,6 @@ export default defineConfig({
       "typescript/no-empty-object-type": "off",
       "typescript/no-unsafe-assignment": "off",
       "typescript/no-unsafe-call": "off",
-      "typescript/no-unsafe-return": "off",
       "typescript/no-unsafe-type-assertion": "off",
     },
   },

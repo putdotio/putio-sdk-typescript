@@ -471,9 +471,10 @@ describe("payment domain", () => {
         Effect.exit(provideSdk(payment.createOpenNodeCharge(""), handler)),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );

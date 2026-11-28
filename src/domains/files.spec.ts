@@ -224,9 +224,10 @@ describe("files domain", () => {
         Effect.exit(provideSdk(files.canWriteFile(0), handler, { accessToken: "token-123" })),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -647,9 +648,9 @@ describe("files domain", () => {
         ),
       ]);
 
-      expect(invalidDirectAccess.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        invalidDirectAccess.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of invalidDirectAccess) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
     }),
   );
 
@@ -1239,9 +1240,10 @@ describe("files domain", () => {
         ),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
 
       const descriptorFailure = expectFailure(
@@ -1331,9 +1333,10 @@ describe("files domain", () => {
         Effect.exit(provideSdk(files.findNextVideo(0), handler, { accessToken: "token-123" })),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -1735,9 +1738,9 @@ describe("files domain", () => {
         ),
       );
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioConfigurationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioConfigurationError);
+      }
     }),
   );
 

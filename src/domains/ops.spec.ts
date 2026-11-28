@@ -332,9 +332,10 @@ describe("operational domain boundaries", () => {
         Effect.exit(provideSdk(rss.retryAllRssFeedItems(0), handler)),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -620,9 +621,10 @@ describe("operational domain boundaries", () => {
         Effect.exit(provideSdk(oauth.regenerateOAuthAppToken(0), handler)),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -970,9 +972,10 @@ describe("operational domain boundaries", () => {
         Effect.exit(provideSdk(sharing.getPublicShareFileUrl(0), handler)),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -1529,9 +1532,10 @@ describe("operational domain boundaries", () => {
         ),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -1593,9 +1597,10 @@ describe("operational domain boundaries", () => {
         Effect.exit(provideSdk(zips.cancelZip(0), handler)),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );

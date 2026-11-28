@@ -22,7 +22,11 @@ export default defineConfig({
         },
       },
       {
-        files: ["scripts/bootstrap-live-fixtures.ts", "src/core/contract-errors.spec.ts"],
+        files: [
+          "scripts/bootstrap-live-fixtures.ts",
+          "src/core/client.spec.ts",
+          "src/core/contract-errors.spec.ts",
+        ],
         rules: {
           "unicorn/catch-error-name": "off",
         },
@@ -50,7 +54,6 @@ export default defineConfig({
       "typescript/no-unsafe-call": "off",
       "typescript/no-unsafe-return": "off",
       "typescript/no-unsafe-type-assertion": "off",
-      "typescript/use-unknown-in-catch-callback-variable": "off",
       "unicorn/consistent-function-scoping": "off",
     },
   },

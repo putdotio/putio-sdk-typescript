@@ -384,7 +384,7 @@ describe("sdk client factories", () => {
 
     const settled = pending.then(
       () => "resolved",
-      (error: Error) => error,
+      (cause: unknown) => cause,
     );
 
     await vi.waitFor(() => {

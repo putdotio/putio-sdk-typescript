@@ -1,6 +1,11 @@
 import { test } from "vite-plus/test";
 
-import { assert, createLiveTokenClients, rejectsWithOperationError } from "./support/harness.js";
+import {
+  assert,
+  assertPresent,
+  createLiveTokenClients,
+  rejectsWithOperationError,
+} from "./support/harness.js";
 
 const { authClient, oauthClient } = createLiveTokenClients();
 
@@ -15,9 +20,7 @@ test("events list before pagination", async () => {
     per_page: 3,
   });
 
-  assert(firstPage.events.length > 0, "expected at least one event");
-
-  const before = firstPage.events[firstPage.events.length - 1].id;
+  const before = assertPresent(firstPage.events.at(-1), "expected at least one event").id;
 
   const nextPage = await oauthClient.events.list({
     before,
@@ -31,7 +34,7 @@ test("events list before pagination", async () => {
 });
 
 test("events delete requires write scope for oauth token", async () => {
-  await rejectsWithOperationError(oauthClient.events.delete(2147483647), {
+  await rejectsWithOperationError(oauthClient.events.delete(2_147_483_647), {
     domain: "events",
     errorType: "invalid_scope",
     operation: "delete",
@@ -49,13 +52,13 @@ test("events clear requires write scope for oauth token", async () => {
 });
 
 test("events delete missing id is harmless with auth token", async () => {
-  const response = await authClient.events.delete(2147483647);
+  const response = await authClient.events.delete(2_147_483_647);
 
   assert(response.status === "OK", "expected OK delete response");
 });
 
 test("events torrent missing id yields typed error", async () => {
-  await rejectsWithOperationError(oauthClient.events.getTorrent(2147483647), {
+  await rejectsWithOperationError(oauthClient.events.getTorrent(2_147_483_647), {
     domain: "events",
     operation: "getTorrent",
     statusCode: 404,

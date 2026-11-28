@@ -1,11 +1,10 @@
-import { Effect, Schema } from "effect";
+import type { Effect } from "effect";
+import { Schema } from "effect";
 
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-} from "../core/errors.js";
-import { requestJson, selectJsonField, type PutioSdkContext } from "../core/http.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
+import { requestJson, selectJsonField } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 export const TunnelRouteSchema = Schema.Struct({
   description: Schema.String,

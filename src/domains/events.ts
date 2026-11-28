@@ -1,21 +1,19 @@
-import { Effect, Schema } from "effect";
+import type { Effect } from "effect";
+import { Schema } from "effect";
 import {
   NonNegativeNumberSchema,
   PositiveIntegerSchema,
   decodeAndRun,
 } from "../core/validation.js";
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-} from "../core/errors.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
 import {
   OkResponseSchema,
   encodePathSegment,
   requestArrayBuffer,
   requestJson,
-  type PutioSdkContext,
 } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 const HistoryEventBaseSchema = Schema.Struct({
   created_at: Schema.String,

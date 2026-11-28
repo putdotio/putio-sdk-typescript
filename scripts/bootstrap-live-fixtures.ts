@@ -33,7 +33,7 @@ const { createPutioSdkPromiseClient: createClient } = await import("../dist/inde
 const { getSecondaryClient } = await import("../test/live/support/bootstrap.ts");
 const { requireLiveFriendWithSharedFiles } = await import("../test/live/support/friends.ts");
 
-const checks: FixtureCheck[] = [];
+const checks: Array<FixtureCheck> = [];
 
 const TypedErrorSummarySchema = Schema.Struct({
   _tag: Schema.optional(Schema.String),

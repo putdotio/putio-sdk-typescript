@@ -5,7 +5,8 @@ import {
   PutioOperationError,
   PutioValidationError,
 } from "../core/errors.js";
-import { normalizePutioSdkOptions, PutioSdkConfig, type PutioSdkContext } from "../core/http.js";
+import { normalizePutioSdkOptions, PutioSdkConfig } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 
 import * as files from "./files.js";
@@ -39,6 +40,20 @@ const baseFile = {
   size: 1024,
   updated_at: "2026-03-17T00:00:00Z",
 };
+
+const badCursorFailure = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
+  Effect.exit(
+    provideSdk(
+      effect,
+      () => jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 }),
+      { accessToken: "token-123" },
+    ),
+  ).pipe(Effect.map((exit) => expectFailure<unknown>(exit)));
+
+const get = (query: files.FileQuery | undefined) => files.getFile({ id: 1, query });
+
+const getChild = (query: files.FileQuery | undefined) =>
+  files.getFileChild({ name: "a", parentId: 0, query });
 
 describe("files domain", () => {
   it.effect("preserves a null codec name in subtitle media info", () =>
@@ -209,9 +224,10 @@ describe("files domain", () => {
         Effect.exit(provideSdk(files.canWriteFile(0), handler, { accessToken: "token-123" })),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -632,9 +648,9 @@ describe("files domain", () => {
         ),
       ]);
 
-      expect(invalidDirectAccess.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        invalidDirectAccess.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of invalidDirectAccess) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
     }),
   );
 
@@ -730,7 +746,7 @@ describe("files domain", () => {
               ...baseFile,
               id: 10,
               media_info: {
-                format: { bit_rate: 4832574, duration: 10571.008, name: "matroska" },
+                format: { bit_rate: 4_832_574, duration: 10_571.008, name: "matroska" },
                 mime_type: "video/x-matroska",
                 playback_issues: ["malformed_sei"],
                 streams: [
@@ -936,15 +952,6 @@ describe("files domain", () => {
 
   it.effect("names continue failures after the continue operation", () =>
     Effect.gen(function* () {
-      const badCursorFailure = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
-        Effect.exit(
-          provideSdk(
-            effect,
-            () => jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 }),
-            { accessToken: "token-123" },
-          ),
-        ).pipe(Effect.map((exit) => expectFailure<unknown>(exit)));
-
       const failures = {
         continue: yield* badCursorFailure(files.continueFiles("cursor-2")),
         continueSearch: yield* badCursorFailure(files.continueSearch("cursor-2")),
@@ -1233,9 +1240,10 @@ describe("files domain", () => {
         ),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
 
       const descriptorFailure = expectFailure(
@@ -1325,9 +1333,10 @@ describe("files domain", () => {
         Effect.exit(provideSdk(files.findNextVideo(0), handler, { accessToken: "token-123" })),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -1729,18 +1738,13 @@ describe("files domain", () => {
         ),
       );
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioConfigurationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioConfigurationError);
+      }
     }),
   );
 
   it("keeps the broad file type for an optional or widened file query", () => {
-    const get = (query: files.FileQuery | undefined) => files.getFile({ id: 1, query });
-
-    const getChild = (query: files.FileQuery | undefined) =>
-      files.getFileChild({ name: "a", parentId: 0, query });
-
     expectTypeOf<Effect.Success<ReturnType<typeof get>>>().toEqualTypeOf<files.FileBroad>();
     expectTypeOf<Effect.Success<ReturnType<typeof getChild>>>().toEqualTypeOf<files.FileBroad>();
     expectTypeOf<Effect.Error<ReturnType<typeof get>>>().toEqualTypeOf<files.GetFileError>();

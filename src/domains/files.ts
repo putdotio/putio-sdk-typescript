@@ -5,9 +5,8 @@ import {
   PutioContractError,
   definePutioOperationErrorSpec,
   withOperationErrors,
-  type PutioOperationFailure,
-  type PutioSdkError,
 } from "../core/errors.js";
+import type { PutioOperationFailure, PutioSdkError } from "../core/errors.js";
 import {
   OkResponseSchema,
   PutioSdkConfig,
@@ -17,9 +16,8 @@ import {
   requestText,
   requestVoid,
   selectJsonField,
-  type PutioSdkResolvedConfig,
-  type PutioSdkContext,
 } from "../core/http.js";
+import type { PutioSdkResolvedConfig, PutioSdkContext } from "../core/http.js";
 import { revealAccessToken } from "../core/secrets.js";
 import {
   NonEmptyStringSchema,
@@ -27,10 +25,10 @@ import {
   PositiveIntegerSchema,
   decodeAndRun,
   cursorSelectionSchema,
-  type CursorSelection,
   failMissingField,
   requireRequestedBreadcrumbs,
 } from "../core/validation.js";
+import type { CursorSelection } from "../core/validation.js";
 
 const RequestedFlag = Schema.Literal(1);
 const NonNegativeFileIdSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
@@ -1033,7 +1031,7 @@ const hasMediaInfo = (
   readonly media_info: FileMediaInfo | null;
 } => "media_info" in value;
 
-const useTunnelToQuery = (useTunnel?: boolean) =>
+const tunnelQuery = (useTunnel?: boolean) =>
   useTunnel === false
     ? {
         notunnel: 1,
@@ -1107,7 +1105,7 @@ export const buildFileApiDownloadUrl = (
       ? `/v2/files/${encodePathSegment(fileId)}/download/${encodePathSegment(options.name)}`
       : `/v2/files/${encodePathSegment(fileId)}/download`,
     {
-      ...useTunnelToQuery(options.useTunnel),
+      ...tunnelQuery(options.useTunnel),
       oauth_token: options.downloadToken,
     },
   );
@@ -1118,7 +1116,7 @@ export const buildFileApiContentUrl = (
   options: FileDirectAccessOptions,
 ): string =>
   buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/stream`, {
-    ...useTunnelToQuery(options.useTunnel),
+    ...tunnelQuery(options.useTunnel),
     oauth_token: options.downloadToken,
   });
 
@@ -1133,7 +1131,7 @@ export const buildFileApiMp4DownloadUrl = (
       ? `/v2/files/${encodePathSegment(fileId)}/mp4/download/${encodePathSegment(options.name)}`
       : `/v2/files/${encodePathSegment(fileId)}/mp4/download`,
     {
-      ...useTunnelToQuery(options.useTunnel),
+      ...tunnelQuery(options.useTunnel),
       convert: options.convert ? 1 : undefined,
       oauth_token: options.downloadToken,
     },

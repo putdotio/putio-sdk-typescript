@@ -8,10 +8,8 @@ import {
   listAccountSubtitleLanguages,
   listAccountConfirmations,
   saveAccountSettings,
-  type AccountInfoBroad,
-  type AccountInfoQuery,
-  type PasInfo,
 } from "./account.js";
+import type { AccountInfoBroad, AccountInfoQuery, PasInfo } from "./account.js";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { createPutioSdkPromiseClient } from "../core/client.js";
 

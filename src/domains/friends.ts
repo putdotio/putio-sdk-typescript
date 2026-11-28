@@ -1,19 +1,18 @@
-import { Effect, Schema } from "effect";
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-} from "../core/errors.js";
+import type { Effect } from "effect";
+import { Schema } from "effect";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
 import { NonEmptyStringSchema, decodeAndRun } from "../core/validation.js";
-import { FileBroadSchema, type FileBroad } from "./files.js";
+import { FileBroadSchema } from "./files.js";
+import type { FileBroad } from "./files.js";
 import {
   OkResponseSchema,
   encodePathSegment,
   requestJson,
   selectJsonField,
   selectJsonFields,
-  type PutioSdkContext,
 } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 export const FriendBaseSchema = Schema.Struct({
   avatar_url: Schema.String,

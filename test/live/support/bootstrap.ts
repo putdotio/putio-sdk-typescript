@@ -2,13 +2,13 @@ import { createHmac } from "node:crypto";
 
 import { Schema } from "effect";
 
-import { createPutioSdkPromiseClient, type PutioSdkPromiseClient } from "../../../dist/index.js";
-import {
-  readFirstPartyClientCredentials,
-  readSecondaryCredentialFixture,
-  type PutioBootstrapSecrets,
-  type PutioClientCredentials,
-  type PutioCredentialFixture,
+import { createPutioSdkPromiseClient } from "../../../dist/index.js";
+import type { PutioSdkPromiseClient } from "../../../dist/index.js";
+import { readFirstPartyClientCredentials, readSecondaryCredentialFixture } from "./secrets.ts";
+import type {
+  PutioBootstrapSecrets,
+  PutioClientCredentials,
+  PutioCredentialFixture,
 } from "./secrets.ts";
 
 type TokenValidation = Awaited<ReturnType<PutioSdkPromiseClient["auth"]["validateToken"]>>;
@@ -33,11 +33,14 @@ const THIRD_PARTY_BOOTSTRAP_CALLBACK = "https://example.com/putio-typescript-sdk
 const THIRD_PARTY_BOOTSTRAP_WEBSITE = "https://example.com/putio-typescript-sdk-live";
 const TOTP_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 const decodeBase32 = (value: string): Buffer => {
-  const normalized = value.replace(/[\s-]/g, "").replace(/=+$/g, "").toUpperCase();
-  const bytes: number[] = [];
+  const normalized = value.replaceAll(/[\s-]/g, "").replaceAll(/=+$/g, "").toUpperCase();
+  const bytes: Array<number> = [];
   let accumulator = 0;
   let bits = 0;
 
@@ -63,11 +66,11 @@ const decodeBase32 = (value: string): Buffer => {
 const generateTotpCode = (secret: string, now = Date.now()): string => {
   const counter = Math.floor(now / 30_000);
   const counterBuffer = Buffer.alloc(8);
-  counterBuffer.writeUInt32BE(Math.floor(counter / 0x1_0000_0000), 0);
+  counterBuffer.writeUInt32BE(Math.floor(counter / 0x1_00_00_00_00), 0);
   counterBuffer.writeUInt32BE(counter >>> 0, 4);
 
   const digest = createHmac("sha1", decodeBase32(secret)).update(counterBuffer).digest();
-  const offset = digest[digest.length - 1] & 0x0f;
+  const offset = (digest.at(-1) ?? 0) & 0x0f;
 
   const code =
     (((digest[offset] & 0x7f) << 24) |
@@ -155,6 +158,7 @@ export const bootstrapFirstPartyToken = async (
       throw new AggregateError(
         [error, cleanupError],
         "First-party token bootstrap failed and its session could not be revoked",
+        { cause: cleanupError },
       );
     }
 

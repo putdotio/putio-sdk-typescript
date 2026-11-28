@@ -15,17 +15,17 @@ const concatBytes = (...parts: ReadonlyArray<Uint8Array>): Uint8Array<ArrayBuffe
 };
 
 const crc32 = (value: Uint8Array): number => {
-  let crc = 0xffffffff;
+  let crc = 0xff_ff_ff_ff;
 
   for (const byte of value) {
     crc ^= byte;
 
     for (let bit = 0; bit < 8; bit += 1) {
-      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+      crc = (crc >>> 1) ^ (0xed_b8_83_20 & -(crc & 1));
     }
   }
 
-  return (crc ^ 0xffffffff) >>> 0;
+  return (crc ^ 0xff_ff_ff_ff) >>> 0;
 };
 
 const zipHeader = (length: number, write: (view: DataView) => void): Uint8Array => {
@@ -41,7 +41,7 @@ export const createStoredZipFile = (name: string): File => {
   const checksum = crc32(contents);
 
   const localHeader = zipHeader(30, (view) => {
-    view.setUint32(0, 0x04034b50, true);
+    view.setUint32(0, 0x04_03_4b_50, true);
     view.setUint16(4, 20, true);
     view.setUint32(14, checksum, true);
     view.setUint32(18, contents.byteLength, true);
@@ -50,7 +50,7 @@ export const createStoredZipFile = (name: string): File => {
   });
 
   const centralHeader = zipHeader(46, (view) => {
-    view.setUint32(0, 0x02014b50, true);
+    view.setUint32(0, 0x02_01_4b_50, true);
     view.setUint16(4, 20, true);
     view.setUint16(6, 20, true);
     view.setUint32(16, checksum, true);
@@ -63,7 +63,7 @@ export const createStoredZipFile = (name: string): File => {
   const centralSize = centralHeader.byteLength + entryName.byteLength;
 
   const end = zipHeader(22, (view) => {
-    view.setUint32(0, 0x06054b50, true);
+    view.setUint32(0, 0x06_05_4b_50, true);
     view.setUint16(8, 1, true);
     view.setUint16(10, 1, true);
     view.setUint32(12, centralSize, true);

@@ -11,7 +11,10 @@ import {
 const SHARED_FRIEND_FIXTURE_FOLDER_NAME = "putio-typescript-sdk-shared-friend-fixture";
 const SHARED_FRIEND_FIXTURE_FILE_NAME = "putio-typescript-sdk-shared-friend-fixture.txt";
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 const hasName = (rows: ReadonlyArray<{ readonly name: string }>, username: string): boolean =>
   rows.some((row) => row.name === username);
@@ -56,7 +59,7 @@ const waitForLiveFriend = async (
       return friend;
     }
 
-    await sleep(1_000);
+    await sleep(1000);
   }
 
   return null;
@@ -233,7 +236,7 @@ const waitForPrimarySharedFixture = async (
       return;
     }
 
-    await sleep(1_000);
+    await sleep(1000);
   }
 
   throw new Error(

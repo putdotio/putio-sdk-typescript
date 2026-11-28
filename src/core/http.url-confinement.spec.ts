@@ -62,11 +62,17 @@ const confinementViolation = (base: string, prefix: string, path: string): strin
   const url = new URL(built);
   const expectedOrigin = new URL(base).origin;
 
-  if (url.origin !== expectedOrigin) return `left origin ${expectedOrigin}: ${built}`;
+  if (url.origin !== expectedOrigin) {
+    return `left origin ${expectedOrigin}: ${built}`;
+  }
 
-  if (url.username !== "" || url.password !== "") return `added userinfo: ${built}`;
+  if (url.username !== "" || url.password !== "") {
+    return `added userinfo: ${built}`;
+  }
 
-  if (prefix !== "" && !url.pathname.startsWith(prefix)) return `escaped ${prefix}: ${built}`;
+  if (prefix !== "" && !url.pathname.startsWith(prefix)) {
+    return `escaped ${prefix}: ${built}`;
+  }
 
   return undefined;
 };
@@ -95,7 +101,9 @@ describe("request URL confinement", () => {
           for (const tail of tokenSequences(length)) {
             const violation = confinementViolation(base, prefix, prefix + tail);
 
-            if (violation) violations.push(`${JSON.stringify(prefix + tail)} ${violation}`);
+            if (violation) {
+              violations.push(`${JSON.stringify(prefix + tail)} ${violation}`);
+            }
           }
         }
       }
@@ -137,7 +145,9 @@ describe("request URL confinement", () => {
                 path: `/${tail}`,
               }),
               (request) => {
-                if (request.headers.has("authorization")) sent.push(request.url);
+                if (request.headers.has("authorization")) {
+                  sent.push(request.url);
+                }
 
                 return jsonResponse({ status: "OK" });
               },
@@ -147,7 +157,9 @@ describe("request URL confinement", () => {
 
           const expectedOrigin = new URL(requestBase ?? configBase).origin;
 
-          for (const url of sent) expect(new URL(url).origin).toBe(expectedOrigin);
+          for (const url of sent) {
+            expect(new URL(url).origin).toBe(expectedOrigin);
+          }
         },
       ),
       { numRuns: 2000 },

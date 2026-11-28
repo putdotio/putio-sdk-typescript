@@ -1,6 +1,7 @@
 import { test } from "vite-plus/test";
 
-import { createPutioSdkPromiseClient, type PutioSdkPromiseClient } from "../../dist/index.js";
+import { createPutioSdkPromiseClient } from "../../dist/index.js";
+import type { PutioSdkPromiseClient } from "../../dist/index.js";
 import {
   assert,
   assertErrorTag,

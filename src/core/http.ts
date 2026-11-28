@@ -12,10 +12,10 @@ import {
   mapValidationError,
   parseErrorBody,
   PutioConfigurationError,
-  type PutioSdkError,
   PutioValidationError,
   toPutioResponseError,
 } from "./errors.js";
+import type { PutioSdkError } from "./errors.js";
 import { isSuccessStatus, unparsableJsonBodyError } from "./response-body.js";
 import { revealAccessToken, revealSecret } from "./secrets.js";
 
@@ -389,7 +389,7 @@ export const selectJsonField =
     effect.pipe(Effect.map((value) => value[field]));
 
 export const selectJsonFields =
-  <const K extends readonly string[]>(...fields: K) =>
+  <const K extends ReadonlyArray<string>>(...fields: K) =>
   <A extends { readonly [P in K[number]]: unknown }, E, R>(
     effect: Effect.Effect<A, E, R>,
   ): Effect.Effect<Pick<A, K[number]>, E, R> =>

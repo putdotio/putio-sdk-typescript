@@ -90,7 +90,7 @@ const pollZip = async (zipId: number) => {
       return info;
     }
 
-    await sleep(1_000);
+    await sleep(1000);
   }
 
   throw new Error(`zip ${zipId} did not reach a terminal state in time`);
@@ -118,7 +118,7 @@ test("zips create works with app token", async () => {
 });
 
 test("zips get missing id yields typed 410", async () => {
-  await rejectsWithOperationError(authClient.zips.get(2147483647), {
+  await rejectsWithOperationError(authClient.zips.get(2_147_483_647), {
     domain: "zips",
     errorType: "LINK_EXPIRED",
     operation: "get",
@@ -127,7 +127,7 @@ test("zips get missing id yields typed 410", async () => {
 });
 
 test("zips cancel missing id yields typed 410", async () => {
-  await rejectsWithOperationError(authClient.zips.cancel(2147483647), {
+  await rejectsWithOperationError(authClient.zips.cancel(2_147_483_647), {
     domain: "zips",
     errorType: "LINK_EXPIRED",
     operation: "cancel",
@@ -136,7 +136,7 @@ test("zips cancel missing id yields typed 410", async () => {
 });
 
 test("zips cancel missing id works with app token", async () => {
-  await rejectsWithOperationError(oauthClient.zips.cancel(2147483647), {
+  await rejectsWithOperationError(oauthClient.zips.cancel(2_147_483_647), {
     domain: "zips",
     errorType: "LINK_EXPIRED",
     operation: "cancel",

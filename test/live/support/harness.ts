@@ -1,11 +1,9 @@
 import { Option, Schema } from "effect";
 
-import {
-  createPutioSdkPromiseClient,
-  type FileUploadResult,
-  type PutioSdkPromiseClient,
-} from "../../../dist/index.js";
-import { readLiveTokens, type PutioLiveTokens } from "./secrets.ts";
+import { createPutioSdkPromiseClient } from "../../../dist/index.js";
+import type { FileUploadResult, PutioSdkPromiseClient } from "../../../dist/index.js";
+import { readLiveTokens } from "./secrets.ts";
+import type { PutioLiveTokens } from "./secrets.ts";
 
 const OperationErrorSchema = Schema.TaggedStruct("PutioOperationError", {
   body: Schema.optional(
@@ -77,7 +75,9 @@ export function assertPresent<T>(value: T, message: string): NonNullable<T> {
 }
 
 export const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 export const expectOperationError = (cause: unknown): OperationError =>
   Option.getOrThrowWith(

@@ -1,6 +1,7 @@
 import { Effect, Predicate, Redacted } from "effect";
 
-import { mapConfigurationError, type PutioConfigurationError } from "./errors.js";
+import { mapConfigurationError } from "./errors.js";
+import type { PutioConfigurationError } from "./errors.js";
 
 export const revealSecret = (
   secret: string | Redacted.Redacted<string>,

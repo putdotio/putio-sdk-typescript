@@ -1,4 +1,5 @@
-import { Cause, Context, Effect, Exit, Layer, ManagedRuntime, Predicate, Schema } from "effect";
+import type { Schema } from "effect";
+import { Cause, Context, Effect, Exit, Layer, ManagedRuntime, Predicate } from "effect";
 
 import {
   clearAccount,
@@ -335,11 +336,11 @@ type OperationResult<Kind extends OperationKind, Success, Failure, Requirements>
   readonly Requirements: Requirements;
 })["Result"];
 
-type Operation = (...args: never[]) => void;
+type Operation = (...args: Array<never>) => void;
 
 type SdkEffect = Effect.Effect<unknown, unknown, PutioSdkContext>;
 
-type SdkEffectOperation = (...args: never[]) => SdkEffect;
+type SdkEffectOperation = (...args: Array<never>) => SdkEffect;
 
 type ResultOf<
   Kind extends OperationKind,

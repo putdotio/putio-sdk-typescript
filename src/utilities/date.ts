@@ -1,3 +1,5 @@
+import { Predicate } from "effect";
+
 const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
   dateStyle: "long",
   timeZone: "UTC",
@@ -14,7 +16,7 @@ const ensureDate = (value: DateInput): Date => {
     return new Date();
   }
 
-  if (value instanceof Date) {
+  if (Predicate.isDate(value)) {
     return value;
   }
 

@@ -1,9 +1,6 @@
 import { Effect, Schema } from "effect";
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-} from "../core/errors.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
 import { NonEmptyStringSchema, decodeAndRun } from "../core/validation.js";
 import {
   OkResponseSchema,
@@ -11,8 +8,8 @@ import {
   requestJson,
   selectJsonField,
   selectJsonFields,
-  type PutioSdkContext,
 } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 const NonNegativeIntegerSchema = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 

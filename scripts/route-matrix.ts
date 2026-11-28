@@ -101,8 +101,8 @@ export const validateRouteMatrix = (
 
   try {
     matrix = decodeRouteMatrixJson(matrixJson);
-  } catch (cause) {
-    throw new RouteMatrixValidationError([`schema: ${String(cause)}`]);
+  } catch (error) {
+    throw new RouteMatrixValidationError([`schema: ${String(error)}`]);
   }
 
   const issues: Array<string> = [];

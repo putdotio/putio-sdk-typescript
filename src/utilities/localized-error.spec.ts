@@ -5,12 +5,8 @@ import {
   PutioOperationError,
   definePutioOperationErrorSpec,
 } from "../core/errors.js";
-import {
-  LocalizedError,
-  createLocalizeError,
-  isErrorLocalizer,
-  type GenericErrorLocalizer,
-} from "./localized-error.js";
+import { LocalizedError, createLocalizeError, isErrorLocalizer } from "./localized-error.js";
+import type { GenericErrorLocalizer } from "./localized-error.js";
 
 const genericErrorLocalizer: GenericErrorLocalizer = {
   kind: "generic",

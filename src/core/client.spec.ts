@@ -9,8 +9,8 @@ import {
   createPutioSdkPromiseClient,
   makePutioSdkEffectClientLayer,
   makePutioSdkLiveClientLayer,
-  type PutioSdkService,
 } from "./client.js";
+import type { PutioSdkService } from "./client.js";
 import type {
   FileBreadcrumb,
   FileBroad,
@@ -29,7 +29,7 @@ import {
 } from "./http.js";
 
 interface ClientSurface {
-  readonly [key: string]: ClientSurface | ((...args: never[]) => void);
+  readonly [key: string]: ClientSurface | ((...args: Array<never>) => void);
 }
 
 const collectFunctionPaths = (surface: ClientSurface, parentPath = ""): ReadonlyArray<string> =>
@@ -46,6 +46,25 @@ const withoutRequirements = <A, E>(effect: Effect.Effect<A, E>): Effect.Effect<A
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+const json = (body: Schema.Json, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+
+const service = (sdk: PutioSdkService) => ({
+  files: sdk.files.list(0, { breadcrumbs: 1 }),
+  filesBroad: sdk.files.list(0),
+  shared: sdk.sharing.publicAccess.listFiles({ breadcrumbs: 1 }),
+  transfers: sdk.transfers.list({ per_page: 20 }),
+  transfersBroad: sdk.transfers.list(),
+});
+
+const queryService = (sdk: PutioSdkService, query: FileQuery | undefined) => ({
+  get: sdk.files.get({ id: 1, query }),
+  getChild: sdk.files.getChild({ name: "a", parentId: 0, query }),
 });
 
 describe("sdk client factories", () => {
@@ -384,7 +403,7 @@ describe("sdk client factories", () => {
 
     const settled = pending.then(
       () => "resolved",
-      (error: Error) => error,
+      (cause: unknown) => cause,
     );
 
     await vi.waitFor(() => {
@@ -564,12 +583,6 @@ describe("sdk client factories", () => {
 
   it("routes the Promise client's typed overload wrappers through their operations", async () => {
     const requests: Array<string> = [];
-
-    const json = (body: Schema.Json, status = 200) =>
-      new Response(JSON.stringify(body), {
-        status,
-        headers: { "content-type": "application/json" },
-      });
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = requestUrl(input);
@@ -803,14 +816,6 @@ describe("sdk client factories", () => {
   it("types conditioned list results the same in the Promise client and the service", () => {
     const client = createPutioSdkPromiseClient();
 
-    const service = (sdk: PutioSdkService) => ({
-      files: sdk.files.list(0, { breadcrumbs: 1 }),
-      filesBroad: sdk.files.list(0),
-      shared: sdk.sharing.publicAccess.listFiles({ breadcrumbs: 1 }),
-      transfers: sdk.transfers.list({ per_page: 20 }),
-      transfersBroad: sdk.transfers.list(),
-    });
-
     type Service = ReturnType<typeof service>;
 
     expectTypeOf(client.files.list<{ readonly breadcrumbs: 1 }>).returns.resolves.toEqualTypeOf<
@@ -852,14 +857,9 @@ describe("sdk client factories", () => {
       getChild: client.files.getChild({ name: "a", parentId: 0, query }),
     });
 
-    const service = (sdk: PutioSdkService, query: FileQuery | undefined) => ({
-      get: sdk.files.get({ id: 1, query }),
-      getChild: sdk.files.getChild({ name: "a", parentId: 0, query }),
-    });
-
     type Promised = ReturnType<typeof promised>;
 
-    type Service = ReturnType<typeof service>;
+    type Service = ReturnType<typeof queryService>;
 
     expectTypeOf<Awaited<Promised["get"]>>().toEqualTypeOf<FileBroad>();
     expectTypeOf<Awaited<Promised["getChild"]>>().toEqualTypeOf<FileBroad>();

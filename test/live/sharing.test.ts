@@ -16,7 +16,7 @@ import { hasSecondaryCredentialFixture } from "./support/secrets.js";
 
 const { authClient, oauthClient } = createLiveTokenClients();
 
-const MISSING_ID = 2147483647;
+const MISSING_ID = 2_147_483_647;
 
 const secondaryFriendTest = test.skipIf(!hasSecondaryCredentialFixture());
 
@@ -52,7 +52,7 @@ const pollClone = async (cloneId: number) => {
       return info;
     }
 
-    await sleep(1_500);
+    await sleep(1500);
   }
 
   throw new Error(`clone task ${cloneId} did not reach a terminal state in time`);
@@ -323,9 +323,9 @@ test("sharing public share pagination mirrors backend contract", async () => {
       assert(secondPage.files.length === 1, "expected second public page item");
       assert(secondPage.cursor === null, "expected no cursor after second page");
 
-      const seenIds = [...firstPage.files, ...secondPage.files].map((file) => file.id);
+      const seenIds = new Set([...firstPage.files, ...secondPage.files].map((file) => file.id));
       assert(
-        seenIds.includes(childA.id) && seenIds.includes(childB.id),
+        seenIds.has(childA.id) && seenIds.has(childB.id),
         "expected paginated public share results to contain both children",
       );
     } finally {

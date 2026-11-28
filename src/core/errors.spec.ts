@@ -13,7 +13,6 @@ import {
   PutioTransportError,
   PutioOperationError,
   PutioValidationError,
-  type PutioSdkError,
   definePutioOperationErrorSpec,
   fallbackPutioErrorEnvelope,
   isPutioApiError,
@@ -30,6 +29,15 @@ import {
   responseRateLimitHeaders,
   withOperationErrors,
 } from "./errors.js";
+import type { PutioSdkError } from "./errors.js";
+
+const parse = (retryAfter: string) => {
+  const error = toPutioResponseError(429, new Headers({ "retry-after": retryAfter }), {});
+
+  return error instanceof PutioRateLimitError
+    ? { retryAfter: error.retryAfter, retryAfterSeconds: error.retryAfterSeconds }
+    : undefined;
+};
 
 describe("sdk core errors", () => {
   afterEach(() => {
@@ -67,14 +75,6 @@ describe("sdk core errors", () => {
   it("parses Retry-After as delta-seconds or an HTTP-date and keeps the raw header", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-17T00:00:00Z"));
-
-    const parse = (retryAfter: string) => {
-      const error = toPutioResponseError(429, new Headers({ "retry-after": retryAfter }), {});
-
-      return error instanceof PutioRateLimitError
-        ? { retryAfter: error.retryAfter, retryAfterSeconds: error.retryAfterSeconds }
-        : undefined;
-    };
 
     expect(parse("0")).toEqual({ retryAfter: "0", retryAfterSeconds: 0 });
     expect(parse(" 120 ")).toEqual({ retryAfter: "120", retryAfterSeconds: 120 });
@@ -247,9 +247,8 @@ describe("sdk core errors", () => {
       expect(error.missingField).toBe("stream_url");
       expect(error.cause).toBeUndefined();
 
-      const decoded = yield* Schema.decodeUnknownEffect(PutioContractError)(
-        JSON.parse(JSON.stringify(yield* Schema.encodeEffect(PutioContractError)(error))),
-      );
+      const wire = JSON.stringify(yield* Schema.encodeEffect(PutioContractError)(error));
+      const decoded = yield* Schema.decodeUnknownEffect(PutioContractError)(JSON.parse(wire));
 
       expect(decoded).toBeInstanceOf(PutioContractError);
       expect(decoded.missingField).toBe("stream_url");
@@ -272,9 +271,8 @@ describe("sdk core errors", () => {
         }),
       );
 
-      const decoded = yield* Schema.decodeUnknownEffect(PutioRateLimitError)(
-        JSON.parse(JSON.stringify(encoded)),
-      );
+      const wire = JSON.stringify(encoded);
+      const decoded = yield* Schema.decodeUnknownEffect(PutioRateLimitError)(JSON.parse(wire));
 
       expect(decoded).toBeInstanceOf(PutioRateLimitError);
       expect(decoded).toMatchObject({

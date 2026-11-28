@@ -71,7 +71,7 @@ describe("supporting domain boundaries", () => {
       readonly cursor: string;
       readonly excludeIds: ReadonlyArray<number>;
     }>().toExtend<Input>();
-    expectTypeOf<{}>().not.toExtend<Input>();
+    expectTypeOf<Record<never, never>>().not.toExtend<Input>();
     expectTypeOf<{ readonly excludeIds: ReadonlyArray<number> }>().not.toExtend<Input>();
     expectTypeOf(downloadLinks.createDownloadLinks).parameters.toEqualTypeOf<[input: Input]>();
   });
@@ -497,9 +497,9 @@ describe("supporting domain boundaries", () => {
         ),
       );
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioContractError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioContractError);
+      }
 
       let fullConfigRequestCount = 0;
 
@@ -697,9 +697,10 @@ describe("supporting domain boundaries", () => {
         Effect.exit(provideSdk(events.getEventTorrent(0), handler)),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -740,9 +741,10 @@ describe("supporting domain boundaries", () => {
         Effect.exit(provideSdk(downloadLinks.getDownloadLinks(0), handler)),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -1000,9 +1002,10 @@ describe("supporting domain boundaries", () => {
         ),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -1138,9 +1141,10 @@ describe("supporting domain boundaries", () => {
         ),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
+
       expect(requestCount).toBe(0);
     }),
   );
@@ -1229,9 +1233,9 @@ describe("supporting domain boundaries", () => {
         ),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioValidationError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioValidationError);
+      }
     }),
   );
 
@@ -1254,9 +1258,9 @@ describe("supporting domain boundaries", () => {
         ),
       ]);
 
-      expect(failures.map((exit) => expectFailure<unknown>(exit))).toEqual(
-        failures.map(() => expect.any(PutioContractError)),
-      );
+      for (const exit of failures) {
+        expect(expectFailure<unknown>(exit)).toBeInstanceOf(PutioContractError);
+      }
     }),
   );
 });

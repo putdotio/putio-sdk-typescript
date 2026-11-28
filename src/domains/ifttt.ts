@@ -1,18 +1,12 @@
 import { Effect, Schema } from "effect";
 
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-} from "../core/errors.js";
-import {
-  OkResponseSchema,
-  requestJson,
-  selectJsonFields,
-  type PutioSdkContext,
-} from "../core/http.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
+import { OkResponseSchema, requestJson, selectJsonFields } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 import { NonEmptyStringSchema, PositiveIntegerSchema, decodeAndRun } from "../core/validation.js";
-import { JsonObjectSchema, type PutioJsonObject } from "./config.js";
+import { JsonObjectSchema } from "./config.js";
+import type { PutioJsonObject } from "./config.js";
 
 const IFTTTStatusEnvelopeSchema = Schema.Struct({
   enabled: Schema.Boolean,

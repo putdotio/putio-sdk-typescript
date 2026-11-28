@@ -5,16 +5,16 @@ import {
   PutioErrorEnvelopeSchema,
   definePutioOperationErrorSpec,
   withOperationErrors,
-  type PutioOperationFailure,
 } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
 import {
   OkResponseSchema,
   encodePathSegment,
   requestJson,
   selectJsonField,
   selectJsonFields,
-  type PutioSdkContext,
 } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 const AppSpecificPasswordIdSchema = Schema.Int.check(Schema.isGreaterThan(0));
 

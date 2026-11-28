@@ -21,7 +21,7 @@ const waitForExtractionTerminalState = async (id: number) => {
       return extraction;
     }
 
-    await sleep(1_000);
+    await sleep(1000);
   }
 
   throw new Error(`timed out waiting for extraction ${id} to reach a terminal state`);
@@ -116,7 +116,7 @@ test("files extract an owned archive", async () => {
   }
 
   let extractionId: number | undefined;
-  const extractedFileIds: number[] = [];
+  const extractedFileIds: Array<number> = [];
 
   try {
     const created = await client.files.extract({ ids: [upload.file.id] });

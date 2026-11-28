@@ -70,14 +70,14 @@ Long-lived Promise clients can replace or clear their token without recreating t
 
 ```ts
 sdk.setAccessToken(nextUserAccessToken);
-const account = await sdk.account.getInfo({});
+const account = await sdk.account.getInfo();
 
 sdk.setAccessToken(undefined);
 ```
 
 `accessToken` and `setAccessToken(...)` take a string or an Effect `Redacted<string>`. The SDK stores the token as `Redacted`, so `PutioSdkConfig` never prints it, and unwraps it only to build the `Authorization` header.
 
-The token is snapshotted when each Promise-client operation is invoked. Token changes apply to subsequent operations; an operation already in flight keeps the snapshot it started with. Base, upload, and web app URLs remain fixed from client creation.
+The token is snapshotted when each Promise-client operation is invoked. Token changes apply to subsequent operations; an operation already in flight keeps the snapshot it started with. Base, upload, and web app URLs and default headers remain fixed from client creation.
 
 Authorization-code clients can exchange a code without configuring a default access token:
 
@@ -93,8 +93,8 @@ const accessToken = await sdk.auth.exchangeAuthorizationCode({
 ```
 
 The exchange uses a form-encoded `POST` and never sends a configured bearer token. Known OAuth
-failures are exposed as `OAuthAuthorizationCodeExchangeError`; client secrets and codes are not
-included in validation errors.
+failures reject with `OAuthAuthorizationCodeExchangeError`; validation errors omit client secrets
+and codes.
 
 ## Utilities
 
@@ -137,13 +137,6 @@ const program = sdk.files
 const { breadcrumbs, files } = await Effect.runPromise(program);
 ```
 
-A field the query asks for is required in the result type, and the call fails with
-`PutioContractError` when the response leaves it out: `breadcrumbs` on `files.list` and
-`sharing.publicAccess.listFiles`, `cursor` and `total` on `transfers.list` with `per_page`, and the
-flags of `account.getInfo`, `files.get`, and `files.getChild`. One flag is exempt: `intercom` leaves
-`user_hash` optional. The Effect client, the `PutioSdk` service, and the Promise client share these
-checks and result types.
-
 Effect workflows can also depend on the SDK as a service:
 
 ```ts
@@ -153,15 +146,13 @@ const serviceProgram = Effect.gen(function* () {
 }).pipe(Effect.provide(makePutioSdkLiveClientLayer({ accessToken: userAccessToken })));
 ```
 
-`makePutioSdkLiveClientLayer(...)` provides the SDK service, SDK config, and default fetch-backed transport.
-`PutioSdk` methods need no further services: `makePutioSdkEffectClientLayer()` reads `PutioSdkConfig` and `PutioHttpClient` once and provides them to every operation, so a test can replace `PutioSdk` alone.
-The free domain functions and `createPutioSdkEffectClient()` keep requiring both services.
-`putioSdkLiveLayer(...)` provides both the SDK config and the default fetch-backed transport.
-Use `putioSdkLayer(...)` with `makePutioFetchLayer(...)` or your own `PutioHttpClient` service when you want to supply custom transport.
+- `makePutioSdkLiveClientLayer(config)` provides the `PutioSdk` service, `PutioSdkConfig`, and default fetch transport.
+- `makePutioSdkEffectClientLayer()` builds `PutioSdk` from `PutioSdkConfig` and `PutioHttpClient` once, so tests can replace `PutioSdk` alone (free domain functions and `createPutioSdkEffectClient()` still require both services).
+- `putioSdkLiveLayer(config)` provides config and default fetch transport; combine `putioSdkLayer(config)` with `makePutioFetchLayer(...)` or a custom `PutioHttpClient` to override transport.
 
 ## Clients
 
-Both client styles expose the same domain surface.
+Both client styles expose the same API operations (the Promise client also attaches `files.createUploadFormData`).
 
 | Client                                | Use it for                                        |
 | ------------------------------------- | ------------------------------------------------- |
@@ -175,6 +166,15 @@ Effect is the canonical typed surface; the Promise client adapts it to standard 
 - Promise client: owns a managed Effect runtime; call `await sdk.dispose()` when tearing down a long-lived client.
 
 Interrupting an Effect during fetch or body reads aborts the underlying request.
+
+### Conditional Response Fields
+
+A field the query asks for is required in the result type, and the call fails with
+`PutioContractError` when the response leaves it out: `breadcrumbs` on `files.list` and
+`sharing.publicAccess.listFiles`, `cursor` and `total` on `transfers.list` with `per_page`, and the
+flags of `account.getInfo`, `files.get`, and `files.getChild`. One flag is exempt: `intercom` leaves
+`user_hash` optional. The Effect client, the `PutioSdk` service, and the Promise client share these
+checks and result types.
 
 ### Cancelling Promise requests
 
@@ -201,28 +201,29 @@ await sdk.withSignal(AbortSignal.timeout(5_000)).account.getInfo();
 
 Both clients expose the namespaces of `sharedOperationTree` in
 [src/core/client.ts](./src/core/client.ts), such as `account`, `files`, `transfers`, and
-`sharing`. Helpers live in the [utilities subpath](#utilities), not on the client.
+`sharing`. Formatting, URL, and error-localization helpers live in
+[@putdotio/sdk/utilities](#utilities).
 
 ## Runtime Requirements
 
 Host runtimes must provide:
 
 - `fetch`
-- `Request`, `Response`, and `Headers`
+- `Headers`
+- `TextDecoder` (for text responses such as `files.getHlsMasterPlaylist`)
 - `URL` and `URLSearchParams`
 - `AbortController`
 - `FormData`
 - `btoa` for username/password auth flows such as `auth.login(...)`
 
-Upload flows also need file inputs such as `File` or `Blob`. Fill missing APIs with host-level
-polyfills or adapters instead of patching the SDK surface.
+Upload flows also need `File` or `Blob`. Polyfill missing Web APIs in the host runtime.
 
 ## Error Handling
 
 Backend error bodies parse into `PutioErrorEnvelopeSchema` in
 [src/core/errors.ts](./src/core/errors.ts); current backend errors carry metadata in `extra`.
 
-Each error tag names who has to act, and each has an `isPutio*` guard:
+Each core SDK error tag names who acts and has an `isPutio*` guard (`auth.exchangeAuthorizationCode` also fails with `OAuthAuthorizationCodeExchangeError`):
 
 | Tag                                                      | Meaning                                                            | Who acts               |
 | -------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------- |
@@ -275,7 +276,7 @@ if (isPutioRateLimitError(error) && error.action === "captcha-needed" && error.i
 }
 ```
 
-Effect consumers keep errors in the typed error channel instead of throwing:
+Effect consumers match errors by tag:
 
 ```ts
 import { Effect } from "effect";
@@ -301,10 +302,9 @@ const handled = Effect.gen(function* () {
 
 ## Direct File Access
 
-`files` exposes both JSON contracts and direct route helpers. Media URLs leave your app (players,
-casting receivers, shared links, logs), so sign them with the account download token, which only
-grants file access, instead of the OAuth token. `downloadToken` is required; the helpers never
-fall back to the client's `accessToken`.
+Media URLs leave your app (players, casting receivers, shared links, logs). Sign them with the
+account download token (`downloadToken`), which grants only file access. The URL and playlist
+helpers never fall back to `accessToken`.
 
 ```ts
 const { download_token: downloadToken } = await sdk.account.getInfo({ download_token: 1 });
@@ -320,7 +320,13 @@ const masterPlaylist = await sdk.files.getHlsMasterPlaylist(fileId, {
   downloadToken,
   playOriginal: false,
 });
+```
 
+### File Uploads
+
+`files.upload` sends requests to `uploadBaseUrl` authenticated with `accessToken` (or an explicit `oauthToken`):
+
+```ts
 const upload = await sdk.files.upload({
   file: new File(["hello"], "hello.txt"),
   parentId: 0,
@@ -340,9 +346,8 @@ await sdk.zips.create({ file_ids: [fileId] });
 
 ## Endpoint Coverage
 
-The SDK covers the supported public put.io API surface. It leaves out admin,
-private, and service-to-service routes, browser page and callback routes, and
-aliases of routes it already covers.
+The SDK covers public put.io API routes and excludes admin, private, service-to-service, browser
+page/callback, and alias routes.
 
 ## TanStack Query
 

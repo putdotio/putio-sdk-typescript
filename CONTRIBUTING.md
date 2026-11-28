@@ -17,6 +17,9 @@ vp run verify
 vp run test:compat
 ```
 
+`vp run test:compat` needs `bun` on `PATH` and a one-time
+`vp run test:compat:browser:install`.
+
 ## Live Tests
 
 Live tests are opt-in and call the real put.io API. Use them for behavior the
@@ -24,18 +27,22 @@ fixtures cannot prove.
 
 ```bash
 cp .env.example .env
+vp run bootstrap:tokens
 vp run test:live
+vp run test:live:targets -- test/live/<file>.test.ts
 ```
 
-[.env.example](./.env.example) names the variables. The live accounts are
-shared and real:
+`vp run bootstrap:tokens` writes `.env.live-tokens`, and
+`vp run test:live:targets` runs specific test files.
+[.env.example](./.env.example) names the variables. The live accounts are shared
+and real:
 
 - Use read-only calls, reversible probe mutations, and roundtrips that clean
   up after themselves.
 - Never add password reset, 2FA changes, account destroy, revoke-all sessions,
   or anything else that can lock out or materially alter the account.
-- `bootstrap:live-fixtures --seed-invite-codes` spends the secondary account's
-  invite quota; use it only when the codes run out.
+- `vp run bootstrap:live-fixtures -- --seed-invite-codes` spends the secondary
+  account's invite quota; use it only when the codes run out.
 
 ## Pull Requests
 

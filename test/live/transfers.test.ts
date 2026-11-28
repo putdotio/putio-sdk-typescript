@@ -92,7 +92,7 @@ test("transfers addMany envelope shape", async () => {
 });
 
 test("missing transfer retry yields typed error", async () => {
-  await rejectsWithOperationError(client.transfers.retry(2147483647), {
+  await rejectsWithOperationError(client.transfers.retry(2_147_483_647), {
     domain: "transfers",
     operation: "retry",
     statusCode: 404,
@@ -100,7 +100,7 @@ test("missing transfer retry yields typed error", async () => {
 });
 
 test("missing transfer stop recording yields typed error", async () => {
-  await rejectsWithOperationError(client.transfers.stopRecording(2147483647), {
+  await rejectsWithOperationError(client.transfers.stopRecording(2_147_483_647), {
     domain: "transfers",
     operation: "stopRecording",
     statusCode: 404,
@@ -126,11 +126,11 @@ test("non-live transfer stop recording yields typed not-recording", async () => 
 });
 
 test("missing transfer cancel is idempotent", async () => {
-  await client.transfers.cancel([2147483647]);
+  await client.transfers.cancel([2_147_483_647]);
 });
 
 test("reannounce on a missing transfer yields typed not found", async () => {
-  await rejectsWithOperationError(client.transfers.reannounce(2147483647), {
+  await rejectsWithOperationError(client.transfers.reannounce(2_147_483_647), {
     domain: "transfers",
     errorType: "TRANSFER_NOT_FOUND",
     operation: "reannounce",

@@ -26,7 +26,7 @@ const retryOnRateLimit = async <T>(operation: () => Promise<T>): Promise<T> => {
       }
 
       rateLimitError = error;
-      await sleep(2_000 * (attempt + 1));
+      await sleep(2000 * (attempt + 1));
     }
   }
 
@@ -191,7 +191,7 @@ test("download links invalid file id yields typed bad request", async () => {
   await rejectsWithOperationError(
     retryOnRateLimit(() =>
       client.downloadLinks.create({
-        ids: [2147483647],
+        ids: [2_147_483_647],
       }),
     ),
     {
@@ -204,7 +204,7 @@ test("download links invalid file id yields typed bad request", async () => {
 });
 
 test("download links missing task yields typed not found", async () => {
-  await rejectsWithOperationError(client.downloadLinks.get(2147483647), {
+  await rejectsWithOperationError(client.downloadLinks.get(2_147_483_647), {
     domain: "downloadLinks",
     errorType: "LINKS_NOT_FOUND",
     operation: "get",

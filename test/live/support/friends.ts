@@ -56,7 +56,7 @@ const waitForLiveFriend = async (
       return friend;
     }
 
-    await sleep(1_000);
+    await sleep(1000);
   }
 
   return null;
@@ -233,7 +233,7 @@ const waitForPrimarySharedFixture = async (
       return;
     }
 
-    await sleep(1_000);
+    await sleep(1000);
   }
 
   throw new Error(

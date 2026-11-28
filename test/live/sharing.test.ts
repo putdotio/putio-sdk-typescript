@@ -16,7 +16,7 @@ import { hasSecondaryCredentialFixture } from "./support/secrets.js";
 
 const { authClient, oauthClient } = createLiveTokenClients();
 
-const MISSING_ID = 2147483647;
+const MISSING_ID = 2_147_483_647;
 
 const secondaryFriendTest = test.skipIf(!hasSecondaryCredentialFixture());
 
@@ -52,7 +52,7 @@ const pollClone = async (cloneId: number) => {
       return info;
     }
 
-    await sleep(1_500);
+    await sleep(1500);
   }
 
   throw new Error(`clone task ${cloneId} did not reach a terminal state in time`);

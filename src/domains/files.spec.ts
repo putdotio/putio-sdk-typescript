@@ -731,7 +731,7 @@ describe("files domain", () => {
               ...baseFile,
               id: 10,
               media_info: {
-                format: { bit_rate: 4832574, duration: 10571.008, name: "matroska" },
+                format: { bit_rate: 4_832_574, duration: 10_571.008, name: "matroska" },
                 mime_type: "video/x-matroska",
                 playback_issues: ["malformed_sei"],
                 streams: [

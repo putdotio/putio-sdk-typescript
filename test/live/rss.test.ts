@@ -5,7 +5,7 @@ import { readOptionalSecret } from "./support/secrets.js";
 
 const { authClient, oauthClient } = createLiveTokenClients();
 
-const MISSING_ID = 2147483647;
+const MISSING_ID = 2_147_483_647;
 
 const RSS_SOURCE_URL =
   readOptionalSecret("PUTIO_LIVE_RSS_SOURCE_URL") ?? "https://xkcd.com/rss.xml";

@@ -74,7 +74,7 @@ const waitForSearchCursor = async (query: string) => {
       return search;
     }
 
-    await sleep(1_500);
+    await sleep(1500);
   }
 
   throw new Error(`expected files search cursor for probe query; last total was ${lastTotal}`);
@@ -369,7 +369,7 @@ test("files folder lifecycle", async () => {
 });
 
 test("missing file yields typed error", async () => {
-  await rejectsWithOperationError(oauthClient.files.get({ id: 2147483647 }), {
+  await rejectsWithOperationError(oauthClient.files.get({ id: 2_147_483_647 }), {
     domain: "files",
     operation: "get",
     statusCode: 404,

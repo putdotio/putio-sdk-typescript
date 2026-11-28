@@ -21,7 +21,7 @@ const waitForExtractionTerminalState = async (id: number) => {
       return extraction;
     }
 
-    await sleep(1_000);
+    await sleep(1000);
   }
 
   throw new Error(`timed out waiting for extraction ${id} to reach a terminal state`);

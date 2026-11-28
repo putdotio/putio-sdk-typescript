@@ -50,6 +50,6 @@ describe("utility date", () => {
   });
 
   it("returns unix timestamps", () => {
-    expect(getUnixTimestamp("2023-06-03T18:30:03Z")).toBe(1685817003);
+    expect(getUnixTimestamp("2023-06-03T18:30:03Z")).toBe(1_685_817_003);
   });
 });

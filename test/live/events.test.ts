@@ -31,7 +31,7 @@ test("events list before pagination", async () => {
 });
 
 test("events delete requires write scope for oauth token", async () => {
-  await rejectsWithOperationError(oauthClient.events.delete(2147483647), {
+  await rejectsWithOperationError(oauthClient.events.delete(2_147_483_647), {
     domain: "events",
     errorType: "invalid_scope",
     operation: "delete",
@@ -49,13 +49,13 @@ test("events clear requires write scope for oauth token", async () => {
 });
 
 test("events delete missing id is harmless with auth token", async () => {
-  const response = await authClient.events.delete(2147483647);
+  const response = await authClient.events.delete(2_147_483_647);
 
   assert(response.status === "OK", "expected OK delete response");
 });
 
 test("events torrent missing id yields typed error", async () => {
-  await rejectsWithOperationError(oauthClient.events.getTorrent(2147483647), {
+  await rejectsWithOperationError(oauthClient.events.getTorrent(2_147_483_647), {
     domain: "events",
     operation: "getTorrent",
     statusCode: 404,

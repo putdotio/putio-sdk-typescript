@@ -315,7 +315,7 @@ test("trash child restore and delete reject non-toplevel entries", () =>
   }));
 
 test("trash restore missing file works with app token", async () => {
-  await rejectsWithOperationError(oauthClient.trash.restore({ file_ids: [2147483647] }), {
+  await rejectsWithOperationError(oauthClient.trash.restore({ file_ids: [2_147_483_647] }), {
     domain: "trash",
     errorType: "TRASH_FILE_NOT_FOUND",
     operation: "restore",
@@ -324,7 +324,7 @@ test("trash restore missing file works with app token", async () => {
 });
 
 test("trash delete missing file works with app token", async () => {
-  await rejectsWithOperationError(oauthClient.trash.delete({ file_ids: [2147483647] }), {
+  await rejectsWithOperationError(oauthClient.trash.delete({ file_ids: [2_147_483_647] }), {
     domain: "trash",
     errorType: "TRASH_FILE_NOT_FOUND",
     operation: "delete",

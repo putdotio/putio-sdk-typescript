@@ -8,16 +8,16 @@ export const secondsToDuration = (seconds: number | null | undefined): string =>
   }
 
   const days = Math.floor(normalizedSeconds / 86_400);
-  const hours = Math.floor((normalizedSeconds % 86_400) / 3_600);
-  const minutes = Math.floor((normalizedSeconds % 3_600) / 60);
+  const hours = Math.floor((normalizedSeconds % 86_400) / 3600);
+  const minutes = Math.floor((normalizedSeconds % 3600) / 60);
   const remainingSeconds = normalizedSeconds % 60;
 
   if (days > 0) {
     return [days, hours, minutes, remainingSeconds].map(formatPadded).join(":");
   }
 
-  if (normalizedSeconds >= 3_600) {
-    return [Math.floor(normalizedSeconds / 3_600), minutes, remainingSeconds]
+  if (normalizedSeconds >= 3600) {
+    return [Math.floor(normalizedSeconds / 3600), minutes, remainingSeconds]
       .map(formatPadded)
       .join(":");
   }
@@ -38,7 +38,7 @@ export const secondsToReadableDuration = (seconds: number | null | undefined): s
 
   if (normalizedSeconds >= 86_400) {
     const days = Math.floor(normalizedSeconds / 86_400);
-    const roundedHours = Math.round((normalizedSeconds - days * 86_400) / 3_600);
+    const roundedHours = Math.round((normalizedSeconds - days * 86_400) / 3600);
 
     if (roundedHours === 24) {
       return `${days + 1}d`;
@@ -47,9 +47,9 @@ export const secondsToReadableDuration = (seconds: number | null | undefined): s
     return roundedHours > 0 ? `${days}d ${roundedHours}h` : `${days}d`;
   }
 
-  if (normalizedSeconds >= 3_600) {
-    const hours = Math.floor(normalizedSeconds / 3_600);
-    const roundedMinutes = Math.round((normalizedSeconds - hours * 3_600) / 60);
+  if (normalizedSeconds >= 3600) {
+    const hours = Math.floor(normalizedSeconds / 3600);
+    const roundedMinutes = Math.round((normalizedSeconds - hours * 3600) / 60);
 
     return roundedMinutes > 0 ? `${hours}h ${roundedMinutes}m` : `${hours}h`;
   }

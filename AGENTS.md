@@ -15,10 +15,9 @@ is `vp run verify`.
 ## Worktrees
 
 `.worktreeinclude` carries `.env`, `.env.live-tokens`, and `.env.local` into
-managed worktrees. Run `vp install`, `vp config`, then `vp run verify`. If the
-live-test env is missing or stale, run `pnpm secrets:setup` with
-`PUTIO_SDK_TYPESCRIPT_SOPS_FILE` set. Before teardown, `pnpm secrets:clean`
-removes the env files and `vp run clean` removes generated artifacts.
+managed worktrees. Run `vp install`, `vp config`, then `vp run verify`. Before
+teardown, remove any local `.env*` secret files and run `vp run clean` to
+remove generated artifacts.
 
 ## Rules
 

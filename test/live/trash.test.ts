@@ -31,7 +31,7 @@ const withTrashEnabled = async <A>(runTest: () => Promise<A>): Promise<A> => {
   }
 };
 
-const deleteNow = async (ids: readonly number[]) => {
+const deleteNow = async (ids: ReadonlyArray<number>) => {
   if (ids.length === 0) {
     return;
   }
@@ -117,7 +117,7 @@ test("trash disposable lifecycle", () =>
     });
 
     const seed = Date.now();
-    const created: number[] = [];
+    const created: Array<number> = [];
     const restoredIds = new Set<number>();
     const trashedIds = new Set<number>();
 
@@ -194,7 +194,7 @@ test("trash disposable lifecycle", () =>
 test("trash bulk restore restores multiple top-level entries", () =>
   withTrashEnabled(async () => {
     const seed = Date.now();
-    const created: number[] = [];
+    const created: Array<number> = [];
     const restoredIds = new Set<number>();
     const trashedIds = new Set<number>();
 

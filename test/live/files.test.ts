@@ -29,7 +29,7 @@ const createTextFile = async (parentId: number, name: string): Promise<number> =
 };
 
 type CursorProbeFolder = {
-  readonly cleanupIds: readonly number[];
+  readonly cleanupIds: ReadonlyArray<number>;
   readonly folderId: number;
 };
 
@@ -39,7 +39,7 @@ const createCursorProbeFolder = async (name: string, fileCount = 3): Promise<Cur
     parent_id: 0,
   });
 
-  const childIds: number[] = [];
+  const childIds: Array<number> = [];
 
   try {
     for (let index = 1; index <= fileCount; index += 1) {

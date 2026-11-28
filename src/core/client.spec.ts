@@ -29,7 +29,7 @@ import {
 } from "./http.js";
 
 interface ClientSurface {
-  readonly [key: string]: ClientSurface | ((...args: never[]) => void);
+  readonly [key: string]: ClientSurface | ((...args: Array<never>) => void);
 }
 
 const collectFunctionPaths = (surface: ClientSurface, parentPath = ""): ReadonlyArray<string> =>

@@ -116,7 +116,7 @@ test("files extract an owned archive", async () => {
   }
 
   let extractionId: number | undefined;
-  const extractedFileIds: number[] = [];
+  const extractedFileIds: Array<number> = [];
 
   try {
     const created = await client.files.extract({ ids: [upload.file.id] });

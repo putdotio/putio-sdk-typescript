@@ -41,7 +41,6 @@ export default defineConfig({
       "no-promise-executor-return": "off",
       "preserve-caught-error": "off",
       "react-hooks/rules-of-hooks": "off",
-      "typescript/array-type": "off",
       "typescript/no-empty-object-type": "off",
       "typescript/no-misused-promises": "off",
       "typescript/no-unsafe-assignment": "off",

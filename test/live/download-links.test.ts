@@ -48,11 +48,11 @@ const waitForDone = async (id: number) => {
 };
 
 type ProbeFile = {
-  readonly cleanupIds: readonly number[];
+  readonly cleanupIds: ReadonlyArray<number>;
   readonly id: number;
 };
 
-const cleanupProbeFiles = async (ids: readonly number[]): Promise<void> => {
+const cleanupProbeFiles = async (ids: ReadonlyArray<number>): Promise<void> => {
   if (ids.length === 0) {
     return;
   }

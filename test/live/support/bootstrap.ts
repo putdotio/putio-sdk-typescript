@@ -37,7 +37,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 const decodeBase32 = (value: string): Buffer => {
   const normalized = value.replace(/[\s-]/g, "").replace(/=+$/g, "").toUpperCase();
-  const bytes: number[] = [];
+  const bytes: Array<number> = [];
   let accumulator = 0;
   let bits = 0;
 

@@ -323,9 +323,9 @@ test("sharing public share pagination mirrors backend contract", async () => {
       assert(secondPage.files.length === 1, "expected second public page item");
       assert(secondPage.cursor === null, "expected no cursor after second page");
 
-      const seenIds = [...firstPage.files, ...secondPage.files].map((file) => file.id);
+      const seenIds = new Set([...firstPage.files, ...secondPage.files].map((file) => file.id));
       assert(
-        seenIds.includes(childA.id) && seenIds.includes(childB.id),
+        seenIds.has(childA.id) && seenIds.has(childB.id),
         "expected paginated public share results to contain both children",
       );
     } finally {

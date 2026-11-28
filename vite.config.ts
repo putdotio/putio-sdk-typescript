@@ -32,6 +32,12 @@ export default defineConfig({
         },
       },
       {
+        files: ["src/core/client.ts"],
+        rules: {
+          "typescript/no-misused-promises": "off",
+        },
+      },
+      {
         files: ["src/core/client.ts", "src/domains/ops.spec.ts"],
         rules: {
           "effecttsgo/any-unknown-in-error-context": "off",
@@ -49,7 +55,6 @@ export default defineConfig({
       "no-console": "off",
       "react-hooks/rules-of-hooks": "off",
       "typescript/no-empty-object-type": "off",
-      "typescript/no-misused-promises": "off",
       "typescript/no-unsafe-assignment": "off",
       "typescript/no-unsafe-call": "off",
       "typescript/no-unsafe-return": "off",

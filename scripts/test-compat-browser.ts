@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import type { Server } from "node:http";
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 
@@ -100,32 +100,40 @@ const isPathInsideDirectory = (directory: string, filePath: string) => {
   return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
 };
 
+const serveFile = async (
+  root: string,
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> => {
+  try {
+    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    const pathname = requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname;
+    const filePath = resolve(root, `.${decodeURIComponent(pathname)}`);
+
+    if (!isPathInsideDirectory(root, filePath)) {
+      response.writeHead(403);
+      response.end("Forbidden");
+
+      return;
+    }
+
+    const body = await readFile(filePath);
+    response.writeHead(200, {
+      "content-type": contentTypeFor(filePath),
+    });
+    response.end(body);
+  } catch (error) {
+    response.writeHead(404);
+    response.end(error instanceof Error ? error.message : "Not found");
+  }
+};
+
 const serveDirectory = (directory: string) =>
   new Promise<StaticServer>((resolveServer, reject) => {
     const root = resolve(directory);
 
-    const server = createServer(async (request, response) => {
-      try {
-        const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
-        const pathname = requestUrl.pathname === "/" ? "/index.html" : requestUrl.pathname;
-        const filePath = resolve(root, `.${decodeURIComponent(pathname)}`);
-
-        if (!isPathInsideDirectory(root, filePath)) {
-          response.writeHead(403);
-          response.end("Forbidden");
-
-          return;
-        }
-
-        const body = await readFile(filePath);
-        response.writeHead(200, {
-          "content-type": contentTypeFor(filePath),
-        });
-        response.end(body);
-      } catch (error) {
-        response.writeHead(404);
-        response.end(error instanceof Error ? error.message : "Not found");
-      }
+    const server = createServer((request, response) => {
+      void serveFile(root, request, response);
     });
 
     server.once("error", reject);

@@ -758,6 +758,55 @@ describe("sdk core http", () => {
     }),
   );
 
+  it.effect("encodes form values and skips undefined fields", () =>
+    Effect.gen(function* () {
+      yield* provideSdk(
+        requestVoid({
+          auth: { type: "none" },
+          body: {
+            type: "form",
+            value: {
+              count: 42,
+              empty: null,
+              list: [1, true, "a"],
+              metadata: { enabled: false },
+              name: "put.io",
+              skipped: undefined,
+            },
+          },
+          method: "POST",
+          path: "/v2/test-form",
+        }),
+        (request) => {
+          expect(request.body).toBeInstanceOf(URLSearchParams);
+          const params = request.body instanceof URLSearchParams ? request.body : undefined;
+          expect(params?.get("count")).toBe("42");
+          expect(params?.get("empty")).toBe("");
+          expect(params?.get("list")).toBe('[1,true,"a"]');
+          expect(params?.get("metadata")).toBe('{"enabled":false}');
+          expect(params?.get("name")).toBe("put.io");
+          expect(params?.has("skipped")).toBe(false);
+
+          return new Response(null, { status: 204 });
+        },
+      );
+
+      void (() =>
+        requestVoid({
+          auth: { type: "none" },
+          body: {
+            type: "form",
+            value: {
+              // @ts-expect-error Form callers must encode booleans explicitly per endpoint.
+              flag: false,
+            },
+          },
+          method: "POST",
+          path: "/v2/test-form",
+        }));
+    }),
+  );
+
   it.effect("sends multipart form-data bodies unchanged", () =>
     Effect.gen(function* () {
       const body = new FormData();

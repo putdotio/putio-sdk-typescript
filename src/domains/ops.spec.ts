@@ -155,6 +155,7 @@ describe("operational domain boundaries", () => {
           (request) => {
             const body = getFormBody(request);
             expect(body.get("delete_old_files")).toBe("on");
+            expect(body.get("dont_process_whole_feed")).toBeNull();
             expect(body.get("parent_dir_id")).toBe("newf");
             expect(body.get("unwanted_keywords")).toBe("");
 
@@ -166,7 +167,27 @@ describe("operational domain boundaries", () => {
 
       expect(
         yield* provideSdk(
+          rss.createRssFeed({
+            delete_old_files: false,
+            dont_process_whole_feed: false,
+            rss_source_url: "https://example.com/feed.xml",
+            title: "SDK Feed",
+          }),
+          (request) => {
+            const body = getFormBody(request);
+            expect(body.get("delete_old_files")).toBeNull();
+            expect(body.get("dont_process_whole_feed")).toBe("false");
+
+            return jsonResponse({ feed: rssFeed, status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toMatchObject({ title: "SDK Feed" });
+
+      expect(
+        yield* provideSdk(
           rss.updateRssFeed(1, {
+            delete_old_files: false,
             dont_process_whole_feed: true,
             rss_source_url: "https://example.com/feed.xml",
             title: "SDK Feed",
@@ -174,8 +195,28 @@ describe("operational domain boundaries", () => {
           }),
           (request) => {
             const body = getFormBody(request);
+            expect(body.get("delete_old_files")).toBe("false");
             expect(body.get("dont_process_whole_feed")).toBe("true");
             expect(body.get("unwanted_keywords")).toBe("spam");
+
+            return jsonResponse({ status: "OK" });
+          },
+          { accessToken: "token-123" },
+        ),
+      ).toEqual({ status: "OK" });
+
+      expect(
+        yield* provideSdk(
+          rss.updateRssFeed(1, {
+            delete_old_files: true,
+            dont_process_whole_feed: false,
+            rss_source_url: "https://example.com/feed.xml",
+            title: "SDK Feed",
+          }),
+          (request) => {
+            const body = getFormBody(request);
+            expect(body.get("delete_old_files")).toBe("true");
+            expect(body.get("dont_process_whole_feed")).toBe("false");
 
             return jsonResponse({ status: "OK" });
           },

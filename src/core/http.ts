@@ -201,10 +201,12 @@ export type PutioAuth =
 
 type PutioRequestMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
+type PutioFormValue = Exclude<Schema.Json, boolean>;
+
 type PutioRequestBody =
   | { readonly type: "none" }
   | { readonly type: "json"; readonly value: unknown }
-  | { readonly type: "form"; readonly value: Readonly<Record<string, Schema.Json | undefined>> }
+  | { readonly type: "form"; readonly value: Readonly<Record<string, PutioFormValue | undefined>> }
   | { readonly type: "form-data"; readonly value: FormData };
 
 interface PutioRequestOptions {
@@ -265,7 +267,7 @@ const resolveAuthorization = (
   }
 };
 
-const normalizeFormValue = (value: Schema.Json): string => {
+const normalizeFormValue = (value: PutioFormValue): string => {
   if (value === null) {
     return "";
   }
@@ -274,7 +276,7 @@ const normalizeFormValue = (value: Schema.Json): string => {
     return value;
   }
 
-  if (Predicate.isNumber(value) || Predicate.isBoolean(value)) {
+  if (Predicate.isNumber(value)) {
     return String(value);
   }
 

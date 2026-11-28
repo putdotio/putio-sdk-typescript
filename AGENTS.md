@@ -33,7 +33,8 @@ worktrees. Run `pnpm install`, `pnpm exec vp config`, then
 - Source, schema, or error-mapping change: `vp run verify`. Cover new code and
   keep the thresholds in [vite.config.ts](./vite.config.ts).
 - Exports, entrypoints, or packaging: also `vp run test:compat`. Locally it
-  needs `bun` on `PATH` and, once, `vp run test:compat:browser:install`.
+  needs `bun` on `PATH`, a one-time `vp run test:compat:browser:install`, and
+  on Linux Playwright OS libraries (`pnpm exec playwright install-deps`).
 - Endpoint behavior the sanitized fixtures cannot prove: the matching live
   target, such as `vp run test:live:targets -- test/live/files.test.ts`. Report
   a live gap you could not run.

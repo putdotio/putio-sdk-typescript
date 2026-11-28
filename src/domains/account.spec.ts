@@ -533,6 +533,11 @@ describe("account domain", () => {
           expect(request.url).toBe("https://api.put.io/v2/account/clear");
           expect(body.get("active_transfers")).toBe("true");
           expect(body.get("files")).toBe("true");
+          expect(body.get("finished_transfers")).toBe("false");
+          expect(body.get("friends")).toBe("false");
+          expect(body.get("history")).toBe("true");
+          expect(body.get("rss_feeds")).toBe("false");
+          expect(body.get("rss_logs")).toBe("false");
           expect(body.get("trash")).toBe("true");
 
           return jsonResponse({ status: "OK" });
@@ -541,6 +546,36 @@ describe("account domain", () => {
       );
 
       expect(clearResult).toEqual({ status: "OK" });
+
+      const clearFalseResult = yield* provideSdk(
+        clearAccount({
+          active_transfers: false,
+          files: false,
+          finished_transfers: true,
+          friends: true,
+          history: false,
+          rss_feeds: true,
+          rss_logs: true,
+          trash: false,
+        }),
+        (request) => {
+          const body = getFormBody(request);
+          expect(request.url).toBe("https://api.put.io/v2/account/clear");
+          expect(body.get("active_transfers")).toBe("false");
+          expect(body.get("files")).toBe("false");
+          expect(body.get("finished_transfers")).toBe("true");
+          expect(body.get("friends")).toBe("true");
+          expect(body.get("history")).toBe("false");
+          expect(body.get("rss_feeds")).toBe("true");
+          expect(body.get("rss_logs")).toBe("true");
+          expect(body.get("trash")).toBe("false");
+
+          return jsonResponse({ status: "OK" });
+        },
+        { accessToken: "token-123" },
+      );
+
+      expect(clearFalseResult).toEqual({ status: "OK" });
 
       const destroyResult = yield* provideSdk(
         destroyAccount("secret"),

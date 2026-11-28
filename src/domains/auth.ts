@@ -542,7 +542,15 @@ export const register = (
       },
       body: {
         type: "form",
-        value: decodedInput,
+        value: {
+          ...decodedInput,
+          product_analytics_enabled:
+            decodedInput.product_analytics_enabled === undefined
+              ? undefined
+              : decodedInput.product_analytics_enabled
+                ? "true"
+                : "false",
+        },
       },
       method: "POST",
       path: "/v2/registration/register",

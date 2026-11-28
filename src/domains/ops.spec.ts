@@ -99,6 +99,43 @@ const rssFeed = {
   updated_at: "2026-03-17T00:00:00Z",
 };
 
+const badCursor = () =>
+  jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 });
+
+const badCursorFailure = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
+  Effect.exit(provideSdk(effect, badCursor, { accessToken: "token-123" })).pipe(
+    Effect.map((exit) => expectFailure<unknown>(exit)),
+  );
+
+const publicShare = (fileType: string) =>
+  provideSdk(
+    sharing.getPublicShare(),
+    () =>
+      jsonResponse({
+        public_share: {
+          created_at: "2026-03-17T00:00:00Z",
+          expiration_date: "2026-03-18T00:00:00Z",
+          id: 3,
+          owner: { name: "sdk" },
+          push_token: "push-token",
+          token: "public-token",
+          user_file: { file_type: fileType, id: 7, name: "Shared" },
+        },
+        status: "OK",
+      }),
+    { accessToken: "token-123" },
+  );
+
+const listTrashWithSize = (trashSize: string) =>
+  provideSdk(
+    trash.listTrash(),
+    () =>
+      new Response(`{"cursor":null,"files":[],"status":"OK","total":0,"trash_size":${trashSize}}`, {
+        headers: { "content-type": "application/json" },
+      }),
+    { accessToken: "token-123" },
+  );
+
 describe("operational domain boundaries", () => {
   const okRoutes: ReadonlyArray<
     readonly [string, string, Effect.Effect<unknown, unknown, PutioSdkContext>]
@@ -1565,14 +1602,6 @@ describe("operational domain boundaries", () => {
 
   it.effect("names continue failures after the continue operation", () =>
     Effect.gen(function* () {
-      const badCursor = () =>
-        jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 });
-
-      const badCursorFailure = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
-        Effect.exit(provideSdk(effect, badCursor, { accessToken: "token-123" })).pipe(
-          Effect.map((exit) => expectFailure<unknown>(exit)),
-        );
-
       const failures = {
         transfers: yield* badCursorFailure(transfers.continueTransfers("cursor-1")),
         trash: yield* badCursorFailure(trash.continueTrash("cursor-1")),
@@ -1702,25 +1731,6 @@ describe("operational domain boundaries", () => {
 
   it.effect("rejects a public share whose file type is outside the file types", () =>
     Effect.gen(function* () {
-      const publicShare = (fileType: string) =>
-        provideSdk(
-          sharing.getPublicShare(),
-          () =>
-            jsonResponse({
-              public_share: {
-                created_at: "2026-03-17T00:00:00Z",
-                expiration_date: "2026-03-18T00:00:00Z",
-                id: 3,
-                owner: { name: "sdk" },
-                push_token: "push-token",
-                token: "public-token",
-                user_file: { file_type: fileType, id: 7, name: "Shared" },
-              },
-              status: "OK",
-            }),
-          { accessToken: "token-123" },
-        );
-
       expect((yield* publicShare("FOLDER")).user_file.file_type).toBe("FOLDER");
       expect(expectFailure(yield* Effect.exit(publicShare("folder")))).toBeInstanceOf(
         PutioContractError,
@@ -1730,17 +1740,6 @@ describe("operational domain boundaries", () => {
 
   it.effect("rejects sizes that are not finite", () =>
     Effect.gen(function* () {
-      const listTrashWithSize = (trashSize: string) =>
-        provideSdk(
-          trash.listTrash(),
-          () =>
-            new Response(
-              `{"cursor":null,"files":[],"status":"OK","total":0,"trash_size":${trashSize}}`,
-              { headers: { "content-type": "application/json" } },
-            ),
-          { accessToken: "token-123" },
-        );
-
       expect((yield* listTrashWithSize("1e15")).trash_size).toBe(1e15);
       expect(expectFailure(yield* Effect.exit(listTrashWithSize("1e999")))).toBeInstanceOf(
         PutioContractError,

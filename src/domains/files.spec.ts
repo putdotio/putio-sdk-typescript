@@ -41,6 +41,20 @@ const baseFile = {
   updated_at: "2026-03-17T00:00:00Z",
 };
 
+const badCursorFailure = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
+  Effect.exit(
+    provideSdk(
+      effect,
+      () => jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 }),
+      { accessToken: "token-123" },
+    ),
+  ).pipe(Effect.map((exit) => expectFailure<unknown>(exit)));
+
+const get = (query: files.FileQuery | undefined) => files.getFile({ id: 1, query });
+
+const getChild = (query: files.FileQuery | undefined) =>
+  files.getFileChild({ name: "a", parentId: 0, query });
+
 describe("files domain", () => {
   it.effect("preserves a null codec name in subtitle media info", () =>
     Effect.gen(function* () {
@@ -937,15 +951,6 @@ describe("files domain", () => {
 
   it.effect("names continue failures after the continue operation", () =>
     Effect.gen(function* () {
-      const badCursorFailure = <A, E>(effect: Effect.Effect<A, E, PutioSdkContext>) =>
-        Effect.exit(
-          provideSdk(
-            effect,
-            () => jsonResponse({ error_message: "Bad cursor", status_code: 400 }, { status: 400 }),
-            { accessToken: "token-123" },
-          ),
-        ).pipe(Effect.map((exit) => expectFailure<unknown>(exit)));
-
       const failures = {
         continue: yield* badCursorFailure(files.continueFiles("cursor-2")),
         continueSearch: yield* badCursorFailure(files.continueSearch("cursor-2")),
@@ -1737,11 +1742,6 @@ describe("files domain", () => {
   );
 
   it("keeps the broad file type for an optional or widened file query", () => {
-    const get = (query: files.FileQuery | undefined) => files.getFile({ id: 1, query });
-
-    const getChild = (query: files.FileQuery | undefined) =>
-      files.getFileChild({ name: "a", parentId: 0, query });
-
     expectTypeOf<Effect.Success<ReturnType<typeof get>>>().toEqualTypeOf<files.FileBroad>();
     expectTypeOf<Effect.Success<ReturnType<typeof getChild>>>().toEqualTypeOf<files.FileBroad>();
     expectTypeOf<Effect.Error<ReturnType<typeof get>>>().toEqualTypeOf<files.GetFileError>();

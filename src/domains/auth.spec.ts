@@ -41,6 +41,27 @@ import {
 const renderErrorForSecretCheck = (error: Error): string =>
   `${String(error)}\n${error.stack ?? ""}\n${JSON.stringify(error)}`;
 
+const sentValue = (productAnalyticsEnabled?: boolean) =>
+  Effect.gen(function* () {
+    let value: string | null = null;
+    yield* provideSdk(
+      register({
+        client_id: 42,
+        mail: "sdk@put.io",
+        password: "secret",
+        product_analytics_enabled: productAnalyticsEnabled,
+        username: "sdk",
+      }),
+      (request) => {
+        value = getFormBody(request).get("product_analytics_enabled");
+
+        return jsonResponse({ access_token: "registered", status: "OK" });
+      },
+    );
+
+    return value;
+  });
+
 describe("auth domain", () => {
   it("builds the hosted login URL", () => {
     expect(
@@ -429,27 +450,6 @@ describe("auth domain", () => {
 
   it.effect("sends the registration analytics choice as the literal strings the API accepts", () =>
     Effect.gen(function* () {
-      const sentValue = (productAnalyticsEnabled?: boolean) =>
-        Effect.gen(function* () {
-          let value: string | null = null;
-          yield* provideSdk(
-            register({
-              client_id: 42,
-              mail: "sdk@put.io",
-              password: "secret",
-              product_analytics_enabled: productAnalyticsEnabled,
-              username: "sdk",
-            }),
-            (request) => {
-              value = getFormBody(request).get("product_analytics_enabled");
-
-              return jsonResponse({ access_token: "registered", status: "OK" });
-            },
-          );
-
-          return value;
-        });
-
       expect(yield* sentValue(true)).toBe("true");
       expect(yield* sentValue(false)).toBe("false");
       expect(yield* sentValue(undefined)).toBeNull();

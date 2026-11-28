@@ -42,6 +42,7 @@ export default defineConfig({
         files: ["src/core/client.ts"],
         rules: {
           "typescript/no-misused-promises": "off",
+          "typescript/no-unsafe-type-assertion": "off",
         },
       },
       {
@@ -75,7 +76,6 @@ export default defineConfig({
       "effecttsgo/schema-number": "error",
       "effecttsgo/unsafe-effect-type-assertion": "error",
       "typescript/no-empty-object-type": "off",
-      "typescript/no-unsafe-type-assertion": "off",
     },
   },
   pack: {

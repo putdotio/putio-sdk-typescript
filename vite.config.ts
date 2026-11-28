@@ -32,6 +32,12 @@ export default defineConfig({
         },
       },
       {
+        files: ["scripts/**"],
+        rules: {
+          "no-console": "off",
+        },
+      },
+      {
         files: ["src/core/client.ts"],
         rules: {
           "typescript/no-misused-promises": "off",
@@ -52,7 +58,6 @@ export default defineConfig({
       "effecttsgo/schema-number": "error",
       "effecttsgo/unsafe-effect-type-assertion": "error",
       "import/no-namespace": "off",
-      "no-console": "off",
       "react-hooks/rules-of-hooks": "off",
       "typescript/no-empty-object-type": "off",
       "typescript/no-unsafe-assignment": "off",

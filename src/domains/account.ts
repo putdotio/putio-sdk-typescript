@@ -6,18 +6,10 @@ import {
   failMissingField,
   NonEmptyStringSchema,
 } from "../core/validation.js";
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-  type PutioSdkError,
-} from "../core/errors.js";
-import {
-  OkResponseSchema,
-  requestJson,
-  selectJsonField,
-  type PutioSdkContext,
-} from "../core/http.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure, PutioSdkError } from "../core/errors.js";
+import { OkResponseSchema, requestJson, selectJsonField } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 const RequestedFlag = Schema.Literal(1);
 

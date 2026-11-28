@@ -7,28 +7,23 @@ import {
   decodeAndRun,
   requireRequestedBreadcrumbs,
 } from "../core/validation.js";
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-} from "../core/errors.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
 import {
   FileBroadSchema,
   FileSortSchema,
   FileTypeSchema,
   FilesListEnvelopeSchema,
-  type FileListResponse,
-  type FileListResponseFor,
-  type FilesBulkSelection,
 } from "./files.js";
+import type { FileListResponse, FileListResponseFor, FilesBulkSelection } from "./files.js";
 import {
   OkResponseSchema,
   encodePathSegment,
   requestJson,
   selectJsonField,
   selectJsonFields,
-  type PutioSdkContext,
 } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 export const SharingCloneStatusSchema = Schema.Literals(["NEW", "PROCESSING", "DONE", "ERROR"]);
 

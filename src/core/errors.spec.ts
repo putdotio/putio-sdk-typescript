@@ -13,7 +13,6 @@ import {
   PutioTransportError,
   PutioOperationError,
   PutioValidationError,
-  type PutioSdkError,
   definePutioOperationErrorSpec,
   fallbackPutioErrorEnvelope,
   isPutioApiError,
@@ -30,6 +29,7 @@ import {
   responseRateLimitHeaders,
   withOperationErrors,
 } from "./errors.js";
+import type { PutioSdkError } from "./errors.js";
 
 describe("sdk core errors", () => {
   afterEach(() => {

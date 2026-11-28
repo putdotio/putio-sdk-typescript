@@ -7,13 +7,8 @@ import {
   decodeAndRun,
   failMissingField,
 } from "../core/validation.js";
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-  type PutioSdkError,
-  type PutioContractError,
-} from "../core/errors.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure, PutioSdkError, PutioContractError } from "../core/errors.js";
 import {
   OkResponseSchema,
   encodePathSegment,
@@ -21,8 +16,8 @@ import {
   requestJson,
   selectJsonField,
   selectJsonFields,
-  type PutioSdkContext,
 } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 const TransferIdSchema = PositiveIntegerSchema;
 const TransferIdsSchema = Schema.Array(TransferIdSchema).check(Schema.isMinLength(1));

@@ -1,17 +1,9 @@
 import { Effect, Schema } from "effect";
 import { joinCsv } from "../core/forms.js";
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-} from "../core/errors.js";
-import {
-  OkResponseSchema,
-  encodePathSegment,
-  requestJson,
-  selectJsonField,
-  type PutioSdkContext,
-} from "../core/http.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
+import { OkResponseSchema, encodePathSegment, requestJson, selectJsonField } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 import {
   NonNegativeNumberSchema,
   NonEmptyStringSchema,

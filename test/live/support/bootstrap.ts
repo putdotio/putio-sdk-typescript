@@ -2,13 +2,13 @@ import { createHmac } from "node:crypto";
 
 import { Schema } from "effect";
 
-import { createPutioSdkPromiseClient, type PutioSdkPromiseClient } from "../../../dist/index.js";
-import {
-  readFirstPartyClientCredentials,
-  readSecondaryCredentialFixture,
-  type PutioBootstrapSecrets,
-  type PutioClientCredentials,
-  type PutioCredentialFixture,
+import { createPutioSdkPromiseClient } from "../../../dist/index.js";
+import type { PutioSdkPromiseClient } from "../../../dist/index.js";
+import { readFirstPartyClientCredentials, readSecondaryCredentialFixture } from "./secrets.ts";
+import type {
+  PutioBootstrapSecrets,
+  PutioClientCredentials,
+  PutioCredentialFixture,
 } from "./secrets.ts";
 
 type TokenValidation = Awaited<ReturnType<PutioSdkPromiseClient["auth"]["validateToken"]>>;

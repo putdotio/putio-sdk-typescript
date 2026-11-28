@@ -1,17 +1,9 @@
 import { Effect, Predicate, Schema, SchemaIssue, SchemaParser } from "effect";
 import { decodeAndRun } from "../core/validation.js";
-import {
-  mapValidationError,
-  type PutioSdkError,
-  type PutioValidationError,
-} from "../core/errors.js";
-import {
-  OkResponseSchema,
-  encodePathSegment,
-  requestJson,
-  selectJsonField,
-  type PutioSdkContext,
-} from "../core/http.js";
+import { mapValidationError } from "../core/errors.js";
+import type { PutioSdkError, PutioValidationError } from "../core/errors.js";
+import { OkResponseSchema, encodePathSegment, requestJson, selectJsonField } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 export type PutioJsonPrimitive = string | number | boolean | null;
 

@@ -1,4 +1,5 @@
-import { createServer, type Server } from "node:http";
+import { createServer } from "node:http";
+import type { Server } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 

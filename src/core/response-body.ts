@@ -1,9 +1,5 @@
-import {
-  fallbackPutioErrorEnvelope,
-  mapContractError,
-  type PutioSdkError,
-  toPutioResponseError,
-} from "./errors.js";
+import { fallbackPutioErrorEnvelope, mapContractError, toPutioResponseError } from "./errors.js";
+import type { PutioSdkError } from "./errors.js";
 
 export const isSuccessStatus = (status: number) => status >= 200 && status < 300;
 

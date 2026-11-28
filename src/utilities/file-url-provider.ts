@@ -2,10 +2,12 @@ import { Predicate, Result, Schema } from "effect";
 
 import { mapValidationError } from "../core/errors.js";
 import { joinCsv } from "../core/forms.js";
-import { buildPutioUrl, encodePathSegment, type PutioQuery } from "../core/http.js";
+import { buildPutioUrl, encodePathSegment } from "../core/http.js";
+import type { PutioQuery } from "../core/http.js";
 import type { FileBroad } from "../domains/files.js";
 import { NonEmptyStringSchema } from "../core/validation.js";
-import { getFileRenderType, type FileRenderTypeInput } from "./file-render-type.js";
+import { getFileRenderType } from "./file-render-type.js";
+import type { FileRenderTypeInput } from "./file-render-type.js";
 
 export type FileUrlProviderInput = Pick<
   FileBroad,

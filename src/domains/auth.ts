@@ -4,9 +4,8 @@ import {
   PutioApiError,
   definePutioOperationErrorSpec,
   withOperationErrors,
-  type PutioOperationFailure,
-  type PutioSdkError,
 } from "../core/errors.js";
+import type { PutioOperationFailure, PutioSdkError } from "../core/errors.js";
 import {
   OkResponseSchema,
   buildPutioUrl,
@@ -14,8 +13,8 @@ import {
   requestJson,
   selectJsonField,
   selectJsonFields,
-  type PutioSdkContext,
 } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 import {
   decodeAndRunRedacted,
   NonEmptyStringSchema,

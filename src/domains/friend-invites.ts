@@ -1,11 +1,9 @@
 import { Effect, Schema } from "effect";
 
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-} from "../core/errors.js";
-import { requestJson, selectJsonFields, type PutioSdkContext } from "../core/http.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
+import { requestJson, selectJsonFields } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 import { NonNegativeNumberSchema } from "../core/validation.js";
 
 export const FriendInviteJoinedUserStatusSchema = Schema.Literals([

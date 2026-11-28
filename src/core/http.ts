@@ -12,10 +12,10 @@ import {
   mapValidationError,
   parseErrorBody,
   PutioConfigurationError,
-  type PutioSdkError,
   PutioValidationError,
   toPutioResponseError,
 } from "./errors.js";
+import type { PutioSdkError } from "./errors.js";
 import { isSuccessStatus, unparsableJsonBodyError } from "./response-body.js";
 import { revealAccessToken, revealSecret } from "./secrets.js";
 

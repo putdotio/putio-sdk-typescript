@@ -36,7 +36,6 @@ export default defineConfig({
       "effecttsgo/schema-class-missing-brand": "error",
       "effecttsgo/schema-number": "error",
       "effecttsgo/unsafe-effect-type-assertion": "error",
-      "import/consistent-type-specifier-style": "off",
       "import/no-namespace": "off",
       "no-console": "off",
       "no-promise-executor-return": "off",

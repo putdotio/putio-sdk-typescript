@@ -7,15 +7,10 @@ import {
   encodePathSegment,
   requestJson,
   selectJsonField,
-  type PutioSdkContext,
-  type PutioQueryValue,
 } from "../core/http.js";
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-  type PutioSdkError,
-} from "../core/errors.js";
+import type { PutioSdkContext, PutioQueryValue } from "../core/http.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure, PutioSdkError } from "../core/errors.js";
 
 export const OAuthAppSchema = Schema.Struct({
   description: Schema.String,

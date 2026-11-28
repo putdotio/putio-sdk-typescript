@@ -9,8 +9,8 @@ import {
   createPutioSdkPromiseClient,
   makePutioSdkEffectClientLayer,
   makePutioSdkLiveClientLayer,
-  type PutioSdkService,
 } from "./client.js";
+import type { PutioSdkService } from "./client.js";
 import type {
   FileBreadcrumb,
   FileBroad,

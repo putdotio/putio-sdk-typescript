@@ -1,4 +1,5 @@
-import { Effect, type Schema } from "effect";
+import { Effect } from "effect";
+import type { Schema } from "effect";
 import { PutioOperationError, PutioContractError, PutioValidationError } from "../core/errors.js";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 

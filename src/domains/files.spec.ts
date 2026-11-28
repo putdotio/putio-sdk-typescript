@@ -5,7 +5,8 @@ import {
   PutioOperationError,
   PutioValidationError,
 } from "../core/errors.js";
-import { normalizePutioSdkOptions, PutioSdkConfig, type PutioSdkContext } from "../core/http.js";
+import { normalizePutioSdkOptions, PutioSdkConfig } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 
 import * as files from "./files.js";

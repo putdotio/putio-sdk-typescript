@@ -2,8 +2,9 @@ import { Effect, Schema } from "effect";
 import { decodeAndRun } from "../core/validation.js";
 
 import { joinCsv } from "../core/forms.js";
-import { type PutioSdkError } from "../core/errors.js";
-import { requestJson, selectJsonFields, type PutioSdkContext } from "../core/http.js";
+import type { PutioSdkError } from "../core/errors.js";
+import { requestJson, selectJsonFields } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 export const PodcastLinkTypeSchema = Schema.Literals(["all", "audio", "video", "mp4"]);
 

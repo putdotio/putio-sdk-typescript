@@ -18,7 +18,6 @@ import {
   normalizePutioSdkOptions,
   putioSdkLayer,
   putioSdkLiveLayer,
-  type PutioHttpClientService,
   PutioSdkConfig,
   requestArrayBuffer,
   requestText,
@@ -26,9 +25,8 @@ import {
   requestVoid,
   selectJsonField,
   selectJsonFields,
-  type PutioAuth,
-  type PutioSdkContext,
 } from "./http.js";
+import type { PutioHttpClientService, PutioAuth, PutioSdkContext } from "./http.js";
 
 describe("sdk core http", () => {
   it("applies default sdk configuration values", () => {

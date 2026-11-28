@@ -7,13 +7,11 @@ import {
   PositiveIntegerSchema,
   decodeAndRun,
 } from "../core/validation.js";
-import {
-  definePutioOperationErrorSpec,
-  withOperationErrors,
-  type PutioOperationFailure,
-} from "../core/errors.js";
+import { definePutioOperationErrorSpec, withOperationErrors } from "../core/errors.js";
+import type { PutioOperationFailure } from "../core/errors.js";
 import { FileTypeSchema } from "./files.js";
-import { OkResponseSchema, requestJson, type PutioSdkContext } from "../core/http.js";
+import { OkResponseSchema, requestJson } from "../core/http.js";
+import type { PutioSdkContext } from "../core/http.js";
 
 export const TrashFileSchema = Schema.Struct({
   content_type: Schema.NullOr(Schema.String),

@@ -19,3 +19,5 @@ peerDependencyRules:
 minimumReleaseAgeExclude:
   - "@effect/tsgo"
   - "@effect/tsgo-*"
+  - "@uinaf/oxlint-config"
+  - "@uinaf/oxlint-plugin-no-comments"

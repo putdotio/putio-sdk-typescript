@@ -1031,7 +1031,7 @@ const hasMediaInfo = (
   readonly media_info: FileMediaInfo | null;
 } => "media_info" in value;
 
-const useTunnelToQuery = (useTunnel?: boolean) =>
+const tunnelQuery = (useTunnel?: boolean) =>
   useTunnel === false
     ? {
         notunnel: 1,
@@ -1105,7 +1105,7 @@ export const buildFileApiDownloadUrl = (
       ? `/v2/files/${encodePathSegment(fileId)}/download/${encodePathSegment(options.name)}`
       : `/v2/files/${encodePathSegment(fileId)}/download`,
     {
-      ...useTunnelToQuery(options.useTunnel),
+      ...tunnelQuery(options.useTunnel),
       oauth_token: options.downloadToken,
     },
   );
@@ -1116,7 +1116,7 @@ export const buildFileApiContentUrl = (
   options: FileDirectAccessOptions,
 ): string =>
   buildPutioUrl(baseUrl, `/v2/files/${encodePathSegment(fileId)}/stream`, {
-    ...useTunnelToQuery(options.useTunnel),
+    ...tunnelQuery(options.useTunnel),
     oauth_token: options.downloadToken,
   });
 
@@ -1131,7 +1131,7 @@ export const buildFileApiMp4DownloadUrl = (
       ? `/v2/files/${encodePathSegment(fileId)}/mp4/download/${encodePathSegment(options.name)}`
       : `/v2/files/${encodePathSegment(fileId)}/mp4/download`,
     {
-      ...useTunnelToQuery(options.useTunnel),
+      ...tunnelQuery(options.useTunnel),
       convert: options.convert ? 1 : undefined,
       oauth_token: options.downloadToken,
     },

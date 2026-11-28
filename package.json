@@ -67,7 +67,7 @@
     "@effect/tsgo": "0.74.1",
     "@effect/vitest": "4.1.7",
     "@types/node": "^26.1.0",
-    "@uinaf/oxlint-config": "1.0.3",
+    "@uinaf/oxlint-config": "1.0.4",
     "@vitest/coverage-v8": "catalog:",
     "fast-check": "^4.10.2",
     "knip": "^6.44.2",

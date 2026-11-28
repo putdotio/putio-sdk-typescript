@@ -216,7 +216,9 @@ describe("sdk core http", () => {
         const signals: Array<AbortSignal> = [];
 
         const client = makePutioFetchClient(async (_input, init) => {
-          if (init?.signal) signals.push(init.signal);
+          if (init?.signal) {
+            signals.push(init.signal);
+          }
 
           return Response.json({ status: "OK" });
         });
@@ -491,7 +493,9 @@ describe("sdk core http", () => {
         });
         expect(JSON.stringify(error)).not.toContain("private response");
 
-        if (status === 429) expect(error).toMatchObject({ retryAfter: "60", id: "test-limit" });
+        if (status === 429) {
+          expect(error).toMatchObject({ retryAfter: "60", id: "test-limit" });
+        }
       }
     }),
   );

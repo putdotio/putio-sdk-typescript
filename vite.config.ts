@@ -30,7 +30,6 @@ export default defineConfig({
     ],
     rules: {
       "@nkzw/no-instanceof": "off",
-      curly: "off",
       "effecttsgo/any-unknown-in-error-context": "error",
       "effecttsgo/lazy-effect": "off",
       "effecttsgo/schema-class-missing-brand": "error",

@@ -44,7 +44,6 @@ export default defineConfig({
       "import/no-namespace": "off",
       "no-console": "off",
       "no-promise-executor-return": "off",
-      "preserve-caught-error": "off",
       "react-hooks/rules-of-hooks": "off",
       "typescript/no-empty-object-type": "off",
       "typescript/no-misused-promises": "off",

@@ -155,6 +155,7 @@ export const bootstrapFirstPartyToken = async (
       throw new AggregateError(
         [error, cleanupError],
         "First-party token bootstrap failed and its session could not be revoked",
+        { cause: cleanupError },
       );
     }
 

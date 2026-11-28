@@ -215,8 +215,8 @@ importers:
         specifier: ^26.1.0
         version: 26.6.11
       '@uinaf/oxlint-config':
-        specifier: 1.0.1
-        version: 1.0.1(oxlint@1.94.0(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1))
+        specifier: 1.0.3
+        version: 1.0.3(oxlint@1.94.0(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1))
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.1.1(@vitest/browser@5.1.1)(vitest@5.1.1)
@@ -1106,8 +1106,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@uinaf/oxlint-config@1.0.1':
-    resolution: {integrity: sha512-1p41DSKyR+DqlsnShp4rz+c6F8ZBXkA0n1MsXGye/AMvzOFIXQxmUlVqQf/ZLNpurWU+t8A7XKunW1akBUHAHQ==}
+  '@uinaf/oxlint-config@1.0.3':
+    resolution: {integrity: sha512-qxAX17mde3A/VnBXhRU6N4mgd8Q/tgru85ZEeda3lm1fqDApXaZWj8VnFglhen93cRgSnLs+eMCe0s08OaMvdQ==}
     engines: {node: ^22.18.0 || >=24.0.0}
     peerDependencies:
       oxlint: '>=1.94.0'
@@ -1118,8 +1118,8 @@ packages:
       vite-plus:
         optional: true
 
-  '@uinaf/oxlint-plugin-no-comments@1.1.1':
-    resolution: {integrity: sha512-/rurT1L+Zi3IXFBkjyLOyWVwJATAnlOCvR8eMw3LoNz0mhkbcXeq78Ii9GHuF7t7TTaZgEnsxkN6vaIr9f13LQ==}
+  '@uinaf/oxlint-plugin-no-comments@1.1.2':
+    resolution: {integrity: sha512-WjcARqtYKxo2YrwzWKOLKwQzIpmg5dIYmMa/6Px87qG4XiBWWDRVfX+vnkwNuMPhU0U0x/C5eoV69RRjp4T+fw==}
     engines: {node: '>=20.19.0'}
 
   '@vitest/browser-preview@5.1.1':
@@ -2516,10 +2516,10 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  '@uinaf/oxlint-config@1.0.1(oxlint@1.94.0(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1))':
+  '@uinaf/oxlint-config@1.0.3(oxlint@1.94.0(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1))':
     dependencies:
       '@cloudflare/oxlint-config': 0.2.0(oxlint@1.94.0(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1)))(tsrs@7.1.0-beta.tsrs4)(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1))
-      '@uinaf/oxlint-plugin-no-comments': 1.1.1
+      '@uinaf/oxlint-plugin-no-comments': 1.1.2
     optionalDependencies:
       oxlint: 1.94.0(vite-plus@1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1))
       vite-plus: 1.8.0(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(@vitest/ui@5.1.1)(jiti@2.7.0)(playwright@1.65.1)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1)
@@ -2528,7 +2528,7 @@ snapshots:
       - eslint-plugin-perfectionist
       - tsrs
 
-  '@uinaf/oxlint-plugin-no-comments@1.1.1': {}
+  '@uinaf/oxlint-plugin-no-comments@1.1.2': {}
 
   '@vitest/browser-preview@5.1.1(@voidzero-dev/vite-plus-core@8.3.8001(@arethetypeswrong/core@0.18.5)(@types/node@26.6.11)(jiti@2.7.0)(publint@0.3.25)(typescript@7.0.2)(yaml@2.9.1))(vitest@5.1.1)':
     dependencies:

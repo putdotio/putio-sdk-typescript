@@ -44,6 +44,17 @@ export default defineConfig({
         },
       },
       {
+        files: [
+          "src/core/client.spec.ts",
+          "src/core/client.ts",
+          "src/core/http.spec.ts",
+          "test/support/sdk-test.ts",
+        ],
+        rules: {
+          "@nkzw/no-instanceof": "off",
+        },
+      },
+      {
         files: ["src/core/client.ts", "src/domains/ops.spec.ts"],
         rules: {
           "effecttsgo/any-unknown-in-error-context": "off",
@@ -51,7 +62,6 @@ export default defineConfig({
       },
     ],
     rules: {
-      "@nkzw/no-instanceof": "off",
       "effecttsgo/any-unknown-in-error-context": "error",
       "effecttsgo/lazy-effect": "off",
       "effecttsgo/schema-class-missing-brand": "error",
